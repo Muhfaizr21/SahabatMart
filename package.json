@@ -1,0 +1,10 @@
+{
+  "name": "sahabatmart",
+  "version": "1.0.0",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && go run main.go",
+    "install:frontend": "cd frontend && npm install",
+    "setup": "npm run install:frontend && cd backend && go mod tidy"
+  }
+}
