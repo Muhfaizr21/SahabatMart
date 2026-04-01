@@ -1,11 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,300,400&display=swap');
 @import "tailwindcss";
+
+@theme {
+  /* Mapping warna-warna yang banyak terpakai sebelumnya ke palet baru */
+  --color-blue-50: #ffffff;
+  --color-blue-100: #f2f0ea; /* Cream dari palet */
+  --color-blue-200: #edcf5d; 
+  --color-blue-500: #010101; 
+  --color-blue-600: #010101; /* Hitam dari palet */
+  --color-blue-700: #1a1a1a;
+  --color-blue-800: #111111;
+  --color-blue-900: #000000;
+  
+  --color-gray-50: #f2f0ea; /* Cream sebagai background pengganti abu-abu muda */
+  --color-gray-100: #e0ded8;
+  --color-gray-400: #a4a4a4; /* Abu-abu palet */
+  --color-gray-500: #a4a4a4; /* Abu-abu palet */
+  --color-gray-600: #666666; 
+  --color-gray-900: #010101; /* Teks utama */
+  
+  --color-yellow-400: #edcf5d; /* Kuning Palet */
+  --color-yellow-500: #edcf5d; 
+}
 
 * { box-sizing: border-box; }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Satoshi', system-ui, sans-serif;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  background-color: #ffffff;
 }

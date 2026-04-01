@@ -14,6 +14,8 @@ const navLinks = [
   { label: 'Beranda', href: '/' },
   { label: 'Toko', href: '/shop' },
   { label: 'Blog', href: '/blog' },
+  { label: 'Kupon', href: '/coupons' },
+  { label: 'Tentang', href: '/about' },
   { label: 'Kontak', href: '/contact' },
 ];
 
@@ -25,21 +27,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* Top Bar */}
-      <div className="bg-gray-900 text-gray-300 text-xs py-2 hidden md:block">
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.0 1.18 2 2 0 012.18 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.92 6.92l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
-            <span>FREE Express Shipping On Orders Rp500.000+</span>
-          </div>
-          <div className="flex items-center gap-5">
-            <span className="flex items-center gap-1 cursor-pointer hover:text-white">IDR <ChevronDown /></span>
-            <span className="flex items-center gap-1 cursor-pointer hover:text-white">Bahasa <ChevronDown /></span>
-            <span className="cursor-pointer hover:text-white">Setting</span>
-          </div>
-        </div>
-      </div>
-
       {/* Main Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-6">
@@ -70,20 +57,20 @@ export default function Navbar() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-4">
-              <Link to="/login" className="hidden lg:flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
+              <Link to="/profile" className="hidden lg:flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
                 <UserIcon />
                 <div className="text-xs">
-                  <div className="text-gray-400">Halo,</div>
-                  <div className="font-semibold text-gray-800">Masuk</div>
+                   <div className="text-gray-400">Halo,</div>
+                   <div className="font-semibold text-gray-800">Masuk</div>
                 </div>
               </Link>
-              <button className="hidden lg:flex text-gray-600 hover:text-blue-600 transition-colors">
+              <Link to="/compare" className="hidden lg:flex text-gray-600 hover:text-blue-600 transition-colors">
                 <CompareIcon />
-              </button>
-              <button className="hidden lg:flex relative text-gray-600 hover:text-blue-600 transition-colors">
+              </Link>
+              <Link to="/wishlist" className="hidden lg:flex relative text-gray-600 hover:text-blue-600 transition-colors">
                 <HeartIcon />
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">4</span>
-              </button>
+              </Link>
               <Link to="/cart" className="relative text-gray-600 hover:text-blue-600 transition-colors">
                 <CartIcon />
                 <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">13</span>

@@ -50,12 +50,12 @@ function ProductCard({ product }) {
           <StarRating rating={product.rating} />
           <span className="text-xs text-gray-400">({product.reviews} Ulasan)</span>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {product.oldPrice && <span className="text-xs text-gray-400 line-through">Rp{(product.oldPrice * 16000).toLocaleString('id')}</span>}
-            <span className="font-bold text-gray-900 text-sm">Rp{(product.price * 16000).toLocaleString('id')}</span>
+        <div className="flex items-end justify-between mt-auto">
+          <div className="flex flex-col">
+            {product.oldPrice && <span className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice * 16000).toLocaleString('id')}</span>}
+            <span className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price * 16000).toLocaleString('id')}</span>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+          <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0 ml-2">
             + Beli
           </button>
         </div>
@@ -83,7 +83,7 @@ export default function ProductSection() {
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
           {products.map(p => <ProductCard key={p.id} product={p} />)}
         </div>
         <div className="text-center mt-10">

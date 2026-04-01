@@ -247,7 +247,7 @@ export default function ShopPage() {
                 <p className="text-gray-500 text-sm">Coba ubah filter atau kategori yang dipilih.</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
                 {filtered.map(product => (
                   <div key={product.id} className="group bg-white rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1">
                     <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-square">
@@ -283,12 +283,12 @@ export default function ShopPage() {
                         <StarRating rating={product.rating} />
                         <span className="text-xs text-gray-400">({product.reviews})</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          {product.oldPrice && <div className="text-xs text-gray-400 line-through">Rp{(product.oldPrice * 16000).toLocaleString('id')}</div>}
-                          <div className="font-bold text-gray-900 text-sm">Rp{(product.price * 16000).toLocaleString('id')}</div>
+                      <div className="flex items-end justify-between mt-auto">
+                        <div className="flex flex-col">
+                          {product.oldPrice && <div className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice * 16000).toLocaleString('id')}</div>}
+                          <div className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price * 16000).toLocaleString('id')}</div>
                         </div>
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                        <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 ml-2 transition-colors">
                           + Beli
                         </button>
                       </div>
