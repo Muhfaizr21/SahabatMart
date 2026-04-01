@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
 import CategorySection from './components/CategorySection';
@@ -24,6 +24,28 @@ import WishlistPage from './pages/WishlistPage';
 import ComparePage from './pages/ComparePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import CouponPage from './pages/CouponPage';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminDashboard from './pages/admin/Dashboard';
+import AdminProductList from './pages/admin/ProductList';
+import AdminAddProduct from './pages/admin/AddProduct';
+import AdminOrders from './pages/admin/Orders';
+import AdminOrderDetail from './pages/admin/OrderDetail';
+import AdminUsers from './pages/admin/Users';
+import AdminCategories from './pages/admin/Categories';
+
+// ── Penanganan Khusus Header/Footer ─────────
+function NavbarManager() {
+  const location = useLocation();
+  if (location.pathname.startsWith('/admin')) return null;
+  return <Navbar />;
+}
+
+function FooterManager() {
+  const location = useLocation();
+  if (location.pathname.startsWith('/admin')) return null;
+  return <Footer />;
+}
+
 // ── Halaman Home ─────────────────────
 function HomePage() {
   return (
@@ -60,7 +82,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-white">
-        <Navbar />
+        <NavbarManager />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ShopPage />} />
@@ -79,9 +101,23 @@ export default function App() {
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
+
+          {/* Admin Routes (Nested Routing untuk memelihara instance Sidebar) */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="products" element={<AdminProductList />} />
+            <Route path="products/add" element={<AdminAddProduct />} />
+            <Route path="categories" element={<AdminCategories />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="orders/detail" element={<AdminOrderDetail />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="reports" element={<div className="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm text-center font-bold text-gray-500 italic uppercase">Laporan Penjualan Sedang Dikembangkan...</div>} />
+            <Route path="settings" element={<div className="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm text-center font-bold text-gray-500 italic uppercase">Pengaturan Admin Sedang Dikembangkan...</div>} />
+          </Route>
+
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-        <Footer />
+        <FooterManager />
       </div>
     </BrowserRouter>
   );
