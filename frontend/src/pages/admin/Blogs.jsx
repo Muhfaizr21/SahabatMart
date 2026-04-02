@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 export default function AdminBlogs() {
   const [blogs, setBlogs] = useState([]);
@@ -9,17 +10,20 @@ export default function AdminBlogs() {
   const [showModal, setShowModal] = useState(false);
 
   const loadBlogs = () => {
-    setLoading(true);
-    fetch(API + '/blogs')
-      .then(r => r.json())
+    fetchJson(API + '/blogs')
       .then(d => setBlogs(d.data || []))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadBlogs(); }, []);
+  useEffect(() => {
+    fetchJson(API + '/blogs')
+      .then(d => setBlogs(d.data || []))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleSave = (e) => {
     e.preventDefault();
+    setLoading(true);
     fetch(API + '/blogs/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,6 +37,7 @@ export default function AdminBlogs() {
 
   const deleteBlog = (id) => {
     if (!window.confirm("Hapus artikel ini?")) return;
+    setLoading(true);
     fetch(API + `/blogs/delete?id=${id}`, { method: 'DELETE' }).then(() => loadBlogs());
   };
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 const AdminOrderDetail = () => {
@@ -10,7 +11,7 @@ const AdminOrderDetail = () => {
 
   useEffect(() => {
     // In real app, get ID from URL. Here we just fetch the latest for demo.
-    fetch(`${API}/orders`).then(r => r.json()).then(d => {
+    fetchJson(`${API}/orders`).then(d => {
       if (d.data && d.data.length > 0) setOrder(d.data[0]);
     }).finally(() => setLoading(false));
   }, []);

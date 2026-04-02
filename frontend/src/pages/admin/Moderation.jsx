@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 export default function AdminModeration() {
   const [products, setProducts] = useState([]);
@@ -8,34 +9,49 @@ export default function AdminModeration() {
   const [search, setSearch]       = useState('');
   const [loading, setLoading]     = useState(true);
   const [msg, setMsg]             = useState('');
+  const [error, setError]         = useState('');
 
   const load = () => {
-    setLoading(true);
     const params = new URLSearchParams();
     if (filterStatus) params.append('status', filterStatus);
     if (search)       params.append('search', search);
-    fetch(API + '/products?' + params)
-      .then(r => r.json())
-      .then(d => setProducts(d.data || []))
-      .catch(() => setProducts([
-        { id: 'p1', name: 'Sepatu Lari Pro X', store_name: 'Toko Berkah', price: 450000, is_active: true, created_at: '2026-04-01' },
-        { id: 'p2', name: 'Laptop Slim 14"', store_name: 'Elektronik Murah', price: 8500000, is_active: false, created_at: '2026-03-30' },
-        { id: 'p3', name: 'Jam Tangan Casual', store_name: 'Warung Jaya', price: 320000, is_active: true, created_at: '2026-03-28' },
-      ]))
+    fetchJson(API + '/products?' + params)
+      .then(d => {
+        setProducts(d.data || []);
+        setError('');
+      })
+      .catch((err) => {
+        setProducts([]);
+        setError(err.message || 'Gagal memuat data moderasi produk');
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [filterStatus]);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterStatus) params.append('status', filterStatus);
+    fetchJson(API + '/products?' + params)
+      .then(d => {
+        setProducts(d.data || []);
+        setError('');
+      })
+      .catch((err) => {
+        setProducts([]);
+        setError(err.message || 'Gagal memuat data moderasi produk');
+      })
+      .finally(() => setLoading(false));
+  }, [filterStatus]);
 
-  const handleSearch = e => { e.preventDefault(); load(); };
+  const handleSearch = e => { e.preventDefault(); setLoading(true); load(); };
 
   const moderate = (id, active) => {
+    const nextStatus = active ? 'active' : 'taken_down';
     fetch(API + '/products/moderate', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, active }),
+      body: JSON.stringify({ id, status: nextStatus, note: 'Moderated via admin moderation page' }),
     }).then(() => {
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: active } : p));
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, status: nextStatus } : p));
       setMsg(`Produk berhasil ${active ? 'diaktifkan' : 'dinonaktifkan'}`);
       setTimeout(() => setMsg(''), 2500);
     });
@@ -67,6 +83,7 @@ export default function AdminModeration() {
           <i className="bi bi-check-circle me-2"></i>{msg}
         </div>
       )}
+      {error && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
 
       <div className="card radius-10">
         <div className="card-body">
@@ -109,7 +126,7 @@ export default function AdminModeration() {
                       <td><span className="badge bg-primary bg-opacity-10 text-primary">{p.store_name || '—'}</span></td>
                       <td>{fmtRp(p.price)}</td>
                       <td>
-                        {p.is_active
+                        {p.status === 'active'
                           ? <span className="badge bg-success bg-opacity-10 text-success"><i className="bi bi-circle-fill me-1" style={{ fontSize: 8 }}></i>Aktif</span>
                           : <span className="badge bg-secondary bg-opacity-10 text-secondary"><i className="bi bi-circle me-1" style={{ fontSize: 8 }}></i>Nonaktif</span>}
                       </td>
@@ -118,7 +135,7 @@ export default function AdminModeration() {
                       </td>
                       <td>
                         <div className="d-flex gap-1">
-                          {p.is_active ? (
+                          {p.status === 'active' ? (
                             <button className="btn btn-xs btn-outline-warning" title="Nonaktifkan"
                               onClick={() => moderate(p.id, false)}>
                               <i className="bi bi-eye-slash"></i>

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 export default function BlogPage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/public/blogs')
-      .then(r => r.json())
+    fetchJson(`${PUBLIC_API_BASE}/blogs`)
       .then(d => setPosts(d.data || []))
+      .catch(() => setPosts([]))
       .finally(() => setLoading(false));
   }, []);
 

@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { sliders } from '../data/products';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 export default function HeroSlider() {
   const [current, setCurrent] = useState(0);
   const [banners, setBanners] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/public/banners')
-      .then(r => r.json())
+    fetchJson(`${PUBLIC_API_BASE}/banners`)
       .then(d => {
         if (d.data && d.data.length > 0) setBanners(d.data);
         else setBanners(sliders); // Fallback to static if empty
       })
-      .finally(() => setLoading(false));
+      .catch(() => setBanners(sliders));
   }, []);
 
   useEffect(() => {
@@ -53,18 +52,18 @@ export default function HeroSlider() {
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
 
       {/* Arrows */}
-      <button onClick={() => setCurrent(p => (p - 1 + sliders.length) % sliders.length)}
+      <button onClick={() => setCurrent(p => (p - 1 + activeSliders.length) % activeSliders.length)}
         className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full hidden lg:block">
         <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <button onClick={() => setCurrent(p => (p + 1) % sliders.length)}
+      <button onClick={() => setCurrent(p => (p + 1) % activeSliders.length)}
         className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full hidden lg:block">
         <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
 
       {/* Dots */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-        {sliders.map((_, i) => (
+        {activeSliders.map((_, i) => (
           <button key={i} onClick={() => setCurrent(i)}
             className={`h-1.5 rounded-full transition-all ${i === current ? 'w-8 bg-white' : 'w-2 bg-white/40'}`} />
         ))}

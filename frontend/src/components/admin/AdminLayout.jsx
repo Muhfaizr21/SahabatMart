@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const AdminLayout = ({ children }) => {
+const AdminLayout = () => {
   const location = useLocation();
 
   // Tutup sidebar saat pindah halaman (khusus mobile overlay)
@@ -80,8 +81,9 @@ const AdminLayout = ({ children }) => {
   const [notifications, setNotif] = React.useState([]);
   
   const loadNotif = () => {
-    fetch('http://localhost:8080/api/admin/notifications')
-      .then(r => r.json()).then(d => setNotif(d.data || []));
+    fetchJson(`${ADMIN_API_BASE}/notifications`)
+      .then(d => setNotif(d.data || []))
+      .catch(() => setNotif([]));
   };
   
   useEffect(() => { loadNotif(); }, []);
@@ -89,7 +91,7 @@ const AdminLayout = ({ children }) => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const markRead = (id) => {
-    fetch(`http://localhost:8080/api/admin/notifications/read?id=${id}`)
+    fetch(`${ADMIN_API_BASE}/notifications/read?id=${id}`)
       .then(() => loadNotif());
   };
 

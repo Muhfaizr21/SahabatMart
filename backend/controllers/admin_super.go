@@ -17,6 +17,10 @@ type AdminController struct {
 	DB *gorm.DB
 }
 
+func (ac *AdminController) hasTable(name string) bool {
+	return ac.DB != nil && ac.DB.Migrator().HasTable(name)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: log audit action
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,17 +286,25 @@ func (ac *AdminController) DeleteCategory(w http.ResponseWriter, r *http.Request
 // GET /api/admin/orders
 func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
-	
+
+	if !ac.hasTable("order_merchant_groups") || !ac.hasTable("orders") {
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"data":   []interface{}{},
+		})
+		return
+	}
+
 	type OrderRow struct {
-		ID            string    `json:"id"`
-		MerchantID    string    `json:"merchant_id"`
-		StoreName     string    `json:"store_name"`
-		BuyerName     string    `json:"buyer_name"`
-		BuyerEmail    string    `json:"buyer_email"`
-		Status        string    `json:"status"`
-		Subtotal      float64   `json:"subtotal"`
-		TotalAmount   float64   `json:"total_amount"`
-		CreatedAt     time.Time `json:"created_at"`
+		ID          string    `json:"id"`
+		MerchantID  string    `json:"merchant_id"`
+		StoreName   string    `json:"store_name"`
+		BuyerName   string    `json:"buyer_name"`
+		BuyerEmail  string    `json:"buyer_email"`
+		Status      string    `json:"status"`
+		Subtotal    float64   `json:"subtotal"`
+		TotalAmount float64   `json:"total_amount"`
+		CreatedAt   time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("order_merchant_groups omg").
@@ -318,7 +330,6 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCTS MANAGEMENT (GLOBAL)
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AFFILIATE / MEMBER MANAGEMENT
@@ -487,23 +498,27 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 	var totalRevenue, totalPlatformFee, pendingPayout, totalInsurance float64
 	var totalOrders, completedOrders int64
 
-	ac.DB.Table("order_merchant_groups").
-		Where("status = 'completed'").
-		Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalPlatformFee)
+	if ac.hasTable("order_merchant_groups") {
+		ac.DB.Table("order_merchant_groups").
+			Where("status = 'completed'").
+			Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalPlatformFee)
 
-	ac.DB.Table("order_merchant_groups").
-		Where("status = 'completed'").
-		Select("COALESCE(SUM(insurance_fee), 0)").Scan(&totalInsurance)
+		ac.DB.Table("order_merchant_groups").
+			Where("status = 'completed'").
+			Select("COALESCE(SUM(insurance_fee), 0)").Scan(&totalInsurance)
 
-	ac.DB.Table("order_merchant_groups").
-		Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
+		ac.DB.Table("order_merchant_groups").
+			Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
 
-	ac.DB.Table("order_merchant_groups").Count(&totalOrders)
-	ac.DB.Table("order_merchant_groups").Where("status = 'completed'").Count(&completedOrders)
+		ac.DB.Table("order_merchant_groups").Count(&totalOrders)
+		ac.DB.Table("order_merchant_groups").Where("status = 'completed'").Count(&completedOrders)
+	}
 
-	ac.DB.Table("payout_requests").
-		Where("status = 'pending'").
-		Select("COALESCE(SUM(amount), 0)").Scan(&pendingPayout)
+	if ac.hasTable("payout_requests") {
+		ac.DB.Table("payout_requests").
+			Where("status = 'pending'").
+			Select("COALESCE(SUM(amount), 0)").Scan(&pendingPayout)
+	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_revenue":      totalRevenue,
@@ -519,6 +534,15 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 func (ac *AdminController) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
+
+	if !ac.hasTable("order_merchant_groups") {
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"total":  0,
+			"data":   []interface{}{},
+		})
+		return
+	}
 
 	type TxRow struct {
 		ID          string  `json:"id"`
@@ -553,11 +577,19 @@ func (ac *AdminController) GetTransactions(w http.ResponseWriter, r *http.Reques
 
 // GET /api/admin/finance/monthly  → revenue per bulan (chart)
 func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Request) {
+	if !ac.hasTable("order_merchant_groups") {
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"data":   []interface{}{},
+		})
+		return
+	}
+
 	type MonthRow struct {
-		Month    string  `json:"month"`
-		Revenue  float64 `json:"revenue"`
-		Fee      float64 `json:"fee"`
-		Orders   int     `json:"orders"`
+		Month   string  `json:"month"`
+		Revenue float64 `json:"revenue"`
+		Fee     float64 `json:"fee"`
+		Orders  int     `json:"orders"`
 	}
 
 	var rows []MonthRow
@@ -1040,15 +1072,19 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 	ac.DB.Model(&models.User{}).Count(&totalUsers)
 	ac.DB.Model(&models.Merchant{}).Where("status = 'active'").Count(&totalMerchants)
 	ac.DB.Model(&models.User{}).Where("role = 'affiliate'").Count(&totalAffiliates)
-	ac.DB.Table("order_merchant_groups").Count(&totalOrders)
-	ac.DB.Table("order_merchant_groups").
-		Where("status = 'completed'").
-		Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
-	ac.DB.Table("order_merchant_groups").
-		Where("status = 'completed'").
-		Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalFee)
-	ac.DB.Table("payout_requests").
-		Where("status = 'pending'").Count(&pendingPayouts)
+	if ac.hasTable("order_merchant_groups") {
+		ac.DB.Table("order_merchant_groups").Count(&totalOrders)
+		ac.DB.Table("order_merchant_groups").
+			Where("status = 'completed'").
+			Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
+		ac.DB.Table("order_merchant_groups").
+			Where("status = 'completed'").
+			Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalFee)
+	}
+	if ac.hasTable("payout_requests") {
+		ac.DB.Table("payout_requests").
+			Where("status = 'pending'").Count(&pendingPayouts)
+	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_users":      totalUsers,
@@ -1060,6 +1096,7 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 		"pending_payouts":  pendingPayouts,
 	})
 }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOG CMS MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────

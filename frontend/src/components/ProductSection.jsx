@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { products } from '../data/products';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 const badgeColors = { hot: 'bg-red-500', trending: 'bg-blue-500', offer: 'bg-green-500', sale: 'bg-orange-500' };
 
@@ -70,12 +70,11 @@ export default function ProductSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/public/products')
-      .then(r => r.json())
+    fetchJson(`${PUBLIC_API_BASE}/products`)
       .then(d => {
         if (d && d.data) setTrending(d.data.slice(0, 10));
       })
-      .catch(e => console.error("Product sync error:", e))
+      .catch(() => setTrending([]))
       .finally(() => setLoading(false));
   }, []);
 

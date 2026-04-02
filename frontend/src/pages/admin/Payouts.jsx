@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 const StatusBadge = ({ status }) => {
@@ -22,22 +23,35 @@ export default function AdminPayouts() {
   const [note, setNote]             = useState('');
   const [processing, setProcessing] = useState(false);
   const [msg, setMsg]               = useState('');
+  const [error, setError]           = useState('');
 
   const load = () => {
-    setLoading(true);
     const params = filterStatus ? `?status=${filterStatus}` : '';
-    fetch(API + '/payouts' + params)
-      .then(r => r.json())
-      .then(d => setPayouts(d.data || []))
-      .catch(() => setPayouts([
-        { id: 'po1', merchant_id: 'm1', amount: 2500000, status: 'pending', requested_at: '2026-04-01', note: '' },
-        { id: 'po2', merchant_id: 'm2', amount: 750000,  status: 'pending', requested_at: '2026-03-30', note: '' },
-        { id: 'po3', merchant_id: 'm3', amount: 5000000, status: 'paid',    requested_at: '2026-03-25', note: 'Transfer BCA' },
-      ]))
+    fetchJson(API + '/payouts' + params)
+      .then(d => {
+        setPayouts(d.data || []);
+        setError('');
+      })
+      .catch((err) => {
+        setPayouts([]);
+        setError(err.message || 'Gagal memuat payout');
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [filterStatus]);
+  useEffect(() => {
+    const params = filterStatus ? `?status=${filterStatus}` : '';
+    fetchJson(API + '/payouts' + params)
+      .then(d => {
+        setPayouts(d.data || []);
+        setError('');
+      })
+      .catch((err) => {
+        setPayouts([]);
+        setError(err.message || 'Gagal memuat payout');
+      })
+      .finally(() => setLoading(false));
+  }, [filterStatus]);
 
   const process = (status) => {
     if (!selected) return;
@@ -95,6 +109,7 @@ export default function AdminPayouts() {
           <i className="bi bi-check-circle me-2"></i>{msg}
         </div>
       )}
+      {error && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
 
       <div className="card radius-10">
         <div className="card-body">

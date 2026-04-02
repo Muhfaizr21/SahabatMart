@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -10,16 +11,17 @@ const AdminCategories = () => {
   const [saving, setSaving] = useState(false);
 
   const loadCategories = () => {
-    setLoading(true);
-    fetch(`${API}/categories`)
-      .then(r => r.json())
+    fetchJson(`${API}/categories`)
       .then(d => setCategories(d.data || []))
       .catch(err => console.error("Error loading categories:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadCategories();
+    fetchJson(`${API}/categories`)
+      .then(d => setCategories(d.data || []))
+      .catch(err => console.error("Error loading categories:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleChange = (e) => {
@@ -36,6 +38,7 @@ const AdminCategories = () => {
     if (!formData.name || !formData.slug) return alert("Nama dan Slug wajib diisi!");
     
     setSaving(true);
+    setLoading(true);
     const payload = { 
         ...formData, 
         parent_id: formData.parent_id > 0 ? parseInt(formData.parent_id) : null 
@@ -54,6 +57,7 @@ const AdminCategories = () => {
 
   const handleDeleteCategory = (id) => {
     if (!window.confirm("Hapus kategori ini?")) return;
+    setLoading(true);
     fetch(`${API}/categories/delete?id=${id}`, {
       method: 'DELETE',
     }).then(() => {

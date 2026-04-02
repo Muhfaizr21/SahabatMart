@@ -1,38 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
+const EMPTY_FORM = { id: 0, code: '', title: '', discount_type: 'percent', discount_value: 0, min_order: 0, quota: 0, status: 'active' };
 
 const AdminVouchers = () => {
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [formData, setFormData] = useState({ code: '', name: '', discount_type: 'percent', discount_value: 0, min_order: 0, quota: 0, status: 'active' });
+    const [formData, setFormData] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
 
     const loadVouchers = () => {
-        setLoading(true);
-        fetch(`${API}/vouchers`)
-            .then(r => r.json())
+        fetchJson(`${API}/vouchers`)
             .then(d => setVouchers(d.data || []))
             .catch(err => console.error("Error loading vouchers:", err))
             .finally(() => setLoading(false));
     };
 
     useEffect(() => {
-        loadVouchers();
+        fetchJson(`${API}/vouchers`)
+            .then(d => setVouchers(d.data || []))
+            .catch(err => console.error("Error loading vouchers:", err))
+            .finally(() => setLoading(false));
     }, []);
 
     const handleSubmit = (e) => {
         e.preventDefault();
         setSaving(true);
+        setLoading(true);
         fetch(`${API}/vouchers/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData),
         }).then(r => r.json()).then(() => {
             loadVouchers();
-            setFormData({ code: '', name: '', discount_type: 'percent', discount_value: 0, min_order: 0, quota: 0, status: 'active' });
+            setFormData(EMPTY_FORM);
         }).finally(() => setSaving(false));
     };
 
@@ -66,7 +70,7 @@ const AdminVouchers = () => {
                                 <div className="col-12">
                                     <label className="form-label small fw-bold">Judul Promo</label>
                                     <input type="text" className="form-control form-control-sm" placeholder="Diskon Subsidi Harbolnas" 
-                                        value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
+                                        value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
                                 </div>
                                 <div className="col-6">
                                     <label className="form-label small fw-bold">Tipe Diskon</label>
@@ -121,7 +125,7 @@ const AdminVouchers = () => {
                                             <tr key={v.id}>
                                                 <td>
                                                     <div className="fw-bold font-monospace text-primary">{v.code}</div>
-                                                    <div className="small text-muted" style={{fontSize:10}}>{v.name}</div>
+                                                    <div className="small text-muted" style={{fontSize:10}}>{v.title}</div>
                                                 </td>
                                                 <td>
                                                     <div className="small">
@@ -136,7 +140,16 @@ const AdminVouchers = () => {
                                                     </span>
                                                 </td>
                                                 <td className="text-end">
-                                                    <button className="btn btn-xs btn-outline-warning" onClick={() => setFormData(v)}><i className="bi bi-pencil"></i></button>
+                                                    <button className="btn btn-xs btn-outline-warning" onClick={() => setFormData({
+                                                        id: v.id || 0,
+                                                        code: v.code || '',
+                                                        title: v.title || '',
+                                                        discount_type: v.discount_type || 'percent',
+                                                        discount_value: v.discount_value || 0,
+                                                        min_order: v.min_order || 0,
+                                                        quota: v.quota || 0,
+                                                        status: v.status || 'active',
+                                                    })}><i className="bi bi-pencil"></i></button>
                                                 </td>
                                             </tr>
                                         ))}

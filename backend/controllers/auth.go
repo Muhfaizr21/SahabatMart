@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/utils"
@@ -27,6 +29,9 @@ type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
+
+const maxFailedLoginAttempts = 5
+const loginLockDuration = 15 * time.Minute
 
 func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -84,10 +89,10 @@ func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 	token, _ := utils.GenerateJWT(user.ID, user.Role, user.Email)
 
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
-		"status": "success",
+		"status":  "success",
 		"message": "User registered successfully",
-		"token":  token,
-		"user":   user,
+		"token":   token,
+		"user":    user,
 	})
 }
 
@@ -104,13 +109,33 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.User
+	now := time.Now()
+	email := strings.ToLower(strings.TrimSpace(req.Email))
 	// Preload Profile agar info user_profile terbawa saat login
-	if err := ac.DB.Preload("Profile").Where("email = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&user).Error; err != nil {
+	if err := ac.DB.Preload("Profile").Where("email = ?", email).First(&user).Error; err != nil {
 		utils.JSONError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
+	if user.Status != "active" {
+		utils.JSONError(w, http.StatusForbidden, "Account is not active")
+		return
+	}
+
+	if user.LockedUntil != nil && user.LockedUntil.After(now) {
+		utils.JSONError(w, http.StatusLocked, "Account is temporarily locked due to failed login attempts")
+		return
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		updates := map[string]interface{}{
+			"failed_login_attempts": user.FailedLoginAttempts + 1,
+		}
+		if user.FailedLoginAttempts+1 >= maxFailedLoginAttempts {
+			lockedUntil := now.Add(loginLockDuration)
+			updates["locked_until"] = &lockedUntil
+		}
+		ac.DB.Model(&user).Updates(updates)
 		utils.JSONError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
@@ -121,10 +146,22 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clientIP := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		clientIP = host
+	}
+
+	ac.DB.Model(&user).Updates(map[string]interface{}{
+		"failed_login_attempts": 0,
+		"locked_until":          nil,
+		"last_login_at":         &now,
+		"last_login_ip":         clientIP,
+	})
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
+		"status":  "success",
 		"message": "Login successful",
-		"token":  token,
-		"user":   user,
+		"token":   token,
+		"user":    user,
 	})
 }

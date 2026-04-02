@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 const AdminOrders = () => {
@@ -9,17 +10,11 @@ const AdminOrders = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
 
-  const loadOrders = () => {
-    setLoading(true);
-    fetch(`${API}/orders?status=${statusFilter}`)
-      .then(r => r.json())
+  useEffect(() => {
+    fetchJson(`${API}/orders?status=${statusFilter}`)
       .then(d => setOrders(d.data || []))
       .catch(err => console.error("Error loading orders:", err))
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadOrders();
   }, [statusFilter]);
 
   return (

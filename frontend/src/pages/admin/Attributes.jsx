@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminAttributes = () => {
   const [attrs, setAttrs] = useState([]);
@@ -10,21 +11,23 @@ const AdminAttributes = () => {
   const [saving, setSaving] = useState(false);
 
   const loadAttrs = () => {
-    setLoading(true);
-    fetch(`${API}/attributes`)
-      .then(r => r.json())
+    fetchJson(`${API}/attributes`)
       .then(d => setAttrs(d.data || []))
       .catch(err => console.error("Error loading attributes:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadAttrs();
+    fetchJson(`${API}/attributes`)
+      .then(d => setAttrs(d.data || []))
+      .catch(err => console.error("Error loading attributes:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setSaving(true);
+    setLoading(true);
     fetch(`${API}/attributes/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

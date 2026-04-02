@@ -1,12 +1,21 @@
 package utils
 
 import (
+	"errors"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var JWTKey = []byte("super_secret_sahabatmart_key") // Gantilah di dalam .env nantinya!
+func jwtKey() []byte {
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if secret == "" {
+		secret = "dev-only-change-this-jwt-secret"
+	}
+	return []byte(secret)
+}
 
 type Claims struct {
 	UserID string `json:"user_id"`
@@ -27,5 +36,30 @@ func GenerateJWT(userID, role, email string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(JWTKey)
+	return token.SignedString(jwtKey())
+}
+
+func ParseJWT(authHeader string) (*Claims, error) {
+	tokenString := strings.TrimSpace(authHeader)
+	if tokenString == "" {
+		return nil, errors.New("missing token")
+	}
+
+	if strings.HasPrefix(strings.ToLower(tokenString), "bearer ") {
+		tokenString = strings.TrimSpace(tokenString[7:])
+	}
+
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey(), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+
+	return claims, nil
 }

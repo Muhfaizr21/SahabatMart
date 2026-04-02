@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 export default function AdminFinance() {
@@ -11,21 +12,21 @@ export default function AdminFinance() {
   const [loading, setLoading]     = useState(true);
   const [dateFrom, setDateFrom]   = useState('');
   const [dateTo, setDateTo]       = useState('');
+  const [error, setError]         = useState('');
+  const [txError, setTxError]     = useState('');
 
   useEffect(() => {
     Promise.all([
-      fetch(API + '/finance').then(r => r.json()),
-      fetch(API + '/finance/monthly').then(r => r.json()),
+      fetchJson(API + '/finance'),
+      fetchJson(API + '/finance/monthly'),
     ]).then(([ov, mo]) => {
       setOverview(ov);
       setMonthly(mo.data || []);
-    }).catch(() => {
-      setOverview({ total_revenue: 847500000, total_platform_fee: 42375000, pending_payout: 3200000, total_orders: 8542, completed_orders: 7214 });
-      setMonthly([
-        { month: '2026-01', revenue: 68000000, fee: 3400000, orders: 540 },
-        { month: '2026-02', revenue: 72000000, fee: 3600000, orders: 590 },
-        { month: '2026-03', revenue: 85000000, fee: 4250000, orders: 720 },
-      ]);
+      setError('');
+    }).catch((err) => {
+      setOverview(null);
+      setMonthly([]);
+      setError(err.message || 'Gagal memuat laporan keuangan');
     }).finally(() => setLoading(false));
   }, []);
 
@@ -33,16 +34,32 @@ export default function AdminFinance() {
     const params = new URLSearchParams();
     if (dateFrom) params.append('from', dateFrom);
     if (dateTo)   params.append('to', dateTo);
-    fetch(API + '/finance/transactions?' + params)
-      .then(r => r.json())
-      .then(d => setTxList(d.data || []))
-      .catch(() => setTxList([
-        { id: 'tx1', store_name: 'Toko Berkah', subtotal: 450000, platform_fee: 22500, status: 'completed', created_at: '2026-04-01' },
-        { id: 'tx2', store_name: 'Elektronik Murah', subtotal: 8500000, platform_fee: 425000, status: 'completed', created_at: '2026-04-01' },
-      ]));
+    fetchJson(API + '/finance/transactions?' + params)
+      .then(d => {
+        setTxList(d.data || []);
+        setTxError('');
+      })
+      .catch((err) => {
+        setTxList([]);
+        setTxError(err.message || 'Gagal memuat transaksi');
+      });
   };
 
-  useEffect(() => { if (tab === 'transactions') loadTx(); }, [tab]);
+  useEffect(() => {
+    if (tab !== 'transactions') return;
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('from', dateFrom);
+    if (dateTo) params.append('to', dateTo);
+    fetchJson(API + '/finance/transactions?' + params)
+      .then(d => {
+        setTxList(d.data || []);
+        setTxError('');
+      })
+      .catch((err) => {
+        setTxList([]);
+        setTxError(err.message || 'Gagal memuat transaksi');
+      });
+  }, [tab, dateFrom, dateTo]);
 
   const maxRevenue = Math.max(...monthly.map(m => m.revenue), 1);
 
@@ -50,10 +67,12 @@ export default function AdminFinance() {
     <>
       <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
         <div className="breadcrumb-title pe-3">Super Admin</div>
-        <div className="ps-3"><nav><ol className="breadcrumb mb-0 p-0">
+      <div className="ps-3"><nav><ol className="breadcrumb mb-0 p-0">
           <li className="breadcrumb-item active">Laporan Keuangan</li>
         </ol></nav></div>
       </div>
+
+      {error && <div className="alert alert-danger mb-3">{error}</div>}
 
       {/* KPI */}
       <div className="row g-3 mb-4">
@@ -146,7 +165,7 @@ export default function AdminFinance() {
           </div>
         </div>
       ) : (
-        <div className="card radius-10">
+          <div className="card radius-10">
           <div className="card-body">
             <div className="d-flex flex-wrap gap-2 mb-3 align-items-end">
               <div>
@@ -159,6 +178,7 @@ export default function AdminFinance() {
               </div>
               <button className="btn btn-sm btn-primary" onClick={loadTx}>Filter</button>
             </div>
+            {txError && <div className="alert alert-danger">{txError}</div>}
             <div className="table-responsive">
               <table className="table align-middle mb-0">
                 <thead className="table-light">

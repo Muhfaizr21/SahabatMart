@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AUTH_API_BASE, fetchJson } from '../lib/api';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export default function RegisterPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/register', {
+      const data = await fetchJson(`${AUTH_API_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -32,11 +33,6 @@ export default function RegisterPage() {
           password: formData.password
         })
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Gagal mendaftar');
-      }
 
       // Berhasil
       localStorage.setItem('token', data.token);

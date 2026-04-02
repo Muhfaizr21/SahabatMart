@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 
+const ORDER_REFERENCE = '#SM-240001';
+
 export default function OrderSuccessPage() {
   return (
     <main className="min-h-[80vh] flex items-center justify-center px-6 py-12 bg-gray-50">
@@ -22,7 +24,7 @@ export default function OrderSuccessPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2 relative z-10">Pesanan Berhasil!</h1>
         <p className="text-gray-500 mb-8 relative z-10">
           Terima kasih telah berbelanja di SahabatMart. Pesanan kamu dengan nomor 
-          <span className="font-bold text-gray-800"> #SM-{(Math.random() * 1000000).toFixed(0).padStart(6, '0')} </span> 
+          <span className="font-bold text-gray-800"> {ORDER_REFERENCE} </span> 
           sedang kami proses.
         </p>
 

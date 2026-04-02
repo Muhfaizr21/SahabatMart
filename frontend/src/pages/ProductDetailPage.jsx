@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 function StarRating({ rating, size = 16 }) {
   return (
@@ -23,36 +24,54 @@ const reviewsData = [
 
 export default function ProductDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [related, setRelated] = useState([]);
 
   useEffect(() => {
-    setLoading(true);
-    fetch(`http://localhost:8080/api/public/product?id=${id}`)
-      .then(r => r.json())
-      .then(d => {
+    let cancelled = false;
+
+    const loadProduct = async () => {
+      try {
+        const d = await fetchJson(`${PUBLIC_API_BASE}/product?id=${id}`);
         if (d && d.data) {
-            setProduct(d.data);
-            // Fetch related products from same category
-            fetch(`http://localhost:8080/api/public/products`)
-                .then(res => res.json())
-                .then(pd => {
-                    const filtered = (pd.data || []).filter(p => p.id !== d.data.id && p.category === d.data.category).slice(0, 4);
-                    setRelated(filtered);
-                });
+          if (cancelled) return;
+          setProduct(d.data);
+
+          const pd = await fetchJson(`${PUBLIC_API_BASE}/products`);
+          if (cancelled) return;
+
+          const filtered = (pd.data || []).filter(p => p.id !== d.data.id && p.category === d.data.category).slice(0, 4);
+          setRelated(filtered);
+          return;
         }
-        else setProduct(null);
-      })
-      .catch(e => console.error(e))
-      .finally(() => setLoading(false));
+
+        if (!cancelled) {
+          setProduct(null);
+          setRelated([]);
+        }
+      } catch {
+        if (!cancelled) {
+          setProduct(null);
+          setRelated([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadProduct();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState('Deskripsi');
-  const [activeImg, setActiveImg] = useState(0);
-  const [liked, setLiked] = useState(false);
+  const activeImg = 0;
   const [addedToCart, setAddedToCart] = useState(false);
 
   if (loading) {

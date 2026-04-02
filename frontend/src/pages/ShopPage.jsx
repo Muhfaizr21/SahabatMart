@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { products, categories } from '../data/products';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 const badgeColors = { hot: 'bg-red-500', trending: 'bg-blue-500', offer: 'bg-green-500', sale: 'bg-orange-500' };
 
@@ -25,10 +25,6 @@ const priceRanges = [
   { label: 'Di atas Rp3.000.000', min: 3000000, max: Infinity },
 ];
 
-const API_PUB = 'http://localhost:8080/api/public';
-
-
-
 export default function ShopPage() {
   const [searchParams] = useSearchParams();
   const catParam = searchParams.get('cat');
@@ -42,20 +38,18 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     Promise.all([
-      fetch(`${API_PUB}/products`).then(r => r.json()),
-      fetch(`${API_PUB}/categories`).then(r => r.json()),
+      fetchJson(`${PUBLIC_API_BASE}/products`),
+      fetchJson(`${PUBLIC_API_BASE}/categories`),
     ]).then(([p, c]) => {
       setAllProducts(p.data || []);
       const cats = ['Semua', ...(c.data || []).map(cat => cat.name)];
       setAllCategories(cats);
+    }).catch(() => {
+      setAllProducts([]);
+      setAllCategories(['Semua']);
     }).finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (catParam) setActiveCategory(catParam);
-  }, [catParam]);
 
   let filtered = allProducts.filter(p => {
     if (activeCategory !== 'Semua' && p.category !== activeCategory) return false;

@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 export default function CategorySection() {
   const [cats, setCats] = useState([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    fetch('http://localhost:8080/api/public/categories')
-    .then(r => r.json())
+    fetchJson(`${PUBLIC_API_BASE}/categories`)
     .then(d => {
       if (d && d.data) setCats(d.data.slice(0, 5));
     })
-    .catch(e => console.error("Cat sync error:", e))
+    .catch(() => setCats([]))
     .finally(() => setLoading(false));
   }, []);
 

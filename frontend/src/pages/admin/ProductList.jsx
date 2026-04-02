@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 const AdminProductList = () => {
@@ -11,31 +12,35 @@ const AdminProductList = () => {
   const [search, setSearch] = useState('');
 
   const loadProducts = () => {
-    setLoading(true);
-    fetch(`${API}/products?status=${statusFilter}&search=${search}`)
-      .then(r => r.json())
+    fetchJson(`${API}/products?status=${statusFilter}&search=${search}`)
       .then(d => setProducts(d.data || []))
       .catch(err => console.error("Error loading products:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadProducts();
+    fetchJson(`${API}/products?status=${statusFilter}`)
+      .then(d => setProducts(d.data || []))
+      .catch(err => console.error("Error loading products:", err))
+      .finally(() => setLoading(false));
   }, [statusFilter]);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setLoading(true);
     loadProducts();
   };
 
   const deleteProduct = (id) => {
     if (!window.confirm("Hapus produk ini?")) return;
+    setLoading(true);
     fetch(`${API}/products/delete?id=${id}`, { method: 'DELETE' })
       .then(() => loadProducts());
   };
 
   const toggleStatus = (id, currentStatus) => {
     const nextStatus = currentStatus === 'active' ? 'taken_down' : 'active';
+    setLoading(true);
     fetch(`${API}/products/moderate`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

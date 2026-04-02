@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 export default function CouponPage() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/public/vouchers')
-      .then(r => r.json())
+    fetchJson(`${PUBLIC_API_BASE}/vouchers`)
       .then(d => {
         if (d && d.data) setCoupons(d.data);
       })
-      .catch(e => console.error("Voucher sync error:", e))
+      .catch(() => setCoupons([]))
       .finally(() => setLoading(false));
   }, []);
 

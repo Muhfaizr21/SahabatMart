@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const StatCard = ({ icon, label, value, color, sub }) => (
   <div style={{
@@ -36,22 +37,23 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     Promise.all([
       fetch(API + '/overview').then(r => r.json()),
       fetch(API + '/finance/monthly').then(r => r.json()),
     ]).then(([ov, mo]) => {
+      if (ov.status === 'error' || mo.status === 'error') {
+        throw new Error(ov.message || mo.message || 'Gagal memuat dashboard admin');
+      }
       setOverview(ov);
       setMonthly(mo.data || []);
-    }).catch(() => {
-      // fallback mock
-      setOverview({
-        total_users: 3482, total_merchants: 127, total_affiliates: 245,
-        total_revenue: 847500000, total_fee: 42375000,
-        total_orders: 8542, pending_payouts: 14
-      });
+      setError('');
+    }).catch((err) => {
+      setOverview(null);
       setMonthly([]);
+      setError(err.message || 'Gagal memuat dashboard admin');
     }).finally(() => setLoading(false));
   }, []);
 
@@ -60,6 +62,14 @@ export default function AdminDashboard() {
       <div className="spinner-border text-primary" role="status"></div>
     </div>
   );
+
+  if (error) {
+    return (
+      <div className="alert alert-danger" role="alert">
+        {error}
+      </div>
+    );
+  }
 
   const stats = [
     { icon: 'bi-people-fill', label: 'Total Pengguna', value: (overview?.total_users || 0).toLocaleString(), color: '#4361ee' },

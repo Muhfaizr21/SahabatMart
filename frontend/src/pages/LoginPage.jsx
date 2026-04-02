@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { AUTH_API_BASE, fetchJson } from '../lib/api';
 
 export default function LoginPage() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -17,16 +17,11 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/login', {
+      const data = await fetchJson(`${AUTH_API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Login gagal, periksa email & password Anda.');
-      }
 
       // Berhasil login
       localStorage.setItem('token', data.token);

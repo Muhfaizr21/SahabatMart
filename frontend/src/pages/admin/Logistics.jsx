@@ -1,26 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminLogistics = () => {
     const [channels, setChannels] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const loadLogistics = () => {
-        setLoading(true);
-        fetch(`${API}/logistics`)
-            .then(r => r.json())
+        fetchJson(`${API}/logistics`)
             .then(d => setChannels(d.data || []))
             .catch(err => console.error("Error loading logistics:", err))
             .finally(() => setLoading(false));
     };
 
     useEffect(() => {
-        loadLogistics();
+        fetchJson(`${API}/logistics`)
+            .then(d => setChannels(d.data || []))
+            .catch(err => console.error("Error loading logistics:", err))
+            .finally(() => setLoading(false));
     }, []);
 
     const toggleChannelStatus = (id, active) => {
+        setLoading(true);
         fetch(`${API}/logistics/toggle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

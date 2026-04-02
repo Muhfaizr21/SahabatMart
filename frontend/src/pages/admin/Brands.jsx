@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminBrands = () => {
   const [brands, setBrands] = useState([]);
@@ -10,21 +11,23 @@ const AdminBrands = () => {
   const [saving, setSaving] = useState(false);
 
   const loadBrands = () => {
-    setLoading(true);
-    fetch(`${API}/brands`)
-      .then(r => r.json())
+    fetchJson(`${API}/brands`)
       .then(d => setBrands(d.data || []))
       .catch(err => console.error("Error loading brands:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadBrands();
+    fetchJson(`${API}/brands`)
+      .then(d => setBrands(d.data || []))
+      .catch(err => console.error("Error loading brands:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setSaving(true);
+    setLoading(true);
     fetch(`${API}/brands/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,6 +120,7 @@ const AdminBrands = () => {
                                             <button className="btn btn-xs btn-outline-warning me-2" onClick={() => setFormData(b)}>Edit</button>
                                             <button className="btn btn-xs btn-outline-danger" onClick={() => {
                                                 if(window.confirm("Hapus brand?")) {
+                                                    setLoading(true);
                                                     fetch(`${API}/brands/delete?id=${b.id}`, { method: 'DELETE' }).then(() => loadBrands());
                                                 }
                                             }}>Hapus</button>

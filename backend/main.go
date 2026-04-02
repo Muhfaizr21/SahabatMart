@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"SahabatMart/backend/controllers"
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/utils"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -16,7 +20,7 @@ import (
 var DB *gorm.DB
 
 func ConnectDB() {
-	dsn := "host=localhost user=muhfaiizr password=admin dbname=sahabatmart port=5432 sslmode=disable TimeZone=Asia/Jakarta"
+	dsn := buildDSN()
 	var err error
 
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -26,9 +30,14 @@ func ConnectDB() {
 
 	// Automigrate
 	err = DB.AutoMigrate(
-		&models.User{}, &models.UserProfile{}, &models.Merchant{}, &models.Product{},
-		&models.Category{}, &models.BlogPost{}, &models.Banner{},
-		&models.Voucher{}, &models.Region{}, &models.LogisticChannel{},
+		&models.User{}, &models.UserProfile{},
+		&models.PlatformConfig{}, &models.CategoryCommission{}, &models.MerchantCommission{},
+		&models.AuditLog{}, &models.PayoutRequest{},
+		&models.Merchant{}, &models.AffiliateConfig{},
+		&models.Category{}, &models.Brand{}, &models.Attribute{},
+		&models.Voucher{}, &models.Dispute{}, &models.LogisticChannel{},
+		&models.AffiliateClick{}, &models.Region{}, &models.AdminNotification{},
+		&models.BlogPost{}, &models.Product{}, &models.Banner{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Gagal melakukan AutoMigrate: %v", err)
@@ -40,21 +49,69 @@ func ConnectDB() {
 	log.Println("✅ Berhasil menyambung ke PostgreSQL! (Database: sahabatmart)")
 }
 
+func getEnv(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func buildDSN() string {
+	if databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL")); databaseURL != "" {
+		return databaseURL
+	}
+
+	host := getEnv("DB_HOST", "localhost")
+	user := getEnv("DB_USER", os.Getenv("USER"))
+	password := os.Getenv("DB_PASSWORD")
+	name := getEnv("DB_NAME", "sahabatmart")
+	port := getEnv("DB_PORT", "5432")
+	sslMode := getEnv("DB_SSLMODE", "disable")
+	timezone := getEnv("DB_TIMEZONE", "Asia/Jakarta")
+
+	return fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
+		host, user, password, name, port, sslMode, timezone,
+	)
+}
+
 func SeedDatabase(db *gorm.DB) {
 	log.Println("🌱 Memulai proses seeding data dummy SahabatMart...")
 
+	adminPasswordHash, err := bcrypt.GenerateFromPassword([]byte("Admin@12345"), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatalf("❌ Gagal membuat password hash admin seed: %v", err)
+	}
+
 	var admin models.User
-	db.Where("email = ?", "admin@sahabatmart.id").First(&admin)
+	db.Where("email IN ?", []string{"admin@platform.com", "admin@sahabatmart.id"}).First(&admin)
 	if admin.ID == "" {
 		admin = models.User{
-			Email:        "admin@sahabatmart.id",
-			PasswordHash: "$2a$10$r.O0Hh.vO6v6v6v6v6v6v6v6v6v6v6v6v6v6v6v6v6v6v6v6v6",
+			Email:        "admin@platform.com",
+			PasswordHash: string(adminPasswordHash),
 			Role:         "superadmin",
 			Status:       "active",
 		}
 		if err := db.Create(&admin).Error; err == nil {
 			profile := models.UserProfile{UserID: admin.ID, FullName: "Admin SahabatMart Lux"}
 			db.Create(&profile)
+		}
+	} else {
+		db.Model(&admin).Updates(map[string]interface{}{
+			"email":                 "admin@platform.com",
+			"password_hash":         string(adminPasswordHash),
+			"role":                  "superadmin",
+			"status":                "active",
+			"failed_login_attempts": 0,
+			"locked_until":          nil,
+		})
+
+		var profile models.UserProfile
+		if err := db.Where("user_id = ?", admin.ID).First(&profile).Error; err == nil {
+			db.Model(&profile).Update("full_name", "Super Administrator")
+		} else {
+			db.Create(&models.UserProfile{UserID: admin.ID, FullName: "Super Administrator"})
 		}
 	}
 
@@ -125,6 +182,28 @@ func enableCORS(next http.Handler) http.Handler {
 	})
 }
 
+func adminOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, err := utils.ParseJWT(r.Header.Get("Authorization"))
+		if err != nil {
+			utils.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		role := strings.ToLower(strings.TrimSpace(claims.Role))
+		if role != "admin" && role != "superadmin" {
+			utils.JSONError(w, http.StatusForbidden, "Forbidden")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+func handleAdmin(mux *http.ServeMux, path string, handler http.HandlerFunc) {
+	mux.HandleFunc(path, adminOnly(handler))
+}
+
 func main() {
 	ConnectDB()
 	authController := controllers.AuthController{DB: DB}
@@ -139,19 +218,60 @@ func main() {
 	mux.HandleFunc("/api/auth/register", authController.Register)
 	mux.HandleFunc("/api/auth/login", authController.Login)
 
-	// Admin API (Simplified list for main.go readability)
-	mux.HandleFunc("/api/admin/overview", adminController.GetOverview)
-	mux.HandleFunc("/api/admin/users", adminController.GetUsers)
-	mux.HandleFunc("/api/admin/merchants", adminController.GetMerchants)
-	mux.HandleFunc("/api/admin/products", adminController.GetProducts)
-	mux.HandleFunc("/api/admin/products/add", adminController.AddProduct)
-	mux.HandleFunc("/api/admin/products/moderate", adminController.ModerateProduct)
-	mux.HandleFunc("/api/admin/products/delete", adminController.DeleteProduct)
-	mux.HandleFunc("/api/admin/categories", adminController.GetCategories)
-	mux.HandleFunc("/api/admin/finance", adminController.GetFinance)
-	mux.HandleFunc("/api/admin/vouchers", adminController.GetVouchers)
-	mux.HandleFunc("/api/admin/blogs", adminController.GetBlogs)
-	mux.HandleFunc("/api/admin/banners", adminController.ManageBanners)
+	// Admin API
+	handleAdmin(mux, "/api/admin/overview", adminController.GetOverview)
+	handleAdmin(mux, "/api/admin/users", adminController.GetUsers)
+	handleAdmin(mux, "/api/admin/users/stats", adminController.GetUserStats)
+	handleAdmin(mux, "/api/admin/users/update", adminController.UpdateUser)
+	handleAdmin(mux, "/api/admin/users/delete", adminController.DeleteUser)
+	handleAdmin(mux, "/api/admin/merchants", adminController.GetMerchants)
+	handleAdmin(mux, "/api/admin/merchants/stats", adminController.GetMerchantStats)
+	handleAdmin(mux, "/api/admin/merchants/status", adminController.UpdateMerchantStatus)
+	handleAdmin(mux, "/api/admin/merchants/verify", adminController.VerifyMerchant)
+	handleAdmin(mux, "/api/admin/orders", adminController.GetAllOrders)
+	handleAdmin(mux, "/api/admin/affiliates", adminController.GetAffiliates)
+	handleAdmin(mux, "/api/admin/affiliates/configs", adminController.GetAffiliateConfigs)
+	handleAdmin(mux, "/api/admin/affiliates/config", adminController.UpsertAffiliateConfig)
+	handleAdmin(mux, "/api/admin/products", adminController.GetProducts)
+	handleAdmin(mux, "/api/admin/products/add", adminController.AddProduct)
+	handleAdmin(mux, "/api/admin/products/moderate", adminController.ModerateProduct)
+	handleAdmin(mux, "/api/admin/products/delete", adminController.DeleteProduct)
+	handleAdmin(mux, "/api/admin/categories", adminController.GetCategories)
+	handleAdmin(mux, "/api/admin/categories/add", adminController.AddCategory)
+	handleAdmin(mux, "/api/admin/categories/delete", adminController.DeleteCategory)
+	handleAdmin(mux, "/api/admin/finance", adminController.GetFinance)
+	handleAdmin(mux, "/api/admin/finance/monthly", adminController.GetMonthlyRevenue)
+	handleAdmin(mux, "/api/admin/finance/transactions", adminController.GetTransactions)
+	handleAdmin(mux, "/api/admin/commissions/category", adminController.ManageCommissions)
+	handleAdmin(mux, "/api/admin/commissions/merchant", adminController.ManageMerchantCommissions)
+	handleAdmin(mux, "/api/admin/commissions/bulk", adminController.BulkUpdateCommissions)
+	handleAdmin(mux, "/api/admin/payouts", adminController.GetPayouts)
+	handleAdmin(mux, "/api/admin/payouts/process", adminController.ProcessPayout)
+	handleAdmin(mux, "/api/admin/brands", adminController.GetBrands)
+	handleAdmin(mux, "/api/admin/brands/save", adminController.UpsertBrand)
+	handleAdmin(mux, "/api/admin/brands/delete", adminController.DeleteBrand)
+	handleAdmin(mux, "/api/admin/attributes", adminController.GetAttributes)
+	handleAdmin(mux, "/api/admin/attributes/save", adminController.UpsertAttribute)
+	handleAdmin(mux, "/api/admin/logistics", adminController.GetLogistics)
+	handleAdmin(mux, "/api/admin/logistics/toggle", adminController.ToggleLogistic)
+	handleAdmin(mux, "/api/admin/disputes", adminController.GetDisputes)
+	handleAdmin(mux, "/api/admin/disputes/arbitrate", adminController.ArbitrateDispute)
+	handleAdmin(mux, "/api/admin/vouchers", adminController.GetVouchers)
+	handleAdmin(mux, "/api/admin/vouchers/save", adminController.UpsertVoucher)
+	handleAdmin(mux, "/api/admin/affiliate-clicks", adminController.GetAffiliateClicks)
+	handleAdmin(mux, "/api/admin/regions", adminController.GetRegions)
+	handleAdmin(mux, "/api/admin/regions/save", adminController.UpsertRegion)
+	handleAdmin(mux, "/api/admin/notifications", adminController.GetNotifications)
+	handleAdmin(mux, "/api/admin/notifications/read", adminController.MarkNotificationRead)
+	handleAdmin(mux, "/api/admin/settings", adminController.GetSettings)
+	handleAdmin(mux, "/api/admin/settings/save", adminController.UpsertSettings)
+	handleAdmin(mux, "/api/admin/settings/payout", adminController.PayoutSettings)
+	handleAdmin(mux, "/api/admin/audit-logs", adminController.GetAuditLogs)
+	handleAdmin(mux, "/api/admin/blogs", adminController.GetBlogs)
+	handleAdmin(mux, "/api/admin/blogs/save", adminController.UpsertBlog)
+	handleAdmin(mux, "/api/admin/blogs/delete", adminController.DeleteBlog)
+	handleAdmin(mux, "/api/admin/banners", adminController.ManageBanners)
+	handleAdmin(mux, "/api/admin/banners/delete", adminController.DeleteBanner)
 
 	// Public API
 	mux.HandleFunc("/api/public/products", adminController.GetPublicProducts)

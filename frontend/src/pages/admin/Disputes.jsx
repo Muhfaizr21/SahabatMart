@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminDisputes = () => {
   const [disputes, setDisputes] = useState([]);
@@ -10,20 +11,22 @@ const AdminDisputes = () => {
   const [decision, setDecision] = useState({ status: 'refund_approved', note: '' });
 
   const loadDisputes = () => {
-    setLoading(true);
-    fetch(`${API}/disputes`)
-      .then(r => r.json())
+    fetchJson(`${API}/disputes`)
       .then(d => setDisputes(d.data || []))
       .catch(err => console.error("Error loading disputes:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadDisputes();
+    fetchJson(`${API}/disputes`)
+      .then(d => setDisputes(d.data || []))
+      .catch(err => console.error("Error loading disputes:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleArbitrate = () => {
     if (!selectedDispute) return;
+    setLoading(true);
     fetch(`${API}/disputes/arbitrate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

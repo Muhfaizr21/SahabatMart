@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const actionColors = {
   update_user:              '#4361ee',
@@ -29,6 +30,7 @@ export default function AdminAuditLog() {
   const [action, setAction]   = useState('');
   const [targetType, setTarget] = useState('');
   const [adminId, setAdminId] = useState('');
+  const [error, setError]     = useState('');
 
   const load = () => {
     setLoading(true);
@@ -39,19 +41,30 @@ export default function AdminAuditLog() {
     if (targetType) params.append('target_type', targetType);
     if (adminId)    params.append('admin_id', adminId);
 
-    fetch(API + '/audit-logs?' + params)
-      .then(r => r.json())
-      .then(d => setLogs(d.data || []))
-      .catch(() => setLogs([
-        { id: 1, admin_id: 'admin', action: 'update_user', target_type: 'user', target_id: 'u001', detail: 'status=suspended', ip_address: '127.0.0.1', created_at: '2026-04-01T10:00:00Z' },
-        { id: 2, admin_id: 'admin', action: 'verify_merchant', target_type: 'merchant', target_id: 'm001', detail: 'verified=true', ip_address: '127.0.0.1', created_at: '2026-04-01T09:30:00Z' },
-        { id: 3, admin_id: 'admin', action: 'process_payout', target_type: 'payout', target_id: 'po001', detail: 'status=paid', ip_address: '127.0.0.1', created_at: '2026-04-01T09:00:00Z' },
-        { id: 4, admin_id: 'admin', action: 'upsert_settings', target_type: 'platform_config', target_id: '', detail: 'updated 4 keys', ip_address: '127.0.0.1', created_at: '2026-04-01T08:45:00Z' },
-      ]))
+    fetchJson(API + '/audit-logs?' + params)
+      .then(d => {
+        setLogs(d.data || []);
+        setError('');
+      })
+      .catch((err) => {
+        setLogs([]);
+        setError(err.message || 'Gagal memuat audit log');
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    fetchJson(API + '/audit-logs')
+      .then(d => {
+        setLogs(d.data || []);
+        setError('');
+      })
+      .catch((err) => {
+        setLogs([]);
+        setError(err.message || 'Gagal memuat audit log');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const allActions = [...new Set([
     ...Object.keys(actionColors),
@@ -121,6 +134,8 @@ export default function AdminAuditLog() {
 
           {loading ? (
             <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>
+          ) : error ? (
+            <div className="alert alert-danger mb-0">{error}</div>
           ) : (
             <div className="table-responsive">
               <table className="table align-middle mb-0 table-sm">

@@ -1,37 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminRegions = () => {
     const [provinces, setProvinces] = useState([]);
     const [cities, setCities] = useState([]);
     const [districts, setDistricts] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [selectedProv, setSelectedProv] = useState(0);
     const [selectedCity, setSelectedCity] = useState(0);
 
-    const loadProvinces = () => {
-        setLoading(true);
-        fetch(`${API}/regions?parent_id=0`)
-            .then(r => r.json())
-            .then(d => setProvinces(d.data || []))
-            .finally(() => setLoading(false));
-    };
-
     const loadCities = (provId) => {
-        fetch(`${API}/regions?parent_id=${provId}`)
-            .then(r => r.json())
+        fetchJson(`${API}/regions?parent_id=${provId}`)
             .then(d => setCities(d.data || []));
     };
 
     const loadDistricts = (cityId) => {
-        fetch(`${API}/regions?parent_id=${cityId}`)
-            .then(r => r.json())
+        fetchJson(`${API}/regions?parent_id=${cityId}`)
             .then(d => setDistricts(d.data || []));
     };
 
-    useEffect(() => { loadProvinces(); }, []);
+    useEffect(() => {
+        fetchJson(`${API}/regions?parent_id=0`)
+            .then(d => setProvinces(d.data || []));
+    }, []);
 
     const handleProvChange = (e) => {
         const id = e.target.value;

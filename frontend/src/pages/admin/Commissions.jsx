@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 export default function AdminCommissions() {
   const [catComms, setCatComms]   = useState([]);
@@ -11,21 +12,20 @@ export default function AdminCommissions() {
   const [editMrc, setEditMrc]     = useState(null);
   const [saving, setSaving]       = useState(false);
   const [msg, setMsg]             = useState('');
+  const [error, setError]         = useState('');
 
   useEffect(() => {
     Promise.all([
-      fetch(API + '/commissions/category').then(r => r.json()),
-      fetch(API + '/commissions/merchant').then(r => r.json()),
+      fetchJson(API + '/commissions/category'),
+      fetchJson(API + '/commissions/merchant'),
     ]).then(([cat, mrc]) => {
       setCatComms(cat.data || []);
       setMrcComms(mrc.data || []);
-    }).catch(() => {
-      setCatComms([
-        { id: 1, category_id: 1, fee_percent: 0.05, fixed_fee: 0, is_active: true },
-        { id: 2, category_id: 2, fee_percent: 0.08, fixed_fee: 500, is_active: true },
-        { id: 3, category_id: 3, fee_percent: 0.03, fixed_fee: 0, is_active: false },
-      ]);
+      setError('');
+    }).catch((err) => {
+      setCatComms([]);
       setMrcComms([]);
+      setError(err.message || 'Gagal memuat konfigurasi komisi');
     }).finally(() => setLoading(false));
   }, []);
 
@@ -33,11 +33,11 @@ export default function AdminCommissions() {
     if (!editCat) return;
     setSaving(true);
     const method = editCat.id === 0 ? 'POST' : 'PUT';
-    fetch(API + '/commissions/category', {
+    fetchJson(API + '/commissions/category', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editCat),
-    }).then(r => r.json()).then(res => {
+    }).then(res => {
       if (res.data) {
         setCatComms(prev => {
           const idx = prev.findIndex(c => c.id === res.data.id);
@@ -48,7 +48,11 @@ export default function AdminCommissions() {
       setMsg('Komisi kategori berhasil disimpan');
       setTimeout(() => setMsg(''), 2500);
       setEditCat(null);
-    }).catch(() => { setEditCat(null); })
+      setError('');
+    }).catch((err) => {
+      setError(err.message || 'Gagal menyimpan komisi kategori');
+      setEditCat(null);
+    })
       .finally(() => setSaving(false));
   };
 
@@ -56,11 +60,11 @@ export default function AdminCommissions() {
     if (!editMrc) return;
     setSaving(true);
     const method = editMrc.id ? 'PUT' : 'POST';
-    fetch(API + '/commissions/merchant', {
+    fetchJson(API + '/commissions/merchant', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editMrc),
-    }).then(r => r.json()).then(res => {
+    }).then(res => {
       if (res.data) {
         setMrcComms(prev => {
           const idx = prev.findIndex(c => c.id === res.data.id);
@@ -71,7 +75,11 @@ export default function AdminCommissions() {
       setMsg('Komisi merchant berhasil disimpan');
       setTimeout(() => setMsg(''), 2500);
       setEditMrc(null);
-    }).catch(() => setEditMrc(null))
+      setError('');
+    }).catch((err) => {
+      setError(err.message || 'Gagal menyimpan override merchant');
+      setEditMrc(null);
+    })
       .finally(() => setSaving(false));
   };
 
@@ -85,6 +93,7 @@ export default function AdminCommissions() {
       </div>
 
       {msg && <div className="alert alert-success py-2 mb-3"><i className="bi bi-check-circle me-2"></i>{msg}</div>}
+      {error && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
 
       <ul className="nav nav-tabs mb-4">
         <li className="nav-item">

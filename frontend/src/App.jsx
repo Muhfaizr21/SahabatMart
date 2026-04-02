@@ -6,6 +6,7 @@ import FeatureBar from './components/FeatureBar';
 import ProductSection from './components/ProductSection';
 import PromoBanner from './components/PromoBanner';
 import Footer from './components/Footer';
+import { getStoredUser, isAdminUser } from './lib/auth';
 
 // ── Protected Route Wrapper ─────────
 function ProtectedRoute({ children }) {
@@ -13,6 +14,21 @@ function ProtectedRoute({ children }) {
   if (!token) {
     return <Navigate to="/login" replace />;
   }
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const token = localStorage.getItem('token');
+  const user = getStoredUser();
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAdminUser(user)) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 }
 
@@ -128,7 +144,7 @@ export default function App() {
           <Route path="/coupons" element={<CouponPage />} />
 
           {/* Admin Routes (Nested Routing) */}
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             {/* Products */}
             <Route path="products" element={<AdminProductList />} />

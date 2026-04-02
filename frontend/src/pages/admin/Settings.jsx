@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const DEFAULT_CONFIGS = [
   // Platform
@@ -41,28 +42,36 @@ export default function AdminSettings() {
   const [saving, setSaving]     = useState(false);
   const [msg, setMsg]           = useState('');
   const [activeGroup, setGroup] = useState('platform');
+  const [error, setError]       = useState('');
 
   useEffect(() => {
-    fetch(API + '/settings')
-      .then(r => r.json())
+    fetchJson(API + '/settings')
       .then(d => {
         const saved = d.data || [];
+        const defaultByKey = Object.fromEntries(DEFAULT_CONFIGS.map(cfg => [cfg.key, cfg]));
         // Merge defaults dengan yang sudah ada di DB
         const merged = DEFAULT_CONFIGS.map(def => {
           const found = saved.find(s => s.key === def.key);
-          return found || def;
+          return found ? { ...def, ...found, group: def.group } : def;
+        });
+        saved.forEach(cfg => {
+          if (!defaultByKey[cfg.key]) {
+            merged.push({ ...cfg, group: cfg.group || 'platform' });
+          }
         });
         setConfigs(merged);
         // Populate editing state
         const ed = {};
         merged.forEach(c => { ed[c.key] = c.value; });
         setEditing(ed);
+        setError('');
       })
-      .catch(() => {
+      .catch((err) => {
         setConfigs(DEFAULT_CONFIGS);
         const ed = {};
         DEFAULT_CONFIGS.forEach(c => { ed[c.key] = c.value; });
         setEditing(ed);
+        setError(err.message || 'Gagal memuat pengaturan dari server');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -78,16 +87,17 @@ export default function AdminSettings() {
       return { key, value: editing[key], description: found?.description || '' };
     });
 
-    fetch(API + '/settings/save', {
+    fetchJson(API + '/settings/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).then(() => {
       setMsg('Pengaturan berhasil disimpan!');
       setTimeout(() => setMsg(''), 3000);
-    }).catch(() => {
-      setMsg('Gagal menyimpan, coba lagi.');
-      setTimeout(() => setMsg(''), 3000);
+      setError('');
+    }).catch((err) => {
+      setMsg('');
+      setError(err.message || 'Gagal menyimpan, coba lagi.');
     }).finally(() => setSaving(false));
   };
 
@@ -145,6 +155,7 @@ export default function AdminSettings() {
           <i className={`bi ${msg.includes('Gagal') ? 'bi-exclamation-circle' : 'bi-check-circle'} me-2`}></i>{msg}
         </div>
       )}
+      {error && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
 
       <div className="row g-4">
         {/* Group Nav */}

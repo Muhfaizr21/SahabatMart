@@ -1,6 +1,8 @@
-export default function Footer() {
-  const Cart = () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>;
+function CartIcon() {
+  return <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>;
+}
 
+export default function Footer() {
   return (
     <footer className="bg-gray-900 text-gray-400 pt-16 pb-8 mt-8">
       <div className="max-w-7xl mx-auto px-6">
@@ -8,7 +10,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white"><Cart /></div>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white"><CartIcon /></div>
               <span className="text-xl font-bold text-white">SahabatMart</span>
             </div>
             <p className="text-sm leading-relaxed mb-6 max-w-xs">

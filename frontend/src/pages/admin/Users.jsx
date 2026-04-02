@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -12,15 +13,14 @@ const AdminUsers = () => {
   const [search, setSearch] = useState('');
 
   const loadUsers = () => {
-    setLoading(true);
     const params = new URLSearchParams();
     if (filterRole) params.append('role', filterRole);
     if (filterStatus) params.append('status', filterStatus);
     if (search) params.append('search', search);
 
     Promise.all([
-      fetch(`${API}/users?${params}`).then(r => r.json()),
-      fetch(`${API}/users/stats`).then(r => r.json())
+      fetchJson(`${API}/users?${params}`),
+      fetchJson(`${API}/users/stats`)
     ]).then(([list, s]) => {
       setUsers(list.data || []);
       setStats(s);
@@ -30,11 +30,24 @@ const AdminUsers = () => {
   };
 
   useEffect(() => {
-    loadUsers();
+    const params = new URLSearchParams();
+    if (filterRole) params.append('role', filterRole);
+    if (filterStatus) params.append('status', filterStatus);
+
+    Promise.all([
+      fetchJson(`${API}/users?${params}`),
+      fetchJson(`${API}/users/stats`)
+    ]).then(([list, s]) => {
+      setUsers(list.data || []);
+      setStats(s);
+    }).catch(err => {
+      console.error("Failed to load users:", err);
+    }).finally(() => setLoading(false));
   }, [filterRole, filterStatus]);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    setLoading(true);
     loadUsers();
   };
 

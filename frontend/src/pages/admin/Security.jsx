@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const AdminSecurity = () => {
     const [clicks, setClicks] = useState([]);
@@ -9,9 +10,7 @@ const AdminSecurity = () => {
     const [stats, setStats] = useState({ total: 0, fraud: 0, bots: 0 });
 
     const loadClicks = () => {
-        setLoading(true);
-        fetch(`${API}/affiliate-clicks`)
-            .then(r => r.json())
+        fetchJson(`${API}/affiliate-clicks`)
             .then(d => {
                 const list = d.data || [];
                 setClicks(list);
@@ -26,7 +25,18 @@ const AdminSecurity = () => {
     };
 
     useEffect(() => {
-        loadClicks();
+        fetchJson(`${API}/affiliate-clicks`)
+            .then(d => {
+                const list = d.data || [];
+                setClicks(list);
+                setStats({
+                    total: list.length,
+                    fraud: list.filter(c => c.is_fraud).length,
+                    bots: list.filter(c => c.is_bot).length
+                });
+            })
+            .catch(err => console.error("Error loading affiliate audit:", err))
+            .finally(() => setLoading(false));
     }, []);
 
     return (

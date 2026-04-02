@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 
 const Badge = ({ status }) => {
   const map = {
@@ -21,33 +22,46 @@ export default function AdminMerchants() {
   const [loading, setLoading]      = useState(true);
   const [selected, setSelected]    = useState(null); // for detail modal
   const [actionNote, setActionNote] = useState('');
+  const [error, setError]          = useState('');
 
   const load = () => {
-    setLoading(true);
     const params = new URLSearchParams();
     if (filterStatus) params.append('status', filterStatus);
     if (search)       params.append('search', search);
 
     Promise.all([
-      fetch(API + '/merchants?' + params).then(r => r.json()),
-      fetch(API + '/merchants/stats').then(r => r.json()),
+      fetchJson(API + '/merchants?' + params),
+      fetchJson(API + '/merchants/stats'),
     ]).then(([list, s]) => {
       setMerchants(list.data || []);
       setStats(s);
-    }).catch(() => {
-      // mock data
-      setMerchants([
-        { id: 'm1', store_name: 'Toko Berkah', slug: 'toko-berkah', status: 'active', is_verified: true, balance: 2500000, total_sales: 15000000, joined_at: '2025-01-15' },
-        { id: 'm2', store_name: 'Warung Jaya', slug: 'warung-jaya', status: 'pending', is_verified: false, balance: 0, total_sales: 0, joined_at: '2026-03-28' },
-        { id: 'm3', store_name: 'Elektronik Murah', slug: 'elektronik-murah', status: 'suspended', is_verified: true, balance: 500000, total_sales: 8000000, joined_at: '2024-11-01' },
-      ]);
-      setStats({ total: 3, active: 1, pending: 1, suspended: 1, verified: 2 });
+      setError('');
+    }).catch((err) => {
+      setMerchants([]);
+      setStats({});
+      setError(err.message || 'Gagal memuat data merchant');
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [filterStatus]);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterStatus) params.append('status', filterStatus);
 
-  const handleSearch = (e) => { e.preventDefault(); load(); };
+    Promise.all([
+      fetchJson(API + '/merchants?' + params),
+      fetchJson(API + '/merchants/stats'),
+    ]).then(([list, s]) => {
+      setMerchants(list.data || []);
+      setStats(s);
+      setError('');
+    }).catch((err) => {
+      setMerchants([]);
+      setStats({});
+      setError(err.message || 'Gagal memuat data merchant');
+    }).finally(() => setLoading(false));
+  }, [filterStatus]);
+
+  const handleSearch = (e) => { e.preventDefault(); setLoading(true); load(); };
 
   const updateStatus = (merchantId, status, note = '') => {
     fetch(API + '/merchants/status', {
@@ -71,10 +85,12 @@ export default function AdminMerchants() {
     <>
       <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
         <div className="breadcrumb-title pe-3">Super Admin</div>
-        <div className="ps-3"><nav><ol className="breadcrumb mb-0 p-0">
+      <div className="ps-3"><nav><ol className="breadcrumb mb-0 p-0">
           <li className="breadcrumb-item active">Kelola Merchant</li>
         </ol></nav></div>
       </div>
+
+      {error && <div className="alert alert-danger mb-3">{error}</div>}
 
       {/* Stats */}
       <div className="row g-3 mb-4">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
-const API = 'http://localhost:8080/api/admin';
+const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 export default function AdminAffiliates() {
@@ -10,35 +11,31 @@ export default function AdminAffiliates() {
   const [loading, setLoading]       = useState(true);
   const [editCfg, setEditCfg]       = useState(null);
   const [savingCfg, setSavingCfg]   = useState(false);
+  const [error, setError]           = useState('');
 
   useEffect(() => {
     Promise.all([
-      fetch(API + '/affiliates').then(r => r.json()),
-      fetch(API + '/affiliates/configs').then(r => r.json()),
+      fetchJson(API + '/affiliates'),
+      fetchJson(API + '/affiliates/configs'),
     ]).then(([af, cfg]) => {
       setAffiliates(af.data || []);
       setConfigs(cfg.data || []);
-    }).catch(() => {
-      setAffiliates([
-        { id: 'a1', email: 'budi@mail.com', status: 'active', profile: { full_name: 'Budi Santoso' } },
-        { id: 'a2', email: 'sari@mail.com', status: 'active', profile: { full_name: 'Sari Dewi' } },
-      ]);
-      setConfigs([
-        { id: 1, tier_name: 'Bronze', comm_rate: 0.02, min_sales: 0, max_sales: 5000000, bonus_rate: 0, is_active: true },
-        { id: 2, tier_name: 'Silver', comm_rate: 0.035, min_sales: 5000000, max_sales: 20000000, bonus_rate: 0.005, is_active: true },
-        { id: 3, tier_name: 'Gold', comm_rate: 0.05, min_sales: 20000000, max_sales: 0, bonus_rate: 0.01, is_active: true },
-      ]);
+      setError('');
+    }).catch((err) => {
+      setAffiliates([]);
+      setConfigs([]);
+      setError(err.message || 'Gagal memuat data affiliate');
     }).finally(() => setLoading(false));
   }, []);
 
   const saveCfg = () => {
     if (!editCfg) return;
     setSavingCfg(true);
-    fetch(API + '/affiliates/config', {
+    fetchJson(API + '/affiliates/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editCfg),
-    }).then(r => r.json()).then(res => {
+    }).then(res => {
       if (res.data) {
         setConfigs(prev => {
           const idx = prev.findIndex(c => c.id === res.data.id);
@@ -47,7 +44,11 @@ export default function AdminAffiliates() {
         });
       }
       setEditCfg(null);
-    }).catch(() => setEditCfg(null))
+      setError('');
+    }).catch((err) => {
+      setError(err.message || 'Gagal menyimpan tier affiliate');
+      setEditCfg(null);
+    })
       .finally(() => setSavingCfg(false));
   };
 
@@ -81,6 +82,8 @@ export default function AdminAffiliates() {
 
       {loading ? (
         <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>
+      ) : error ? (
+        <div className="alert alert-danger">{error}</div>
       ) : tab === 'members' ? (
         <div className="card radius-10">
           <div className="card-body">
