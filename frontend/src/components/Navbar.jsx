@@ -57,11 +57,13 @@ export default function Navbar() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-4">
-              <Link to="/profile" className="hidden lg:flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
+              <Link to={localStorage.getItem('token') ? "/profile" : "/login"} className="hidden lg:flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
                 <UserIcon />
                 <div className="text-xs">
                    <div className="text-gray-400">Halo,</div>
-                   <div className="font-semibold text-gray-800">Masuk</div>
+                   <div className="font-semibold text-gray-800 w-16 truncate">
+                     {localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).profile?.full_name || 'Member' : 'Masuk'}
+                   </div>
                 </div>
               </Link>
               <Link to="/compare" className="hidden lg:flex text-gray-600 hover:text-blue-600 transition-colors">

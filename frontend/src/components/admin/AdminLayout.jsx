@@ -77,6 +77,22 @@ const AdminLayout = ({ children }) => {
     };
   }, []);
 
+  const [notifications, setNotif] = React.useState([]);
+  
+  const loadNotif = () => {
+    fetch('http://localhost:8080/api/admin/notifications')
+      .then(r => r.json()).then(d => setNotif(d.data || []));
+  };
+  
+  useEffect(() => { loadNotif(); }, []);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const markRead = (id) => {
+    fetch(`http://localhost:8080/api/admin/notifications/read?id=${id}`)
+      .then(() => loadNotif());
+  };
+
   return (
     <div className="wrapper">
       {/* start top header */}
@@ -102,10 +118,29 @@ const AdminLayout = ({ children }) => {
                <li className="nav-item dropdown dropdown-large">
                 <a className="nav-link dropdown-toggle dropdown-toggle-nocaret" href="#" data-bs-toggle="dropdown">
                   <div className="notifications">
-                    <span className="notify-badge">8</span>
+                    {unreadCount > 0 && <span className="notify-badge">{unreadCount}</span>}
                     <i className="bi bi-bell-fill"></i>
                   </div>
                 </a>
+                <div className="dropdown-menu dropdown-menu-end p-0">
+                  <div className="p-2 border-bottom fw-bold d-flex align-items-center">
+                    <span>Notifikasi Admin</span>
+                    <button className="btn btn-xs btn-link ms-auto text-decoration-none" onClick={loadNotif}>Refresh</button>
+                  </div>
+                  <div className="header-notifications-list p-2" style={{maxHeight: 300, overflowY:'auto'}}>
+                    {notifications.length === 0 ? (
+                      <p className="text-center text-muted small py-3">Tidak ada notifikasi</p>
+                    ) : notifications.map(n => (
+                      <div key={n.id} className={`d-flex align-items-start gap-3 p-2 rounded mb-1 ${n.is_read ? 'bg-light opacity-50' : 'bg-white border'}`}>
+                        <div className="flex-grow-1">
+                           <h6 className="mb-0 small fw-bold">{n.message}</h6>
+                           <small className="text-muted" style={{fontSize: 10}}>{new Date(n.created_at).toLocaleString()}</small>
+                        </div>
+                        {!n.is_read && <button className="btn btn-xs btn-outline-primary" onClick={() => markRead(n.id)}><i className="bi bi-check"></i></button>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </li>
             </ul>
           </div>
@@ -147,125 +182,147 @@ const AdminLayout = ({ children }) => {
           </div>
           {/* navigation */}
           <ul className="metismenu" id="menu">
+
+            {/* ── Overview ─────────────────────────────── */}
             <li>
-              <a href="javascript:;" className="has-arrow">
-                <div className="parent-icon"><i className="bi bi-house-fill"></i></div>
+              <Link to="/admin">
+                <div className="parent-icon"><i className="bi bi-speedometer2"></i></div>
                 <div className="menu-title">Dashboard</div>
-              </a>
-              <ul>
-                <li> <Link to="/admin"><i className="bi bi-circle"></i>Admin Dashboard</Link></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Color Dashboard 1</a></li>
-              </ul>
+              </Link>
             </li>
+
+            <li className="menu-label">Manajemen Pengguna</li>
+
+            {/* ── Users ───────────────────────────────── */}
             <li>
               <a href="javascript:;" className="has-arrow">
-                <div className="parent-icon"><i className="bi bi-basket2-fill"></i></div>
-                <div className="menu-title">eCommerce</div>
+                <div className="parent-icon"><i className="bi bi-people-fill"></i></div>
+                <div className="menu-title">Pengguna & Member</div>
               </a>
               <ul>
-                <li> <Link to="/admin/products"><i className="bi bi-circle"></i>Products List</Link></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Products Grid</a></li>
-                <li> <Link to="/admin/categories"><i className="bi bi-circle"></i>Categories</Link></li>
-                <li> <Link to="/admin/orders"><i className="bi bi-circle"></i>Orders</Link></li>
-                <li> <Link to="/admin/orders/detail"><i className="bi bi-circle"></i>Order details</Link></li>
-                <li> <Link to="/admin/products/add"><i className="bi bi-circle"></i>Add New Product</Link></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Transactions</a></li>
-                <li> <Link to="/admin/users"><i className="bi bi-circle"></i>User Accounts</Link></li>
+                <li><Link to="/admin/users"><i className="bi bi-circle"></i>Semua Pengguna</Link></li>
+                <li><Link to="/admin/affiliates"><i className="bi bi-circle"></i>Member Affiliate</Link></li>
               </ul>
             </li>
-            <li className="menu-label">UI Elements</li>
+
+            {/* ── Merchants ───────────────────────────── */}
+            <li>
+              <Link to="/admin/merchants">
+                <div className="parent-icon"><i className="bi bi-shop-window"></i></div>
+                <div className="menu-title">Kelola Merchant</div>
+              </Link>
+            </li>
+
+            <li className="menu-label">Produk & Katalog</li>
+
+            {/* ── Products ────────────────────────────── */}
             <li>
               <a href="javascript:;" className="has-arrow">
-                <div className="parent-icon"><i className="bi bi-droplet-fill"></i></div>
-                <div className="menu-title">Widgets</div>
+                <div className="parent-icon"><i className="bi bi-box-seam-fill"></i></div>
+                <div className="menu-title">Produk</div>
               </a>
               <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Static Widgets</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Data Widgets</a></li>
+                <li><Link to="/admin/products"><i className="bi bi-circle"></i>Daftar Produk</Link></li>
+                <li><Link to="/admin/products/add"><i className="bi bi-circle"></i>Tambah Produk</Link></li>
+                <li><Link to="/admin/categories"><i className="bi bi-circle"></i>Kategori</Link></li>
+                <li><Link to="/admin/brands"><i className="bi bi-circle"></i>Brand / Merk</Link></li>
+                <li><Link to="/admin/attributes"><i className="bi bi-circle"></i>Atribut Global</Link></li>
+                <li><Link to="/admin/moderation"><i className="bi bi-circle"></i>Moderasi Produk</Link></li>
               </ul>
             </li>
+
+            {/* ── Orders ──────────────────────────────── */}
             <li>
-              <a className="has-arrow" href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-award-fill"></i></div>
-                <div className="menu-title">Components</div>
+              <a href="javascript:;" className="has-arrow">
+                <div className="parent-icon"><i className="bi bi-bag-check-fill"></i></div>
+                <div className="menu-title">Pesanan & Sengketa</div>
               </a>
               <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Alerts</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Accordions</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Modals</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Pagination</a></li>
+                <li><Link to="/admin/orders"><i className="bi bi-circle"></i>Semua Pesanan</Link></li>
+                <li><Link to="/admin/disputes"><i className="bi bi-circle"></i>Sengketa (Dispute)</Link></li>
               </ul>
             </li>
-            <li className="menu-label">Forms & Tables</li>
+
+            <li className="menu-label">Pemasaran & Logistik</li>
             <li>
-              <a className="has-arrow" href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-file-earmark-break-fill"></i></div>
-                <div className="menu-title">Forms</div>
-              </a>
-              <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Form Elements</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Input Groups</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Forms Layouts</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Form Validation</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Date Pickers</a></li>
-              </ul>
+              <Link to="/admin/vouchers">
+                <div className="parent-icon"><i className="bi bi-ticket-perforated-fill"></i></div>
+                <div className="menu-title">Voucher Platform</div>
+              </Link>
             </li>
             <li>
-              <a className="has-arrow" href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-file-earmark-spreadsheet-fill"></i></div>
-                <div className="menu-title">Tables</div>
-              </a>
-              <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Basic Table</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Advance Tables</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Data Table</a></li>
-              </ul>
-            </li>
-            <li className="menu-label">Pages</li>
-            <li>
-              <a className="has-arrow" href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-lock-fill"></i></div>
-                <div className="menu-title">Authentication</div>
-              </a>
-              <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Sign In</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Sign Up</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Reset Password</a></li>
-              </ul>
+              <Link to="/admin/logistics">
+                <div className="parent-icon"><i className="bi bi-truck"></i></div>
+                <div className="menu-title">Saluran Logistik</div>
+              </Link>
             </li>
             <li>
-              <a href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-person-lines-fill"></i></div>
-                <div className="menu-title">User Profile</div>
-              </a>
+              <Link to="/admin/regions">
+                <div className="parent-icon"><i className="bi bi-geo-alt-fill"></i></div>
+                <div className="menu-title">Data Geografis</div>
+              </Link>
             </li>
+
+            <li className="menu-label">Keuangan & Komisi</li>
+
+            {/* ── Finance ─────────────────────────────── */}
             <li>
-              <a href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-collection-play-fill"></i></div>
-                <div className="menu-title">Timeline</div>
-              </a>
-            </li>
-            <li className="menu-label">Charts & Maps</li>
-            <li>
-              <a className="has-arrow" href="javascript:;">
+              <Link to="/admin/finance">
                 <div className="parent-icon"><i className="bi bi-bar-chart-line-fill"></i></div>
-                <div className="menu-title">Charts</div>
-              </a>
-              <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Apex</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Chartjs</a></li>
-              </ul>
+                <div className="menu-title">Laporan Keuangan</div>
+              </Link>
             </li>
+
+            {/* ── Commissions ─────────────────────────── */}
             <li>
-              <a className="has-arrow" href="javascript:;">
-                <div className="parent-icon"><i className="bi bi-pin-map-fill"></i></div>
-                <div className="menu-title">Maps</div>
-              </a>
-              <ul>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Google Maps</a></li>
-                <li> <a href="javascript:;"><i className="bi bi-circle"></i>Vector Maps</a></li>
-              </ul>
+              <Link to="/admin/commissions">
+                <div className="parent-icon"><i className="bi bi-percent"></i></div>
+                <div className="menu-title">Konfigurasi Komisi</div>
+              </Link>
             </li>
+
+            {/* ── Payouts ─────────────────────────────── */}
+            <li>
+              <Link to="/admin/payouts">
+                <div className="parent-icon"><i className="bi bi-wallet2"></i></div>
+                <div className="menu-title">Manajemen Payout</div>
+              </Link>
+            </li>
+
+            <li className="menu-label">CMS & Konten</li>
+            <li>
+              <Link to="/admin/blogs">
+                <div className="parent-icon"><i className="bi bi-journal-richtext"></i></div>
+                <div className="menu-title">Kelola Blog</div>
+              </Link>
+            </li>
+
+            <li className="menu-label">Sistem & Keamanan</li>
+
+            {/* ── Settings ────────────────────────────── */}
+            <li>
+              <Link to="/admin/settings">
+                <div className="parent-icon"><i className="bi bi-gear-fill"></i></div>
+                <div className="menu-title">Pengaturan Platform</div>
+              </Link>
+            </li>
+
+            {/* ── Audit Log ───────────────────────────── */}
+            <li>
+              <Link to="/admin/audit">
+                <div className="parent-icon"><i className="bi bi-journal-text"></i></div>
+                <div className="menu-title">Audit Log</div>
+              </Link>
+            </li>
+
+            {/* ── Security ────────────────────────────── */}
+            <li>
+              <Link to="/admin/security">
+                <div className="parent-icon"><i className="bi bi-shield-lock-fill"></i></div>
+                <div className="menu-title">Keamanan & Fraud</div>
+              </Link>
+            </li>
+
           </ul>
           {/* end navigation */}
        </aside>

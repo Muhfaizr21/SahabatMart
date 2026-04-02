@@ -1,12 +1,19 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function CouponPage() {
-  const coupons = [
-    { code: 'SAHABATBARU', title: 'Diskon Pengguna Baru', desc: 'Dapatkan potongan langsung Rp50.000 untuk transaksi perdana kamu minimal Rp200.000. Hanya berlaku untuk pengguna yang baru terdaftar.', exp: '31 Des 2024', color: 'bg-blue-600', max: 'Rp50.000' },
-    { code: 'ONGKIRGRATIS', title: 'Gratis Ongkir Pulau Jawa', desc: 'Nikmati layanan gratis biaya pengiriman hingga Rp30.000 ke seluruh wilayah di Pulau Jawa. Minimal belanja Rp100.000.', exp: '15 Mei 2024', color: 'bg-green-500', max: 'Rp30.000' },
-    { code: 'PAYDAY24', title: 'Promo Payday Super', desc: 'Diskon besar-besaran 20% khusus metode pembayaran E-Wallet dan Kartu Kredit di akhir bulan.', exp: 'Sebentar Lagi', color: 'bg-red-500', max: 'Rp150.000' },
-    { code: 'GADGETPRO', title: 'Cashback Ekstra Gadget', desc: 'Cashback berupa Koin SahabatMart (Coins) sebesar 5% untuk semua kategori Elektronik dan Gadget.', exp: '30 Apr 2024', color: 'bg-purple-600', max: 'Rp200.000' },
-  ];
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/public/vouchers')
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.data) setCoupons(d.data);
+      })
+      .catch(e => console.error("Voucher sync error:", e))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <main className="min-h-screen bg-gray-50 py-12">
@@ -20,34 +27,47 @@ export default function CouponPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {coupons.map((c, i) => (
+          {loading ? (
+            <div className="col-span-full text-center py-20">
+                <div className="spinner-border text-blue-600"></div>
+                <p className="text-gray-500 mt-4 font-medium italic">Mencari kupon terbaik untukmu...</p>
+            </div>
+          ) : coupons.length === 0 ? (
+            <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-gray-100 italic text-gray-400">
+                Belum ada kupon yang tersedia saat ini.
+            </div>
+          ) : coupons.map((c, i) => (
             <div key={i} className="flex flex-col sm:flex-row bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-shadow group relative">
               {/* Desain Tepi Ribbed (Kupon Sobek) */}
-              <div className={`${c.color} sm:w-1/3 p-6 flex flex-col justify-center items-center text-center relative border-r-2 border-dashed border-white/40`}>
+              <div className={`${c.bg_color || 'bg-blue-600'} sm:w-1/3 p-6 flex flex-col justify-center items-center text-center relative border-r-2 border-dashed border-white/40 min-h-[140px]`}>
                 <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-gray-50 rounded-full"></div>
                 
-                <h3 className="text-white font-black text-2xl mb-1">{c.max}</h3>
-                <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Maks. Potongan</span>
+                <h3 className="text-white font-black text-2xl mb-1">
+                    {c.discount_type === 'percent' ? `${c.discount_value}%` : `Rp${(c.discount_value || 0).toLocaleString('id')}`}
+                </h3>
+                <span className="text-white/80 text-[10px] font-bold uppercase tracking-wider">Maks. Potongan</span>
               </div>
               
               <div className="p-6 sm:w-2/3 flex flex-col relative">
                  <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-gray-50 rounded-full"></div>
                  
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-gray-900 text-xl">{c.title}</h3>
-                  <span className="text-[10px] font-bold uppercase py-1 px-2.5 bg-gray-100 text-gray-500 rounded-lg">Exp: {c.exp}</span>
+                  <h3 className="font-bold text-gray-900 text-lg sm:text-xl line-clamp-1">{c.title}</h3>
+                  <span className="text-[10px] font-bold uppercase py-1 px-2.5 bg-gray-100 text-gray-500 rounded-lg whitespace-nowrap">
+                    Exp: {new Date(c.expiry_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
                 </div>
                 
-                <p className="text-sm text-gray-500 mb-5 leading-relaxed flex-1">
-                  {c.desc}
+                <p className="text-sm text-gray-500 mb-5 leading-relaxed flex-1 line-clamp-2">
+                  {c.description}
                 </p>
                 
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-4 py-3 font-mono font-bold text-gray-900 text-center tracking-widest text-lg">
+                  <div className="flex-1 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-2 py-3 font-mono font-bold text-gray-900 text-center tracking-widest text-base sm:text-lg">
                     {c.code}
                   </div>
-                  <button className="bg-gray-900 hover:bg-blue-600 text-white font-bold p-3 rounded-xl transition-colors shrink-0 tooltip relative">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  <button className="bg-gray-900 hover:bg-blue-600 text-white font-bold p-3 rounded-xl transition-colors shrink-0">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                   </button>
                 </div>
               </div>

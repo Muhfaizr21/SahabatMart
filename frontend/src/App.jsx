@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
 import CategorySection from './components/CategorySection';
@@ -6,6 +6,15 @@ import FeatureBar from './components/FeatureBar';
 import ProductSection from './components/ProductSection';
 import PromoBanner from './components/PromoBanner';
 import Footer from './components/Footer';
+
+// ── Protected Route Wrapper ─────────
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
 
 // Pages
 import ShopPage from './pages/ShopPage';
@@ -32,6 +41,22 @@ import AdminOrders from './pages/admin/Orders';
 import AdminOrderDetail from './pages/admin/OrderDetail';
 import AdminUsers from './pages/admin/Users';
 import AdminCategories from './pages/admin/Categories';
+import AdminMerchants from './pages/admin/Merchants';
+import AdminAffiliates from './pages/admin/Affiliates';
+import AdminModeration from './pages/admin/Moderation';
+import AdminFinance from './pages/admin/Finance';
+import AdminCommissions from './pages/admin/Commissions';
+import AdminPayouts from './pages/admin/Payouts';
+import AdminSettings from './pages/admin/Settings';
+import AdminAuditLog from './pages/admin/AuditLog';
+import AdminBrands from './pages/admin/Brands';
+import AdminAttributes from './pages/admin/Attributes';
+import AdminDisputes from './pages/admin/Disputes';
+import AdminVouchers from './pages/admin/Vouchers';
+import AdminLogistics from './pages/admin/Logistics';
+import AdminSecurity from './pages/admin/Security';
+import AdminRegions from './pages/admin/Regions';
+import AdminBlogs from './pages/admin/Blogs';
 
 // ── Penanganan Khusus Header/Footer ─────────
 function NavbarManager() {
@@ -88,31 +113,58 @@ export default function App() {
           <Route path="/shop" element={<ShopPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/order-success" element={<OrderSuccessPage />} />
+          <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+          <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:id" element={<BlogDetailPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
 
-          {/* Admin Routes (Nested Routing untuk memelihara instance Sidebar) */}
+          {/* Admin Routes (Nested Routing) */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
+            {/* Products */}
             <Route path="products" element={<AdminProductList />} />
             <Route path="products/add" element={<AdminAddProduct />} />
             <Route path="categories" element={<AdminCategories />} />
+            {/* Orders */}
             <Route path="orders" element={<AdminOrders />} />
             <Route path="orders/detail" element={<AdminOrderDetail />} />
+            {/* Users & Affiliates */}
             <Route path="users" element={<AdminUsers />} />
-            <Route path="reports" element={<div className="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm text-center font-bold text-gray-500 italic uppercase">Laporan Penjualan Sedang Dikembangkan...</div>} />
-            <Route path="settings" element={<div className="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm text-center font-bold text-gray-500 italic uppercase">Pengaturan Admin Sedang Dikembangkan...</div>} />
+            <Route path="affiliates" element={<AdminAffiliates />} />
+            {/* Merchants */}
+            <Route path="merchants" element={<AdminMerchants />} />
+            {/* Moderation */}
+            <Route path="moderation" element={<AdminModeration />} />
+            {/* Finance */}
+            <Route path="finance" element={<AdminFinance />} />
+            {/* Commissions */}
+            <Route path="commissions" element={<AdminCommissions />} />
+            {/* Payouts */}
+            <Route path="payouts" element={<AdminPayouts />} />
+            {/* Master Data */}
+            <Route path="brands" element={<AdminBrands />} />
+            <Route path="attributes" element={<AdminAttributes />} />
+            {/* Disputes & Vouchers */}
+            <Route path="disputes" element={<AdminDisputes />} />
+            <Route path="vouchers" element={<AdminVouchers />} />
+            {/* Logistics & Regions */}
+            <Route path="logistics" element={<AdminLogistics />} />
+            <Route path="regions" element={<AdminRegions />} />
+            {/* Security */}
+            <Route path="security" element={<AdminSecurity />} />
+            {/* Audit Log */}
+            <Route path="audit" element={<AdminAuditLog />} />
+            {/* CMS */}
+            <Route path="blogs" element={<AdminBlogs />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

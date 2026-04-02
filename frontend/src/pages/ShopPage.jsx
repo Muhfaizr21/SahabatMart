@@ -25,80 +25,43 @@ const priceRanges = [
   { label: 'Di atas Rp3.000.000', min: 3000000, max: Infinity },
 ];
 
-// Extend products for shop page (add more dummy products)
-const shopProducts = [
-  ...products,
-  {
-    id: 9,
-    name: 'Apple MacBook Air M2 13-inch 8GB 256GB',
-    category: 'Laptop',
-    price: 1180,
-    oldPrice: 1350,
-    rating: 5,
-    reviews: 24,
-    badge: 'Hot',
-    badgeClass: 'hot',
-    image: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=300&h=300&fit=crop',
-  },
-  {
-    id: 10,
-    name: 'Sony WH-1000XM5 Wireless Noise Cancelling',
-    category: 'Headphone',
-    price: 248,
-    oldPrice: 300,
-    rating: 5,
-    reviews: 18,
-    badge: 'Sale',
-    badgeClass: 'sale',
-    image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=300&h=300&fit=crop',
-  },
-  {
-    id: 11,
-    name: 'iPhone 15 Pro Max 256GB Titanium',
-    category: 'Smartphone',
-    price: 1100,
-    oldPrice: null,
-    rating: 5,
-    reviews: 32,
-    badge: 'Trending',
-    badgeClass: 'trending',
-    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=300&h=300&fit=crop',
-  },
-  {
-    id: 12,
-    name: 'Samsung Galaxy Watch 6 Classic 47mm',
-    category: 'Smart Watch',
-    price: 280,
-    oldPrice: 350,
-    rating: 4.5,
-    reviews: 11,
-    badge: '-20%',
-    badgeClass: 'offer',
-    image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=300&h=300&fit=crop',
-  },
-];
+const API_PUB = 'http://localhost:8080/api/public';
 
-const allCategories = ['Semua', ...new Set(shopProducts.map(p => p.category))];
+
 
 export default function ShopPage() {
   const [searchParams] = useSearchParams();
   const catParam = searchParams.get('cat');
-
   const [activeCategory, setActiveCategory] = useState(catParam || 'Semua');
   const [sortBy, setSortBy] = useState('Default');
   const [priceRange, setPriceRange] = useState(0);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [viewMode, setViewMode] = useState('grid');
   const [liked, setLiked] = useState({});
+  const [allProducts, setAllProducts] = useState([]);
+  const [allCategories, setAllCategories] = useState(['Semua']);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_PUB}/products`).then(r => r.json()),
+      fetch(`${API_PUB}/categories`).then(r => r.json()),
+    ]).then(([p, c]) => {
+      setAllProducts(p.data || []);
+      const cats = ['Semua', ...(c.data || []).map(cat => cat.name)];
+      setAllCategories(cats);
+    }).finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (catParam) setActiveCategory(catParam);
   }, [catParam]);
 
-  let filtered = shopProducts.filter(p => {
+  let filtered = allProducts.filter(p => {
     if (activeCategory !== 'Semua' && p.category !== activeCategory) return false;
-    const priceIDR = p.price * 16000;
+    const price = p.price || 0;
     const range = priceRanges[priceRange];
-    if (priceIDR < range.min || priceIDR > range.max) return false;
+    if (price < range.min || price > range.max) return false;
     return true;
   });
 
@@ -140,7 +103,7 @@ export default function ShopPage() {
                   >
                     {cat}
                     <span className="float-right text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {cat === 'Semua' ? shopProducts.length : shopProducts.filter(p => p.category === cat).length}
+                      {cat === 'Semua' ? allProducts.length : allProducts.filter(p => p.category === cat).length}
                     </span>
                   </button>
                 ))}
@@ -203,7 +166,7 @@ export default function ShopPage() {
             {/* Toolbar */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
               <span className="text-sm text-gray-500">
-                Menampilkan <strong className="text-gray-900">{filtered.length}</strong> dari <strong className="text-gray-900">{shopProducts.length}</strong> produk
+                Menampilkan <strong className="text-gray-900">{filtered.length}</strong> dari <strong className="text-gray-900">{allProducts.length}</strong> produk
               </span>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -239,8 +202,12 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {/* Products Grid / List */}
-            {filtered.length === 0 ? (
+            {loading ? (
+                <div className="bg-white rounded-2xl border border-gray-100 p-20 text-center">
+                    <div className="spinner-border text-blue-600"></div>
+                    <p className="text-gray-500 mt-3">Memuat produk...</p>
+                </div>
+            ) : filtered.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
                 <div className="text-5xl mb-4">🔍</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Produk Tidak Ditemukan</h3>
@@ -285,8 +252,8 @@ export default function ShopPage() {
                       </div>
                       <div className="flex items-end justify-between mt-auto">
                         <div className="flex flex-col">
-                          {product.oldPrice && <div className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice * 16000).toLocaleString('id')}</div>}
-                          <div className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price * 16000).toLocaleString('id')}</div>
+                          {product.oldPrice && <div className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice).toLocaleString('id')}</div>}
+                          <div className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price || 0).toLocaleString('id')}</div>
                         </div>
                         <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 ml-2 transition-colors">
                           + Beli
@@ -313,8 +280,8 @@ export default function ShopPage() {
                         <span className="text-xs text-gray-400">({product.reviews} Ulasan)</span>
                       </div>
                       <div className="flex items-center gap-3 mt-auto">
-                        {product.oldPrice && <span className="text-sm text-gray-400 line-through">Rp{(product.oldPrice * 16000).toLocaleString('id')}</span>}
-                        <span className="font-bold text-lg text-gray-900">Rp{(product.price * 16000).toLocaleString('id')}</span>
+                        {product.oldPrice && <span className="text-sm text-gray-400 line-through">Rp{(product.oldPrice).toLocaleString('id')}</span>}
+                        <span className="font-bold text-lg text-gray-900">Rp{(product.price || 0).toLocaleString('id')}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 justify-center">

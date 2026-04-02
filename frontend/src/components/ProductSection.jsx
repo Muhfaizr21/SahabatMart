@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { products } from '../data/products';
 
@@ -52,8 +52,8 @@ function ProductCard({ product }) {
         </div>
         <div className="flex items-end justify-between mt-auto">
           <div className="flex flex-col">
-            {product.oldPrice && <span className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice * 16000).toLocaleString('id')}</span>}
-            <span className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price * 16000).toLocaleString('id')}</span>
+            {product.oldPrice && <span className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice).toLocaleString('id')}</span>}
+            <span className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price || 0).toLocaleString('id')}</span>
           </div>
           <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0 ml-2">
             + Beli
@@ -66,6 +66,19 @@ function ProductCard({ product }) {
 
 export default function ProductSection() {
   const [activeTab, setActiveTab] = useState('New');
+  const [trending, setTrending] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/public/products')
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.data) setTrending(d.data.slice(0, 10));
+      })
+      .catch(e => console.error("Product sync error:", e))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <section className="py-14 bg-white">
       <div className="max-w-7xl mx-auto px-6">
@@ -83,9 +96,15 @@ export default function ProductSection() {
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-          {products.map(p => <ProductCard key={p.id} product={p} />)}
-        </div>
+        
+        {loading ? (
+             <div className="text-center py-20"><div className="spinner-border text-blue-600"></div></div>
+        ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                {trending.map(p => <ProductCard key={p.id} product={p} />)}
+            </div>
+        )}
+
         <div className="text-center mt-10">
           <Link to="/shop" className="inline-flex items-center gap-2 border-2 border-blue-600 text-blue-600 font-semibold px-8 py-3 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
             Lihat Semua Produk

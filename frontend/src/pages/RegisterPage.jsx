@@ -1,6 +1,54 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function RegisterPage() {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    password: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:8080/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Gagal mendaftar');
+      }
+
+      // Berhasil
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      navigate('/'); // Redirect ke home
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-6">
       <div className="max-w-4xl w-full bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row-reverse border border-gray-100">
@@ -12,11 +60,21 @@ export default function RegisterPage() {
             <p className="text-gray-500">Bergabunglah dengan ribuan pengguna SahabatMart lainnya.</p>
           </div>
           
-          <form className="flex flex-col gap-4">
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-xl text-sm font-medium">
+              {error}
+            </div>
+          )}
+
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
             <div>
               <label className="text-sm font-semibold text-gray-700 block mb-1.5">Nama Lengkap</label>
               <input 
                 type="text" 
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                required
                 placeholder="Cth: John Doe" 
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all bg-gray-50 focus:bg-white" 
               />
@@ -26,6 +84,10 @@ export default function RegisterPage() {
               <label className="text-sm font-semibold text-gray-700 block mb-1.5">Alamat Email</label>
               <input 
                 type="email" 
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
                 placeholder="nama@email.com" 
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all bg-gray-50 focus:bg-white" 
               />
@@ -39,6 +101,9 @@ export default function RegisterPage() {
                 </span>
                 <input 
                   type="tel" 
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
                   placeholder="81234567890" 
                   className="w-full px-4 py-3 text-sm outline-none bg-transparent" 
                 />
@@ -49,20 +114,24 @@ export default function RegisterPage() {
               <label className="text-sm font-semibold text-gray-700 block mb-1.5">Password</label>
               <input 
                 type="password" 
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
                 placeholder="Minimal 8 karakter" 
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all bg-gray-50 focus:bg-white" 
               />
             </div>
             
             <div className="flex items-start gap-2 mt-1">
-              <input type="checkbox" id="terms" className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+              <input type="checkbox" id="terms" required className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
               <label htmlFor="terms" className="text-xs text-gray-600 leading-relaxed cursor-pointer select-none">
                 Saya menyetujui <Link to="#" className="text-blue-600 font-medium hover:underline">Syarat & Ketentuan</Link> serta <Link to="#" className="text-blue-600 font-medium hover:underline">Kebijakan Privasi</Link> SahabatMart.
               </label>
             </div>
             
-            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-colors mt-2 shadow-lg shadow-blue-600/20">
-              Daftar Sekarang
+            <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3.5 rounded-xl transition-colors mt-2 shadow-lg shadow-blue-600/20">
+              {loading ? 'Memproses...' : 'Daftar Sekarang'}
             </button>
             
             <div className="relative flex items-center pt-2">

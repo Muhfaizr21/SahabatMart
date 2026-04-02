@@ -170,50 +170,6 @@ Platform ini dibangun untuk menjawab tiga kebutuhan bisnis sekaligus:
 
 ## 🏗️ Arsitektur Sistem
 
-### Pendekatan Arsitektur
-
-Platform ini direkomendasikan menggunakan arsitektur **Modular Monolith** terlebih dahulu (bukan microservices) untuk mempermudah development awal, dengan desain yang memungkinkan ekstraksi ke microservices di masa depan jika skala sudah besar.
-
-```
-                        ┌─────────────────┐
-                        │   CDN / S3      │
-                        │  (Gambar, Aset) │
-                        └────────┬────────┘
-                                 │
-┌──────────┐    ┌────────────────▼─────────────────┐
-│  Mobile  │    │         Web Frontend              │
-│   App    │───▶│  (Next.js / React / Nuxt.js)      │
-└──────────┘    └────────────────┬─────────────────┘
-                                 │ HTTPS
-                    ┌────────────▼──────────────┐
-                    │       API Gateway          │
-                    │  Rate Limiting, Auth Check │
-                    └────────────┬──────────────┘
-                                 │
-          ┌──────────────────────┼────────────────────────┐
-          │                      │                        │
-┌─────────▼────────┐  ┌──────────▼────────┐  ┌───────────▼──────┐
-│  User & Auth     │  │  Catalog Service  │  │  Order Service   │
-│  Service         │  │  (Produk, Search) │  │  (Cart, Checkout)│
-└──────────────────┘  └───────────────────┘  └──────────────────┘
-          │                      │                        │
-          └──────────────────────┼────────────────────────┘
-                                 │
-          ┌──────────────────────┼────────────────────────┐
-          │                      │                        │
-┌─────────▼────────┐  ┌──────────▼────────┐  ┌───────────▼──────┐
-│  Payment Service │  │ Commission Engine │  │ Affiliate Service│
-│  (PG Integration)│  │  (Split, Hitung)  │  │  (Tracking, Link)│
-└──────────────────┘  └───────────────────┘  └──────────────────┘
-          │                      │                        │
-          └──────────────────────┼────────────────────────┘
-                                 │
-                    ┌────────────▼──────────────┐
-                    │        Data Layer          │
-                    │  PostgreSQL │ Redis │ S3   │
-                    └────────────────────────────┘
-```
-
 ### Komponen Infrastruktur
 
 | Komponen | Fungsi |
