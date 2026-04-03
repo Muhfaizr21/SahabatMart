@@ -3,7 +3,11 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,17 +29,86 @@ func (ac *AdminController) hasTable(name string) bool {
 // HELPER: log audit action
 // ─────────────────────────────────────────────────────────────────────────────
 
-func (ac *AdminController) logAudit(adminID, action, targetType, targetID, detail, ip string) {
-	if adminID == "" {
-		adminID = "system"
+// POST /api/admin/upload
+func (ac *AdminController) UploadImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
 	}
+
+	r.ParseMultipartForm(10 << 20) // Max 10MB
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Failed to get image")
+		return
+	}
+	defer file.Close()
+
+	// Pastikan folder uploads ada
+	os.MkdirAll("uploads", os.ModePerm)
+
+	// Buat nama file unik (ganti extension ke .webp sebagai penanda)
+	filename := fmt.Sprintf("%d-%s.webp", time.Now().Unix(), strings.TrimSpace(header.Filename))
+	filePath := filepath.Join("uploads", filename)
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Failed to save file")
+		return
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, file)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Failed to write file")
+		return
+	}
+
+	// Kembalikan URL publik
+	utils.JSONResponse(w, http.StatusOK, map[string]string{
+		"url": fmt.Sprintf("http://localhost:8080/uploads/%s", filename),
+	})
+}
+
+func (ac *AdminController) logAudit(adminID, action, targetType, targetID, detail, ip string) {
+	// Bersihkan IP dari port secara paksa agar PostgreSQL 'inet' tidak eror
+	cleanIP := ip
+	if strings.Contains(ip, ":") {
+		host, _, err := net.SplitHostPort(ip)
+		if err == nil {
+			cleanIP = host
+		} else {
+			// Jika gagal (mungkin IPv6 tanpa port), buang bagian setelah titik dua terakhir jika ada
+			if idx := strings.LastIndex(ip, "]:"); idx != -1 {
+				cleanIP = ip[1:idx]
+			} else if !strings.Contains(ip, "[") && strings.Count(ip, ":") == 1 {
+				// IPv4:port
+				cleanIP = strings.Split(ip, ":")[0]
+			}
+		}
+	}
+	// Fallback jika masih loopback IPv6 atau format aneh
+	if cleanIP == "::1" || cleanIP == "[::1]" || cleanIP == "127.0.0.1" {
+		cleanIP = "127.0.0.1"
+	}
+
+	// Jika adminID bukan UUID valid (seperti "admin"), cari ID admin pertama dari DB
+	if len(adminID) < 32 {
+		var firstAdmin models.User
+		ac.DB.Where("role IN ?", []string{"admin", "superadmin"}).First(&firstAdmin)
+		adminID = firstAdmin.ID
+	}
+	if adminID == "" {
+		adminID = "00000000-0000-0000-0000-000000000000" // Fallback nil UUID
+	}
+
 	ac.DB.Create(&models.AuditLog{
 		AdminID:    adminID,
 		Action:     action,
 		TargetType: targetType,
 		TargetID:   targetID,
 		Detail:     detail,
-		IPAddress:  ip,
+		IPAddress:  cleanIP,
 	})
 }
 
@@ -58,8 +131,8 @@ func (ac *AdminController) GetUsers(w http.ResponseWriter, r *http.Request) {
 		query = query.Where("status = ?", status)
 	}
 	if search != "" {
-		like := "%" + strings.ToLower(search) + "%"
-		query = query.Where("email ILIKE ? OR phone ILIKE ?", like, like)
+		// Kita tambahkan pencarian berdasarkan ID juga agar fitur Edit bisa memanggil data lewat ID
+		query = query.Where("email ILIKE ? OR phone ILIKE ? OR CAST(id AS TEXT) = ?", "%"+search+"%", "%"+search+"%", search)
 	}
 
 	var users []models.User
@@ -115,8 +188,11 @@ func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.URL.Query().Get("id")
-	ac.DB.Where("id = ?", id).Delete(&models.User{})
-	ac.logAudit("admin", "delete_user", "user", id, "soft deleted", r.RemoteAddr)
+	if err := ac.DB.Delete(&models.User{}, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus user")
+		return
+	}
+	ac.logAudit("admin", "delete_user", "user", id, "suspended", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -311,7 +387,7 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 		Select("omg.id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, omg.total_amount, omg.created_at").
 		Joins("JOIN merchants m ON m.id = omg.merchant_id").
 		Joins("JOIN orders o ON o.id = omg.order_id").
-		Joins("JOIN users u ON u.id = o.user_id").
+		Joins("JOIN users u ON u.id = o.buyer_id").
 		Joins("JOIN user_profiles up ON up.user_id = u.id")
 
 	if status != "" {
@@ -388,21 +464,22 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.URL.Query().Get("merchant_id")
 
 	type ProductRow struct {
-		ID         string    `json:"id"`
-		Name       string    `json:"name"`
-		Slug       string    `json:"slug"`
-		Price      float64   `json:"price"`
-		Status     string    `json:"status"`
-		MerchantID string    `json:"merchant_id"`
-		StoreName  string    `json:"store_name"`
-		Category   string    `json:"category"`
-		CreatedAt  time.Time `json:"created_at"`
+		ID          string    `json:"id"`
+		Name        string    `json:"name"`
+		Description string    `json:"description"`
+		Slug        string    `json:"slug"`
+		Price       float64   `json:"price"`
+		Status      string    `json:"status"`
+		MerchantID  string    `json:"merchant_id"`
+		StoreName   string    `json:"store_name"`
+		Category    string    `json:"category"`
+		Image       string    `json:"image"`
+		CreatedAt   time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("products p").
-		Select("p.id, p.name, p.slug, p.price, p.status, p.merchant_id, m.store_name, p.category, p.created_at").
-		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id").
-		Where("p.deleted_at IS NULL")
+		Select("p.id, p.name, p.description, p.image, p.slug, p.price, p.status, p.merchant_id, m.store_name, p.category, p.created_at").
+		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id")
 
 	if status != "" {
 		query = query.Where("p.status = ?", status)
@@ -412,7 +489,8 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	if search != "" {
 		like := "%" + strings.ToLower(search) + "%"
-		query = query.Where("p.name ILIKE ?", like)
+		// Cari berdasarkan Nama, Deskripsi, ATAU ID (dengan CAST ke text)
+		query = query.Where("p.name ILIKE ? OR p.description ILIKE ? OR CAST(p.id AS TEXT) = ?", like, like, search)
 	}
 
 	var rows []ProductRow
@@ -451,9 +529,12 @@ func (ac *AdminController) DeleteProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	id := r.URL.Query().Get("id")
-	// Soft delete using DB.Table if the model has DeletedAt
-	ac.DB.Table("products").Where("id = ?", id).Update("deleted_at", time.Now())
-	ac.logAudit("admin", "delete_product", "product", id, "soft deleted", r.RemoteAddr)
+	// HAPUS PERMANEN (Hard Delete) - Data benar-benar hilang dari database
+	if err := ac.DB.Unscoped().Delete(&models.Product{}, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus produk secara permanen")
+		return
+	}
+	ac.logAudit("admin", "delete_product_permanent", "product", id, "purged from database", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -472,21 +553,84 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 	// Default to SahabatMart Official if no merchant selected (for super admin)
 	if p.MerchantID == "" {
 		var m models.Merchant
-		ac.DB.Where("store_name = ?", "SahabatMart Official").First(&m)
+		err := ac.DB.Where("store_name = ?", "SahabatMart Official").First(&m).Error
+		if err != nil {
+			// Find first admin to link the merchant
+			var admin models.User
+			ac.DB.Where("role IN ?", []string{"admin", "superadmin"}).First(&admin)
+			
+			// Benar-benar tidak ada merchant, buatkan satu official terkait admin
+			m = models.Merchant{
+				UserID:    admin.ID,
+				StoreName: "SahabatMart Official",
+				Slug:      "sahabatmart-official",
+				Status:    "active",
+			}
+			ac.DB.Create(&m)
+		}
 		p.MerchantID = m.ID
 	}
 
 	if p.Slug == "" {
 		p.Slug = strings.ToLower(strings.ReplaceAll(p.Name, " ", "-"))
+		// Tambahkan suffix timestamp agar slug unik
+		p.Slug = fmt.Sprintf("%s-%d", p.Slug, time.Now().Unix()%1000)
 	}
 
 	if err := ac.DB.Create(&p).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to create product")
+		fmt.Printf("❌ Database Error: %v\n", err) // Log ke terminal backend untuk debug
+		utils.JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Database Error: %v", err))
 		return
 	}
 
 	ac.logAudit("admin", "create_product", "product", p.ID, p.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{"status": "success", "data": p})
+}
+
+// PUT /api/admin/products/update
+func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		ID          string  `json:"id"`
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		OldPrice    float64 `json:"old_price"`
+		Category    string  `json:"category"`
+		Brand       string  `json:"brand"`
+		Attributes  string  `json:"attributes"`
+		Stock       int     `json:"stock"`
+		Image       string  `json:"image"`
+		Status      string  `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"name":        req.Name,
+		"description": req.Description,
+		"price":       req.Price,
+		"old_price":   req.OldPrice,
+		"category":    req.Category,
+		"brand":       req.Brand,
+		"attributes":  req.Attributes,
+		"stock":       req.Stock,
+		"image":       req.Image,
+		"status":      req.Status,
+	}
+
+	if err := ac.DB.Table("products").Where("id = ?", req.ID).Updates(updates).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Failed to update product")
+		return
+	}
+
+	ac.logAudit("admin", "update_product", "product", req.ID, req.Name, r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -498,26 +642,20 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 	var totalRevenue, totalPlatformFee, pendingPayout, totalInsurance float64
 	var totalOrders, completedOrders int64
 
-	if ac.hasTable("order_merchant_groups") {
-		ac.DB.Table("order_merchant_groups").
-			Where("status = 'completed'").
-			Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalPlatformFee)
-
-		ac.DB.Table("order_merchant_groups").
-			Where("status = 'completed'").
-			Select("COALESCE(SUM(insurance_fee), 0)").Scan(&totalInsurance)
-
-		ac.DB.Table("order_merchant_groups").
-			Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
-
-		ac.DB.Table("order_merchant_groups").Count(&totalOrders)
-		ac.DB.Table("order_merchant_groups").Where("status = 'completed'").Count(&completedOrders)
+	if ac.hasTable("wallets") {
+		ac.DB.Table("wallets").Select("COALESCE(SUM(balance), 0)").Scan(&totalRevenue)
+		ac.DB.Table("wallets").Select("COALESCE(SUM(pending_balance), 0)").Scan(&pendingPayout)
 	}
 
-	if ac.hasTable("payout_requests") {
-		ac.DB.Table("payout_requests").
-			Where("status = 'pending'").
-			Select("COALESCE(SUM(amount), 0)").Scan(&pendingPayout)
+	if ac.hasTable("wallet_transactions") {
+		ac.DB.Table("wallet_transactions").
+			Where("type = ?", models.TxPlatformFee).
+			Select("COALESCE(SUM(amount), 0)").Scan(&totalPlatformFee)
+	}
+
+	if ac.hasTable("orders") {
+		ac.DB.Model(&models.Order{}).Count(&totalOrders)
+		ac.DB.Model(&models.Order{}).Where("status = ?", models.OrderCompleted).Count(&completedOrders)
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -607,6 +745,91 @@ func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Requ
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data":   rows,
+	})
+}
+
+// GET /api/admin/finance/ledger  → list mutasi saldo finansial (Audit Trail)
+func (ac *AdminController) GetFinanceLedger(w http.ResponseWriter, r *http.Request) {
+	if !ac.hasTable("wallet_transactions") {
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"data":   []interface{}{},
+		})
+		return
+	}
+
+	var rows []models.WalletTransaction
+	ac.DB.Order("created_at DESC").Limit(500).Find(&rows)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   rows,
+	})
+}
+
+// GET /api/admin/orders/:id  → Detail pesanan lengkap (Req 1, 6)
+func (ac *AdminController) GetOrderDetail(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/admin/orders/")
+	var order models.Order
+	if err := ac.DB.Preload("MerchantGroups.Items").First(&order, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Order not found")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   order,
+	})
+}
+
+// POST /api/admin/orders/status → Update status dengan State Machine (Req 1)
+func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OrderID string            `json:"order_id"`
+		Status  models.OrderStatus `json:"status"`
+		Note    string            `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
+		return
+	}
+
+	var order models.Order
+	if err := ac.DB.First(&order, "id = ?", req.OrderID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Order not found")
+		return
+	}
+
+	// Validate Transition (Req 1)
+	if err := utils.ValidateOrderTransition(order.Status, req.Status); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Update Status
+	oldStatus := order.Status
+	order.Status = req.Status
+	if req.Status == models.OrderCompleted {
+		now := time.Now()
+		order.CompletedAt = &now
+	}
+
+	if err := ac.DB.Save(&order).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Failed to update status")
+		return
+	}
+
+	// Audit Trail (Req 9)
+	adminID := "admin-system"
+	utils.LogAudit(ac.DB, adminID, "update_order_status", "order", order.ID, fmt.Sprintf("Changed status from %s to %s. Note: %s", oldStatus, req.Status, req.Note), oldStatus, req.Status, r.RemoteAddr, r.UserAgent())
+
+	// If status is PAID, trigger background work (Commissions, etc - Req 13)
+	if req.Status == models.OrderPaid {
+		// Mock triggering commission approval/processing
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Order status updated successfully",
 	})
 }
 

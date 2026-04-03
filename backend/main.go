@@ -22,10 +22,18 @@ var DB *gorm.DB
 func ConnectDB() {
 	dsn := buildDSN()
 	var err error
+	
+	// Print DSN (tanpa password) untuk debugging
+	maskedDSN := dsn
+	if pwd := os.Getenv("DB_PASSWORD"); pwd != "" {
+		maskedDSN = strings.ReplaceAll(dsn, pwd, "******")
+	}
+	fmt.Printf("🔍 Connecting to DB with DSN: %s\n", maskedDSN)
 
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("❌ Gagal menyambung ke PostgreSQL: %v\n=> Pastikan service PostgreSQL sedang aktif.", err)
+		log.Printf("❌ Gagal menyambung: %v\n", err)
+		log.Fatalf("⚠️ TIPS: Cobalah jalankan command ini: createdb %s", getEnv("DB_NAME", "sahabatmart"))
 	}
 
 	// Automigrate
@@ -38,10 +46,20 @@ func ConnectDB() {
 		&models.Voucher{}, &models.Dispute{}, &models.LogisticChannel{},
 		&models.AffiliateClick{}, &models.Region{}, &models.AdminNotification{},
 		&models.BlogPost{}, &models.Product{}, &models.Banner{},
+		// New robust models
+		&models.Order{}, &models.OrderMerchantGroup{}, &models.OrderItem{}, &models.OrderStatusHistory{},
+		&models.Wallet{}, &models.WalletTransaction{}, &models.WithdrawalRequest{}, &models.Refund{},
+		&models.AffiliateMember{}, &models.MembershipTier{}, &models.AffiliateCommission{}, &models.AffiliateLink{}, &models.AffiliateClickLog{},
+		&models.CommissionRule{}, &models.Payment{}, &models.PaymentWebhook{},
 	)
 	if err != nil {
 		log.Fatalf("❌ Gagal melakukan AutoMigrate: %v", err)
 	}
+
+	// Start Background Workers (Req 14)
+	utils.StartBackgroundJobs(DB)
+
+	log.Println("🚀 Database migrated & background jobs started!")
 
 	// Seed Data
 	SeedDatabase(DB)
@@ -68,12 +86,10 @@ func buildDSN() string {
 	name := getEnv("DB_NAME", "sahabatmart")
 	port := getEnv("DB_PORT", "5432")
 	sslMode := getEnv("DB_SSLMODE", "disable")
-	timezone := getEnv("DB_TIMEZONE", "Asia/Jakarta")
 
-	return fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
-		host, user, password, name, port, sslMode, timezone,
-	)
+	// Format URL: postgres://user:password@host:port/dbname?sslmode=disable
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", 
+		user, password, host, port, name, sslMode)
 }
 
 func SeedDatabase(db *gorm.DB) {
@@ -128,6 +144,45 @@ func SeedDatabase(db *gorm.DB) {
 		db.Create(&official)
 	}
 
+	// 4. Brands & Merchants
+	brands := []models.Brand{
+		{Name: "Apple", LogoURL: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg"},
+		{Name: "Samsung", LogoURL: "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg"},
+		{Name: "Sony", LogoURL: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg"},
+		{Name: "Nike", LogoURL: "https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg"},
+	}
+	db.Create(&brands)
+
+	// 5. Products (Dummy Data)
+	var merchant models.Merchant
+	db.Where("store_name = ?", "SahabatMart Official").First(&merchant)
+	
+	if merchant.ID != "" {
+		products := []models.Product{
+			{Name: "MacBook Pro 16 M3 Max", Description: "Vibrant Liquid Retina XDR display with up to 1000 nits.", Price: 52999000, Category: "Elektronik", Brand: "Apple", Stock: 10, Image: "https://images.unsplash.com/photo-1517336714460-4c3d7907576a?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "macbook-m3-max"},
+			{Name: "Sony PlayStation 5 Pro", Description: "Unleash new gaming possibilities with the PS5 Pro.", Price: 11500000, Category: "Gaming", Brand: "Sony", Stock: 25, Image: "https://images.unsplash.com/photo-1606144042614-b2517ae7c3bc?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "ps5-pro-core"},
+			{Name: "AirPods Pro Gen 2", Description: "Up to 2x more Active Noise Cancellation.", Price: 3999000, Category: "Elektronik", Brand: "Apple", Stock: 200, Image: "https://images.unsplash.com/photo-1588423770186-80f099331677?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "airpods-pro-2"},
+			{Name: "Nike Dunk Low Retro", Description: "Classic basketball icon returns with crisp overlays.", Price: 1549000, Category: "Fashion", Brand: "Nike", Stock: 45, Image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "nike-dunk-low"},
+		}
+		db.Create(&products)
+	}
+
+	// 6. Vouchers
+	vouchers := []models.Voucher{
+		{Code: "PROMOID", Title: "Lebaran Promo", DiscountValue: 50000, MinOrder: 500000, Status: "active"},
+		{Code: "UPGRADE2026", Title: "Tech Upgrade", DiscountValue: 100000, MinOrder: 2000000, Status: "active"},
+	}
+	db.Create(&vouchers)
+
+	// 3. Merapikan Atribut (Sinkronisasi agar tidak satu-satu)
+	db.Exec("DELETE FROM attributes") // Hapus data lama yang berantakan
+	attrs := []models.Attribute{
+		{Name: "Ukuran", Values: "XS, S, M, L, XL, XXL, XXXL, 36, 37, 38, 39, 40, 41, 42, 43, 44"},
+		{Name: "Warna", Values: "HITAM, PUTIH, MERAH, BIRU, HIJAU, KUNING, ORANGE, HIJAU"},
+		{Name: "Bahan", Values: "Katun, Kulit, Sintetis, Kanvas, Besi, Kayu"},
+	}
+	db.Create(&attrs)
+
 	// Categories
 	categories := []models.Category{
 		{Name: "Elektronik", Slug: "elektronik", Order: 1},
@@ -140,7 +195,6 @@ func SeedDatabase(db *gorm.DB) {
 		db.Where("name = ?", c.Name).FirstOrCreate(&c)
 	}
 
-	// Products
 	products := []models.Product{
 		{
 			MerchantID: official.ID, Name: "Galaxy Tab S6 Lite 10.4-inch", Slug: "galaxy-tab-s6-lite",
@@ -218,7 +272,11 @@ func main() {
 	mux.HandleFunc("/api/auth/register", authController.Register)
 	mux.HandleFunc("/api/auth/login", authController.Login)
 
+	// Serve Uploaded Files
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+
 	// Admin API
+	handleAdmin(mux, "/api/admin/upload", adminController.UploadImage)
 	handleAdmin(mux, "/api/admin/overview", adminController.GetOverview)
 	handleAdmin(mux, "/api/admin/users", adminController.GetUsers)
 	handleAdmin(mux, "/api/admin/users/stats", adminController.GetUserStats)
@@ -229,11 +287,14 @@ func main() {
 	handleAdmin(mux, "/api/admin/merchants/status", adminController.UpdateMerchantStatus)
 	handleAdmin(mux, "/api/admin/merchants/verify", adminController.VerifyMerchant)
 	handleAdmin(mux, "/api/admin/orders", adminController.GetAllOrders)
+	handleAdmin(mux, "/api/admin/orders/", adminController.GetOrderDetail)
+	handleAdmin(mux, "/api/admin/orders/status", adminController.UpdateOrderStatus)
 	handleAdmin(mux, "/api/admin/affiliates", adminController.GetAffiliates)
 	handleAdmin(mux, "/api/admin/affiliates/configs", adminController.GetAffiliateConfigs)
 	handleAdmin(mux, "/api/admin/affiliates/config", adminController.UpsertAffiliateConfig)
 	handleAdmin(mux, "/api/admin/products", adminController.GetProducts)
 	handleAdmin(mux, "/api/admin/products/add", adminController.AddProduct)
+	handleAdmin(mux, "/api/admin/products/update", adminController.UpdateProduct)
 	handleAdmin(mux, "/api/admin/products/moderate", adminController.ModerateProduct)
 	handleAdmin(mux, "/api/admin/products/delete", adminController.DeleteProduct)
 	handleAdmin(mux, "/api/admin/categories", adminController.GetCategories)
@@ -242,6 +303,7 @@ func main() {
 	handleAdmin(mux, "/api/admin/finance", adminController.GetFinance)
 	handleAdmin(mux, "/api/admin/finance/monthly", adminController.GetMonthlyRevenue)
 	handleAdmin(mux, "/api/admin/finance/transactions", adminController.GetTransactions)
+	handleAdmin(mux, "/api/admin/finance/ledger", adminController.GetFinanceLedger)
 	handleAdmin(mux, "/api/admin/commissions/category", adminController.ManageCommissions)
 	handleAdmin(mux, "/api/admin/commissions/merchant", adminController.ManageMerchantCommissions)
 	handleAdmin(mux, "/api/admin/commissions/bulk", adminController.BulkUpdateCommissions)

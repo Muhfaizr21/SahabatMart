@@ -1,165 +1,218 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
+const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
+
+/* ─── Styles ─────────────────────────────────────────────── */
+const S = {
+  page: { fontFamily: "'Inter', sans-serif" },
+  alertBox: {
+    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px',
+    background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, marginBottom: 20,
+  },
+  card: { background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden' },
+  cardHeader: { padding: '18px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  tableTitle: { fontSize: 16, fontWeight: 700, color: '#0f172a' },
+  tableSub: { fontSize: 13, color: '#94a3b8', marginTop: 2 },
+  searchWrap: { position: 'relative' },
+  searchInput: { paddingLeft: 36, paddingRight: 12, paddingTop: 8, paddingBottom: 8, borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', width: 220 },
+  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 17 },
+  thCell: { padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.6px', textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', background: '#f8fafc' },
+  tdCell: { padding: '14px 16px', borderBottom: '1px solid #f8fafc', verticalAlign: 'middle' },
+  avatar: { width: 44, height: 44, borderRadius: 10, objectFit: 'cover', border: '1px solid #f1f5f9', background: '#f8fafc' },
+  approveBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, border: 'none', background: '#d1fae5', color: '#065f46', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' },
+  rejectBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, border: 'none', background: '#fff1f2', color: '#be123c', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' },
+};
 
 export default function AdminModeration() {
   const [products, setProducts] = useState([]);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [search, setSearch]       = useState('');
-  const [loading, setLoading]     = useState(true);
-  const [msg, setMsg]             = useState('');
-  const [error, setError]         = useState('');
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
-  const load = () => {
-    const params = new URLSearchParams();
-    if (filterStatus) params.append('status', filterStatus);
-    if (search)       params.append('search', search);
-    fetchJson(API + '/products?' + params)
-      .then(d => {
-        setProducts(d.data || []);
-        setError('');
-      })
-      .catch((err) => {
-        setProducts([]);
-        setError(err.message || 'Gagal memuat data moderasi produk');
-      })
+  const loadPending = () => {
+    setLoading(true);
+    fetchJson(`${API}/products?status=pending&search=${search}`)
+      .then(d => setProducts(d.data || []))
+      .catch(err => console.error(err))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (filterStatus) params.append('status', filterStatus);
-    fetchJson(API + '/products?' + params)
-      .then(d => {
-        setProducts(d.data || []);
-        setError('');
-      })
-      .catch((err) => {
-        setProducts([]);
-        setError(err.message || 'Gagal memuat data moderasi produk');
-      })
-      .finally(() => setLoading(false));
-  }, [filterStatus]);
+  useEffect(() => { loadPending(); }, []);
 
-  const handleSearch = e => { e.preventDefault(); setLoading(true); load(); };
-
-  const moderate = (id, active) => {
-    const nextStatus = active ? 'active' : 'taken_down';
-    fetch(API + '/products/moderate', {
+  const moderate = (id, status, note) => {
+    if (!window.confirm('Konfirmasi tindakan moderasi ini?')) return;
+    setLoading(true);
+    fetchJson(`${API}/products/moderate`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status: nextStatus, note: 'Moderated via admin moderation page' }),
-    }).then(() => {
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, status: nextStatus } : p));
-      setMsg(`Produk berhasil ${active ? 'diaktifkan' : 'dinonaktifkan'}`);
-      setTimeout(() => setMsg(''), 2500);
-    });
+      body: JSON.stringify({ id, status, note })
+    }).then(() => loadPending())
+      .catch(err => alert(err.message));
   };
-
-  const deleteProduct = id => {
-    if (!window.confirm('Hapus produk ini secara permanen?')) return;
-    fetch(API + '/products/delete?id=' + id, { method: 'DELETE' })
-      .then(() => {
-        setProducts(prev => prev.filter(p => p.id !== id));
-        setMsg('Produk berhasil dihapus');
-        setTimeout(() => setMsg(''), 2500);
-      });
-  };
-
-  const fmtRp = n => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
   return (
-    <>
-      <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
-        <div className="breadcrumb-title pe-3">Super Admin</div>
-        <div className="ps-3"><nav><ol className="breadcrumb mb-0 p-0">
-          <li className="breadcrumb-item active">Moderasi Produk</li>
-        </ol></nav></div>
+    <div style={S.page} className="fade-in">
+      {/* Breadcrumb */}
+      <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>Quality Control</span>
+        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
+        <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Moderasi Konten</span>
       </div>
 
-      {msg && (
-        <div className="alert alert-success alert-dismissible py-2 mb-3" role="alert">
-          <i className="bi bi-check-circle me-2"></i>{msg}
+      {/* Alert Banner */}
+      <div style={S.alertBox}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+          <i className="bx bx-shield-quarter" />
         </div>
-      )}
-      {error && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
-
-      <div className="card radius-10">
-        <div className="card-body">
-          {/* Filter */}
-          <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
-            <form onSubmit={handleSearch} className="d-flex gap-2 flex-grow-1">
-              <input type="text" className="form-control form-control-sm" style={{ maxWidth: 280 }}
-                placeholder="Cari nama produk..." value={search} onChange={e => setSearch(e.target.value)} />
-              <button className="btn btn-sm btn-primary" type="submit"><i className="bi bi-search"></i></button>
-            </form>
-            <select className="form-select form-select-sm" style={{ width: 160 }}
-              value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="">Semua Produk</option>
-              <option value="active">Aktif</option>
-              <option value="inactive">Nonaktif</option>
-            </select>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}>Antrian Moderasi Aktif</div>
+          <div style={{ fontSize: 12.5, color: '#b45309', marginTop: 2 }}>
+            Semua produk yang disubmit oleh merchant membutuhkan persetujuan sebelum ditampilkan ke storefront.
           </div>
-
-          {loading ? (
-            <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th>Produk</th>
-                    <th>Toko</th>
-                    <th>Harga</th>
-                    <th>Status</th>
-                    <th>Tgl Dibuat</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center text-muted py-4">Tidak ada produk</td></tr>
-                  ) : products.map(p => (
-                    <tr key={p.id}>
-                      <td className="fw-medium">{p.name}</td>
-                      <td><span className="badge bg-primary bg-opacity-10 text-primary">{p.store_name || '—'}</span></td>
-                      <td>{fmtRp(p.price)}</td>
-                      <td>
-                        {p.status === 'active'
-                          ? <span className="badge bg-success bg-opacity-10 text-success"><i className="bi bi-circle-fill me-1" style={{ fontSize: 8 }}></i>Aktif</span>
-                          : <span className="badge bg-secondary bg-opacity-10 text-secondary"><i className="bi bi-circle me-1" style={{ fontSize: 8 }}></i>Nonaktif</span>}
-                      </td>
-                      <td className="text-muted small">
-                        {p.created_at ? new Date(p.created_at).toLocaleDateString('id-ID') : '—'}
-                      </td>
-                      <td>
-                        <div className="d-flex gap-1">
-                          {p.status === 'active' ? (
-                            <button className="btn btn-xs btn-outline-warning" title="Nonaktifkan"
-                              onClick={() => moderate(p.id, false)}>
-                              <i className="bi bi-eye-slash"></i>
-                            </button>
-                          ) : (
-                            <button className="btn btn-xs btn-outline-success" title="Aktifkan"
-                              onClick={() => moderate(p.id, true)}>
-                              <i className="bi bi-eye"></i>
-                            </button>
-                          )}
-                          <button className="btn btn-xs btn-outline-danger" title="Hapus"
-                            onClick={() => deleteProduct(p.id)}>
-                            <i className="bi bi-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+        <span style={{ padding: '4px 12px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontSize: 12, fontWeight: 700, border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+          {products.length} Menunggu
+        </span>
       </div>
-    </>
+
+      <div style={S.card}>
+        {/* Header */}
+        <div style={S.cardHeader}>
+          <div>
+            <div style={S.tableTitle}>Produk Menunggu Review</div>
+            <div style={S.tableSub}>Tinjau dan berikan keputusan untuk setiap produk</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={S.searchWrap}>
+              <i className="bx bx-search" style={S.searchIcon} />
+              <input
+                type="search"
+                style={S.searchInput}
+                placeholder="Cari produk..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && loadPending()}
+              />
+            </div>
+            <button onClick={loadPending} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <i className="bx bx-refresh" style={{ fontSize: 18 }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <div className="spinner-border" style={{ color: '#4361ee', width: 32, height: 32, borderWidth: 3 }} />
+            <div style={{ marginTop: 12, fontSize: 13, color: '#94a3b8' }}>Memuat antrian moderasi...</div>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
+              <thead>
+                <tr>
+                  {[['Produk', 'left', 24], ['Merchant', 'left', 16], ['Trust Score', 'left', 16], ['Harga', 'left', 16], ['Keputusan', 'right', 24]].map(([h, align, pl]) => (
+                    <th key={h} style={{ ...S.thCell, textAlign: align, paddingLeft: pl, paddingRight: h === 'Keputusan' ? 24 : 16 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '64px 0', color: '#94a3b8' }}>
+                      <i className="bx bx-check-shield" style={{ fontSize: 48, display: 'block', marginBottom: 12, opacity: 0.3 }} />
+                      <div style={{ fontWeight: 600, fontSize: 15, color: '#475569', marginBottom: 6 }}>Antrian bersih</div>
+                      <div style={{ fontSize: 13 }}>Tidak ada produk yang menunggu review saat ini.</div>
+                    </td>
+                  </tr>
+                ) : products.map((p, idx) => (
+                  <tr key={p.id}
+                    style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fffdf0'}
+                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+                  >
+                    {/* Produk */}
+                    <td style={{ ...S.tdCell, paddingLeft: 24 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <img
+                          src={p.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=fef3c7&color=b45309&size=100`}
+                          style={S.avatar} alt=""
+                        />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{p.name}</div>
+                          <div style={{ fontSize: 11.5, color: '#94a3b8', fontFamily: 'monospace', marginTop: 2 }}>
+                            #{p.id.slice(0, 8).toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Merchant */}
+                    <td style={S.tdCell}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: '#eff6ff', color: '#2563eb', fontSize: 12, fontWeight: 600 }}>
+                        <i className="bx bx-store" style={{ fontSize: 13 }} />
+                        {p.store_name || '—'}
+                      </span>
+                    </td>
+
+                    {/* Trust Score */}
+                    <td style={S.tdCell}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, borderRadius: 99, background: '#f1f5f9', overflow: 'hidden' }}>
+                          <div style={{ width: '85%', height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: 99 }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#059669', width: 34, textAlign: 'right' }}>85%</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Skor kepercayaan optimal</div>
+                    </td>
+
+                    {/* Harga */}
+                    <td style={S.tdCell}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{fmt(p.price)}</div>
+                    </td>
+
+                    {/* Actions */}
+                    <td style={{ ...S.tdCell, paddingRight: 24, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                        <button
+                          style={S.approveBtn}
+                          onClick={() => moderate(p.id, 'active', 'Disetujui oleh Admin')}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#a7f3d0'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#d1fae5'; }}
+                        >
+                          <i className="bx bx-check-circle" style={{ fontSize: 16 }} /> Setujui
+                        </button>
+                        <button
+                          style={S.rejectBtn}
+                          onClick={() => moderate(p.id, 'taken_down', 'Melanggar kebijakan platform')}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#fecdd3'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#fff1f2'; }}
+                        >
+                          <i className="bx bx-x-circle" style={{ fontSize: 16 }} /> Tolak
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer */}
+        {!loading && products.length > 0 && (
+          <div style={{ padding: '12px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, color: '#94a3b8' }}>
+              <strong style={{ color: '#d97706' }}>{products.length}</strong> produk menunggu keputusan
+            </span>
+            <span style={{ fontSize: 12, color: '#cbd5e1' }}>
+              Diperbarui: {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

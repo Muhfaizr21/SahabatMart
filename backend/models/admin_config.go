@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // PlatformConfig menyimpan pengaturan global platform
@@ -214,7 +216,9 @@ type Product struct {
 	Stock       int       `gorm:"default:0" json:"stock"`
 	Category    string    `gorm:"type:varchar(100)" json:"category"`
 	Brand       string    `gorm:"type:varchar(100)" json:"brand"`
-	Image       string    `gorm:"type:text" json:"image"`
+	Attributes  string     `gorm:"type:text" json:"attributes"` // JSON: {color: "red", size: "XL"}
+	Image       string     `gorm:"type:text" json:"image"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 	Rating      float64   `gorm:"type:decimal(2,1);default:0" json:"rating"`
 	Reviews     int       `gorm:"default:0" json:"reviews"`
 	Badge       string    `gorm:"type:varchar(50)" json:"badge"`

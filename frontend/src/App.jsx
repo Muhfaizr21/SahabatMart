@@ -53,6 +53,7 @@ import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminProductList from './pages/admin/ProductList';
 import AdminAddProduct from './pages/admin/AddProduct';
+import AdminEditProduct from './pages/admin/EditProduct';
 import AdminOrders from './pages/admin/Orders';
 import AdminOrderDetail from './pages/admin/OrderDetail';
 import AdminUsers from './pages/admin/Users';
@@ -149,6 +150,7 @@ export default function App() {
             {/* Products */}
             <Route path="products" element={<AdminProductList />} />
             <Route path="products/add" element={<AdminAddProduct />} />
+            <Route path="products/edit" element={<AdminEditProduct />} />
             <Route path="categories" element={<AdminCategories />} />
             {/* Orders */}
             <Route path="orders" element={<AdminOrders />} />

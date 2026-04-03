@@ -188,140 +188,118 @@ const AdminLayout = () => {
             {/* ── Overview ─────────────────────────────── */}
             <li>
               <Link to="/admin">
-                <div className="parent-icon"><i className="bi bi-speedometer2"></i></div>
-                <div className="menu-title">Dashboard</div>
+                <div className="parent-icon"><i className="bx bxs-dashboard"></i></div>
+                <div className="menu-title">Dashboard Overview</div>
               </Link>
             </li>
 
-            <li className="menu-label">Manajemen Pengguna</li>
+            <li className="menu-label">User Ecosystem</li>
 
             {/* ── Users ───────────────────────────────── */}
             <li>
               <a href="javascript:;" className="has-arrow">
-                <div className="parent-icon"><i className="bi bi-people-fill"></i></div>
-                <div className="menu-title">Pengguna & Member</div>
+                <div className="parent-icon"><i className="bx bxs-user-account"></i></div>
+                <div className="menu-title">Users & Members</div>
               </a>
               <ul>
-                <li><Link to="/admin/users"><i className="bi bi-circle"></i>Semua Pengguna</Link></li>
-                <li><Link to="/admin/affiliates"><i className="bi bi-circle"></i>Member Affiliate</Link></li>
+                <li><Link to="/admin/users"><i className="bx bx-circle"></i>Platform Users</Link></li>
+                <li><Link to="/admin/affiliates"><i className="bx bx-circle"></i>Affiliate Members</Link></li>
               </ul>
             </li>
 
             {/* ── Merchants ───────────────────────────── */}
             <li>
               <Link to="/admin/merchants">
-                <div className="parent-icon"><i className="bi bi-shop-window"></i></div>
-                <div className="menu-title">Kelola Merchant</div>
+                <div className="parent-icon"><i className="bx bxs-store-alt"></i></div>
+                <div className="menu-title">Merchant Management</div>
               </Link>
             </li>
 
-            <li className="menu-label">Produk & Katalog</li>
+            <li className="menu-label">Product Catalog</li>
 
             {/* ── Products ────────────────────────────── */}
             <li>
               <a href="javascript:;" className="has-arrow">
-                <div className="parent-icon"><i className="bi bi-box-seam-fill"></i></div>
-                <div className="menu-title">Produk</div>
+                <div className="parent-icon"><i className="bx bxs-package"></i></div>
+                <div className="menu-title">Products Monitoring</div>
               </a>
               <ul>
-                <li><Link to="/admin/products"><i className="bi bi-circle"></i>Daftar Produk</Link></li>
-                <li><Link to="/admin/products/add"><i className="bi bi-circle"></i>Tambah Produk</Link></li>
-                <li><Link to="/admin/categories"><i className="bi bi-circle"></i>Kategori</Link></li>
-                <li><Link to="/admin/brands"><i className="bi bi-circle"></i>Brand / Merk</Link></li>
-                <li><Link to="/admin/attributes"><i className="bi bi-circle"></i>Atribut Global</Link></li>
-                <li><Link to="/admin/moderation"><i className="bi bi-circle"></i>Moderasi Produk</Link></li>
+                <li><Link to="/admin/products"><i className="bx bx-circle"></i>Product List</Link></li>
+                <li><Link to="/admin/products/add"><i className="bx bx-circle"></i>Direct Publish</Link></li>
+                <li><Link to="/admin/categories"><i className="bx bx-circle"></i>Categories</Link></li>
+                <li><Link to="/admin/brands"><i className="bx bx-circle"></i>Brands</Link></li>
+                <li><Link to="/admin/attributes"><i className="bx bx-circle"></i>Global Attributes</Link></li>
+                <li><Link to="/admin/moderation"><i className="bx bx-circle"></i>Moderation Queue</Link></li>
               </ul>
             </li>
 
             {/* ── Orders ──────────────────────────────── */}
             <li>
               <a href="javascript:;" className="has-arrow">
-                <div className="parent-icon"><i className="bi bi-bag-check-fill"></i></div>
-                <div className="menu-title">Pesanan & Sengketa</div>
+                <div className="parent-icon"><i className="bx bxs-receipt"></i></div>
+                <div className="menu-title">Order Lifecycle</div>
               </a>
               <ul>
-                <li><Link to="/admin/orders"><i className="bi bi-circle"></i>Semua Pesanan</Link></li>
-                <li><Link to="/admin/disputes"><i className="bi bi-circle"></i>Sengketa (Dispute)</Link></li>
+                <li><Link to="/admin/orders"><i className="bx bx-circle"></i>Order History</Link></li>
+                <li><Link to="/admin/disputes"><i className="bx bx-circle"></i>Dispute Arbitration</Link></li>
               </ul>
             </li>
 
-            <li className="menu-label">Pemasaran & Logistik</li>
+            <li className="menu-label">Marketing & Logistics</li>
             <li>
               <Link to="/admin/vouchers">
-                <div className="parent-icon"><i className="bi bi-ticket-perforated-fill"></i></div>
-                <div className="menu-title">Voucher Platform</div>
+                <div className="parent-icon"><i className="bx bxs-coupon"></i></div>
+                <div className="menu-title">Platform Vouchers</div>
               </Link>
             </li>
             <li>
               <Link to="/admin/logistics">
-                <div className="parent-icon"><i className="bi bi-truck"></i></div>
-                <div className="menu-title">Saluran Logistik</div>
-              </Link>
-            </li>
-            <li>
-              <Link to="/admin/regions">
-                <div className="parent-icon"><i className="bi bi-geo-alt-fill"></i></div>
-                <div className="menu-title">Data Geografis</div>
+                <div className="parent-icon"><i className="bx bxs-truck"></i></div>
+                <div className="menu-title">Logistics & Shipping</div>
               </Link>
             </li>
 
-            <li className="menu-label">Keuangan & Komisi</li>
+            <li className="menu-label">Finance & Audit</li>
 
             {/* ── Finance ─────────────────────────────── */}
             <li>
               <Link to="/admin/finance">
-                <div className="parent-icon"><i className="bi bi-bar-chart-line-fill"></i></div>
-                <div className="menu-title">Laporan Keuangan</div>
+                <div className="parent-icon"><i className="bx bxs-bar-chart-alt-2"></i></div>
+                <div className="menu-title">Financial Ledger</div>
               </Link>
             </li>
 
             {/* ── Commissions ─────────────────────────── */}
             <li>
               <Link to="/admin/commissions">
-                <div className="parent-icon"><i className="bi bi-percent"></i></div>
-                <div className="menu-title">Konfigurasi Komisi</div>
+                <div className="parent-icon"><i className="bx bxs-percentage"></i></div>
+                <div className="menu-title">Commission Engine</div>
               </Link>
             </li>
 
             {/* ── Payouts ─────────────────────────────── */}
             <li>
               <Link to="/admin/payouts">
-                <div className="parent-icon"><i className="bi bi-wallet2"></i></div>
-                <div className="menu-title">Manajemen Payout</div>
+                <div className="parent-icon"><i className="bx bxs-wallet"></i></div>
+                <div className="menu-title">Payout Operations</div>
               </Link>
             </li>
 
-            <li className="menu-label">CMS & Konten</li>
-            <li>
-              <Link to="/admin/blogs">
-                <div className="parent-icon"><i className="bi bi-journal-richtext"></i></div>
-                <div className="menu-title">Kelola Blog</div>
-              </Link>
-            </li>
-
-            <li className="menu-label">Sistem & Keamanan</li>
-
-            {/* ── Settings ────────────────────────────── */}
-            <li>
-              <Link to="/admin/settings">
-                <div className="parent-icon"><i className="bi bi-gear-fill"></i></div>
-                <div className="menu-title">Pengaturan Platform</div>
-              </Link>
-            </li>
+            <li className="menu-label">Settings & Forensic</li>
 
             {/* ── Audit Log ───────────────────────────── */}
             <li>
               <Link to="/admin/audit">
-                <div className="parent-icon"><i className="bi bi-journal-text"></i></div>
-                <div className="menu-title">Audit Log</div>
+                <div className="parent-icon"><i className="bx bxs-file-find"></i></div>
+                <div className="menu-title">Audit Log Forensic</div>
               </Link>
             </li>
 
             {/* ── Security ────────────────────────────── */}
             <li>
               <Link to="/admin/security">
-                <div className="parent-icon"><i className="bi bi-shield-lock-fill"></i></div>
-                <div className="menu-title">Keamanan & Fraud</div>
+                <div className="parent-icon"><i className="bx bxs-shield-alt-2"></i></div>
+                <div className="menu-title">Security & Fraud</div>
               </Link>
             </li>
 

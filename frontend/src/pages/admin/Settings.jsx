@@ -4,81 +4,74 @@ import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 const API = ADMIN_API_BASE;
 
 const DEFAULT_CONFIGS = [
-  // Platform
-  { key: 'platform_name',           value: 'SahabatMart',  description: 'Nama platform',            group: 'platform' },
-  { key: 'platform_maintenance',    value: 'false',        description: 'Mode Pemeliharaan (Maintenance)', group: 'platform' },
-  { key: 'platform_maint_msg',      value: 'Kami sedang melakukan pemeliharaan rutin.', description: 'Pesan Maintenance', group: 'platform' },
-  { key: 'platform_fee_default',    value: '0.05',         description: 'Fee default platform (%)', group: 'platform' },
-  { key: 'platform_currency',       value: 'IDR',          description: 'Mata uang',                 group: 'platform' },
-  { key: 'platform_min_order',      value: '10000',        description: 'Minimum order (Rp)',        group: 'platform' },
-  // Payout
-  { key: 'payout_min_amount',       value: '50000',        description: 'Minimum payout (Rp)',       group: 'payout' },
-  { key: 'payout_schedule',         value: 'weekly',       description: 'Jadwal payout (daily/weekly/monthly)', group: 'payout' },
-  { key: 'payout_day',              value: 'monday',       description: 'Hari payout (weekly)',      group: 'payout' },
-  { key: 'payout_bank_code',        value: '',             description: 'Kode bank default',         group: 'payout' },
-  // Payment
-  { key: 'payment_gateway',         value: 'midtrans',     description: 'Payment gateway aktif',     group: 'payment' },
-  { key: 'payment_midtrans_key',    value: '',             description: 'Midtrans Server Key',       group: 'payment' },
-  { key: 'payment_sandbox_mode',    value: 'true',         description: 'Mode sandbox',              group: 'payment' },
-  { key: 'payment_timeout_minutes', value: '60',           description: 'Timeout pembayaran (menit)', group: 'payment' },
-  // Notification
-  { key: 'notif_email_enabled',     value: 'true',         description: 'Email notifikasi aktif',   group: 'notification' },
-  { key: 'notif_wa_enabled',        value: 'false',        description: 'WhatsApp notifikasi aktif', group: 'notification' },
-  { key: 'notif_smtp_host',         value: '',             description: 'SMTP Host',                 group: 'notification' },
-  { key: 'notif_smtp_port',         value: '587',          description: 'SMTP Port',                 group: 'notification' },
+  { key: 'platform_name',           value: 'SahabatMart',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
+  { key: 'platform_maintenance',    value: 'false',            description: 'Mode Pemeliharaan',           group: 'platform',  type: 'bool' },
+  { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
+  { key: 'platform_fee_default',    value: '0.05',             description: 'Fee Platform Default (%)',   group: 'platform',  type: 'number' },
+  { key: 'platform_currency',       value: 'IDR',              description: 'Mata Uang',                  group: 'platform',  type: 'text' },
+  { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
+  { key: 'payout_min_amount',       value: '50000',            description: 'Minimum Payout (Rp)',        group: 'payout',    type: 'number' },
+  { key: 'payout_schedule',         value: 'weekly',           description: 'Jadwal Payout',              group: 'payout',    type: 'select', options: ['daily', 'weekly', 'monthly'] },
+  { key: 'payout_day',              value: 'friday',           description: 'Hari Payout (jika weekly)',  group: 'payout',    type: 'select', options: ['monday','tuesday','wednesday','thursday','friday'] },
+  { key: 'payout_bank_code',        value: '',                 description: 'Kode Bank Default',          group: 'payout',    type: 'text' },
+  { key: 'payment_gateway',         value: 'midtrans',         description: 'Payment Gateway Aktif',      group: 'payment',   type: 'select', options: ['midtrans', 'xendit'] },
+  { key: 'payment_midtrans_key',    value: '',                 description: 'Midtrans Server Key',        group: 'payment',   type: 'secret' },
+  { key: 'payment_sandbox_mode',    value: 'true',             description: 'Mode Sandbox',               group: 'payment',   type: 'bool' },
+  { key: 'payment_timeout_minutes', value: '60',               description: 'Timeout Pembayaran (menit)', group: 'payment',   type: 'number' },
+  { key: 'notif_email_enabled',     value: 'true',             description: 'Email Notifikasi',           group: 'notification', type: 'bool' },
+  { key: 'notif_wa_enabled',        value: 'false',            description: 'WhatsApp Notifikasi',        group: 'notification', type: 'bool' },
+  { key: 'notif_smtp_host',         value: '',                 description: 'SMTP Host',                  group: 'notification', type: 'text' },
+  { key: 'notif_smtp_port',         value: '587',              description: 'SMTP Port',                  group: 'notification', type: 'number' },
+  { key: 'notif_smtp_user',         value: '',                 description: 'SMTP Username/Email',        group: 'notification', type: 'text' },
+  { key: 'notif_smtp_pass',         value: '',                 description: 'SMTP Password',              group: 'notification', type: 'secret' },
 ];
 
-const groupIcons = {
-  platform:     { icon: 'bi-globe',          label: 'Platform',     color: '#4361ee' },
-  payout:       { icon: 'bi-wallet2',         label: 'Payout',       color: '#f4a261' },
-  payment:      { icon: 'bi-credit-card',     label: 'Pembayaran',   color: '#06d6a0' },
-  notification: { icon: 'bi-bell',            label: 'Notifikasi',   color: '#7209b7' },
+const GROUP_META = {
+  platform:     { icon: 'bx-globe',       label: 'Platform',      color: '#4361ee' },
+  payout:       { icon: 'bx-wallet',      label: 'Payout',        color: '#f59e0b' },
+  payment:      { icon: 'bx-credit-card', label: 'Pembayaran',    color: '#10b981' },
+  notification: { icon: 'bx-bell',        label: 'Notifikasi',    color: '#8b5cf6' },
+};
+
+const S = {
+  page: { fontFamily: "'Inter', sans-serif", paddingTop: 20 },
+  label: { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#64748b', letterSpacing: '0.4px', textTransform: 'uppercase', marginBottom: 5 },
+  sublabel: { fontSize: 11.5, color: '#94a3b8', marginTop: 3 },
+  input: { width: '100%', padding: '9px 13px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border 0.2s' },
+  select: { width: '100%', padding: '9px 13px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 };
 
 export default function AdminSettings() {
-  const [configs, setConfigs]   = useState([]);
-  const [editing, setEditing]   = useState({});
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [msg, setMsg]           = useState('');
-  const [activeGroup, setGroup] = useState('platform');
-  const [error, setError]       = useState('');
+  const [configs, setConfigs] = useState([]);
+  const [editing, setEditing] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [activeGroup, setActiveGroup] = useState('platform');
 
   useEffect(() => {
     fetchJson(API + '/settings')
       .then(d => {
         const saved = d.data || [];
-        const defaultByKey = Object.fromEntries(DEFAULT_CONFIGS.map(cfg => [cfg.key, cfg]));
-        // Merge defaults dengan yang sudah ada di DB
         const merged = DEFAULT_CONFIGS.map(def => {
           const found = saved.find(s => s.key === def.key);
-          return found ? { ...def, ...found, group: def.group } : def;
-        });
-        saved.forEach(cfg => {
-          if (!defaultByKey[cfg.key]) {
-            merged.push({ ...cfg, group: cfg.group || 'platform' });
-          }
+          return found ? { ...def, ...found, type: def.type, options: def.options } : def;
         });
         setConfigs(merged);
-        // Populate editing state
         const ed = {};
         merged.forEach(c => { ed[c.key] = c.value; });
         setEditing(ed);
-        setError('');
       })
-      .catch((err) => {
+      .catch(() => {
         setConfigs(DEFAULT_CONFIGS);
         const ed = {};
         DEFAULT_CONFIGS.forEach(c => { ed[c.key] = c.value; });
         setEditing(ed);
-        setError(err.message || 'Gagal memuat pengaturan dari server');
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const handleChange = (key, val) => {
-    setEditing(prev => ({ ...prev, [key]: val }));
-  };
+  const handleChange = (key, val) => setEditing(prev => ({ ...prev, [key]: val }));
 
   const handleSave = () => {
     setSaving(true);
@@ -86,139 +79,141 @@ export default function AdminSettings() {
       const found = configs.find(c => c.key === key);
       return { key, value: editing[key], description: found?.description || '' };
     });
-
     fetchJson(API + '/settings/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).then(() => {
-      setMsg('Pengaturan berhasil disimpan!');
-      setTimeout(() => setMsg(''), 3000);
-      setError('');
-    }).catch((err) => {
-      setMsg('');
-      setError(err.message || 'Gagal menyimpan, coba lagi.');
+      setToast({ type: 'success', msg: 'Pengaturan berhasil disimpan!' });
+      setTimeout(() => setToast(null), 3000);
+    }).catch(() => {
+      setToast({ type: 'error', msg: 'Gagal menyimpan. Coba lagi.' });
+      setTimeout(() => setToast(null), 3000);
     }).finally(() => setSaving(false));
   };
 
-  const groups = [...new Set(DEFAULT_CONFIGS.map(c => c.group))];
-  const filteredConfigs = configs.filter(c => c.group === activeGroup);
-
   const renderInput = (cfg) => {
     const val = editing[cfg.key] ?? cfg.value;
-    // Boolean toggle
-    if (['true', 'false'].includes(cfg.value)) {
+    if (cfg.type === 'bool') {
+      const isOn = val === 'true' || val === true;
       return (
-        <div className="form-check form-switch">
-          <input className="form-check-input" type="checkbox" id={cfg.key}
-            checked={val === 'true' || val === true}
-            onChange={e => handleChange(cfg.key, e.target.checked ? 'true' : 'false')} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ position: 'relative', width: 52, height: 28, flexShrink: 0, cursor: 'pointer' }}
+            onClick={() => handleChange(cfg.key, isOn ? 'false' : 'true')}>
+            <div style={{ width: 52, height: 28, borderRadius: 28, background: isOn ? '#22c55e' : '#e2e8f0', transition: '0.3s' }} />
+            <div style={{ position: 'absolute', top: 3, left: isOn ? 26 : 3, width: 22, height: 22, borderRadius: '50%', background: '#fff', transition: '0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: isOn ? '#16a34a' : '#64748b' }}>{isOn ? 'Aktif' : 'Nonaktif'}</span>
         </div>
       );
     }
-    // Dropdown untuk schedule
-    if (cfg.key === 'payout_schedule') {
+    if (cfg.type === 'select') {
       return (
-        <select className="form-select form-select-sm" value={val}
-          onChange={e => handleChange(cfg.key, e.target.value)}>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
+        <select style={S.select} value={val} onChange={e => handleChange(cfg.key, e.target.value)}>
+          {cfg.options?.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       );
     }
-    // Password/key fields
-    if (cfg.key.includes('key') || cfg.key.includes('secret')) {
+    if (cfg.type === 'secret') {
       return (
-        <input type="password" className="form-control form-control-sm" value={val}
+        <input style={S.input} type="password" value={val} placeholder={`Masukkan ${cfg.description}...`}
           onChange={e => handleChange(cfg.key, e.target.value)}
-          placeholder={`Masukkan ${cfg.description}`} />
+          onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
       );
     }
     return (
-      <input type="text" className="form-control form-control-sm" value={val}
-        onChange={e => handleChange(cfg.key, e.target.value)} />
+      <input style={S.input} type={cfg.type === 'number' ? 'number' : 'text'} value={val}
+        onChange={e => handleChange(cfg.key, e.target.value)}
+        onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
     );
   };
 
+  const groups = [...new Set(DEFAULT_CONFIGS.map(c => c.group))];
+  const filtered = configs.filter(c => c.group === activeGroup);
+  const gm = GROUP_META[activeGroup];
+
   return (
-    <>
-      <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
-        <div className="breadcrumb-title pe-3">Super Admin</div>
-        <div className="ps-3"><nav><ol className="breadcrumb mb-0 p-0">
-          <li className="breadcrumb-item active">Pengaturan Platform</li>
-        </ol></nav></div>
+    <div style={S.page} className="fade-in">
+      {/* Breadcrumb */}
+      <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>Konfigurasi</span>
+        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
+        <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Pengaturan Platform</span>
       </div>
 
-      {msg && (
-        <div className={`alert py-2 mb-3 ${msg.includes('Gagal') ? 'alert-danger' : 'alert-success'}`}>
-          <i className={`bi ${msg.includes('Gagal') ? 'bi-exclamation-circle' : 'bi-check-circle'} me-2`}></i>{msg}
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, background: toast.type === 'success' ? '#d1fae5' : '#ffe4e6', color: toast.type === 'success' ? '#065f46' : '#9f1239', fontSize: 13.5, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className={`bx ${toast.type === 'success' ? 'bx-check-circle' : 'bx-error-circle'}`} style={{ fontSize: 20 }} />
+          {toast.msg}
         </div>
       )}
-      {error && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2"></i>{error}</div>}
 
-      <div className="row g-4">
-        {/* Group Nav */}
-        <div className="col-12 col-lg-3">
-          <div className="card radius-10">
-            <div className="card-body p-2">
-              <p className="text-muted small px-2 mb-2 mt-1">Grup Pengaturan</p>
-              {groups.map(g => {
-                const gi = groupIcons[g] || { icon: 'bi-gear', label: g, color: '#888' };
-                return (
-                  <button key={g}
-                    className={`w-100 text-start btn btn-sm mb-1 d-flex align-items-center gap-2 ${activeGroup === g ? 'btn-primary' : 'btn-light'}`}
-                    onClick={() => setGroup(g)}
-                    style={{ borderRadius: 8, padding: '8px 12px' }}>
-                    <i className={`bi ${gi.icon}`} style={{ color: activeGroup === g ? '#fff' : gi.color }}></i>
-                    <span>{gi.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, alignItems: 'start' }}>
+        {/* Sidebar Nav */}
+        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden', position: 'sticky', top: 20 }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Grup Konfigurasi</div>
+          </div>
+          <div style={{ padding: 8 }}>
+            {groups.map(g => {
+              const m = GROUP_META[g];
+              const active = activeGroup === g;
+              return (
+                <button key={g} onClick={() => setActiveGroup(g)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 2, background: active ? m.color + '15' : 'transparent', transition: 'all 0.15s' }}>
+                  <i className={`bx ${m.icon}`} style={{ fontSize: 20, color: active ? m.color : '#94a3b8' }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: active ? m.color : '#475569' }}>{m.label}</span>
+                  {active && <i className="bx bx-chevron-right" style={{ fontSize: 18, color: m.color, marginLeft: 'auto' }} />}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Settings Panel */}
-        <div className="col-12 col-lg-9">
-          <div className="card radius-10">
-            <div className="card-body">
-              {loading ? (
-                <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>
-              ) : (
-                <>
-                  <div className="d-flex align-items-center gap-2 mb-4">
-                    <i className={`bi ${groupIcons[activeGroup]?.icon || 'bi-gear'} fs-5`}
-                      style={{ color: groupIcons[activeGroup]?.color }}></i>
-                    <h6 className="mb-0 fw-semibold">{groupIcons[activeGroup]?.label || activeGroup}</h6>
-                  </div>
-
-                  <div className="row g-3">
-                    {filteredConfigs.map(cfg => (
-                      <div key={cfg.key} className="col-12 col-md-6">
-                        <label className="form-label small fw-medium mb-1">
-                          {cfg.description}
-                          <code className="ms-2 text-muted" style={{ fontSize: 10 }}>{cfg.key}</code>
-                        </label>
-                        {renderInput(cfg)}
-                      </div>
-                    ))}
-                  </div>
-
-                  <hr className="my-4" />
-                  <div className="d-flex justify-content-end">
-                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                      {saving
-                        ? <><span className="spinner-border spinner-border-sm me-2"></span>Menyimpan...</>
-                        : <><i className="bi bi-floppy me-2"></i>Simpan Pengaturan</>}
-                    </button>
-                  </div>
-                </>
-              )}
+        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+          {/* Panel Header */}
+          <div style={{ padding: '18px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: gm.color + '15', color: gm.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                <i className={`bx ${gm.icon}`} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Pengaturan {gm.label}</div>
+                <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{filtered.length} parameter dikonfigurasi</div>
+              </div>
             </div>
+          </div>
+
+          {/* Config Fields */}
+          <div style={{ padding: 24 }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                <div className="spinner-border" style={{ color: '#4361ee', width: 32, height: 32, borderWidth: 3 }} />
+                <div style={{ marginTop: 12, fontSize: 13, color: '#94a3b8' }}>Memuat konfigurasi...</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
+                  {filtered.map(cfg => (
+                    <div key={cfg.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={S.label}>{cfg.description}</label>
+                      {renderInput(cfg)}
+                      <code style={{ fontSize: 11, color: '#cbd5e1', fontFamily: 'monospace' }}>{cfg.key}</code>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  <button onClick={handleSave} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, border: 'none', background: '#4361ee', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                    {saving ? <div className="spinner-border spinner-border-sm" style={{ width: 16, height: 16 }} /> : <i className="bx bx-save" style={{ fontSize: 18 }} />}
+                    {saving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

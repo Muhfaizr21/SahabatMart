@@ -1,141 +1,165 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
 
-const AdminRegions = () => {
-    const [provinces, setProvinces] = useState([]);
-    const [cities, setCities] = useState([]);
-    const [districts, setDistricts] = useState([]);
-    const [selectedProv, setSelectedProv] = useState(0);
-    const [selectedCity, setSelectedCity] = useState(0);
-
-    const loadCities = (provId) => {
-        fetchJson(`${API}/regions?parent_id=${provId}`)
-            .then(d => setCities(d.data || []));
-    };
-
-    const loadDistricts = (cityId) => {
-        fetchJson(`${API}/regions?parent_id=${cityId}`)
-            .then(d => setDistricts(d.data || []));
-    };
-
-    useEffect(() => {
-        fetchJson(`${API}/regions?parent_id=0`)
-            .then(d => setProvinces(d.data || []));
-    }, []);
-
-    const handleProvChange = (e) => {
-        const id = e.target.value;
-        setSelectedProv(id);
-        setSelectedCity(0);
-        setDistricts([]);
-        if (id > 0) loadCities(id);
-    };
-
-    const handleCityChange = (e) => {
-        const id = e.target.value;
-        setSelectedCity(id);
-        if (id > 0) loadDistricts(id);
-    };
-
-    return (
-        <>
-            <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
-                <div className="breadcrumb-title pe-3">Master Data</div>
-                <div className="ps-3">
-                    <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb mb-0 p-0">
-                            <li className="breadcrumb-item"><Link to="/admin"><i className="bx bx-home-alt"></i></Link></li>
-                            <li className="breadcrumb-item active" aria-current="page">Data Geografis Indonesia</li>
-                        </ol>
-                    </nav>
-                </div>
-            </div>
-
-            <div className="row g-3 h-100">
-                <div className="col-12 col-lg-4">
-                    <div className="card h-100 mb-0 shadow-none border">
-                        <div className="card-header bg-light">
-                            <h6 className="mb-0 fw-bold small">PROVINSI</h6>
-                        </div>
-                        <div className="card-body p-0" style={{maxHeight:'500px', overflowY:'auto'}}>
-                            <div className="list-group list-group-flush">
-                                {provinces.map(p => (
-                                    <button key={p.id} onClick={() => handleProvChange({target:{value:p.id}})} 
-                                        className={`list-group-item list-group-item-action ${selectedProv == p.id ? 'active' : ''}`}>
-                                        <div className="d-flex w-100 justify-content-between align-items-center">
-                                            <span className="small fw-bold">{p.name}</span>
-                                            <i className="bi bi-chevron-right small"></i>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-12 col-lg-4">
-                    <div className="card h-100 mb-0 shadow-none border">
-                        <div className="card-header bg-light">
-                            <h6 className="mb-0 fw-bold small">KOTA / KABUPATEN</h6>
-                        </div>
-                        <div className="card-body p-0" style={{maxHeight:'500px', overflowY:'auto'}}>
-                             {!selectedProv ? (
-                                <div className="p-4 text-center text-muted small">Pilih provinsi terlebih dahulu</div>
-                             ) : (
-                                <div className="list-group list-group-flush">
-                                    {cities.map(c => (
-                                        <button key={c.id} onClick={() => handleCityChange({target:{value:c.id}})} 
-                                            className={`list-group-item list-group-item-action ${selectedCity == c.id ? 'active' : ''}`}>
-                                            <div className="d-flex w-100 justify-content-between align-items-center">
-                                                <span className="small">{c.name}</span>
-                                                <i className="bi bi-chevron-right small"></i>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                             )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-12 col-lg-4">
-                    <div className="card h-100 mb-0 shadow-none border">
-                        <div className="card-header bg-light">
-                            <h6 className="mb-0 fw-bold small">KECAMATAN / KODEPOS</h6>
-                        </div>
-                        <div className="card-body p-0" style={{maxHeight:'500px', overflowY:'auto'}}>
-                            {!selectedCity ? (
-                                <div className="p-4 text-center text-muted small">Pilih kota terlebih dahulu</div>
-                            ) : (
-                                <div className="list-group list-group-flush">
-                                    {districts.map(d => (
-                                        <div key={d.id} className="list-group-item border-bottom">
-                                            <div className="d-flex align-items-center justify-content-between">
-                                                <span className="small">{d.name}</span>
-                                                <span className="badge bg-light-secondary text-secondary font-monospace" style={{fontSize:9}}>{d.zip_code}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <button className="list-group-item text-primary small text-center py-3"><i className="bi bi-plus-circle me-1"></i>Tambah Data Baru</button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="mt-4 p-3 bg-light-info rounded d-flex gap-3 align-items-center">
-                <i className="bi bi-info-circle-fill text-info fs-4"></i>
-                <p className="mb-0 small text-muted">
-                    Master data wilayah ini disinkronkan dengan basis data POS Indonesia dan Kurir partner. 
-                    Gunakan <strong>Import CSV</strong> untuk melakukan update massal pada data kelurahan/kecamatan.
-                </p>
-            </div>
-        </>
-    );
+const S = {
+  page: { fontFamily: "'Inter', sans-serif", paddingTop: 20 },
+  card: { background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden' },
+  cardHeader: (color) => ({ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', background: color + '08', display: 'flex', alignItems: 'center', gap: 8 }),
+  headerTitle: { fontSize: 12, fontWeight: 700, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase' },
+  listItem: (active) => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', cursor: 'pointer', transition: 'all 0.15s', borderBottom: '1px solid #f8fafc',
+    background: active ? '#4361ee' : 'transparent', color: active ? '#fff' : '#334155',
+  }),
+  districtItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderBottom: '1px solid #f8fafc' },
 };
 
-export default AdminRegions;
+export default function AdminRegions() {
+  const [provinces, setProvinces] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [selectedProv, setSelectedProv] = useState(null);
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+
+  useEffect(() => {
+    fetchJson(`${API}/regions?parent_id=0`)
+      .then(d => setProvinces(d.data || []));
+  }, []);
+
+  const handleProvClick = (prov) => {
+    setSelectedProv(prov);
+    setSelectedCity(null);
+    setDistricts([]);
+    setLoadingCities(true);
+    fetchJson(`${API}/regions?parent_id=${prov.id}`)
+      .then(d => setCities(d.data || []))
+      .finally(() => setLoadingCities(false));
+  };
+
+  const handleCityClick = (city) => {
+    setSelectedCity(city);
+    setLoadingDistricts(true);
+    fetchJson(`${API}/regions?parent_id=${city.id}`)
+      .then(d => setDistricts(d.data || []))
+      .finally(() => setLoadingDistricts(false));
+  };
+
+  return (
+    <div style={S.page} className="fade-in">
+      {/* Breadcrumb */}
+      <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>Master Data</span>
+        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
+        <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Data Geografis Indonesia</span>
+      </div>
+
+      {/* Info Banner */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, marginBottom: 24 }}>
+        <i className="bx bx-map" style={{ fontSize: 22, color: '#2563eb', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#1e40af' }}>Data Wilayah Indonesia</div>
+          <div style={{ fontSize: 12.5, color: '#3b82f6', marginTop: 2 }}>
+            Data ini digunakan untuk pengiriman, validasi alamat, dan konfigurasi ongkir. Klik provinsi untuk menjelajahi.
+          </div>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', background: '#dbeafe', padding: '4px 12px', borderRadius: 20 }}>
+          {provinces.length} Provinsi
+        </span>
+      </div>
+
+      {/* 3-column explorer */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, alignItems: 'start' }}>
+
+        {/* Provinsi */}
+        <div style={S.card}>
+          <div style={S.cardHeader('#4361ee')}>
+            <i className="bx bx-map-pin" style={{ fontSize: 16, color: '#4361ee' }} />
+            <span style={S.headerTitle}>Provinsi ({provinces.length})</span>
+          </div>
+          <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+            {provinces.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: 13 }}>
+                <i className="bx bx-loader-alt" style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
+                Memuat...
+              </div>
+            ) : provinces.map(p => (
+              <div key={p.id} style={S.listItem(selectedProv?.id === p.id)}
+                onClick={() => handleProvClick(p)}
+                onMouseEnter={e => { if (selectedProv?.id !== p.id) e.currentTarget.style.background = '#f0f7ff'; }}
+                onMouseLeave={e => { if (selectedProv?.id !== p.id) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{p.name}</span>
+                <i className="bx bx-chevron-right" style={{ fontSize: 18, opacity: 0.7 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Kota/Kabupaten */}
+        <div style={S.card}>
+          <div style={S.cardHeader('#10b981')}>
+            <i className="bx bx-buildings" style={{ fontSize: 16, color: '#10b981' }} />
+            <span style={S.headerTitle}>Kota / Kabupaten {cities.length > 0 ? `(${cities.length})` : ''}</span>
+          </div>
+          <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+            {!selectedProv ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+                <i className="bx bx-arrow-back" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: 0.4 }} />
+                <div style={{ fontSize: 13 }}>Pilih provinsi dahulu</div>
+              </div>
+            ) : loadingCities ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div className="spinner-border spinner-border-sm" style={{ color: '#10b981' }} />
+              </div>
+            ) : cities.map(c => (
+              <div key={c.id} style={S.listItem(selectedCity?.id === c.id)}
+                onClick={() => handleCityClick(c)}
+                onMouseEnter={e => { if (selectedCity?.id !== c.id) e.currentTarget.style.background = '#f0fdf4'; }}
+                onMouseLeave={e => { if (selectedCity?.id !== c.id) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{c.name}</span>
+                <i className="bx bx-chevron-right" style={{ fontSize: 18, opacity: 0.7 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Kecamatan */}
+        <div style={S.card}>
+          <div style={S.cardHeader('#f59e0b')}>
+            <i className="bx bx-home-circle" style={{ fontSize: 16, color: '#f59e0b' }} />
+            <span style={S.headerTitle}>Kecamatan {districts.length > 0 ? `(${districts.length})` : ''}</span>
+          </div>
+          <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+            {!selectedCity ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+                <i className="bx bx-arrow-back" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: 0.4 }} />
+                <div style={{ fontSize: 13 }}>Pilih kota dahulu</div>
+              </div>
+            ) : loadingDistricts ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div className="spinner-border spinner-border-sm" style={{ color: '#f59e0b' }} />
+              </div>
+            ) : districts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8', fontSize: 13 }}>
+                Tidak ada data kecamatan
+              </div>
+            ) : districts.map(d => (
+              <div key={d.id} style={S.districtItem}>
+                <span style={{ fontSize: 13.5, fontWeight: 500, color: '#334155' }}>{d.name}</span>
+                {d.zip_code && (
+                  <span style={{ fontFamily: 'monospace', fontSize: 11.5, fontWeight: 700, color: '#4361ee', background: '#eff6ff', padding: '2px 8px', borderRadius: 6 }}>
+                    {d.zip_code}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

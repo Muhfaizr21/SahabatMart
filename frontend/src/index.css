@@ -1,34 +1,104 @@
-@import url('https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,300,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* Mapping warna-warna yang banyak terpakai sebelumnya ke palet baru */
-  --color-blue-50: #ffffff;
-  --color-blue-100: #f2f0ea; /* Cream dari palet */
-  --color-blue-200: #edcf5d; 
-  --color-blue-500: #010101; 
-  --color-blue-600: #010101; /* Hitam dari palet */
-  --color-blue-700: #1a1a1a;
-  --color-blue-800: #111111;
-  --color-blue-900: #000000;
+  /* Premium & Soft Palette */
+  --color-primary: #4361ee;
+  --color-primary-dark: #3a0ca3;
+  --color-primary-light: #4895ef;
   
-  --color-gray-50: #f2f0ea; /* Cream sebagai background pengganti abu-abu muda */
-  --color-gray-100: #e0ded8;
-  --color-gray-400: #a4a4a4; /* Abu-abu palet */
-  --color-gray-500: #a4a4a4; /* Abu-abu palet */
-  --color-gray-600: #666666; 
-  --color-gray-900: #010101; /* Teks utama */
+  --color-secondary: #06d6a0;
+  --color-accent: #f4a261;
   
-  --color-yellow-400: #edcf5d; /* Kuning Palet */
-  --color-yellow-500: #edcf5d; 
+  --color-bg-light: #f8fafc;
+  --color-bg-dark: #0f172a;
+  
+  --color-text-main: #1e293b;
+  --color-text-muted: #64748b;
+  
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
 }
 
-* { box-sizing: border-box; }
+:root {
+  --bs-primary: #4361ee;
+  --bs-primary-rgb: 67, 97, 238;
+  --bs-body-bg: #f8fafc;
+  --bs-body-color: #1e293b;
+  --bs-border-color: #e2e8f0;
+}
 
 body {
-  font-family: 'Satoshi', system-ui, sans-serif;
-  margin: 0;
-  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
   -webkit-font-smoothing: antialiased;
-  background-color: #ffffff;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/** PREMIUM UI COMPONENTS **/
+
+/* Glassmorphism Cards */
+.card {
+  border: 1px solid rgba(226, 232, 240, 0.6) !important;
+  background: #ffffff !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: var(--radius-xl) !important;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Rounded Pills for Badges */
+.badge {
+  font-weight: 600;
+  padding: 0.35em 1em;
+  letter-spacing: 0.01em;
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  font-weight: 600;
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--color-primary);
+  background: #ffffff;
+  box-shadow: 0 10px 15px -3px rgba(67, 97, 238, 0.1);
+}
+
+/* Custom Scrollbar for Premium Feel */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
 }
