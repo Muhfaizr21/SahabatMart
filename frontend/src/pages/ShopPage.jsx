@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 
 const badgeColors = { hot: 'bg-red-500', trending: 'bg-blue-500', offer: 'bg-green-500', sale: 'bg-orange-500' };
 
@@ -212,7 +212,7 @@ export default function ShopPage() {
                 {filtered.map(product => (
                   <div key={product.id} className="group bg-white rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1">
                     <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-square">
-                      <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       {product.badge && (
                         <span className={`absolute top-3 left-3 ${badgeColors[product.badgeClass]} text-white text-xs font-bold px-2.5 py-1 rounded-full`}>{product.badge}</span>
                       )}
@@ -262,7 +262,7 @@ export default function ShopPage() {
                 {filtered.map(product => (
                   <div key={product.id} className="bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-all p-4 flex gap-5 group">
                     <Link to={`/product/${product.id}`} className="w-36 h-36 flex-shrink-0 rounded-xl overflow-hidden bg-gray-50">
-                      <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     </Link>
                     <div className="flex-1 flex flex-col gap-2">
                       <Link to={`/shop?cat=${product.category}`} className="text-xs text-blue-600 font-medium hover:underline">{product.category}</Link>

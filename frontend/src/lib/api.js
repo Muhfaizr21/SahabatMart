@@ -25,3 +25,9 @@ export async function fetchJson(url, options) {
 
   return data ?? {};
 }
+
+export function formatImage(path) {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+}

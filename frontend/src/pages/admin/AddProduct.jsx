@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
 
@@ -53,10 +53,23 @@ export default function AdminAddProduct() {
     });
   }, []);
 
-  const handleAttrChange = (name, val) => {
-    const next = { ...selectedAttrs, [name]: val };
-    setSelectedAttrs(next);
-    setP({ ...p, attributes: JSON.stringify(next) });
+  const handleAttrChange = (name, val, checked) => {
+    console.log(`Attribute Change: ${name} -> ${val} (Checked: ${checked})`);
+    setSelectedAttrs(prev => {
+      const currentVals = Array.isArray(prev[name]) ? prev[name] : [];
+      let nextVals;
+      if (checked) {
+        nextVals = [...currentVals, val];
+      } else {
+        nextVals = currentVals.filter(v => v !== val);
+      }
+      const next = { ...prev, [name]: nextVals };
+      
+      // Sync with main product state using functional update
+      setP(pPrev => ({ ...pPrev, attributes: JSON.stringify(next) }));
+      
+      return next;
+    });
   };
 
   const handleUpload = async (e) => {
@@ -72,7 +85,7 @@ export default function AdminAddProduct() {
         body: formData
       });
       const data = await resp.json();
-      if (data.url) setP({ ...p, image: data.url });
+      if (data.url) setP(prev => ({ ...prev, image: data.url }));
     } catch (err) { alert('Upload gagal: ' + err.message); }
     finally { setUploading(false); }
   };
@@ -121,12 +134,12 @@ export default function AdminAddProduct() {
           <div style={{ display: 'grid', gap: 18 }}>
             <FormField label="Nama Produk Lengkap">
               <input style={S.input} type="text" placeholder="Contoh: Apple MacBook M3 Pro 14-inch" required
-                value={p.name} onChange={e => setP({ ...p, name: e.target.value })}
+                value={p.name} onChange={e => setP(prev => ({ ...prev, name: e.target.value }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
             <FormField label="Deskripsi Produk">
               <textarea style={{ ...S.textarea, minHeight: 90 }} rows={3} placeholder="Jelaskan fitur, spesifikasi, dan keunggulan produk..."
-                value={p.description} onChange={e => setP({ ...p, description: e.target.value })}
+                value={p.description} onChange={e => setP(prev => ({ ...prev, description: e.target.value }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
           </div>
@@ -139,19 +152,19 @@ export default function AdminAddProduct() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 18 }}>
             <FormField label="Kategori">
-              <select style={S.select} value={p.category} onChange={e => setP({ ...p, category: e.target.value })}>
+              <select style={S.select} value={p.category} onChange={e => setP(prev => ({ ...prev, category: e.target.value }))}>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
             </FormField>
             <FormField label="Brand / Merek">
-              <select style={S.select} value={p.brand} onChange={e => setP({ ...p, brand: e.target.value })}>
+              <select style={S.select} value={p.brand} onChange={e => setP(prev => ({ ...prev, brand: e.target.value }))}>
                 <option value="">— Tanpa Brand —</option>
                 {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
             </FormField>
             <FormField label="Stok Tersedia">
               <input style={S.input} type="number" min={0} value={p.stock}
-                onChange={e => setP({ ...p, stock: parseInt(e.target.value) || 0 })}
+                onChange={e => setP(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
           </div>
@@ -160,17 +173,43 @@ export default function AdminAddProduct() {
           {attrs.length > 0 && (
             <>
               <div style={S.divider} />
-              <div style={S.sectionTitle}>
-                <i className="bx bx-list-check" style={{ fontSize: 15 }} /> Atribut Produk (Dinamis)
+              <div style={{ ...S.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="bx bx-list-check" style={{ fontSize: 15 }} /> Atribut Produk (Dinamis)
+                </div>
+                <button type="button" onClick={() => window.location.href='/admin/attributes'} 
+                  style={{ padding: '4px 12px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 11, cursor: 'pointer', color: '#4361ee', fontWeight: 600 }}>
+                  <i className="bx bx-cog" style={{ marginRight: 4 }} /> Kelola Master
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
+              <div style={{ display: 'grid', gap: 14 }}>
                 {attrs.map(a => (
-                  <FormField key={a.id} label={a.name}>
-                    <select style={S.select} onChange={e => handleAttrChange(a.name, e.target.value)}>
-                      <option value="">Pilih...</option>
-                      {a.values?.split(',').map(v => <option key={v} value={v.trim()}>{v.trim()}</option>)}
-                    </select>
-                  </FormField>
+                  <div key={a.id}>
+                    <label style={S.label}>{a.name}</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, background: '#f8fafc', padding: '12px 16px', borderRadius: 12, border: '1.5px solid #e2e8f0' }}>
+                      {a.values?.split(',').map(v => {
+                        const val = v.trim();
+                        const isChecked = Array.isArray(selectedAttrs[a.name]) && selectedAttrs[a.name].includes(val);
+                        return (
+                          <label key={val} className="form-check-label" 
+                            style={{ 
+                              display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', 
+                              fontSize: 12, fontWeight: 600, 
+                              color: isChecked ? '#4361ee' : '#64748b',
+                              background: isChecked ? 'rgba(67, 97, 238, 0.06)' : '#fff',
+                              padding: '6px 14px', borderRadius: 10, transition: 'all 0.2s',
+                              border: `1.5px solid ${isChecked ? '#4361ee' : '#e2e8f0'}`,
+                              boxShadow: isChecked ? '0 2px 4px rgba(67, 97, 238, 0.1)' : 'none'
+                            }}>
+                            <input type="checkbox" checked={isChecked} onChange={e => handleAttrChange(a.name, val, e.target.checked)} 
+                              style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+                            {isChecked && <i className="bx bx-check-circle" style={{ fontSize: 14 }} />}
+                            <span>{val}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
               </div>
             </>
@@ -185,18 +224,18 @@ export default function AdminAddProduct() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 18, alignItems: 'start' }}>
             <FormField label="Harga Jual (IDR)">
               <input style={{ ...S.input, fontWeight: 700, color: '#4361ee' }} type="number" min={0} value={p.price}
-                onChange={e => setP({ ...p, price: parseFloat(e.target.value) || 0 })}
+                onChange={e => setP(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
             <FormField label="Harga Coret (Opsional)">
               <input style={S.input} type="number" min={0} value={p.old_price}
-                onChange={e => setP({ ...p, old_price: parseFloat(e.target.value) || 0 })}
+                onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
             <FormField label="URL Gambar">
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ ...S.input, flex: 1 }} type="text" placeholder="https://..." value={p.image}
-                  onChange={e => setP({ ...p, image: e.target.value })}
+                  onChange={e => setP(prev => ({ ...prev, image: e.target.value }))}
                   onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#64748b', fontSize: 20 }}>
                   {uploading ? <div className="spinner-border spinner-border-sm" /> : <i className="bx bx-upload" />}
@@ -204,7 +243,7 @@ export default function AdminAddProduct() {
                 </label>
               </div>
               {p.image && (
-                <img src={p.image} alt="" style={{ marginTop: 10, width: 80, height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                <img src={formatImage(p.image)} alt="" style={{ marginTop: 10, width: 80, height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
               )}
             </FormField>
           </div>

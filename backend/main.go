@@ -153,37 +153,17 @@ func SeedDatabase(db *gorm.DB) {
 	}
 	db.Create(&brands)
 
-	// 5. Products (Dummy Data)
-	var merchant models.Merchant
-	db.Where("store_name = ?", "SahabatMart Official").First(&merchant)
-	
-	if merchant.ID != "" {
-		products := []models.Product{
-			{Name: "MacBook Pro 16 M3 Max", Description: "Vibrant Liquid Retina XDR display with up to 1000 nits.", Price: 52999000, Category: "Elektronik", Brand: "Apple", Stock: 10, Image: "https://images.unsplash.com/photo-1517336714460-4c3d7907576a?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "macbook-m3-max"},
-			{Name: "Sony PlayStation 5 Pro", Description: "Unleash new gaming possibilities with the PS5 Pro.", Price: 11500000, Category: "Gaming", Brand: "Sony", Stock: 25, Image: "https://images.unsplash.com/photo-1606144042614-b2517ae7c3bc?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "ps5-pro-core"},
-			{Name: "AirPods Pro Gen 2", Description: "Up to 2x more Active Noise Cancellation.", Price: 3999000, Category: "Elektronik", Brand: "Apple", Stock: 200, Image: "https://images.unsplash.com/photo-1588423770186-80f099331677?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "airpods-pro-2"},
-			{Name: "Nike Dunk Low Retro", Description: "Classic basketball icon returns with crisp overlays.", Price: 1549000, Category: "Fashion", Brand: "Nike", Stock: 45, Image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "nike-dunk-low"},
-		}
-		db.Create(&products)
-	}
-
-	// 6. Vouchers
-	vouchers := []models.Voucher{
-		{Code: "PROMOID", Title: "Lebaran Promo", DiscountValue: 50000, MinOrder: 500000, Status: "active"},
-		{Code: "UPGRADE2026", Title: "Tech Upgrade", DiscountValue: 100000, MinOrder: 2000000, Status: "active"},
-	}
-	db.Create(&vouchers)
-
-	// 3. Merapikan Atribut (Sinkronisasi agar tidak satu-satu)
-	db.Exec("DELETE FROM attributes") // Hapus data lama yang berantakan
+	// 3. Atribut (Master Setup)
 	attrs := []models.Attribute{
 		{Name: "Ukuran", Values: "XS, S, M, L, XL, XXL, XXXL, 36, 37, 38, 39, 40, 41, 42, 43, 44"},
 		{Name: "Warna", Values: "HITAM, PUTIH, MERAH, BIRU, HIJAU, KUNING, ORANGE, HIJAU"},
 		{Name: "Bahan", Values: "Katun, Kulit, Sintetis, Kanvas, Besi, Kayu"},
 	}
-	db.Create(&attrs)
+	for _, a := range attrs {
+		db.Where("name = ?", a.Name).FirstOrCreate(&a)
+	}
 
-	// Categories
+	// 4. Categories
 	categories := []models.Category{
 		{Name: "Elektronik", Slug: "elektronik", Order: 1},
 		{Name: "Fashion", Slug: "fashion", Order: 2},
@@ -192,33 +172,32 @@ func SeedDatabase(db *gorm.DB) {
 		{Name: "Hobi & Hiburan", Slug: "hobi-hiburan", Order: 5},
 	}
 	for _, c := range categories {
-		db.Where("name = ?", c.Name).FirstOrCreate(&c)
+		db.Where("slug = ?", c.Slug).FirstOrCreate(&c)
 	}
 
-	products := []models.Product{
-		{
-			MerchantID: official.ID, Name: "Galaxy Tab S6 Lite 10.4-inch", Slug: "galaxy-tab-s6-lite",
-			Category: "Elektronik", Price: 4500000, OldPrice: 5200000, Rating: 4.5, Reviews: 120,
-			Image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400", Badge: "Hot", BadgeClass: "hot", Status: "active",
-		},
-		{
-			MerchantID: official.ID, Name: "Smart Watch IP67 Waterproof", Slug: "smart-watch-ip67",
-			Category: "Elektronik", Price: 850000, OldPrice: 1200000, Rating: 4.8, Reviews: 85,
-			Image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400", Badge: "Trending", BadgeClass: "trending", Status: "active",
-		},
-		{
-			MerchantID: official.ID, Name: "Wireless Headphones Sony XM4", Slug: "sony-xm4-wireless",
-			Category: "Elektronik", Price: 3500000, OldPrice: 4200000, Rating: 5.0, Reviews: 250,
-			Image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400", Badge: "-20%", BadgeClass: "offer", Status: "active",
-		},
-	}
-	for _, p := range products {
-		db.Where("name = ?", p.Name).FirstOrCreate(&p)
+	// 5. Products (Dummy Data)
+	var merchant models.Merchant
+	db.Where("store_name = ?", "SahabatMart Official").First(&merchant)
+	if merchant.ID != "" {
+		products := []models.Product{
+			{Name: "MacBook Pro 16 M3 Max", Description: "Vibrant Liquid Retina XDR display with up to 1000 nits.", Price: 52999000, Category: "Elektronik", Brand: "Apple", Stock: 10, Image: "https://images.unsplash.com/photo-1517336714460-4c3d7907576a?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "macbook-m3-max"},
+			{Name: "Sony PlayStation 5 Pro", Description: "Unleash new gaming possibilities with the PS5 Pro.", Price: 11500000, Category: "Gaming", Brand: "Sony", Stock: 25, Image: "https://images.unsplash.com/photo-1606144042614-b2517ae7c3bc?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "ps5-pro-core"},
+			{Name: "AirPods Pro Gen 2", Description: "Up to 2x more Active Noise Cancellation.", Price: 3999000, Category: "Elektronik", Brand: "Apple", Stock: 200, Image: "https://images.unsplash.com/photo-1588423770186-80f099331677?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "airpods-pro-2"},
+			{Name: "Nike Dunk Low Retro", Description: "Classic basketball icon returns with crisp overlays.", Price: 1549000, Category: "Fashion", Brand: "Nike", Stock: 45, Image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=500", Status: "active", MerchantID: merchant.ID, Slug: "nike-dunk-low"},
+			{Name: "Galaxy Tab S6 Lite 10.4-inch", Slug: "galaxy-tab-s6-lite", MerchantID: merchant.ID, Category: "Elektronik", Price: 4500000, OldPrice: 5200000, Rating: 4.5, Reviews: 120, Image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400", Status: "active"},
+			{Name: "Smart Watch IP67 Waterproof", Slug: "smart-watch-ip67", MerchantID: merchant.ID, Category: "Elektronik", Price: 850000, OldPrice: 1200000, Rating: 4.8, Reviews: 85, Image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400", Status: "active"},
+			{Name: "Wireless Headphones Sony XM4", Slug: "sony-xm4-wireless", MerchantID: merchant.ID, Category: "Elektronik", Price: 3500000, OldPrice: 4200000, Rating: 5.0, Reviews: 250, Image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400", Status: "active"},
+		}
+		for _, p := range products {
+			db.Where("slug = ?", p.Slug).FirstOrCreate(&p)
+		}
 	}
 
-	// Banners, Blogs, Vouchers (Omitted for brevity if not strictly needed, but let's keep them small)
+	// 6. Banners & Blogs & Vouchers
 	db.Where("title = ?", "Promo Elektronik Terbesar 2024").FirstOrCreate(&models.Banner{Title: "Promo Elektronik Terbesar 2024", Image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800", IsActive: true})
 	db.Where("code = ?", "SAHABATBARU").FirstOrCreate(&models.Voucher{Code: "SAHABATBARU", Title: "Diskon Pengguna Baru", DiscountValue: 50000, MinOrder: 200000, Status: "active"})
+	db.Where("code = ?", "PROMOID").FirstOrCreate(&models.Voucher{Code: "PROMOID", Title: "Lebaran Promo", DiscountValue: 50000, MinOrder: 500000, Status: "active"})
+	db.Where("code = ?", "UPGRADE2026").FirstOrCreate(&models.Voucher{Code: "UPGRADE2026", Title: "Tech Upgrade", DiscountValue: 100000, MinOrder: 2000000, Status: "active"})
 
 	log.Println("✅ Seeding selesai!")
 }
@@ -340,6 +319,7 @@ func main() {
 	mux.HandleFunc("/api/public/product", adminController.GetPublicProductDetail)
 	mux.HandleFunc("/api/public/categories", adminController.GetPublicCategories)
 	mux.HandleFunc("/api/public/blogs", adminController.GetPublicBlogs)
+	mux.HandleFunc("/api/public/blog", adminController.GetPublicBlogDetail)
 	mux.HandleFunc("/api/public/banners", adminController.GetPublicBanners)
 	mux.HandleFunc("/api/public/vouchers", adminController.GetPublicVouchers)
 

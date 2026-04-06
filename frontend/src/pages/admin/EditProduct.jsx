@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
 
@@ -68,10 +68,23 @@ export default function AdminEditProduct() {
     }).finally(() => setLoading(false));
   }, [productId]);
 
-  const handleAttrChange = (name, val) => {
-    const next = { ...selectedAttrs, [name]: val };
-    setSelectedAttrs(next);
-    setP({ ...p, attributes: JSON.stringify(next) });
+  const handleAttrChange = (name, val, checked) => {
+    console.log(`Edit Attribute Change: ${name} -> ${val} (Checked: ${checked})`);
+    setSelectedAttrs(prev => {
+      const currentVals = Array.isArray(prev[name]) ? prev[name] : [];
+      let nextVals;
+      if (checked) {
+        nextVals = [...currentVals, val];
+      } else {
+        nextVals = currentVals.filter(v => v !== val);
+      }
+      const next = { ...prev, [name]: nextVals };
+      
+      // Update the main product state with the fresh 'next' object
+      setP(pPrev => ({ ...pPrev, attributes: JSON.stringify(next) }));
+      
+      return next;
+    });
   };
 
   const handleUpload = async (e) => {
@@ -87,7 +100,7 @@ export default function AdminEditProduct() {
         body: formData
       });
       const data = await resp.json();
-      if (data.url) setP({ ...p, image: data.url });
+      if (data.url) setP(prev => ({ ...prev, image: data.url }));
     } catch (err) { alert("Upload gagal: " + err.message); }
     finally { setUploading(false); }
   };
@@ -133,15 +146,15 @@ export default function AdminEditProduct() {
              </div>
              <div className="card-body p-4 pt-0">
                 <form onSubmit={handleSubmit} className="row g-4">
-                   <div className="col-md-12">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Nama Produk Lengkap</label>
-                      <input type="text" className="form-control radius-12 border-0 bg-light py-2 fw-bold" placeholder="E.g. Apple MacBook M3 Pro" required value={p.name} onChange={e => setP({...p, name: e.target.value})} />
-                   </div>
-                   
-                   <div className="col-md-12">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Deskripsi Produk (Detail)</label>
-                      <textarea className="form-control radius-15 border-0 bg-light py-3" placeholder="Enrich your product with details..." rows="3" value={p.description} onChange={e => setP({...p, description: e.target.value})}></textarea>
-                   </div>
+                    <div className="col-md-12">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Nama Produk Lengkap</label>
+                       <input type="text" className="form-control radius-12 border-0 bg-light py-2 fw-bold" placeholder="E.g. Apple MacBook M3 Pro" required value={p.name} onChange={e => setP(prev => ({...prev, name: e.target.value}))} />
+                    </div>
+                    
+                    <div className="col-md-12">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Deskripsi Produk (Detail)</label>
+                       <textarea className="form-control radius-15 border-0 bg-light py-3" placeholder="Enrich your product with details..." rows="3" value={p.description} onChange={e => setP(prev => ({...prev, description: e.target.value}))}></textarea>
+                    </div>
 
                    {/* Preview Center */}
                    <div className="col-md-6 text-center my-2 mx-auto">
@@ -151,65 +164,89 @@ export default function AdminEditProduct() {
                    </div>
 
                    {/* Master Data Row */}
-                   <div className="col-md-4">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Kategori Induk</label>
-                      <select className="form-select radius-12 border-0 bg-light py-2 fw-medium" value={p.category} onChange={e => setP({...p, category: e.target.value})}>
-                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                      </select>
-                   </div>
-                   <div className="col-md-4">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Brand / Merk</label>
-                      <select className="form-select radius-12 border-0 bg-light py-2 fw-medium" value={p.brand} onChange={e => setP({...p, brand: e.target.value})}>
-                        <option value="">-- No Specific Brand --</option>
-                        {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-                      </select>
-                   </div>
-                   <div className="col-md-4">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Stok Tersedia</label>
-                      <input type="number" className="form-control radius-12 border-0 bg-light py-2 fw-bold" value={p.stock} onChange={e => setP({...p, stock: parseInt(e.target.value)})} />
-                   </div>
+                    <div className="col-md-4">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Kategori Induk</label>
+                       <select className="form-select radius-12 border-0 bg-light py-2 fw-medium" value={p.category} onChange={e => setP(prev => ({...prev, category: e.target.value}))}>
+                         {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                       </select>
+                    </div>
+                    <div className="col-md-4">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Brand / Merk</label>
+                       <select className="form-select radius-12 border-0 bg-light py-2 fw-medium" value={p.brand} onChange={e => setP(prev => ({...prev, brand: e.target.value}))}>
+                         <option value="">-- No Specific Brand --</option>
+                         {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                       </select>
+                    </div>
+                    <div className="col-md-4">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Stok Tersedia</label>
+                       <input type="number" className="form-control radius-12 border-0 bg-light py-2 fw-bold" value={p.stock} onChange={e => setP(prev => ({...prev, stock: parseInt(e.target.value)}))} />
+                    </div>
 
                    {/* Attributes Section */}
                    <div className="col-12 mt-3">
                       <div className="bg-light p-4 radius-15 border border-white">
-                         <h6 className="fw-bold mb-3 small"><i className="bx bx-list-check me-1 text-primary"></i> Global Attributes (Master Setup)</h6>
+                          <div className="d-flex align-items-center justify-content-between mb-3">
+                             <h6 className="fw-bold mb-0 small"><i className="bx bx-list-check me-1 text-primary"></i> Global Attributes (Master Setup)</h6>
+                             <button type="button" onClick={() => window.location.href='/admin/attributes'}
+                                className="btn btn-sm btn-outline-primary border-0 radius-8 px-3 x-small fw-bold">
+                                <i className="bx bx-cog me-1"></i> Kelola Master
+                             </button>
+                          </div>
                          <div className="row g-3">
-                            {attrs.length === 0 ? <p className="x-small text-muted mb-0">No global attributes found in platform settings.</p> : 
-                            attrs.map(a => (
-                               <div key={a.id} className="col-md-4">
-                                  <label className="form-label x-small fw-bold opacity-75">{a.name.toUpperCase()}</label>
-                                  <select className="form-select form-select-sm radius-10 border-0 shadow-sm" style={{fontSize: 12}} 
-                                    value={selectedAttrs[a.name] || ''}
-                                    onChange={e => handleAttrChange(a.name, e.target.value)}>
-                                     <option value="">Select...</option>
-                                     {a.values?.split(',').map(v => <option key={v} value={v.trim()}>{v.trim()}</option>)}
-                                  </select>
-                               </div>
-                            ))}
+                             {attrs.length === 0 ? <p className="x-small text-muted mb-0">No global attributes found in platform settings.</p> : 
+                             attrs.map(a => (
+                                <div key={a.id} className="col-12 mb-2">
+                                   <label className="form-label x-small fw-bold opacity-75 mb-2">{a.name.toUpperCase()}</label>
+                                   <div className="d-flex flex-wrap gap-2">
+                                      {a.values?.split(',').map(v => {
+                                         const val = v.trim();
+                                         const isChecked = Array.isArray(selectedAttrs[a.name]) && selectedAttrs[a.name].includes(val);
+                                         return (
+                                            <label key={val} className={`px-3 py-2 radius-10 border d-flex align-items-center gap-2 transition-all`} 
+                                              style={{ 
+                                                 cursor: 'pointer',
+                                                 background: isChecked ? 'rgba(67, 97, 238, 0.05)' : '#fff',
+                                                 border: `1.5px solid ${isChecked ? '#4361ee' : '#f1f5f9'}`,
+                                                 color: isChecked ? '#4361ee' : '#64748b',
+                                                 fontWeight: isChecked ? '700' : '600',
+                                                 fontSize: '12px'
+                                              }}>
+                                               <input type="checkbox" style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} checked={isChecked} onChange={e => handleAttrChange(a.name, val, e.target.checked)} />
+                                               {isChecked && <i className="bx bx-check-double" style={{fontSize: 14}}></i>}
+                                               <span>{val}</span>
+                                            </label>
+                                         );
+                                      })}
+                                   </div>
+                                </div>
+                             ))}
                          </div>
                       </div>
                    </div>
                    
-                   <div className="col-md-6">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Display Asset (URL or File Lokal)</label>
-                      <div className="input-group">
-                         <span className="input-group-text border-0 radius-left-12 bg-light"><i className="bx bx-image-add"></i></span>
-                         <input type="text" className="form-control border-0 bg-light py-2" placeholder="https://..." value={p.image} onChange={e => setP({ ...p, image: e.target.value })} />
-                         <label className="btn btn-light border-0 radius-right-12 px-3 m-0 d-flex align-items-center" style={{ cursor: 'pointer' }}>
-                            {uploading ? <div className="spinner-border spinner-border-sm"></div> : <i className="bx bx-upload fs-5"></i>}
-                            <input type="file" className="d-none" accept="image/*" onChange={handleUpload} />
-                         </label>
-                      </div>
-                   </div>
-
-                   <div className="col-md-3">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Harga Jual (IDR)</label>
-                      <input type="number" className="form-control radius-12 border-0 bg-light py-2 fw-bold text-primary" value={p.price} onChange={e => setP({...p, price: parseFloat(e.target.value)})} />
-                   </div>
-                   <div className="col-md-3">
-                      <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Harga Coret (Optional)</label>
-                      <input type="number" className="form-control radius-12 border-0 bg-light py-2 text-muted" value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
-                   </div>
+                    <div className="col-md-6">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Display Asset (URL or File Lokal)</label>
+                       <div className="input-group">
+                          <span className="input-group-text border-0 radius-left-12 bg-light"><i className="bx bx-image-add"></i></span>
+                          <input type="text" className="form-control border-0 bg-light py-2" placeholder="https://..." value={p.image} onChange={e => setP(prev => ({ ...prev, image: e.target.value }))} />
+                          <label className="btn btn-light border-0 radius-right-12 px-3 m-0 d-flex align-items-center" style={{ cursor: 'pointer' }}>
+                             {uploading ? <div className="spinner-border spinner-border-sm"></div> : <i className="bx bx-upload fs-5"></i>}
+                             <input type="file" className="d-none" accept="image/*" onChange={handleUpload} />
+                          </label>
+                       </div>
+                       {p.image && (
+                         <img src={formatImage(p.image)} alt="" style={{ marginTop: 10, width: 80, height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                       )}
+                    </div>
+ 
+                    <div className="col-md-3">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Harga Jual (IDR)</label>
+                       <input type="number" className="form-control radius-12 border-0 bg-light py-2 fw-bold text-primary" value={p.price} onChange={e => setP(prev => ({...prev, price: parseFloat(e.target.value)}))} />
+                    </div>
+                    <div className="col-md-3">
+                       <label className="form-label x-small fw-bold text-muted text-uppercase mb-2">Harga Coret (Optional)</label>
+                       <input type="number" className="form-control radius-12 border-0 bg-light py-2 text-muted" value={p.old_price} onChange={e => setP(prev => ({...prev, old_price: parseFloat(e.target.value)}))} />
+                    </div>
 
                    <div className="col-12 pt-3">
                       <div className="bg-light p-3 radius-15 d-flex align-items-center justify-content-between border border-white">

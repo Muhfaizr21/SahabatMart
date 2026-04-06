@@ -5,6 +5,7 @@ import CategorySection from './components/CategorySection';
 import FeatureBar from './components/FeatureBar';
 import ProductSection from './components/ProductSection';
 import PromoBanner from './components/PromoBanner';
+import VoucherSection from './components/VoucherSection';
 import Footer from './components/Footer';
 import { getStoredUser, isAdminUser } from './lib/auth';
 
@@ -95,6 +96,7 @@ function HomePage() {
       <HeroSlider />
       <CategorySection />
       <FeatureBar />
+      <VoucherSection />
       <ProductSection />
       <PromoBanner />
     </>

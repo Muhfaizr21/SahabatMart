@@ -384,7 +384,7 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 	}
 
 	query := ac.DB.Table("order_merchant_groups omg").
-		Select("omg.id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, omg.total_amount, omg.created_at").
+		Select("omg.id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.created_at").
 		Joins("JOIN merchants m ON m.id = omg.merchant_id").
 		Joins("JOIN orders o ON o.id = omg.order_id").
 		Joins("JOIN users u ON u.id = o.buyer_id").
@@ -473,12 +473,13 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 		MerchantID  string    `json:"merchant_id"`
 		StoreName   string    `json:"store_name"`
 		Category    string    `json:"category"`
+		Attributes  string    `json:"attributes"`
 		Image       string    `json:"image"`
 		CreatedAt   time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("products p").
-		Select("p.id, p.name, p.description, p.image, p.slug, p.price, p.status, p.merchant_id, m.store_name, p.category, p.created_at").
+		Select("p.id, p.name, p.description, p.image, p.slug, p.price, p.status, p.merchant_id, m.store_name, p.category, p.attributes, p.created_at").
 		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id")
 
 	if status != "" {
@@ -1273,7 +1274,7 @@ func (ac *AdminController) GetPublicVouchers(w http.ResponseWriter, r *http.Requ
 	}
 
 	var vouchers []models.Voucher
-	ac.DB.Where("is_active = ?", true).Find(&vouchers)
+	ac.DB.Where("status = ?", "active").Find(&vouchers)
 
 	if vouchers == nil {
 		vouchers = []models.Voucher{}
@@ -1333,6 +1334,20 @@ func (ac *AdminController) GetBlogs(w http.ResponseWriter, r *http.Request) {
 	}
 	query.Find(&blogs)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": blogs})
+}
+
+func (ac *AdminController) GetPublicBlogDetail(w http.ResponseWriter, r *http.Request) {
+	slug := r.URL.Query().Get("slug")
+	if slug == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Slug is required")
+		return
+	}
+	var blog models.BlogPost
+	if err := ac.DB.Where("slug = ? AND status = 'published'", slug).First(&blog).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Article not found")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": blog})
 }
 
 func (ac *AdminController) UpsertBlog(w http.ResponseWriter, r *http.Request) {

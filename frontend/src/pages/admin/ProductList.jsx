@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
 const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
@@ -172,7 +172,7 @@ export default function AdminProductList() {
                     <td style={{ ...S.tdCell, paddingLeft: 24 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <img
-                          src={p.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=e0e7ff&color=4361ee&size=100`}
+                          src={formatImage(p.image) || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=e0e7ff&color=4361ee&size=100`}
                           style={S.avatar} alt=""
                         />
                         <div>

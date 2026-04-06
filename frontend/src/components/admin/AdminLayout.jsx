@@ -259,6 +259,14 @@ const AdminLayout = () => {
               </Link>
             </li>
 
+            <li className="menu-label">Content & Media</li>
+            <li>
+              <Link to="/admin/blogs">
+                <div className="parent-icon"><i className="bx bxs-news"></i></div>
+                <div className="menu-title">Blog & Articles</div>
+              </Link>
+            </li>
+
             <li className="menu-label">Finance & Audit</li>
 
             {/* ── Finance ─────────────────────────────── */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 
 function StarRating({ rating, size = 16 }) {
   return (
@@ -96,9 +96,10 @@ export default function ProductDetailPage() {
     );
   }
 
+  const baseImg = formatImage(product.image);
   const images = [
-    product.image,
-    product.image.includes('unsplash') ? product.image + "&auto=format&fit=crop&q=60" : product.image
+    baseImg,
+    baseImg.includes('unsplash') ? baseImg + "&auto=format&fit=crop&q=60" : baseImg
   ];
 
   const priceIDR = (product.price || 0).toLocaleString('id');
@@ -161,9 +162,35 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              <p className="text-gray-500 leading-relaxed mb-8 flex-1">
+              <p className="text-gray-500 leading-relaxed mb-6">
                 {product.description || "Tidak ada deskripsi untuk produk ini."}
               </p>
+
+              {/* Dynamic Attributes (Master Setup) */}
+              {product.attributes && (
+                <div className="space-y-4 mb-8 pt-6 border-t border-gray-100">
+                  {(() => {
+                    try {
+                      const attrs = JSON.parse(product.attributes);
+                      return Object.entries(attrs).map(([name, values]) => (
+                        <div key={name}>
+                          <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 block">{name}</label>
+                          <div className="flex flex-wrap gap-2">
+                            {Array.isArray(values) && values.map(val => (
+                              <button key={val} className="px-4 py-2 rounded-xl border-2 border-gray-100 text-sm font-bold text-gray-700 hover:border-blue-600 hover:text-blue-600 transition-all bg-white shadow-sm">
+                                {val}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ));
+                    } catch (e) {
+                      console.error("Parse attributes error:", e);
+                      return null;
+                    }
+                  })()}
+                </div>
+              )}
 
               <div className="flex items-center gap-4 mb-8 pt-6 border-t border-gray-100">
                 <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-14">
@@ -193,13 +220,47 @@ export default function ProductDetailPage() {
                </button>
              ))}
            </div>
-           
-           <div className="p-8 md:p-10">
-             {activeTab === 'Deskripsi' && (
-               <div className="prose prose-blue max-w-none text-gray-500 leading-loose whitespace-pre-wrap">
-                 {product.description || "Produk berkualitas tinggi dari SahabatMart. Jaminan original dan bergaransi resmi."}
-               </div>
-             )}
+                     <div className="p-8 md:p-10 text-gray-500 leading-loose">
+              {activeTab === 'Deskripsi' && (
+                <div className="prose prose-blue max-w-none whitespace-pre-wrap">
+                  {product.description || "Produk berkualitas tinggi dari SahabatMart. Jaminan original dan bergaransi resmi."}
+                </div>
+              )}
+              {activeTab === 'Informasi Tambahan' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      ['Brand', product.brand || 'No Brand'],
+                      ['Kategori', product.category || 'Lainnya'],
+                      ['Stok', `${product.stock || 0} unit`],
+                      ['Status', product.status === 'active' ? 'Tersedia' : 'Kosong'],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                        <span className="text-gray-400 font-bold text-xs uppercase tracking-widest">{k}</span>
+                        <span className="text-gray-900 font-black">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {product.attributes && (
+                    <div className="pt-6 border-t border-gray-100">
+                      <h4 className="text-sm font-black text-gray-900 mb-4 tracking-wider">Spesifikasi Detail</h4>
+                      <div className="space-y-3">
+                        {(() => {
+                          try {
+                            const attrs = JSON.parse(product.attributes);
+                            return Object.entries(attrs).map(([k, v]) => (
+                              <div key={k} className="flex gap-4 text-sm py-1 border-b border-gray-50 last:border-0 pb-3">
+                                <span className="w-32 text-gray-400 font-bold">{k}</span>
+                                <span className="flex-1 text-gray-700 font-medium">{(Array.isArray(v) ? v : [v]).join(', ')}</span>
+                              </div>
+                            ));
+                          } catch(e) { return null; }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
              {activeTab === 'Ulasan' && (
                <div className="space-y-10">
                  {reviewsData.map(rev => (
@@ -236,7 +297,7 @@ export default function ProductDetailPage() {
               {related.map(p => (
                 <Link to={`/product/${p.id}`} key={p.id} className="bg-white rounded-2xl p-4 border border-gray-100 hover:shadow-xl transition-all group shadow-sm flex flex-col">
                     <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 mb-4 border border-gray-100">
-                        <img src={p.image} alt={p.name} className="w-full h-full object-contain p-2 group-hover:scale-110 transition-transform" />
+                        <img src={formatImage(p.image)} alt={p.name} className="w-full h-full object-contain p-2 group-hover:scale-110 transition-transform" />
                     </div>
                     <h3 className="font-bold text-gray-900 line-clamp-2 mb-2 group-hover:text-blue-600 transition-colors h-10">{p.name}</h3>
                     <div className="mt-auto">
