@@ -5,13 +5,22 @@ import (
 	"net/http"
 
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
 	"gorm.io/gorm"
 )
 
 type BuyerController struct {
-	DB *gorm.DB
+	DB           *gorm.DB
+	OrderService *services.OrderService
+}
+
+func NewBuyerController(db *gorm.DB) *BuyerController {
+	return &BuyerController{
+		DB:           db,
+		OrderService: services.NewOrderService(db),
+	}
 }
 
 // GET /api/buyer/cart
@@ -24,7 +33,7 @@ func (bc *BuyerController) GetCart(w http.ResponseWriter, r *http.Request) {
 			cart = models.Cart{BuyerID: buyerID}
 			bc.DB.Create(&cart)
 		} else {
-			utils.JSONError(w, http.StatusInternalServerError, "Failed to get cart")
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil keranjang")
 			return
 		}
 	}
@@ -43,7 +52,7 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
@@ -70,7 +79,7 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 		bc.DB.Create(&item)
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Item added to cart"})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Item berhasil ditambahkan ke keranjang"})
 }
 
 // POST /api/buyer/checkout
@@ -83,23 +92,21 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
-	// 1. Get Cart Items
 	var cart models.Cart
 	if err := bc.DB.Preload("Items").Where("buyer_id = ?", buyerID).First(&cart).Error; err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Cart is empty")
+		utils.JSONError(w, http.StatusBadRequest, "Keranjang kosong")
 		return
 	}
 
 	if len(cart.Items) == 0 {
-		utils.JSONError(w, http.StatusBadRequest, "Cart is empty")
+		utils.JSONError(w, http.StatusBadRequest, "Keranjang kosong")
 		return
 	}
 
-	// 2. Convert CartItems to OrderItems (Simplified for logic)
 	var orderItems []models.OrderItem
 	for _, ci := range cart.Items {
 		var variant models.ProductVariant
@@ -123,14 +130,12 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// 3. Create Order using Split Logic
-	order, err := utils.CreateOrder(bc.DB, buyerID, orderItems, req.AffiliateID, req.ShippingInfo)
+	order, err := bc.OrderService.CreateOrder(buyerID, orderItems, req.AffiliateID, req.ShippingInfo)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to create order: "+err.Error())
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat pesanan: "+err.Error())
 		return
 	}
 
-	// 4. Clear Cart
 	bc.DB.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{})
 
 	utils.JSONResponse(w, http.StatusCreated, order)

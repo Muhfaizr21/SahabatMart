@@ -5,21 +5,31 @@ import (
 	"net/http"
 
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
 	"gorm.io/gorm"
 )
 
 type MerchantController struct {
-	DB *gorm.DB
+	Service *services.MerchantService
+}
+
+func NewMerchantController(db *gorm.DB) *MerchantController {
+	return &MerchantController{
+		Service: services.NewMerchantService(db),
+	}
 }
 
 // GET /api/merchant/products
 func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
 
-	var products []models.Product
-	mc.DB.Preload("Variants").Where("merchant_id = ?", merchantID).Find(&products)
+	products, err := mc.Service.GetProducts(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar produk")
+		return
+	}
 
 	utils.JSONResponse(w, http.StatusOK, products)
 }
@@ -30,13 +40,13 @@ func (mc *MerchantController) AddProduct(w http.ResponseWriter, r *http.Request)
 
 	var product models.Product
 	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
 	product.MerchantID = merchantID
-	if err := mc.DB.Create(&product).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to create product")
+	if err := mc.Service.AddProduct(&product); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menambahkan produk")
 		return
 	}
 
@@ -47,8 +57,11 @@ func (mc *MerchantController) AddProduct(w http.ResponseWriter, r *http.Request)
 func (mc *MerchantController) GetOrders(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
 
-	var groups []models.OrderMerchantGroup
-	mc.DB.Preload("Items").Where("merchant_id = ?", merchantID).Order("created_at desc").Find(&groups)
+	groups, err := mc.Service.GetOrders(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar pesanan")
+		return
+	}
 
 	utils.JSONResponse(w, http.StatusOK, groups)
 }
@@ -63,18 +76,15 @@ func (mc *MerchantController) UpdateOrderStatus(w http.ResponseWriter, r *http.R
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
-	var group models.OrderMerchantGroup
-	if err := mc.DB.Where("id = ? AND merchant_id = ?", req.GroupID, merchantID).First(&group).Error; err != nil {
-		utils.JSONError(w, http.StatusNotFound, "Order group not found")
+	group, err := mc.Service.UpdateOrderStatus(req.GroupID, merchantID, req.Status)
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan")
 		return
 	}
-
-	group.Status = models.MerchantOrderStatus(req.Status)
-	mc.DB.Save(&group)
 
 	utils.JSONResponse(w, http.StatusOK, group)
 }

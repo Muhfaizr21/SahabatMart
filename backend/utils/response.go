@@ -5,15 +5,46 @@ import (
 	"net/http"
 )
 
-func JSONResponse(w http.ResponseWriter, statusCode int, payload interface{}) {
+type APIResponse struct {
+	Status  string      `json:"status"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+	Meta    interface{} `json:"meta,omitempty"`
+}
+
+func JSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(payload)
+	
+	resp := APIResponse{
+		Status: "success",
+		Data:   data,
+	}
+
+	// If data is already a map with status/message, handle it
+	if m, ok := data.(map[string]interface{}); ok {
+		if s, ok := m["status"].(string); ok {
+			resp.Status = s
+		}
+		if msg, ok := m["message"].(string); ok {
+			resp.Message = msg
+			delete(m, "message")
+		}
+		if d, ok := m["data"]; ok {
+			resp.Data = d
+		} else {
+			resp.Data = m
+		}
+	}
+
+	json.NewEncoder(w).Encode(resp)
 }
 
 func JSONError(w http.ResponseWriter, statusCode int, message string) {
-	JSONResponse(w, statusCode, map[string]string{
-		"status":  "error",
-		"message": message,
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(APIResponse{
+		Status:  "error",
+		Message: message,
 	})
 }

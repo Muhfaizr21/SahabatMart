@@ -3,114 +3,62 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/repositories"
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
 	"gorm.io/gorm"
 )
 
 type AdminController struct {
-	DB *gorm.DB
+	DB       *gorm.DB
+	Service  *services.AdminService
+	Audit    *services.AuditService
+	Storage  *services.StorageService
+}
+
+func NewAdminController(db *gorm.DB) *AdminController {
+	audit := services.NewAuditService(repositories.NewAuditRepository(db))
+	return &AdminController{
+		DB:      db,
+		Service: services.NewAdminService(db, audit),
+		Audit:   audit,
+		Storage: services.NewStorageService("http://localhost:8080", "uploads"),
+	}
 }
 
 func (ac *AdminController) hasTable(name string) bool {
 	return ac.DB != nil && ac.DB.Migrator().HasTable(name)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPER: log audit action
-// ─────────────────────────────────────────────────────────────────────────────
-
 // POST /api/admin/upload
 func (ac *AdminController) UploadImage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Metode tidak diizinkan")
 		return
 	}
 
-	r.ParseMultipartForm(10 << 20) // Max 10MB
+	r.ParseMultipartForm(10 << 20)
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Failed to get image")
+		utils.JSONError(w, http.StatusBadRequest, "Gagal mengambil gambar")
 		return
 	}
 	defer file.Close()
 
-	// Pastikan folder uploads ada
-	os.MkdirAll("uploads", os.ModePerm)
-
-	// Buat nama file unik (ganti extension ke .webp sebagai penanda)
-	filename := fmt.Sprintf("%d-%s.webp", time.Now().Unix(), strings.TrimSpace(header.Filename))
-	filePath := filepath.Join("uploads", filename)
-
-	out, err := os.Create(filePath)
+	url, err := ac.Storage.SaveImage(file, header)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to save file")
-		return
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, file)
-	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to write file")
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan file")
 		return
 	}
 
-	// Kembalikan URL publik
-	utils.JSONResponse(w, http.StatusOK, map[string]string{
-		"url": fmt.Sprintf("http://localhost:8080/uploads/%s", filename),
-	})
-}
-
-func (ac *AdminController) logAudit(adminID, action, targetType, targetID, detail, ip string) {
-	// Bersihkan IP dari port secara paksa agar PostgreSQL 'inet' tidak eror
-	cleanIP := ip
-	if strings.Contains(ip, ":") {
-		host, _, err := net.SplitHostPort(ip)
-		if err == nil {
-			cleanIP = host
-		} else {
-			// Jika gagal (mungkin IPv6 tanpa port), buang bagian setelah titik dua terakhir jika ada
-			if idx := strings.LastIndex(ip, "]:"); idx != -1 {
-				cleanIP = ip[1:idx]
-			} else if !strings.Contains(ip, "[") && strings.Count(ip, ":") == 1 {
-				// IPv4:port
-				cleanIP = strings.Split(ip, ":")[0]
-			}
-		}
-	}
-	// Fallback jika masih loopback IPv6 atau format aneh
-	if cleanIP == "::1" || cleanIP == "[::1]" || cleanIP == "127.0.0.1" {
-		cleanIP = "127.0.0.1"
-	}
-
-	// Jika adminID bukan UUID valid (seperti "admin"), cari ID admin pertama dari DB
-	if len(adminID) < 32 {
-		var firstAdmin models.User
-		ac.DB.Where("role IN ?", []string{"admin", "superadmin"}).First(&firstAdmin)
-		adminID = firstAdmin.ID
-	}
-	if adminID == "" {
-		adminID = "00000000-0000-0000-0000-000000000000" // Fallback nil UUID
-	}
-
-	ac.DB.Create(&models.AuditLog{
-		AdminID:    adminID,
-		Action:     action,
-		TargetType: targetType,
-		TargetID:   targetID,
-		Detail:     detail,
-		IPAddress:  cleanIP,
-	})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"url": url})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,7 +123,7 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ac.DB.Model(&models.User{}).Where("id = ?", req.UserID).Updates(updates)
-	ac.logAudit("admin", "update_user", "user", req.UserID,
+	ac.Audit.Log("admin", "update_user", "user", req.UserID,
 		fmt.Sprintf("status=%s role=%s admin_role=%s", req.Status, req.Role, req.AdminRole),
 		r.RemoteAddr)
 
@@ -193,7 +141,7 @@ func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus user")
 		return
 	}
-	ac.logAudit("admin", "delete_user", "user", id, "suspended", r.RemoteAddr)
+	ac.Audit.Log("admin", "delete_user", "user", id, "suspended", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -265,7 +213,7 @@ func (ac *AdminController) UpdateMerchantStatus(w http.ResponseWriter, r *http.R
 	}
 
 	ac.DB.Model(&models.Merchant{}).Where("id = ?", req.MerchantID).Updates(updates)
-	ac.logAudit("admin", "update_merchant_status", "merchant", req.MerchantID,
+	ac.Audit.Log("admin", "update_merchant_status", "merchant", req.MerchantID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.SuspendNote),
 		r.RemoteAddr)
 
@@ -284,7 +232,7 @@ func (ac *AdminController) VerifyMerchant(w http.ResponseWriter, r *http.Request
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Model(&models.Merchant{}).Where("id = ?", req.MerchantID).Update("is_verified", req.Verified)
-	ac.logAudit("admin", "verify_merchant", "merchant", req.MerchantID,
+	ac.Audit.Log("admin", "verify_merchant", "merchant", req.MerchantID,
 		fmt.Sprintf("verified=%v", req.Verified), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -337,7 +285,7 @@ func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusInternalServerError, "Failed to create category")
 		return
 	}
-	ac.logAudit("admin", "create_category", "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
+	ac.Audit.Log("admin", "create_category", "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"status": "success",
 		"data":   cat,
@@ -352,7 +300,7 @@ func (ac *AdminController) DeleteCategory(w http.ResponseWriter, r *http.Request
 	}
 	id := r.URL.Query().Get("id")
 	ac.DB.Where("id = ?", id).Delete(&models.Category{})
-	ac.logAudit("admin", "delete_category", "category", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log("admin", "delete_category", "category", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -445,7 +393,7 @@ func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.
 	} else {
 		ac.DB.Save(&cfg)
 	}
-	ac.logAudit("admin", "upsert_affiliate_config", "affiliate_config",
+	ac.Audit.Log("admin", "upsert_affiliate_config", "affiliate_config",
 		fmt.Sprintf("%d", cfg.ID), cfg.TierName, r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -518,7 +466,7 @@ func (ac *AdminController) ModerateProduct(w http.ResponseWriter, r *http.Reques
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Table("products").Where("id = ?", req.ID).Update("status", req.Status)
-	ac.logAudit("admin", "moderate_product", "product", req.ID,
+	ac.Audit.Log("admin", "moderate_product", "product", req.ID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.Note), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -536,7 +484,7 @@ func (ac *AdminController) DeleteProduct(w http.ResponseWriter, r *http.Request)
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus produk secara permanen")
 		return
 	}
-	ac.logAudit("admin", "delete_product_permanent", "product", id, "purged from database", r.RemoteAddr)
+	ac.Audit.Log("admin", "delete_product_permanent", "product", id, "purged from database", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -585,7 +533,7 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ac.logAudit("admin", "create_product", "product", p.ID, p.Name, r.RemoteAddr)
+	ac.Audit.Log("admin", "create_product", "product", p.ID, p.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{"status": "success", "data": p})
 }
 
@@ -631,7 +579,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ac.logAudit("admin", "update_product", "product", req.ID, req.Name, r.RemoteAddr)
+	ac.Audit.Log("admin", "update_product", "product", req.ID, req.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -855,7 +803,7 @@ func (ac *AdminController) FreezeOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	ac.logAudit("admin", "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
+	ac.Audit.Log("admin", "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
 		"status": "success", 
@@ -883,7 +831,7 @@ func (ac *AdminController) ManageCommissions(w http.ResponseWriter, r *http.Requ
 		var comm models.CategoryCommission
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
-		ac.logAudit("admin", "upsert_commission", "category_commission",
+		ac.Audit.Log("admin", "upsert_commission", "category_commission",
 			fmt.Sprintf("%d", comm.ID), fmt.Sprintf("cat=%d fee=%.4f", comm.CategoryID, comm.FeePercent),
 			r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -914,7 +862,7 @@ func (ac *AdminController) ManageMerchantCommissions(w http.ResponseWriter, r *h
 		var comm models.MerchantCommission
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
-		ac.logAudit("admin", "upsert_merchant_commission", "merchant_commission",
+		ac.Audit.Log("admin", "upsert_merchant_commission", "merchant_commission",
 			comm.MerchantID, fmt.Sprintf("fee=%.4f", comm.FeePercent), r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
@@ -937,7 +885,7 @@ func (ac *AdminController) BulkUpdateCommissions(w http.ResponseWriter, r *http.
 	for _, comm := range comms {
 		ac.DB.Save(&comm)
 	}
-	ac.logAudit("admin", "bulk_update_commissions", "category_commission", "", fmt.Sprintf("updated %d items", len(comms)), r.RemoteAddr)
+	ac.Audit.Log("admin", "bulk_update_commissions", "category_commission", "", fmt.Sprintf("updated %d items", len(comms)), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -983,7 +931,7 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 		"processed_at": &now,
 		"processed_by": req.ProcessedBy,
 	})
-	ac.logAudit(req.ProcessedBy, "process_payout", "payout", req.PayoutID,
+	ac.Audit.Log(req.ProcessedBy, "process_payout", "payout", req.PayoutID,
 		fmt.Sprintf("status=%s", req.Status), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -1007,14 +955,14 @@ func (ac *AdminController) UpsertBrand(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ac.DB.Save(&brand)
 	}
-	ac.logAudit("admin", "upsert_brand", "brand", fmt.Sprintf("%d", brand.ID), brand.Name, r.RemoteAddr)
+	ac.Audit.Log("admin", "upsert_brand", "brand", fmt.Sprintf("%d", brand.ID), brand.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, brand)
 }
 
 func (ac *AdminController) DeleteBrand(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Brand{}, id)
-	ac.logAudit("admin", "delete_brand", "brand", id, "", r.RemoteAddr)
+	ac.Audit.Log("admin", "delete_brand", "brand", id, "", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1036,7 +984,7 @@ func (ac *AdminController) UpsertAttribute(w http.ResponseWriter, r *http.Reques
 	} else {
 		ac.DB.Save(&attr)
 	}
-	ac.logAudit("admin", "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
+	ac.Audit.Log("admin", "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, attr)
 }
 
@@ -1057,7 +1005,7 @@ func (ac *AdminController) ToggleLogistic(w http.ResponseWriter, r *http.Request
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Model(&models.LogisticChannel{}).Where("id = ?", req.ID).Update("is_active", req.Active)
-	ac.logAudit("admin", "toggle_logistic", "logistic", fmt.Sprintf("%d", req.ID), fmt.Sprintf("active=%v", req.Active), r.RemoteAddr)
+	ac.Audit.Log("admin", "toggle_logistic", "logistic", fmt.Sprintf("%d", req.ID), fmt.Sprintf("active=%v", req.Active), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1085,7 +1033,7 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 		DecidedBy:    req.DecidedBy,
 		UpdatedAt:    time.Now(),
 	})
-	ac.logAudit(req.DecidedBy, "arbitrate_dispute", "dispute", fmt.Sprintf("%d", req.ID), req.Status, r.RemoteAddr)
+	ac.Audit.Log(req.DecidedBy, "arbitrate_dispute", "dispute", fmt.Sprintf("%d", req.ID), req.Status, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1107,7 +1055,7 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 	} else {
 		ac.DB.Save(&v)
 	}
-	ac.logAudit("admin", "upsert_voucher", "voucher", v.Code, v.Title, r.RemoteAddr)
+	ac.Audit.Log("admin", "upsert_voucher", "voucher", v.Code, v.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, v)
 }
 
@@ -1118,7 +1066,7 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 func (ac *AdminController) GetAffiliateClicks(w http.ResponseWriter, r *http.Request) {
 	var clicks []models.AffiliateClick
 	ac.DB.Order("created_at DESC").Limit(1000).Find(&clicks)
-	ac.logAudit("admin", "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
+	ac.Audit.Log("admin", "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": clicks})
 }
 
@@ -1143,7 +1091,7 @@ func (ac *AdminController) UpsertRegion(w http.ResponseWriter, r *http.Request) 
 	var reg models.Region
 	json.NewDecoder(r.Body).Decode(&reg)
 	ac.DB.Save(&reg)
-	ac.logAudit("admin", "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
+	ac.Audit.Log("admin", "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, reg)
 }
 
@@ -1199,7 +1147,7 @@ func (ac *AdminController) UpsertSettings(w http.ResponseWriter, r *http.Request
 			Assign(models.PlatformConfig{Value: cfg.Value, Description: cfg.Description}).
 			FirstOrCreate(&models.PlatformConfig{})
 	}
-	ac.logAudit("admin", "upsert_settings", "platform_config", "",
+	ac.Audit.Log("admin", "upsert_settings", "platform_config", "",
 		fmt.Sprintf("updated %d keys", len(configs)), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -1402,14 +1350,14 @@ func (ac *AdminController) UpsertBlog(w http.ResponseWriter, r *http.Request) {
 		post.Slug = strings.Trim(post.Slug, "-")
 	}
 	ac.DB.Save(&post)
-	ac.logAudit("admin", "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
+	ac.Audit.Log("admin", "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, post)
 }
 
 func (ac *AdminController) DeleteBlog(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.BlogPost{}, id)
-	ac.logAudit("admin", "delete_blog", "blog", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log("admin", "delete_blog", "blog", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1423,14 +1371,14 @@ func (ac *AdminController) ManageBanners(w http.ResponseWriter, r *http.Request)
 	var b models.Banner
 	json.NewDecoder(r.Body).Decode(&b)
 	ac.DB.Save(&b)
-	ac.logAudit("admin", "upsert_banner", "banner", fmt.Sprintf("%d", b.ID), b.Title, r.RemoteAddr)
+	ac.Audit.Log("admin", "upsert_banner", "banner", fmt.Sprintf("%d", b.ID), b.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, b)
 }
 
 func (ac *AdminController) DeleteBanner(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Banner{}, id)
-	ac.logAudit("admin", "delete_banner", "banner", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log("admin", "delete_banner", "banner", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 

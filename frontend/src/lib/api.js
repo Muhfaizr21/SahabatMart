@@ -31,6 +31,12 @@ export async function fetchJson(url, options = {}) {
     if (!response.ok) {
       throw new Error(data?.message || `Error ${response.status}`);
     }
+    
+    // Auto-unwrap standardised response
+    if (data && data.status === 'success' && data.data !== undefined) {
+      return data.data;
+    }
+    
     return data;
   } catch (err) {
     throw err;
