@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { BUYER_API_BASE, fetchJson } from '../lib/api';
 
 const steps = ['Keranjang', 'Checkout', 'Konfirmasi'];
 const provinces = ['DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Yogyakarta', 'Bali', 'Sumatera Utara', 'Sulawesi Selatan'];
@@ -10,31 +11,72 @@ const paymentMethods = [
   { id: 'cc', label: 'Kartu Kredit/Debit', icon: '💳', desc: 'Visa, MasterCard, JCB' },
 ];
 
-const orderSummary = [
-  { name: 'Galaxy Tab S6 Lite 10.4-inch Android Tablet 128GB', qty: 1, price: 247 * 16000, image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=60&h=60&fit=crop' },
-  { name: 'Cancelling Headphones Wireless Premium Edition', qty: 2, price: 120 * 16000, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=60&h=60&fit=crop' },
-];
-
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('transfer');
+  const [cart, setCart] = useState({ items: [] });
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     address: '', city: '', province: '', postalCode: '', notes: '',
   });
   const [loading, setLoading] = useState(false);
 
-  const subtotal = orderSummary.reduce((s, i) => s + i.price * i.qty, 0);
+  useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+        const data = await fetchJson(`${BUYER_API_BASE}/cart`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setCart(data);
+      } catch (err) {
+        console.error('Failed to fetch cart:', err);
+      }
+    };
+    fetchCart();
+  }, [navigate]);
+
+  const subtotal = cart.items?.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0) || 0;
   const shipping = 0;
   const total = subtotal + shipping;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        shipping_info: {
+          shipping_name: `${form.firstName} ${form.lastName}`,
+          shipping_phone: form.phone,
+          shipping_address: form.address,
+          shipping_city: form.city,
+          shipping_province: form.province,
+          shipping_postal_code: form.postalCode,
+          notes: form.notes,
+        },
+        affiliate_id: localStorage.getItem('affiliate_id') || null,
+      };
+
+      await fetchJson(`${BUYER_API_BASE}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
       navigate('/order-success');
-    }, 2000);
+    } catch (err) {
+      alert('Checkout gagal: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -169,16 +211,16 @@ export default function CheckoutPage() {
             <div className="lg:w-80 flex-shrink-0">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24">
                 <h3 className="font-bold text-gray-900 text-lg mb-5">Ringkasan Pesanan</h3>
-                <div className="space-y-4 mb-5">
-                  {orderSummary.map((item, i) => (
+                <div className="space-y-4 mb-5 max-h-60 overflow-y-auto pr-2">
+                  {cart.items?.map((item, i) => (
                     <div key={i} className="flex gap-3">
-                      <div className="relative">
-                        <img src={item.image} alt="" className="w-14 h-14 rounded-xl object-cover bg-gray-50" />
-                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-bold">{item.qty}</span>
+                      <div className="relative flex-shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-lg">📦</div>
+                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white">{item.quantity}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-700 font-medium leading-snug line-clamp-2">{item.name}</div>
-                        <div className="text-xs font-bold text-gray-900 mt-1">Rp{(item.price * item.qty).toLocaleString('id')}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] text-gray-700 font-medium leading-tight line-clamp-2">ID: {item.product_variant_id.substring(0,8)}</div>
+                        <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{((item.unit_price || 0) * item.quantity).toLocaleString('id-ID')}</div>
                       </div>
                     </div>
                   ))}
@@ -186,15 +228,15 @@ export default function CheckoutPage() {
                 <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
-                    <span className="font-medium text-gray-900">Rp{subtotal.toLocaleString('id')}</span>
+                    <span className="font-medium text-gray-900">Rp{subtotal.toLocaleString('id-ID')}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Pengiriman</span>
-                    <span className="text-green-600 font-medium">GRATIS</span>
+                    <span className="text-green-600 font-medium text-xs">GRATIS (Promo)</span>
                   </div>
                   <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
                     <span>Total</span>
-                    <span>Rp{total.toLocaleString('id')}</span>
+                    <span>Rp{total.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
                 <button

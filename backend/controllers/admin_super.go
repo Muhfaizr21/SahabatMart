@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -834,6 +835,34 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// POST /api/admin/orders/freeze
+func (ac *AdminController) FreezeOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		OrderID string `json:"order_id"`
+		Reason  string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
+		return
+	}
+
+	if err := ac.DB.Model(&models.Order{}).Where("id = ?", req.OrderID).Update("status", models.OrderFrozen).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Failed to freeze order")
+		return
+	}
+	
+	ac.logAudit("admin", "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{
+		"status": "success", 
+		"message": "Order has been frozen for mediation",
+	})
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMMISSION CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1283,6 +1312,16 @@ func (ac *AdminController) GetPublicVouchers(w http.ResponseWriter, r *http.Requ
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": vouchers})
 }
 
+func (ac *AdminController) GetPublicConfig(w http.ResponseWriter, r *http.Request) {
+	var cfgs []models.PlatformConfig
+	ac.DB.Find(&cfgs)
+	res := make(map[string]string)
+	for _, c := range cfgs {
+		res[c.Key] = c.Value
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": res})
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD ANALYTICS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1356,9 +1395,11 @@ func (ac *AdminController) UpsertBlog(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
-	// Simple slug generator for demo
+	// Robust slug generator for SEO
 	if post.Slug == "" {
-		post.Slug = strings.ToLower(strings.ReplaceAll(post.Title, " ", "-"))
+		reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+		post.Slug = strings.ToLower(reg.ReplaceAllString(post.Title, "-"))
+		post.Slug = strings.Trim(post.Slug, "-")
 	}
 	ac.DB.Save(&post)
 	ac.logAudit("admin", "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)

@@ -486,32 +486,6 @@ Komisi ditentukan dengan urutan prioritas berikut (dari paling spesifik ke palin
 
 ---
 
-## 🛠️ Tech Stack yang Direkomendasikan
-
-### Backend
-
-| Pilihan | Framework | Keterangan |
-|---|---|---|
-| **Primary** | Node.js + Express / Fastify | Ekosistem luas, cocok untuk event-driven |
-| **Alternative** | Laravel (PHP) | Mature, banyak developer Indonesia |
-| **Alternative** | Django (Python) | Cocok jika tim lebih familiar dengan Python |
-
-### Frontend
-
-| Layer | Teknologi | Keterangan |
-|---|---|---|
-| **Storefront** | Next.js (React) | SSR untuk SEO produk sangat penting |
-| **Admin Panel** | React + Vite atau Next.js | SPA cukup untuk internal tool |
-| **Mobile** | React Native atau Flutter | Opsional fase selanjutnya |
-
-### Database & Cache
-
-| Komponen | Teknologi |
-|---|---|
-| **Database utama** | PostgreSQL 15+ |
-| **Cache & Session** | Redis 7+ |
-| **Search produk** | PostgreSQL Full-Text Search (awal) → Elasticsearch (skala besar) |
-| **Object Storage** | AWS S3 / Cloudflare R2 / MinIO (self-hosted) |
 
 ### Infrastructure
 

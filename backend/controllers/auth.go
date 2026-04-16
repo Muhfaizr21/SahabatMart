@@ -19,78 +19,123 @@ type AuthController struct {
 }
 
 type RegisterRequest struct {
-	FullName string `json:"full_name"`
-	Email    string `json:"email"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
+	FullName string `json:"full_name" validate:"required"`
 	Phone    string `json:"phone"`
-	Password string `json:"password"`
+	Role     string `json:"role"` // buyer, merchant, affiliate
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
 }
 
-const maxFailedLoginAttempts = 5
-const loginLockDuration = 15 * time.Minute
+const (
+	maxFailedLoginAttempts = 5
+	loginLockDuration      = 15 * time.Minute
+)
 
 func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Metode tidak diizinkan")
 		return
 	}
 
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid request payload")
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	// Validasi input minimal
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 	if req.Email == "" || req.Password == "" || req.FullName == "" {
-		utils.JSONError(w, http.StatusBadRequest, "Email, password, and full name are required")
+		utils.JSONError(w, http.StatusBadRequest, "Email, password, dan nama lengkap wajib diisi")
 		return
 	}
 
-	// Cek apakah email sudah ada
+	if len(req.Password) < 8 {
+		utils.JSONError(w, http.StatusBadRequest, "Password minimal 8 karakter")
+		return
+	}
+
+	// Cek duplikasi email
 	var existingUser models.User
 	if err := ac.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
-		utils.JSONError(w, http.StatusConflict, "Email is already registered")
+		utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar")
 		return
 	}
 
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to hash password")
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memproses kata sandi")
 		return
 	}
 
-	var phonePtr *string
-	if req.Phone != "" {
-		phonePtr = &req.Phone
+	// Inisialisasi User
+	role := strings.ToLower(req.Role)
+	if role == "" {
+		role = "buyer"
 	}
 
 	user := models.User{
 		Email:        req.Email,
-		Phone:        phonePtr,
 		PasswordHash: string(hashedPassword),
-		Role:         "buyer", // Default mendaftar sebagai pembeli
+		Role:         role,
 		Status:       "active",
 		Profile: models.UserProfile{
 			FullName: req.FullName,
 		},
 	}
 
-	if err := ac.DB.Create(&user).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to create user account")
+	if req.Phone != "" {
+		user.Phone = &req.Phone
+	}
+
+	// Simpan ke DB dengan Transaksi
+	err = ac.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+
+		// Buat record profil aktor jika perlu
+		switch role {
+		case "merchant":
+			return tx.Create(&models.Merchant{
+				UserID:    user.ID,
+				StoreName: req.FullName + "'s Store",
+				Status:    "pending",
+			}).Error
+		case "affiliate":
+			// GenerateRefCode should be robust
+			return tx.Create(&models.AffiliateMember{
+				UserID:           user.ID,
+				RefCode:          utils.GenerateRefCode(req.FullName),
+				MembershipTierID: 1,
+				Status:           models.AffiliateActive,
+			}).Error
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mendaftarkan akun: "+err.Error())
 		return
 	}
 
-	token, _ := utils.GenerateJWT(user.ID, user.Role, user.Email)
+	// Generate Token
+	mID, aID := ac.getExtraIDs(user.ID, user.Role)
+	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat sesi login")
+		return
+	}
 
+	// Return logic: exclude sensitive data
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
-		"status":  "success",
-		"message": "User registered successfully",
+		"message": "Registrasi berhasil",
 		"token":   token,
 		"user":    user,
 	})
@@ -98,70 +143,110 @@ func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 
 func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Metode tidak diizinkan")
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
 	var user models.User
-	now := time.Now()
-	email := strings.ToLower(strings.TrimSpace(req.Email))
-	// Preload Profile agar info user_profile terbawa saat login
+	email := strings.TrimSpace(strings.ToLower(req.Email))
 	if err := ac.DB.Preload("Profile").Where("email = ?", email).First(&user).Error; err != nil {
-		utils.JSONError(w, http.StatusUnauthorized, "Invalid email or password")
+		utils.JSONError(w, http.StatusUnauthorized, "Email atau kata sandi salah")
 		return
 	}
 
+	// Cek Status & Lock
 	if user.Status != "active" {
-		utils.JSONError(w, http.StatusForbidden, "Account is not active")
+		utils.JSONError(w, http.StatusForbidden, "Akun Anda tidak aktif atau ditangguhkan")
+		return
+	}
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+		utils.JSONError(w, http.StatusLocked, "Akun terkunci sementara karena terlalu banyak percobaan gagal")
 		return
 	}
 
-	if user.LockedUntil != nil && user.LockedUntil.After(now) {
-		utils.JSONError(w, http.StatusLocked, "Account is temporarily locked due to failed login attempts")
-		return
-	}
-
+	// Verifikasi Password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		updates := map[string]interface{}{
-			"failed_login_attempts": user.FailedLoginAttempts + 1,
-		}
-		if user.FailedLoginAttempts+1 >= maxFailedLoginAttempts {
-			lockedUntil := now.Add(loginLockDuration)
-			updates["locked_until"] = &lockedUntil
-		}
-		ac.DB.Model(&user).Updates(updates)
-		utils.JSONError(w, http.StatusUnauthorized, "Invalid email or password")
+		ac.handleFailedLogin(&user)
+		utils.JSONError(w, http.StatusUnauthorized, "Email atau kata sandi salah")
 		return
 	}
 
-	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email)
+	// Login Berhasil
+	clientIP := ac.getClientIP(r)
+	ac.handleSuccessfulLogin(&user, clientIP)
+
+	mID, aID := ac.getExtraIDs(user.ID, user.Role)
+	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to generate token")
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat sesi login")
 		return
 	}
 
-	clientIP := r.RemoteAddr
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		clientIP = host
-	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": "Login berhasil",
+		"token":   token,
+		"user":    user,
+	})
+}
 
-	ac.DB.Model(&user).Updates(map[string]interface{}{
+func (ac *AuthController) getExtraIDs(userID, role string) (string, string) {
+	mID, aID := "", ""
+	if role == "merchant" {
+		var m models.Merchant
+		if err := ac.DB.Select("id").Where("user_id = ?", userID).First(&m).Error; err == nil {
+			mID = m.ID
+		}
+	} else if role == "affiliate" {
+		var a models.AffiliateMember
+		if err := ac.DB.Select("id").Where("user_id = ?", userID).First(&a).Error; err == nil {
+			aID = a.ID
+		}
+	}
+	return mID, aID
+}
+
+func (ac *AuthController) getClientIP(r *http.Request) string {
+	// Look for X-Forwarded-For header
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		ips := strings.Split(xff, ",")
+		return strings.TrimSpace(ips[0])
+	}
+	
+	// Fallback to RemoteAddr
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (ac *AuthController) handleFailedLogin(user *models.User) {
+	newAttempts := user.FailedLoginAttempts + 1
+	updates := map[string]interface{}{
+		"failed_login_attempts": newAttempts,
+	}
+	
+	if newAttempts >= maxFailedLoginAttempts {
+		lockedUntil := time.Now().Add(loginLockDuration)
+		updates["locked_until"] = &lockedUntil
+	}
+	
+	ac.DB.Model(user).Updates(updates)
+}
+
+func (ac *AuthController) handleSuccessfulLogin(user *models.User, clientIP string) {
+	now := time.Now()
+	ac.DB.Model(user).Updates(map[string]interface{}{
 		"failed_login_attempts": 0,
 		"locked_until":          nil,
 		"last_login_at":         &now,
 		"last_login_ip":         clientIP,
-	})
-
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status":  "success",
-		"message": "Login successful",
-		"token":   token,
-		"user":    user,
 	})
 }

@@ -226,6 +226,40 @@ type Product struct {
 	Status      string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, taken_down, draft
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+
+	Variants    []ProductVariant `gorm:"foreignKey:ProductID" json:"variants"`
+}
+
+// ProductVariant untuk variasi produk (warna, ukuran, dsb)
+type ProductVariant struct {
+	ID        string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ProductID string    `gorm:"type:uuid;not null;index" json:"product_id"`
+	Name      string    `gorm:"type:varchar(255);not null" json:"name"` // e.g., "Red, XL"
+	SKU       string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"sku"`
+	Price     float64   `gorm:"type:decimal(15,2);not null" json:"price"`
+	Stock     int       `gorm:"default:0" json:"stock"`
+	Image     string    `gorm:"type:text" json:"image"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Cart persistence untuk buyer
+type Cart struct {
+	ID        string     `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	BuyerID   string     `gorm:"type:uuid;uniqueIndex;not null" json:"buyer_id"`
+	Items     []CartItem `gorm:"foreignKey:CartID" json:"items"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+type CartItem struct {
+	ID               string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	CartID           string  `gorm:"type:uuid;not null;index" json:"cart_id"`
+	ProductID        string  `gorm:"type:uuid;not null" json:"product_id"`
+	ProductVariantID string  `gorm:"type:uuid;not null" json:"product_variant_id"`
+	Quantity         int     `gorm:"not null" json:"quantity"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // Banner untuk Hero Slider Home Page
@@ -256,6 +290,9 @@ func (Dispute) TableName() string            { return "disputes" }
 func (LogisticChannel) TableName() string    { return "logistic_channels" }
 func (AffiliateClick) TableName() string     { return "affiliate_clicks" }
 func (Region) TableName() string             { return "regions" }
+func (ProductVariant) TableName() string      { return "product_variants" }
+func (Cart) TableName() string                { return "carts" }
+func (CartItem) TableName() string            { return "cart_items" }
 func (AdminNotification) TableName() string  { return "admin_notifications" }
 func (BlogPost) TableName() string           { return "blog_posts" }
 func (Product) TableName() string            { return "products" }

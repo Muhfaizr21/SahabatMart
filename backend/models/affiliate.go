@@ -39,6 +39,7 @@ type AffiliateMember struct {
 	TotalConversions   int             `gorm:"default:0" json:"total_conversions"`
 	TotalEarned        float64         `gorm:"type:decimal(15,2);default:0" json:"total_earned"`
 	TotalWithdrawn     float64         `gorm:"type:decimal(15,2);default:0" json:"total_withdrawn"`
+	Flags              string          `gorm:"type:text" json:"flags"` // JSON encoded flags like "self_referral_detected"
 
 	CreatedAt          time.Time       `json:"created_at"`
 	UpdatedAt          time.Time       `json:"updated_at"`
@@ -111,5 +112,7 @@ type AffiliateClickLog struct {
 	IsUnique         bool      `gorm:"default:true" json:"is_unique"`
 	IsConverted      bool      `gorm:"default:false" json:"is_converted"`
 	OrderID          *string   `gorm:"type:uuid" json:"order_id"`
+	DeviceFingerprint string   `gorm:"type:varchar(255)" json:"device_fingerprint"`
+	FraudScore        int      `gorm:"default:0" json:"fraud_score"` // 0-100 logic
 	ClickedAt        time.Time `gorm:"autoCreateTime" json:"clicked_at"`
 }

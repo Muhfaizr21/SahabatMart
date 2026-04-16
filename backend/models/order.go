@@ -19,6 +19,7 @@ const (
 	OrderRefundProcessing OrderStatus = "refund_processing"
 	OrderRefunded       OrderStatus = "refunded"
 	OrderDisputed       OrderStatus = "disputed"
+	OrderFrozen         OrderStatus = "frozen" // Transaksi dibekukan oleh admin
 )
 
 type MerchantOrderStatus string

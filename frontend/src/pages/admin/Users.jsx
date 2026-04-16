@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
+const ADMIN_AVATAR = '/admin-assets/images/avatars/avatar-1.png';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -70,8 +71,85 @@ const AdminUsers = () => {
     });
   };
 
+  const getStatusBadgeClass = (status) => {
+    if (status === 'active') return 'bg-success';
+    if (status === 'suspended') return 'bg-warning text-dark';
+    if (status === 'banned') return 'bg-danger';
+    return 'bg-secondary';
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('id-ID');
+  };
+
+  const renderDesktopActions = (user) => (
+    <div className="d-flex justify-content-end">
+      <div className="dropdown">
+        <button
+          className="btn btn-sm btn-outline-secondary dropdown-toggle"
+          type="button"
+          data-bs-toggle="dropdown"
+        >
+          Kelola
+        </button>
+        <ul className="dropdown-menu dropdown-menu-end shadow-sm users-action-menu">
+          {user.role === 'admin' ? (
+            <>
+              <li><h6 className="dropdown-header">Role Admin</h6></li>
+              <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'super')}>Jadikan Super Admin</button></li>
+              <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'finance')}>Jadikan Finance Admin</button></li>
+              <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'cs_staff')}>Jadikan CS Staff</button></li>
+              <li><hr className="dropdown-divider" /></li>
+              <li><button className="dropdown-item text-danger" onClick={() => updateUser(user.id, user.status, 'buyer')}>Turunkan ke Buyer</button></li>
+            </>
+          ) : (
+            <>
+              <li><h6 className="dropdown-header">Role</h6></li>
+              <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'cs_staff')}>Promote ke Admin</button></li>
+            </>
+          )}
+          <li><hr className="dropdown-divider" /></li>
+          <li><h6 className="dropdown-header">Status</h6></li>
+          <li><button className="dropdown-item" onClick={() => updateUser(user.id, 'active', user.role, user.admin_role)}>Aktifkan</button></li>
+          <li><button className="dropdown-item" onClick={() => updateUser(user.id, 'suspended', user.role, user.admin_role)}>Suspend</button></li>
+          <li><button className="dropdown-item" onClick={() => updateUser(user.id, 'banned', user.role, user.admin_role)}>Ban</button></li>
+          <li><hr className="dropdown-divider" /></li>
+          <li><button className="dropdown-item text-danger" onClick={() => deleteUser(user.id)}>Hapus Pengguna</button></li>
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderMobileActions = (user) => (
+    <div className="users-mobile-actions">
+      <div className="users-mobile-actions__section">
+        <div className="users-mobile-actions__label">Role</div>
+        {user.role === 'admin' ? (
+          <div className="users-mobile-actions__grid">
+            <button className="btn btn-sm btn-outline-info" onClick={() => updateUser(user.id, user.status, 'admin', 'super')}>Super</button>
+            <button className="btn btn-sm btn-outline-info" onClick={() => updateUser(user.id, user.status, 'admin', 'finance')}>Finance</button>
+            <button className="btn btn-sm btn-outline-info" onClick={() => updateUser(user.id, user.status, 'admin', 'cs_staff')}>CS Staff</button>
+            <button className="btn btn-sm btn-outline-danger" onClick={() => updateUser(user.id, user.status, 'buyer')}>Jadi Buyer</button>
+          </div>
+        ) : (
+          <button className="btn btn-sm btn-outline-primary w-100" onClick={() => updateUser(user.id, user.status, 'admin', 'cs_staff')}>Promote ke Admin</button>
+        )}
+      </div>
+      <div className="users-mobile-actions__section">
+        <div className="users-mobile-actions__label">Status</div>
+        <div className="users-mobile-actions__grid">
+          <button className="btn btn-sm btn-outline-success" onClick={() => updateUser(user.id, 'active', user.role, user.admin_role)}>Aktifkan</button>
+          <button className="btn btn-sm btn-outline-warning" onClick={() => updateUser(user.id, 'suspended', user.role, user.admin_role)}>Suspend</button>
+          <button className="btn btn-sm btn-outline-danger" onClick={() => updateUser(user.id, 'banned', user.role, user.admin_role)}>Ban</button>
+        </div>
+      </div>
+      <button className="btn btn-sm btn-danger-subtle text-danger-emphasis border w-100" onClick={() => deleteUser(user.id)}>Hapus Pengguna</button>
+    </div>
+  );
+
   return (
-    <>
+    <div className="users-admin-page">
       <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
         <div className="breadcrumb-title pe-3">Super Admin</div>
         <div className="ps-3">
@@ -109,10 +187,10 @@ const AdminUsers = () => {
         <div className="card-header py-3">
           <div className="row align-items-center m-0 g-2">
             <div className="col-md-4 col-12 me-auto">
-               <form onSubmit={handleSearch} className="d-flex gap-2">
+               <form onSubmit={handleSearch} className="d-flex flex-column flex-sm-row gap-2">
                   <input type="search" className="form-control form-control-sm" placeholder="Cari email atau telepon..." 
                     value={search} onChange={e => setSearch(e.target.value)} />
-                  <button type="submit" className="btn btn-sm btn-primary">Cari</button>
+                  <button type="submit" className="btn btn-sm btn-primary flex-shrink-0">Cari</button>
                </form>
             </div>
             <div className="col-md-2 col-6">
@@ -137,8 +215,11 @@ const AdminUsers = () => {
         <div className="card-body">
           {loading ? (
             <div className="text-center py-5"><div className="spinner-border text-primary"></div></div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-4 text-muted">Tidak ada pengguna ditemukan</div>
           ) : (
-            <div className="table-responsive">
+            <>
+            <div className="users-table-shell d-none d-lg-block">
               <table className="table align-middle table-striped mb-0">
                 <thead className="table-light">
                   <tr>
@@ -146,18 +227,16 @@ const AdminUsers = () => {
                     <th>Role</th>
                     <th>Status</th>
                     <th>Terdaftar</th>
-                    <th>Aksi</th>
+                    <th className="text-end">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center py-4 text-muted">Tidak ada pengguna ditemukan</td></tr>
-                  ) : users.map((user) => (
+                  {users.map((user) => (
                     <tr key={user.id}>
-                      <td>
+                      <td style={{ minWidth: 220 }}>
                         <div className="d-flex align-items-center gap-3">
                           <div className="product-box border" style={{ borderRadius: '50%', width: 35, height: 35, overflow: 'hidden'}}>
-                              <img src={user.profile?.avatar_url || '/admin-assets/images/avatars/avatar-1.png'} alt="" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                              <img src={user.profile?.avatar_url || ADMIN_AVATAR} alt="" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                           </div>
                           <div>
                               <h6 className="mb-0 small fw-bold">{user.profile?.full_name || 'No Name'}</h6>
@@ -165,58 +244,53 @@ const AdminUsers = () => {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td style={{ minWidth: 120 }}>
                         <span className={`badge bg-light-${user.role === 'admin' ? 'purple text-purple' : 'info text-info'} rounded-pill`}>
                           {user.role}
                         </span>
                       </td>
-                      <td>
-                        <span className={`badge bg-${user.status === 'active' ? 'success' : 'danger'}`}>
+                      <td style={{ minWidth: 120 }}>
+                        <span className={`badge ${getStatusBadgeClass(user.status)}`}>
                           {user.status}
                         </span>
                       </td>
-                      <td><span className="small text-muted">{new Date(user.created_at).toLocaleDateString('id-ID')}</span></td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          {user.role === 'admin' ? (
-                            <div className="dropdown">
-                              <button className="btn btn-xs btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                {user.admin_role || 'Staff'}
-                              </button>
-                              <ul className="dropdown-menu">
-                                <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'super')}>Super Admin</button></li>
-                                <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'finance')}>Finance Admin</button></li>
-                                <li><button className="dropdown-item" onClick={() => updateUser(user.id, user.status, 'admin', 'cs_staff')}>CS Staff</button></li>
-                                <div className="dropdown-divider"></div>
-                                <li><button className="dropdown-item text-danger" onClick={() => updateUser(user.id, user.status, 'buyer')}>Demote to Buyer</button></li>
-                              </ul>
-                            </div>
-                          ) : (
-                            <button className="btn btn-xs btn-outline-primary" onClick={() => updateUser(user.id, user.status, 'admin', 'cs_staff')}>Promote Admin</button>
-                          )}
-                          <div className="dropdown">
-                            <button className="btn btn-xs btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                              Status
-                            </button>
-                            <ul className="dropdown-menu">
-                              <li><button className="dropdown-item" onClick={() => updateUser(user.id, 'active', user.role, user.admin_role)}>Activate</button></li>
-                              <li><button className="dropdown-item" onClick={() => updateUser(user.id, 'suspended', user.role, user.admin_role)}>Suspend</button></li>
-                            </ul>
-                          </div>
-                          <button className="btn btn-xs btn-outline-danger" onClick={() => deleteUser(user.id)}>
-                            <i className="bi bi-trash"></i>
-                          </button>
-                        </div>
+                      <td><span className="small text-muted">{formatDate(user.created_at)}</span></td>
+                      <td style={{ minWidth: 170 }}>
+                        {renderDesktopActions(user)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <div className="d-grid gap-3 d-lg-none">
+              {users.map((user) => (
+                <article key={user.id} className="card border-0 shadow-sm users-mobile-card">
+                  <div className="card-body">
+                    <div className="d-flex align-items-start gap-3 mb-3">
+                      <div className="product-box border" style={{ borderRadius: '50%', width: 48, height: 48, overflow: 'hidden', flexShrink: 0 }}>
+                        <img src={user.profile?.avatar_url || ADMIN_AVATAR} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                      <div className="flex-grow-1 min-w-0">
+                        <h6 className="mb-1 fw-bold">{user.profile?.full_name || 'No Name'}</h6>
+                        <div className="small text-muted text-break">{user.email}</div>
+                      </div>
+                    </div>
+                    <div className="users-mobile-meta">
+                      <div><span className="users-mobile-meta__label">Role</span><span className="badge bg-light-info text-info rounded-pill">{user.role}</span></div>
+                      <div><span className="users-mobile-meta__label">Status</span><span className={`badge ${getStatusBadgeClass(user.status)}`}>{user.status}</span></div>
+                      <div><span className="users-mobile-meta__label">Terdaftar</span><span className="small text-muted">{formatDate(user.created_at)}</span></div>
+                    </div>
+                    {renderMobileActions(user)}
+                  </div>
+                </article>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

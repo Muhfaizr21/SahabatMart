@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, NavLink, useLocation, Outlet } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const AdminLayout = () => {
   const location = useLocation();
+  const pathname = location.pathname;
 
   // Tutup sidebar saat pindah halaman (khusus mobile overlay)
   useEffect(() => {
@@ -90,6 +91,20 @@ const AdminLayout = () => {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  const isActivePath = (path, exact = true) => (
+    exact ? pathname === path : pathname.startsWith(path)
+  );
+
+  const getMenuItemClass = (path, exact = true) => (
+    isActivePath(path, exact) ? 'mm-active' : ''
+  );
+
+  const getSubmenuClass = (paths) => (
+    paths.some(path => isActivePath(path, false)) ? 'mm-show' : ''
+  );
+
+  const getNavLinkClass = ({ isActive }) => (isActive ? 'active' : '');
+
   const markRead = (id) => {
     fetch(`${ADMIN_API_BASE}/notifications/read?id=${id}`)
       .then(() => loadNotif());
@@ -156,12 +171,19 @@ const AdminLayout = () => {
                 </div>
               </div>
             </a>
-            <ul className="dropdown-menu dropdown-menu-end">
+            <ul className="dropdown-menu dropdown-menu-end shadow border-0">
               <li>
-                <a className="dropdown-item" href="#">
+                <a className="dropdown-item" href="#" onClick={(e) => {
+                  e.preventDefault();
+                  if (window.confirm('Keluar dari Dashboard Admin?')) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login';
+                  }
+                }}>
                   <div className="d-flex align-items-center">
-                    <div className=""><i className="bi bi-lock-fill"></i></div>
-                    <div className="ms-3"><span>Logout</span></div>
+                    <div className="text-danger"><i className="bi bi-box-arrow-right"></i></div>
+                    <div className="ms-3 text-danger"><span>Logout</span></div>
                   </div>
                 </a>
               </li>
@@ -186,129 +208,144 @@ const AdminLayout = () => {
           <ul className="metismenu" id="menu">
 
             {/* ── Overview ─────────────────────────────── */}
-            <li>
-              <Link to="/admin">
+            <li className={getMenuItemClass('/admin')}>
+              <NavLink to="/admin" end className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-dashboard"></i></div>
                 <div className="menu-title">Dashboard Overview</div>
-              </Link>
+              </NavLink>
             </li>
 
             <li className="menu-label">User Ecosystem</li>
 
             {/* ── Users ───────────────────────────────── */}
-            <li>
-              <a href="javascript:;" className="has-arrow">
+            <li className={getMenuItemClass('/admin/users', false) || getMenuItemClass('/admin/affiliates', false)}>
+              <a
+                href="#"
+                className={`has-arrow ${isActivePath('/admin/users', false) || isActivePath('/admin/affiliates', false) ? 'active' : ''}`}
+                onClick={(e) => e.preventDefault()}
+                aria-expanded={isActivePath('/admin/users', false) || isActivePath('/admin/affiliates', false)}
+              >
                 <div className="parent-icon"><i className="bx bxs-user-account"></i></div>
                 <div className="menu-title">Users & Members</div>
               </a>
-              <ul>
-                <li><Link to="/admin/users"><i className="bx bx-circle"></i>Platform Users</Link></li>
-                <li><Link to="/admin/affiliates"><i className="bx bx-circle"></i>Affiliate Members</Link></li>
+              <ul className={getSubmenuClass(['/admin/users', '/admin/affiliates'])}>
+                <li><NavLink to="/admin/users" className={getNavLinkClass}><i className="bx bx-circle"></i>Platform Users</NavLink></li>
+                <li><NavLink to="/admin/affiliates" className={getNavLinkClass}><i className="bx bx-circle"></i>Affiliate Members</NavLink></li>
               </ul>
             </li>
 
             {/* ── Merchants ───────────────────────────── */}
-            <li>
-              <Link to="/admin/merchants">
+            <li className={getMenuItemClass('/admin/merchants', false)}>
+              <NavLink to="/admin/merchants" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-store-alt"></i></div>
                 <div className="menu-title">Merchant Management</div>
-              </Link>
+              </NavLink>
             </li>
 
             <li className="menu-label">Product Catalog</li>
 
             {/* ── Products ────────────────────────────── */}
-            <li>
-              <a href="javascript:;" className="has-arrow">
+            <li className={['/admin/products', '/admin/categories', '/admin/brands', '/admin/attributes', '/admin/moderation'].some(path => isActivePath(path, false)) ? 'mm-active' : ''}>
+              <a
+                href="#"
+                className={`has-arrow ${['/admin/products', '/admin/categories', '/admin/brands', '/admin/attributes', '/admin/moderation'].some(path => isActivePath(path, false)) ? 'active' : ''}`}
+                onClick={(e) => e.preventDefault()}
+                aria-expanded={['/admin/products', '/admin/categories', '/admin/brands', '/admin/attributes', '/admin/moderation'].some(path => isActivePath(path, false))}
+              >
                 <div className="parent-icon"><i className="bx bxs-package"></i></div>
                 <div className="menu-title">Products Monitoring</div>
               </a>
-              <ul>
-                <li><Link to="/admin/products"><i className="bx bx-circle"></i>Product List</Link></li>
-                <li><Link to="/admin/products/add"><i className="bx bx-circle"></i>Direct Publish</Link></li>
-                <li><Link to="/admin/categories"><i className="bx bx-circle"></i>Categories</Link></li>
-                <li><Link to="/admin/brands"><i className="bx bx-circle"></i>Brands</Link></li>
-                <li><Link to="/admin/attributes"><i className="bx bx-circle"></i>Global Attributes</Link></li>
-                <li><Link to="/admin/moderation"><i className="bx bx-circle"></i>Moderation Queue</Link></li>
+              <ul className={getSubmenuClass(['/admin/products', '/admin/categories', '/admin/brands', '/admin/attributes', '/admin/moderation'])}>
+                <li><NavLink to="/admin/products" end className={getNavLinkClass}><i className="bx bx-circle"></i>Product List</NavLink></li>
+                <li><NavLink to="/admin/products/add" className={getNavLinkClass}><i className="bx bx-circle"></i>Direct Publish</NavLink></li>
+                <li><NavLink to="/admin/categories" className={getNavLinkClass}><i className="bx bx-circle"></i>Categories</NavLink></li>
+                <li><NavLink to="/admin/brands" className={getNavLinkClass}><i className="bx bx-circle"></i>Brands</NavLink></li>
+                <li><NavLink to="/admin/attributes" className={getNavLinkClass}><i className="bx bx-circle"></i>Global Attributes</NavLink></li>
+                <li><NavLink to="/admin/moderation" className={getNavLinkClass}><i className="bx bx-circle"></i>Moderation Queue</NavLink></li>
               </ul>
             </li>
 
             {/* ── Orders ──────────────────────────────── */}
-            <li>
-              <a href="javascript:;" className="has-arrow">
+            <li className={['/admin/orders', '/admin/disputes'].some(path => isActivePath(path, false)) ? 'mm-active' : ''}>
+              <a
+                href="#"
+                className={`has-arrow ${['/admin/orders', '/admin/disputes'].some(path => isActivePath(path, false)) ? 'active' : ''}`}
+                onClick={(e) => e.preventDefault()}
+                aria-expanded={['/admin/orders', '/admin/disputes'].some(path => isActivePath(path, false))}
+              >
                 <div className="parent-icon"><i className="bx bxs-receipt"></i></div>
                 <div className="menu-title">Order Lifecycle</div>
               </a>
-              <ul>
-                <li><Link to="/admin/orders"><i className="bx bx-circle"></i>Order History</Link></li>
-                <li><Link to="/admin/disputes"><i className="bx bx-circle"></i>Dispute Arbitration</Link></li>
+              <ul className={getSubmenuClass(['/admin/orders', '/admin/disputes'])}>
+                <li><NavLink to="/admin/orders" end className={getNavLinkClass}><i className="bx bx-circle"></i>Order History</NavLink></li>
+                <li><NavLink to="/admin/disputes" className={getNavLinkClass}><i className="bx bx-circle"></i>Dispute Arbitration</NavLink></li>
               </ul>
             </li>
 
             <li className="menu-label">Marketing & Logistics</li>
-            <li>
-              <Link to="/admin/vouchers">
+            <li className={getMenuItemClass('/admin/vouchers', false)}>
+              <NavLink to="/admin/vouchers" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-coupon"></i></div>
                 <div className="menu-title">Platform Vouchers</div>
-              </Link>
+              </NavLink>
             </li>
-            <li>
-              <Link to="/admin/logistics">
+            <li className={getMenuItemClass('/admin/logistics', false)}>
+              <NavLink to="/admin/logistics" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-truck"></i></div>
                 <div className="menu-title">Logistics & Shipping</div>
-              </Link>
+              </NavLink>
             </li>
 
             <li className="menu-label">Content & Media</li>
-            <li>
-              <Link to="/admin/blogs">
+            <li className={getMenuItemClass('/admin/blogs', false)}>
+              <NavLink to="/admin/blogs" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-news"></i></div>
                 <div className="menu-title">Blog & Articles</div>
-              </Link>
+              </NavLink>
             </li>
 
             <li className="menu-label">Finance & Audit</li>
 
             {/* ── Finance ─────────────────────────────── */}
-            <li>
-              <Link to="/admin/finance">
+            <li className={getMenuItemClass('/admin/finance', false)}>
+              <NavLink to="/admin/finance" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-bar-chart-alt-2"></i></div>
                 <div className="menu-title">Financial Ledger</div>
-              </Link>
+              </NavLink>
             </li>
 
             {/* ── Commissions ─────────────────────────── */}
-            <li>
-              <Link to="/admin/commissions">
+            <li className={getMenuItemClass('/admin/commissions', false)}>
+              <NavLink to="/admin/commissions" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-percentage"></i></div>
                 <div className="menu-title">Commission Engine</div>
-              </Link>
+              </NavLink>
             </li>
 
             {/* ── Payouts ─────────────────────────────── */}
-            <li>
-              <Link to="/admin/payouts">
+            <li className={getMenuItemClass('/admin/payouts', false)}>
+              <NavLink to="/admin/payouts" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-wallet"></i></div>
                 <div className="menu-title">Payout Operations</div>
-              </Link>
+              </NavLink>
             </li>
 
             <li className="menu-label">Settings & Forensic</li>
 
             {/* ── Audit Log ───────────────────────────── */}
-            <li>
-              <Link to="/admin/audit">
+            <li className={getMenuItemClass('/admin/audit', false)}>
+              <NavLink to="/admin/audit" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-file-find"></i></div>
                 <div className="menu-title">Audit Log Forensic</div>
-              </Link>
+              </NavLink>
             </li>
 
             {/* ── Security ────────────────────────────── */}
-            <li>
-              <Link to="/admin/security">
+            <li className={getMenuItemClass('/admin/security', false)}>
+              <NavLink to="/admin/security" className={getNavLinkClass}>
                 <div className="parent-icon"><i className="bx bxs-shield-alt-2"></i></div>
                 <div className="menu-title">Security & Fraud</div>
-              </Link>
+              </NavLink>
             </li>
 
           </ul>

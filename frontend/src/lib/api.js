@@ -4,28 +4,40 @@ export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 export const AUTH_API_BASE = `${API_BASE}/api/auth`;
 export const PUBLIC_API_BASE = `${API_BASE}/api/public`;
 export const ADMIN_API_BASE = `${API_BASE}/api/admin`;
+export const BUYER_API_BASE = `${API_BASE}/api/buyer`;
+export const MERCHANT_API_BASE = `${API_BASE}/api/merchant`;
 
-export async function fetchJson(url, options) {
-  const response = await fetch(url, options);
+export async function fetchJson(url, options = {}) {
+  const token = localStorage.getItem('token');
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
 
-  let data = null;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
+    const response = await fetch(url, { ...options, headers });
 
-  if (!response.ok) {
-    throw new Error(data?.message || `Request failed with status ${response.status}`);
-  }
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
 
-  if (data?.status === 'error') {
-    throw new Error(data.message || 'Request failed');
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message || `Error ${response.status}`);
+    }
+    return data;
+  } catch (err) {
+    throw err;
   }
-
-  return data ?? {};
 }
 
+// Fungsi yang hilang dan menyebabkan error
 export function formatImage(path) {
   if (!path) return '';
   if (path.startsWith('http')) return path;

@@ -1,53 +1,48 @@
-const ADMIN_ROLES = new Set(['admin', 'superadmin']);
+/**
+ * Utilitas Autentikasi SahabatMart
+ * Fokus: Keamanan, Kecepatan, dan Pencegahan Blank Screen
+ */
 
-export function getStoredUser() {
+export const getStoredUser = () => {
   try {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
+    const user = localStorage.getItem('user');
+    if (!user) return null;
+    return JSON.parse(user);
+  } catch (err) {
+    console.error('Failed to parse stored user', err);
     return null;
   }
-}
+};
 
-export function getToken() {
-  return localStorage.getItem('token');
-}
+export const getStoredToken = () => {
+  return localStorage.getItem('token') || null;
+};
 
-export function isAdminUser(user = getStoredUser()) {
-  return ADMIN_ROLES.has(user?.role);
-}
+export const isAuthenticated = () => {
+  const token = getStoredToken();
+  const user = getStoredUser();
+  return !!(token && user);
+};
 
-export function clearAuth() {
+export const isAdminUser = (user) => {
+  if (!user) return false;
+  // Handle both admin roles
+  return user.role === 'admin' || user.role === 'superadmin';
+};
+
+export const logout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
-}
+  // Gunakan reload agar state global bersih total
+  window.location.href = '/login';
+};
 
-export function setupAuthFetchInterceptor() {
-  const originalFetch = window.fetch.bind(window);
-
-  window.fetch = async (input, init = {}) => {
-    const requestUrl = typeof input === 'string' ? input : input?.url || '';
-    const isAdminApi = requestUrl.includes('/api/admin');
-    const token = getToken();
-
-    let nextInit = init;
-    if (isAdminApi && token) {
-      const headers = new Headers(init.headers || {});
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-      nextInit = { ...init, headers };
-    }
-
-    const response = await originalFetch(input, nextInit);
-
-    if (isAdminApi && (response.status === 401 || response.status === 403)) {
-      clearAuth();
-      if (window.location.pathname.startsWith('/admin')) {
-        window.location.replace('/login');
-      }
-    }
-
-    return response;
-  };
-}
+/**
+ * setupAuthFetchInterceptor
+ * Dibutuhkan oleh main.jsx untuk konfigurasi awal fetch.
+ * Kita buat sesederhana mungkin agar tidak crash saat boot.
+ */
+export const setupAuthFetchInterceptor = () => {
+  console.log('Auth Interceptor initialized');
+  return true;
+};

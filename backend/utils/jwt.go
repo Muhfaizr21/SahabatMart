@@ -18,18 +18,22 @@ func jwtKey() []byte {
 }
 
 type Claims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	Email  string `json:"email"`
+	UserID      string `json:"user_id"`
+	MerchantID  string `json:"merchant_id,omitempty"`
+	AffiliateID string `json:"affiliate_id,omitempty"`
+	Role        string `json:"role"`
+	Email       string `json:"email"`
 	jwt.RegisteredClaims
 }
 
-func GenerateJWT(userID, role, email string) (string, error) {
+func GenerateJWT(userID, role, email, merchantID, affiliateID string) (string, error) {
 	expirationTime := time.Now().Add(24 * 7 * time.Hour) // 7 Hari
 	claims := &Claims{
-		UserID: userID,
-		Role:   role,
-		Email:  email,
+		UserID:      userID,
+		MerchantID:  merchantID,
+		AffiliateID: affiliateID,
+		Role:        role,
+		Email:       email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
