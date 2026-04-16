@@ -12,25 +12,29 @@ import (
 )
 
 type MerchantController struct {
+	DB      *gorm.DB
 	Service *services.MerchantService
 }
 
 func NewMerchantController(db *gorm.DB) *MerchantController {
 	return &MerchantController{
+		DB:      db,
 		Service: services.NewMerchantService(db),
 	}
 }
 
+// ─────────────────────────────────────────
+// PRODUCT MANAGEMENT
+// ─────────────────────────────────────────
+
 // GET /api/merchant/products
 func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
-
 	products, err := mc.Service.GetProducts(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar produk")
 		return
 	}
-
 	utils.JSONResponse(w, http.StatusOK, products)
 }
 
@@ -38,31 +42,75 @@ func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request
 func (mc *MerchantController) AddProduct(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
 
-	var product models.Product
-	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
+	var req struct {
+		Product  models.Product        `json:"product"`
+		Variants []models.ProductVariant `json:"variants"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
-	product.MerchantID = merchantID
-	if err := mc.Service.AddProduct(&product); err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menambahkan produk")
+	req.Product.MerchantID = merchantID
+	req.Product.Status = "pending" // Requires admin approval
+	product, err := mc.Service.AddProductWithVariants(&req.Product, req.Variants)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menambahkan produk: "+err.Error())
+		return
+	}
+	utils.JSONResponse(w, http.StatusCreated, product)
+}
+
+// POST /api/merchant/products/update
+func (mc *MerchantController) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+
+	var req struct {
+		Product  models.Product        `json:"product"`
+		Variants []models.ProductVariant `json:"variants"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusCreated, product)
+	product, err := mc.Service.UpdateProductWithVariants(merchantID, &req.Product, req.Variants)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal update produk: "+err.Error())
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, product)
 }
+
+// DELETE /api/merchant/products/delete?id=...
+func (mc *MerchantController) DeleteProduct(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	productID := r.URL.Query().Get("id")
+	if productID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
+		return
+	}
+	if err := mc.Service.DeleteProduct(merchantID, productID); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus produk")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Produk berhasil dihapus"})
+}
+
+// ─────────────────────────────────────────
+// ORDER MANAGEMENT
+// ─────────────────────────────────────────
 
 // GET /api/merchant/orders
 func (mc *MerchantController) GetOrders(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
+	status := r.URL.Query().Get("status")
 
-	groups, err := mc.Service.GetOrders(merchantID)
+	groups, err := mc.Service.GetOrders(merchantID, status)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar pesanan")
 		return
 	}
-
 	utils.JSONResponse(w, http.StatusOK, groups)
 }
 
@@ -71,20 +119,208 @@ func (mc *MerchantController) UpdateOrderStatus(w http.ResponseWriter, r *http.R
 	merchantID := r.Context().Value("merchant_id").(string)
 
 	var req struct {
-		GroupID string `json:"group_id"`
-		Status  string `json:"status"`
+		GroupID       string `json:"group_id"`
+		Status        string `json:"status"`
+		TrackingNumber string `json:"tracking_number"`
+		CourierCode   string `json:"courier_code"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
 	}
 
-	group, err := mc.Service.UpdateOrderStatus(req.GroupID, merchantID, req.Status)
+	group, err := mc.Service.UpdateOrderStatus(req.GroupID, merchantID, req.Status, req.TrackingNumber, req.CourierCode)
 	if err != nil {
-		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan")
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan atau akses ditolak")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, group)
+}
+
+// ─────────────────────────────────────────
+// WALLET & FINANCE
+// ─────────────────────────────────────────
+
+// GET /api/merchant/wallet
+func (mc *MerchantController) GetWallet(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	wallet, err := mc.Service.GetWallet(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data wallet")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, wallet)
+}
+
+// POST /api/merchant/wallet/withdraw
+func (mc *MerchantController) RequestPayout(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+
+	var req struct {
+		Amount      float64 `json:"amount"`
+		BankName    string  `json:"bank_name"`
+		AccountNo   string  `json:"account_no"`
+		AccountName string  `json:"account_name"`
+		Note        string  `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+	if req.Amount <= 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Jumlah penarikan harus lebih dari 0")
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusOK, group)
+	payout, err := mc.Service.RequestPayout(merchantID, req.Amount, req.Note)
+	if err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	utils.JSONResponse(w, http.StatusCreated, payout)
+}
+
+// GET /api/merchant/wallet/history
+func (mc *MerchantController) GetPayoutHistory(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	history, err := mc.Service.GetPayoutHistory(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil riwayat penarikan")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, history)
+}
+
+// ─────────────────────────────────────────
+// VOUCHER MANAGEMENT
+// ─────────────────────────────────────────
+
+// GET /api/merchant/vouchers
+func (mc *MerchantController) GetVouchers(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	vouchers, err := mc.Service.GetVouchers(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil voucher")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, vouchers)
+}
+
+// POST /api/merchant/vouchers/upsert
+func (mc *MerchantController) UpsertVoucher(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+
+	var voucher models.Voucher
+	if err := json.NewDecoder(r.Body).Decode(&voucher); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+	voucher.MerchantID = &merchantID
+
+	result, err := mc.Service.UpsertVoucher(&voucher)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan voucher")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, result)
+}
+
+// DELETE /api/merchant/vouchers/delete?id=...
+func (mc *MerchantController) DeleteVoucher(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Voucher ID dibutuhkan")
+		return
+	}
+	if err := mc.Service.DeleteVoucher(merchantID, idStr); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus voucher")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Voucher berhasil dihapus"})
+}
+
+// ─────────────────────────────────────────
+// DISPUTE MANAGEMENT
+// ─────────────────────────────────────────
+
+// GET /api/merchant/disputes
+func (mc *MerchantController) GetDisputes(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	disputes, err := mc.Service.GetDisputes(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil sengketa")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, disputes)
+}
+
+// POST /api/merchant/disputes/respond
+func (mc *MerchantController) RespondDispute(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+
+	var req struct {
+		DisputeID uint   `json:"dispute_id"`
+		Response  string `json:"response"` // "accept" or "reject"
+		Note      string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	dispute, err := mc.Service.RespondDispute(merchantID, req.DisputeID, req.Response, req.Note)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal merespons sengketa")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, dispute)
+}
+
+// ─────────────────────────────────────────
+// STORE PROFILE
+// ─────────────────────────────────────────
+
+// GET /api/merchant/store
+func (mc *MerchantController) GetStoreProfile(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	store, err := mc.Service.GetStoreProfile(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Data toko tidak ditemukan")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, store)
+}
+
+// POST /api/merchant/store/update
+func (mc *MerchantController) UpdateStoreProfile(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+
+	var updates map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	store, err := mc.Service.UpdateStoreProfile(merchantID, updates)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal update profil toko")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, store)
+}
+
+// ─────────────────────────────────────────
+// AFFILIATE INSIGHT (Read-only for merchant)
+// ─────────────────────────────────────────
+
+// GET /api/merchant/affiliate-stats
+func (mc *MerchantController) GetAffiliateStats(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	stats, err := mc.Service.GetAffiliateStats(merchantID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil statistik afiliasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, stats)
 }

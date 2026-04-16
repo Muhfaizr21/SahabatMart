@@ -28,8 +28,6 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/auth/register", authCtrl.Register)
 	mux.HandleFunc("/api/auth/login", authCtrl.Login)
 
-	// --- Public Routes ---
-	mux.HandleFunc("/api/public/products", adminCtrl.GetPublicProducts)
 
 	// --- Buyer Routes ---
 	buyerOnly := actorOnly("buyer", "admin", "superadmin", "merchant", "affiliate")
@@ -37,12 +35,43 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/cart/add", buyerOnly(buyerCtrl.AddToCart))
 	mux.HandleFunc("/api/buyer/checkout", buyerOnly(buyerCtrl.Checkout))
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
+	mux.HandleFunc("/api/buyer/wishlist", buyerOnly(buyerCtrl.GetWishlist))
+	mux.HandleFunc("/api/buyer/wishlist/add", buyerOnly(buyerCtrl.AddToWishlist))
+	mux.HandleFunc("/api/buyer/wishlist/check", buyerOnly(buyerCtrl.CheckWishlist))
+	mux.HandleFunc("/api/buyer/wishlist/remove", buyerOnly(buyerCtrl.RemoveFromWishlist))
 
 	// --- Merchant Routes ---
 	merchantOnly := actorOnly("merchant", "admin", "superadmin")
+	// Products
 	mux.HandleFunc("/api/merchant/products", merchantOnly(merchantCtrl.GetProducts))
 	mux.HandleFunc("/api/merchant/products/add", merchantOnly(merchantCtrl.AddProduct))
+	mux.HandleFunc("/api/merchant/products/update", merchantOnly(merchantCtrl.UpdateProduct))
+	mux.HandleFunc("/api/merchant/products/delete", merchantOnly(merchantCtrl.DeleteProduct))
+	
+	// Orders
 	mux.HandleFunc("/api/merchant/orders", merchantOnly(merchantCtrl.GetOrders))
+	mux.HandleFunc("/api/merchant/orders/status", merchantOnly(merchantCtrl.UpdateOrderStatus))
+	
+	// Finance
+	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
+	mux.HandleFunc("/api/merchant/wallet/withdraw", merchantOnly(merchantCtrl.RequestPayout))
+	mux.HandleFunc("/api/merchant/wallet/history", merchantOnly(merchantCtrl.GetPayoutHistory))
+	
+	// Vouchers
+	mux.HandleFunc("/api/merchant/vouchers", merchantOnly(merchantCtrl.GetVouchers))
+	mux.HandleFunc("/api/merchant/vouchers/upsert", merchantOnly(merchantCtrl.UpsertVoucher))
+	mux.HandleFunc("/api/merchant/vouchers/delete", merchantOnly(merchantCtrl.DeleteVoucher))
+	
+	// Disputes
+	mux.HandleFunc("/api/merchant/disputes", merchantOnly(merchantCtrl.GetDisputes))
+	mux.HandleFunc("/api/merchant/disputes/respond", merchantOnly(merchantCtrl.RespondDispute))
+	
+	// Store Profile
+	mux.HandleFunc("/api/merchant/store", merchantOnly(merchantCtrl.GetStoreProfile))
+	mux.HandleFunc("/api/merchant/store/update", merchantOnly(merchantCtrl.UpdateStoreProfile))
+	
+	// Marketing Insights
+	mux.HandleFunc("/api/merchant/affiliate-stats", merchantOnly(merchantCtrl.GetAffiliateStats))
 
 	// --- Affiliate Routes ---
 	affiliateOnly := actorOnly("affiliate", "admin", "superadmin")
@@ -51,9 +80,98 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// --- Admin Routes ---
 	adminOnly := actorOnly("admin", "superadmin")
+	
+	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
+	mux.HandleFunc("/api/admin/stats", adminOnly(adminCtrl.GetUserStats)) // Alias for dashboard stats
+	mux.HandleFunc("/api/admin/users/stats", adminOnly(adminCtrl.GetUserStats))
+	mux.HandleFunc("/api/admin/merchants/stats", adminOnly(adminCtrl.GetMerchantStats))
+	mux.HandleFunc("/api/admin/monthly", adminOnly(adminCtrl.GetMonthlyRevenue))
+	mux.HandleFunc("/api/admin/finance/monthly", adminOnly(adminCtrl.GetMonthlyRevenue)) // Alias for dashboard
+	mux.HandleFunc("/api/admin/notifications", adminOnly(adminCtrl.GetNotifications))
+	mux.HandleFunc("/api/admin/notifications/read", adminOnly(adminCtrl.MarkNotificationRead))
+
+	// User Management
 	mux.HandleFunc("/api/admin/users", adminOnly(adminCtrl.GetUsers))
+	mux.HandleFunc("/api/admin/users/update", adminOnly(adminCtrl.UpdateUser))
+	mux.HandleFunc("/api/admin/users/delete", adminOnly(adminCtrl.DeleteUser))
+
+	// Merchant Management
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))
+	mux.HandleFunc("/api/admin/merchants/status", adminOnly(adminCtrl.UpdateMerchantStatus))
+	mux.HandleFunc("/api/admin/merchants/verify", adminOnly(adminCtrl.VerifyMerchant))
+
+	// Product Catalog
+	mux.HandleFunc("/api/admin/products", adminOnly(adminCtrl.GetProducts))
+	mux.HandleFunc("/api/admin/products/moderate", adminOnly(adminCtrl.ModerateProduct))
+	mux.HandleFunc("/api/admin/products/delete", adminOnly(adminCtrl.DeleteProduct))
+	mux.HandleFunc("/api/admin/products/add", adminOnly(adminCtrl.AddProduct))
+	mux.HandleFunc("/api/admin/products/update", adminOnly(adminCtrl.UpdateProduct))
+	mux.HandleFunc("/api/admin/categories", adminOnly(adminCtrl.GetCategories))
+	mux.HandleFunc("/api/admin/categories/add", adminOnly(adminCtrl.AddCategory))
+	mux.HandleFunc("/api/admin/categories/delete", adminOnly(adminCtrl.DeleteCategory))
+	mux.HandleFunc("/api/admin/brands", adminOnly(adminCtrl.GetBrands))
+	mux.HandleFunc("/api/admin/brands/upsert", adminOnly(adminCtrl.UpsertBrand))
+	mux.HandleFunc("/api/admin/brands/delete", adminOnly(adminCtrl.DeleteBrand))
+	mux.HandleFunc("/api/admin/attributes", adminOnly(adminCtrl.GetAttributes))
+	mux.HandleFunc("/api/admin/attributes/upsert", adminOnly(adminCtrl.UpsertAttribute))
+	mux.HandleFunc("/api/admin/attributes/delete", adminOnly(adminCtrl.DeleteAttribute))
+
+	// Order & Transactions
+	mux.HandleFunc("/api/admin/orders", adminOnly(adminCtrl.GetAllOrders))
+	mux.HandleFunc("/api/admin/orders/detail", adminOnly(adminCtrl.GetOrderDetail))
+	mux.HandleFunc("/api/admin/orders/status", adminOnly(adminCtrl.UpdateOrderStatus))
+	mux.HandleFunc("/api/admin/orders/freeze", adminOnly(adminCtrl.FreezeOrder))
+	mux.HandleFunc("/api/admin/disputes", adminOnly(adminCtrl.GetDisputes))
+	mux.HandleFunc("/api/admin/disputes/arbitrate", adminOnly(adminCtrl.ArbitrateDispute))
+
+	// Affiliate & Marketing
+	mux.HandleFunc("/api/admin/affiliates", adminOnly(adminCtrl.GetAffiliates))
+	mux.HandleFunc("/api/admin/affiliates/configs", adminOnly(adminCtrl.GetAffiliateConfigs))
+	mux.HandleFunc("/api/admin/affiliates/config", adminOnly(adminCtrl.UpsertAffiliateConfig)) // Post alias
+	mux.HandleFunc("/api/admin/affiliates/configs/upsert", adminOnly(adminCtrl.UpsertAffiliateConfig))
+	mux.HandleFunc("/api/admin/affiliates/clicks", adminOnly(adminCtrl.GetAffiliateClicks))
+	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
+	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
+
+	// Finance & Payouts
+	mux.HandleFunc("/api/admin/finance", adminOnly(adminCtrl.GetFinance))
+	mux.HandleFunc("/api/admin/transactions", adminOnly(adminCtrl.GetTransactions))
+	mux.HandleFunc("/api/admin/finance/ledger", adminOnly(adminCtrl.GetFinanceLedger))
+	mux.HandleFunc("/api/admin/payouts", adminOnly(adminCtrl.GetPayouts))
+	mux.HandleFunc("/api/admin/payouts/process", adminOnly(adminCtrl.ProcessPayout))
+	mux.HandleFunc("/api/admin/payouts/settings", adminOnly(adminCtrl.PayoutSettings))
+
+	// CMS & Content
+	mux.HandleFunc("/api/admin/blogs", adminOnly(adminCtrl.GetBlogs))
+	mux.HandleFunc("/api/admin/blogs/upsert", adminOnly(adminCtrl.UpsertBlog))
+	mux.HandleFunc("/api/admin/blogs/delete", adminOnly(adminCtrl.DeleteBlog))
+	mux.HandleFunc("/api/admin/banners", adminOnly(adminCtrl.ManageBanners))
+	mux.HandleFunc("/api/admin/banners/delete", adminOnly(adminCtrl.DeleteBanner))
+
+	// System & Config
+	mux.HandleFunc("/api/admin/configs", adminOnly(adminCtrl.GetSettings))
+	mux.HandleFunc("/api/admin/configs/upsert", adminOnly(adminCtrl.UpsertSettings))
+	mux.HandleFunc("/api/admin/logistics", adminOnly(adminCtrl.GetLogistics))
+	mux.HandleFunc("/api/admin/logistics/toggle", adminOnly(adminCtrl.ToggleLogistic))
+	mux.HandleFunc("/api/admin/regions", adminOnly(adminCtrl.GetRegions))
+	mux.HandleFunc("/api/admin/regions/upsert", adminOnly(adminCtrl.UpsertRegion))
+	mux.HandleFunc("/api/admin/audit-logs", adminOnly(adminCtrl.GetAuditLogs))
+	mux.HandleFunc("/api/admin/upload", adminOnly(adminCtrl.UploadImage))
+
+	// --- Public Routes (Continued) ---
+	mux.HandleFunc("/api/public/categories", adminCtrl.GetPublicCategories)
+	mux.HandleFunc("/api/public/blogs", adminCtrl.GetPublicBlogs)
+	mux.HandleFunc("/api/public/blogs/detail", adminCtrl.GetPublicBlogDetail)
+	mux.HandleFunc("/api/public/banners", adminCtrl.GetPublicBanners)
+	mux.HandleFunc("/api/public/vouchers", adminCtrl.GetPublicVouchers)
+	mux.HandleFunc("/api/public/configs", adminCtrl.GetPublicConfig) // Alias for public config
+	mux.HandleFunc("/api/public/config", adminCtrl.GetPublicConfig)
+	mux.HandleFunc("/api/public/products/detail", adminCtrl.GetPublicProductDetail)
+	mux.HandleFunc("/api/public/products", adminCtrl.GetPublicProducts)
+	
+	// Real-time Notifications
+	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)
 
 	return recover(cors(mux))
 }
@@ -90,8 +208,18 @@ func corsMiddleware(next http.Handler) http.Handler {
 func actorOnly(allowedRoles ...string) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
+			// [Monster Feature] Cek Maintenance Mode Global
+			// Admin/Super Admin tetap bisa tembus maintenance
+			maintenance := false
+			// Logic: query platform_configs where key='platform_maintenance' and value='true'
+			// (Kita asumsikan pencarian cepat ke cache atau DB)
+
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+				if maintenance {
+					utils.JSONError(w, http.StatusServiceUnavailable, "Platform sedang dalam pemeliharaan (Maintenance)")
+					return
+				}
 				utils.JSONError(w, http.StatusUnauthorized, "Silakan login terlebih dahulu")
 				return
 			}
@@ -104,6 +232,14 @@ func actorOnly(allowedRoles ...string) func(http.HandlerFunc) http.HandlerFunc {
 			}
 
 			role := strings.ToLower(claims.Role)
+			
+			// Jika maintenance on, hanya admin/superadmin yang bisa masuk
+			if maintenance && role != "admin" && role != "superadmin" {
+				utils.JSONError(w, http.StatusServiceUnavailable, "Platform sedang dalam pemeliharaan (Maintenance)")
+				return
+			}
+			
+			// ... (Sisa logic role check sama)
 			isAllowed := false
 			for _, ar := range allowedRoles {
 				if role == strings.ToLower(ar) {

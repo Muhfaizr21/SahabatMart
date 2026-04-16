@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getStoredUser, isAuthenticated, logout, isAdminUser } from '../lib/auth';
-import { BUYER_API_BASE, fetchJson } from '../lib/api';
+import { BUYER_API_BASE, PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 const SearchIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
 const CartIcon = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>;
@@ -29,18 +29,36 @@ export default function Navbar() {
   const [catOpen, setCatOpen] = useState(false);
   const [userDropdown, setUserDropdown] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const [wishCount, setWishCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dynamicCats, setDynamicCats] = useState([]);
 
   const loggedIn = isAuthenticated();
   const user = getStoredUser();
   const isAdmin = isAdminUser(user);
 
   useEffect(() => {
+    // Sync Categories via Public API
+    fetchJson(`${PUBLIC_API_BASE}/categories`).then(res => setDynamicCats(res.data || [])).catch(() => {});
+    
     if (loggedIn) {
       fetchJson(`${BUYER_API_BASE}/cart`)
         .then(data => setCartCount(data?.items?.length || 0))
         .catch(() => {});
+      
+      fetchJson(`${BUYER_API_BASE}/wishlist`)
+        .then(data => setWishCount(Array.isArray(data) ? data.length : (data?.data?.length || 0)))
+        .catch(() => {});
     }
   }, [loggedIn]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -59,15 +77,21 @@ export default function Navbar() {
           <span className="text-2xl font-black text-gray-900 tracking-tight">SahabatMart</span>
         </Link>
 
-        {/* Search Bar */}
-        <div className="hidden lg:flex flex-1 max-w-2xl">
+        {/* Search Bar - Activated */}
+        <form onSubmit={handleSearch} className="hidden lg:flex flex-1 max-w-2xl">
           <div className="flex w-full border-2 border-gray-100 rounded-2xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50 focus-within:bg-white focus-within:shadow-xl focus-within:shadow-blue-50">
-            <input type="text" placeholder="Cari produk, kategori, atau merk..." className="flex-1 px-6 py-2.5 text-sm outline-none bg-transparent" />
-            <button className="bg-blue-600 hover:bg-blue-700 px-6 text-white transition-colors flex items-center justify-center">
+            <input 
+              type="text" 
+              placeholder="Cari produk premium, kategori, atau merk..." 
+              className="flex-1 px-6 py-2.5 text-sm outline-none bg-transparent"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 px-6 text-white transition-colors flex items-center justify-center">
               <SearchIcon />
             </button>
           </div>
-        </div>
+        </form>
 
         {/* Actions */}
         <div className="flex items-center gap-2 sm:gap-6">
@@ -100,6 +124,12 @@ export default function Navbar() {
                     {isAdmin && (
                       <Link to="/admin" className="block px-4 py-2.5 text-sm font-black text-blue-600 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Dashboard Admin</Link>
                     )}
+                    {user?.role === 'merchant' && (
+                      <Link to="/merchant" className="block px-4 py-2.5 text-sm font-black text-blue-600 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Dashboard Merchant</Link>
+                    )}
+                    {user?.role === 'affiliate' && (
+                      <Link to="/affiliate" className="block px-4 py-2.5 text-sm font-black text-blue-600 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Dashboard Affiliate</Link>
+                    )}
                     <div className="mt-2 pt-2 border-t border-gray-50">
                       <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">Keluar (Logout)</button>
                     </div>
@@ -116,7 +146,7 @@ export default function Navbar() {
 
           <Link to="/wishlist" className="hidden sm:flex relative p-2.5 text-gray-700 hover:text-red-500 transition-colors">
             <HeartIcon />
-            {loggedIn && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">0</span>}
+            {loggedIn && wishCount > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{wishCount}</span>}
           </Link>
 
           <Link to="/cart" className="relative p-2.5 text-gray-700 hover:text-blue-600 transition-colors">
@@ -135,7 +165,7 @@ export default function Navbar() {
       {/* Navigation Bottom */}
       <div className="hidden lg:block border-t border-gray-100 bg-gray-50/50">
         <div className="max-w-7xl mx-auto px-6 flex items-center gap-10 h-12">
-          {/* Departments */}
+          {/* Departments - Dynamicized */}
           <div className="relative h-full">
             <button 
               className="flex items-center gap-3 h-full px-4 bg-blue-600 text-white text-sm font-bold rounded-t-lg shadow-sm"
@@ -148,9 +178,11 @@ export default function Navbar() {
             </button>
             {catOpen && (
               <div className="absolute top-full left-0 w-64 bg-white border border-gray-100 shadow-2xl py-3 rounded-b-2xl z-50">
-                {categories.map(cat => (
-                  <Link key={cat} to={`/shop?cat=${cat}`} className="block px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600">{cat}</Link>
-                ))}
+                {dynamicCats.length > 0 ? dynamicCats.map(cat => (
+                  <Link key={cat.id} to={`/shop?cat=${cat.name}`} className="block px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600" onClick={() => setCatOpen(false)}>{cat.name}</Link>
+                )) : (
+                  <div className="px-6 py-3 text-xs text-gray-400 italic">Memuat kategori...</div>
+                )}
               </div>
             )}
           </div>
@@ -163,7 +195,7 @@ export default function Navbar() {
 
           <div className="ml-auto hidden xl:flex items-center gap-2 text-sm">
             <span className="text-gray-400">Butuh bantuan?</span>
-            <span className="font-black text-gray-900">0812-3456-7890</span>
+            <span className="font-black text-gray-900 italic">SahabatMart Care</span>
           </div>
         </div>
       </div>

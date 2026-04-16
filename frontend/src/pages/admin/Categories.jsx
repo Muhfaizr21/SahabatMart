@@ -1,32 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
 
-const S = {
-  page: { fontFamily: "'Inter', sans-serif", paddingTop: 20 },
-  splitLayout: { display: 'grid', gridTemplateColumns: '340px 1fr', gap: 24, alignItems: 'start' },
-  card: { background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden' },
-  formCard: { background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden', position: 'sticky', top: 20 },
-  cardHeader: { padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 },
-  cardHeaderIcon: (color) => ({ width: 36, height: 36, borderRadius: 9, background: color + '18', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }),
-  label: { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#64748b', letterSpacing: '0.4px', textTransform: 'uppercase', marginBottom: 5 },
-  input: { width: '100%', padding: '9px 13px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
-  textarea: { width: '100%', padding: '9px 13px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' },
-  thCell: { padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.6px', textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', whiteSpace: 'nowrap' },
-  tdCell: { padding: '14px 16px', borderBottom: '1px solid #f8fafc', verticalAlign: 'middle' },
-  btnPrimary: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '10px 0', borderRadius: 10, border: 'none', background: '#4361ee', color: '#fff', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' },
-  btnDanger: { width: 32, height: 32, borderRadius: 8, border: 'none', background: '#fff1f2', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16 },
-};
-
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', slug: '', description: '', order: 0 });
   const [saving, setSaving] = useState(false);
 
   const load = () => {
+    setLoading(true);
     fetchJson(`${API}/categories`)
       .then(d => setCategories(d.data || []))
       .catch(err => console.error(err))
@@ -35,169 +20,155 @@ export default function AdminCategories() {
 
   useEffect(() => { load(); }, []);
 
+  const openForm = (cat = null) => {
+    if (cat) {
+      setFormData(cat);
+    } else {
+      setFormData({ name: '', slug: '', description: '', order: 0 });
+    }
+    setShowModal(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.slug) return alert('Nama dan Slug wajib diisi!');
     setSaving(true);
-    setLoading(true);
-    fetch(`${API}/categories/add`, {
+    fetchJson(`${API}/categories/add`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...formData, parent_id: null }),
-    }).then(r => r.json()).then(() => {
+    }).then(() => {
       load();
-      setFormData({ name: '', slug: '', description: '', order: 0 });
-    }).catch(err => console.error(err)).finally(() => setSaving(false));
+      setShowModal(false);
+    }).catch(err => alert("Gagal: " + err.message))
+      .finally(() => setSaving(false));
   };
 
   const handleDelete = (id) => {
-    if (!window.confirm('Hapus kategori ini?')) return;
-    setLoading(true);
-    fetch(`${API}/categories/delete?id=${id}`, { method: 'DELETE' }).then(() => load());
+    if (!window.confirm('Hapus kategori ini secara permanen?')) return;
+    fetchJson(`${API}/categories/delete?id=${id}`, { method: 'DELETE' })
+      .then(() => load())
+      .catch(err => alert("Gagal: " + err.message));
   };
 
-  // Auto-generate slug from name
   const handleNameChange = (name) => {
     const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     setFormData(prev => ({ ...prev, name, slug }));
   };
 
   return (
-    <div style={S.page} className="fade-in">
-      {/* Breadcrumb */}
-      <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
-        <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>Product Catalog</span>
-        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
-        <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Kelola Kategori</span>
+    <div className="container-fluid py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* Monster Header */}
+      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
+        <div>
+          <h4 className="fw-bold text-dark mb-1">Product Categories</h4>
+          <p className="text-secondary small mb-0">Atur hirarki kategori produk untuk navigasi yang lebih baik.</p>
+        </div>
+        <button className="btn btn-primary px-4 py-2 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow" onClick={() => openForm()}>
+          <i className="bx bx-plus fs-5" /> Tambah Kategori
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24, alignItems: 'start' }}>
-
-        {/* Form Panel */}
-        <div style={S.formCard}>
-          <div style={S.cardHeader}>
-            <div style={S.cardHeaderIcon('#4361ee')}>
-              <i className="bx bx-category" />
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Tambah Kategori</div>
-              <div style={{ fontSize: 12, color: '#94a3b8' }}>Buat kategori produk baru</div>
-            </div>
-          </div>
-          <form onSubmit={handleSubmit} style={{ padding: 20 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={S.label}>Nama Kategori</label>
-                <input style={S.input} type="text" placeholder="Contoh: Fashion Pria"
-                  value={formData.name} onChange={e => handleNameChange(e.target.value)} required
-                  onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-              </div>
-              <div>
-                <label style={S.label}>URL Slug</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }}>/</span>
-                  <input style={{ ...S.input, paddingLeft: 22 }} type="text" placeholder="fashion-pria"
-                    value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value })} required
-                    onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-                </div>
-              </div>
-              <div>
-                <label style={S.label}>Urutan Tampil</label>
-                <input style={S.input} type="number" min={0} value={formData.order}
-                  onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
-                  onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-              </div>
-              <div>
-                <label style={S.label}>Deskripsi (Opsional)</label>
-                <textarea style={{ ...S.textarea, minHeight: 72 }} rows={3} placeholder="Ringkasan singkat kategori..."
-                  value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-              </div>
-              <button type="submit" style={S.btnPrimary} disabled={saving}
-                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                {saving ? <div className="spinner-border spinner-border-sm" style={{ width: 16, height: 16 }} /> : <i className="bx bx-plus" style={{ fontSize: 18 }} />}
-                {saving ? 'Menyimpan...' : 'Simpan Kategori'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Table */}
-        <div style={S.card}>
-          <div style={{ ...S.cardHeader, justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={S.cardHeaderIcon('#10b981')}>
-                <i className="bx bx-list-ul" />
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Daftar Kategori</div>
-                <div style={{ fontSize: 12, color: '#94a3b8' }}>{categories.length} kategori terdaftar</div>
-              </div>
-            </div>
-            <button onClick={load} style={{ width: 34, height: 34, borderRadius: 9, border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 18 }}>
-              <i className="bx bx-refresh" />
-            </button>
-          </div>
-
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '50px 0' }}>
-              <div className="spinner-border" style={{ color: '#4361ee', width: 30, height: 30, borderWidth: 3 }} />
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    {[['#', 'left', 20], ['Nama Kategori', 'left', 16], ['URL Slug', 'left', 16], ['Urutan', 'center', 16], ['Aksi', 'right', 20]].map(([h, align, pl]) => (
-                      <th key={h} style={{ ...S.thCell, textAlign: align, paddingLeft: pl, paddingRight: h === 'Aksi' ? 20 : 16 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '50px 0', color: '#94a3b8' }}>
-                        <i className="bx bx-category" style={{ fontSize: 40, display: 'block', marginBottom: 10, opacity: 0.3 }} />
-                        <div style={{ fontWeight: 600, color: '#475569' }}>Belum ada kategori</div>
-                      </td>
-                    </tr>
-                  ) : categories.map((cat, idx) => (
-                    <tr key={cat.id}
-                      style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f0f7ff'}
-                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
-                    >
-                      <td style={{ ...S.tdCell, paddingLeft: 20, paddingRight: 16 }}>
-                        <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>{cat.id}</span>
-                      </td>
-                      <td style={S.tdCell}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eff6ff', color: '#4361ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
-                            <i className={`bx ${cat.parent_id > 0 ? 'bx-subdirectory-right' : 'bx-tag'}`} />
-                          </div>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{cat.name}</span>
-                        </div>
-                      </td>
-                      <td style={S.tdCell}>
-                        <code style={{ fontSize: 12, color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: 6 }}>/{cat.slug}</code>
-                      </td>
-                      <td style={{ ...S.tdCell, textAlign: 'center' }}>
-                        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, background: '#eff6ff', color: '#4361ee', fontSize: 12, fontWeight: 700 }}>{cat.order}</span>
-                      </td>
-                      <td style={{ ...S.tdCell, textAlign: 'right', paddingRight: 20 }}>
-                        <button style={S.btnDanger} onClick={() => handleDelete(cat.id)} title="Hapus Kategori"
-                          onMouseEnter={e => e.currentTarget.style.opacity = '0.75'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                          <i className="bx bx-trash" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Modern Table List */}
+      <div className="card border-0 rounded-4 shadow-sm overflow-hidden border border-light">
+        <div className="table-responsive">
+          <table className="table table-hover align-middle mb-0">
+            <thead className="bg-light">
+              <tr>
+                <th className="ps-4 py-3 text-uppercase small fw-bold text-secondary">Identitas Kategori</th>
+                <th className="py-3 text-uppercase small fw-bold text-secondary">URL Slug</th>
+                <th className="py-3 text-uppercase small fw-bold text-secondary text-center">Urutan</th>
+                <th className="pe-4 py-3 text-uppercase small fw-bold text-secondary text-end">Opsi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={4} className="text-center py-5"><div className="spinner-border text-primary" /></td></tr>
+              ) : categories.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-5 text-muted">Belum ada kategori terdaftar.</td></tr>
+              ) : categories.map((cat, idx) => (
+                <tr key={cat.id}>
+                  <td className="ps-4">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="rounded-3 bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style={{ width: 40, height: 40 }}>
+                        <i className="bx bx-tag fs-5" />
+                      </div>
+                      <div>
+                        <div className="fw-bold text-dark fs-6">{cat.name}</div>
+                        <div className="text-muted" style={{ fontSize: 11 }}>UID: {cat.id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <code className="bg-light text-primary px-2 py-1 rounded small">/{cat.slug}</code>
+                  </td>
+                  <td className="text-center">
+                    <span className="badge bg-light text-dark border px-3 py-2 rounded-pill small fw-bold">{cat.order}</span>
+                  </td>
+                  <td className="pe-4 text-end">
+                    <div className="btn-group shadow-sm rounded-3 overflow-hidden">
+                      <button className="btn btn-white btn-sm border-end px-3" onClick={() => openForm(cat)} title="Edit">
+                        <i className="bx bx-edit-alt text-warning fs-5" />
+                      </button>
+                      <button className="btn btn-white btn-sm px-3" onClick={() => handleDelete(cat.id)} title="Hapus">
+                        <i className="bx bx-trash text-danger fs-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* MONSTER MODAL */}
+      {showModal && (
+        <div className="modal show d-block" style={{ background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(10px)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 rounded-4 shadow-lg">
+              <div className="modal-header border-0 p-4 pb-0">
+                <h5 className="modal-title fw-bold text-dark">
+                  {formData.id ? 'Perbarui Kategori' : 'Buat Kategori Baru'}
+                </h5>
+                <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
+              </div>
+              <div className="modal-body p-4 pt-0">
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-3 mt-3">
+                    <label className="form-label small fw-bold text-uppercase text-secondary">Nama Kategori</label>
+                    <input type="text" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
+                      placeholder="Misal: Fashion Pria, Elektronik" value={formData.name} 
+                      onChange={e => handleNameChange(e.target.value)} required />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-bold text-uppercase text-secondary">URL Slug (Auto)</label>
+                    <input type="text" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
+                      placeholder="fashion-pria" value={formData.slug} 
+                      onChange={e => setFormData({...formData, slug: e.target.value})} required />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label small fw-bold text-uppercase text-secondary">Urutan Tampil</label>
+                    <input type="number" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
+                      value={formData.order} onChange={e => setFormData({...formData, order: parseInt(e.target.value) || 0})} />
+                  </div>
+                  <div className="mb-4">
+                    <label className="form-label small fw-bold text-uppercase text-secondary">Deskripsi Singkat</label>
+                    <textarea className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" rows="3"
+                      placeholder="Jelaskan isi kategori ini..." value={formData.description}
+                      onChange={e => setFormData({...formData, description: e.target.value})} />
+                  </div>
+                  <div className="d-flex gap-2 pt-2">
+                    <button type="button" className="btn btn-light w-50 py-3 rounded-3 fw-bold text-secondary" onClick={() => setShowModal(false)}>Batal</button>
+                    <button type="submit" className="btn btn-primary w-50 py-3 rounded-3 fw-bold shadow" disabled={saving}>
+                      {saving ? <span className="spinner-border spinner-border-sm me-2" /> : <i className="bx bx-save me-2" />}
+                      Simpan Data
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

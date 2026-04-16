@@ -103,7 +103,7 @@ type Category struct {
 // Brand merk produk
 type Brand struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
-	Name       string    `gorm:"type:varchar(100);not null" json:"name"`
+	Name       string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"name"`
 	LogoURL    string    `gorm:"type:text" json:"logo_url"`
 	IsFeatured bool      `gorm:"default:false" json:"is_featured"`
 	CreatedAt  time.Time `json:"created_at"`
@@ -118,9 +118,10 @@ type Attribute struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Voucher diskon platform
+// Voucher diskon platform atau merchant
 type Voucher struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
+	MerchantID    *string   `gorm:"type:uuid;index" json:"merchant_id"` // NULL jika platform voucher
 	Code          string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"code"`
 	Title         string    `gorm:"type:varchar(100)" json:"title"`
 	Description   string    `gorm:"type:text" json:"description"`
@@ -141,6 +142,7 @@ type Dispute struct {
 	BuyerID      string     `gorm:"type:uuid;not null" json:"buyer_id"`
 	MerchantID   string     `gorm:"type:uuid;not null" json:"merchant_id"`
 	Reason       string     `gorm:"type:text" json:"reason"`
+	Amount       float64    `gorm:"type:decimal(15,2);not null;default:0" json:"amount"`
 	Attachments  string     `gorm:"type:text" json:"attachments"`                  // JSON array URLs
 	Status       string     `gorm:"type:varchar(20);default:'open'" json:"status"` // open, pending, merchant_refused, refund_approved, rejected
 	DecisionNote string     `gorm:"type:text" json:"decision_note"`
@@ -157,7 +159,7 @@ type LogisticChannel struct {
 	IsActive bool   `gorm:"default:true" json:"is_active"`
 }
 
-// AffiliateClick log untuk deteksi fraud
+// AffiliateClick log untuk deteksi fraud & deep tracking
 type AffiliateClick struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	AffiliateID string    `gorm:"type:uuid" json:"affiliate_id"`
@@ -165,6 +167,9 @@ type AffiliateClick struct {
 	Referrer    string    `gorm:"type:text" json:"referrer"`
 	IPAddress   string    `gorm:"type:inet" json:"ip_address"`
 	UserAgent   string    `gorm:"type:text" json:"user_agent"`
+	SubID1      string    `gorm:"type:varchar(100)" json:"sub_id_1"` // Support professional tracking
+	SubID2      string    `gorm:"type:varchar(100)" json:"sub_id_2"`
+	SubID3      string    `gorm:"type:varchar(100)" json:"sub_id_3"`
 	IsBot       bool      `gorm:"default:false" json:"is_bot"`
 	IsFraud     bool      `gorm:"default:false" json:"is_fraud"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -218,6 +223,7 @@ type Product struct {
 	Brand       string    `gorm:"type:varchar(100)" json:"brand"`
 	Attributes  string     `gorm:"type:text" json:"attributes"` // JSON: {color: "red", size: "XL"}
 	Image       string     `gorm:"type:text" json:"image"`
+	Images      string     `gorm:"type:text" json:"images"` // JSON Array: ["url1", "url2", "url3"]
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 	Rating      float64   `gorm:"type:decimal(2,1);default:0" json:"rating"`
 	Reviews     int       `gorm:"default:0" json:"reviews"`
@@ -235,7 +241,7 @@ type ProductVariant struct {
 	ID        string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	ProductID string    `gorm:"type:uuid;not null;index" json:"product_id"`
 	Name      string    `gorm:"type:varchar(255);not null" json:"name"` // e.g., "Red, XL"
-	SKU       string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"sku"`
+	SKU       string    `gorm:"type:varchar(100);unique;not null" json:"sku"`
 	Price     float64   `gorm:"type:decimal(15,2);not null" json:"price"`
 	Stock     int       `gorm:"default:0" json:"stock"`
 	Image     string    `gorm:"type:text" json:"image"`
@@ -297,3 +303,13 @@ func (AdminNotification) TableName() string  { return "admin_notifications" }
 func (BlogPost) TableName() string           { return "blog_posts" }
 func (Product) TableName() string            { return "products" }
 func (Banner) TableName() string             { return "banners" }
+
+// Wishlist menyimpan produk favorit buyer
+type Wishlist struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	BuyerID   string    `gorm:"type:uuid;not null;index:idx_buyer_product,unique" json:"buyer_id"`
+	ProductID string    `gorm:"type:uuid;not null;index:idx_buyer_product,unique" json:"product_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (Wishlist) TableName() string { return "wishlists" }

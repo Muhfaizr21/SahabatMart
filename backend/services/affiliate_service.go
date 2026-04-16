@@ -13,11 +13,19 @@ func NewAffiliateService(db *gorm.DB) *AffiliateService {
 	return &AffiliateService{DB: db}
 }
 
-func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua string) (*models.AffiliateMember, error) {
+func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua string, subID1, subID2, subID3 string) (*models.AffiliateMember, error) {
 	var affiliate models.AffiliateMember
 	if err := s.DB.Where("ref_code = ?", refCode).First(&affiliate).Error; err != nil {
 		return nil, err
 	}
+
+	// Fraud Shield: Cek anomali jumlah klik dari IP yang sama dalam durasi singkat
+	var recentClicks int64
+	s.DB.Model(&models.AffiliateClick{}).
+		Where("ip_address = ? AND created_at > NOW() - INTERVAL '5 minutes'", ip).
+		Count(&recentClicks)
+
+	isFraud := recentClicks > 50 // Threshold proteksi bot
 
 	click := models.AffiliateClick{
 		AffiliateID: affiliate.ID,
@@ -25,6 +33,11 @@ func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua strin
 		Referrer:    referrer,
 		IPAddress:   ip,
 		UserAgent:   ua,
+		SubID1:      subID1,
+		SubID2:      subID2,
+		SubID3:      subID3,
+		IsFraud:     isFraud,
+		IsBot:       isFraud, // Anggap bot jika klik brutal
 	}
 	s.DB.Create(&click)
 	

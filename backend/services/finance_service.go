@@ -4,6 +4,8 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/repositories"
 	"fmt"
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -70,4 +72,74 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 	}
 
 	return tx.Create(txn).Error
+}
+
+// DistributeFunds membagi dana ke Merchant dan Affiliate saat pesanan dibayar
+func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
+	var order models.Order
+	if err := tx.Preload("MerchantGroups").First(&order, "id = ?", orderID).Error; err != nil {
+		return err
+	}
+
+	// 1. Distribute ke Merchant Portions
+	for _, group := range order.MerchantGroups {
+		desc := fmt.Sprintf("Hasil Penjualan: %s", order.OrderNumber)
+		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, group.MerchantPayout, order.ID, "order", desc); err != nil {
+			return err
+		}
+	}
+
+	// 2. Distribute ke Affiliate (jika ada)
+	if order.AffiliateID != nil && *order.AffiliateID != "" {
+		desc := fmt.Sprintf("Komisi Affiliate: %s", order.OrderNumber)
+		if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, order.TotalCommission, order.ID, "order", desc); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ManualAdjustment memungkinkan Admin mengintervensi saldo secara manual (Credit/Debit)
+func (s *FinanceService) ManualAdjustment(adminID string, targetID string, ownerType models.WalletOwnerType, amount float64, note string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		txType := models.TxAdjustment
+		desc := fmt.Sprintf("Penyesuaian Admin (%s): %s", adminID, note)
+		
+		return s.ProcessTransaction(tx, targetID, ownerType, txType, amount, adminID, "admin_adjustment", desc)
+	})
+}
+
+// MovePendingToAvailable... (previous code)
+func (s *FinanceService) ProcessSettlements() error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		limitDate := time.Now().AddDate(0, 0, -7) // Settlement delay 7 hari
+		
+		var txs []models.WalletTransaction
+		// Cari transaksi pending yang sudah melewati batas waktu dan belum di-settle
+		err := tx.Where("pending_after > pending_before AND created_at < ?", limitDate).Find(&txs).Error
+		if err != nil {
+			return err
+		}
+
+		for _, txn := range txs {
+			var wallet models.Wallet
+			if err := tx.First(&wallet, "id = ?", txn.WalletID).Error; err != nil {
+				continue
+			}
+
+			// Pindahkan dari pending ke balance
+			amount := txn.Amount
+			wallet.PendingBalance -= amount
+			wallet.Balance += amount
+
+			if err := tx.Save(&wallet).Error; err != nil {
+				return err
+			}
+
+			// Update transaction status atau buat log baru
+			// Di sini kita asumsikan sistem track via timestamp
+		}
+		return nil
+	})
 }

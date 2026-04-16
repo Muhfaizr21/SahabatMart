@@ -16,25 +16,19 @@ func JSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	
-	resp := APIResponse{
-		Status: "success",
-		Data:   data,
+	// Default response
+	resp := map[string]interface{}{
+		"status": "success",
 	}
 
-	// If data is already a map with status/message, handle it
+	// If data is a map, merge it to keep it "flat" for frontend compatibility
 	if m, ok := data.(map[string]interface{}); ok {
-		if s, ok := m["status"].(string); ok {
-			resp.Status = s
+		for k, v := range m {
+			resp[k] = v
 		}
-		if msg, ok := m["message"].(string); ok {
-			resp.Message = msg
-			delete(m, "message")
-		}
-		if d, ok := m["data"]; ok {
-			resp.Data = d
-		} else {
-			resp.Data = m
-		}
+	} else {
+		// If it's a slice or primitive, put it in 'data' field
+		resp["data"] = data
 	}
 
 	json.NewEncoder(w).Encode(resp)

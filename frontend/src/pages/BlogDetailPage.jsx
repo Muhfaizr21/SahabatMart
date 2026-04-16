@@ -8,7 +8,7 @@ export default function BlogDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchJson(`${PUBLIC_API_BASE}/blog?slug=${id}`)
+    fetchJson(`${PUBLIC_API_BASE}/blogs/detail?slug=${id}`)
       .then(d => {
         if (d.data) setBlog(d.data);
       })
@@ -61,7 +61,7 @@ export default function BlogDetailPage() {
       </header>
 
       {/* Gambar Konten Utama */}
-      {blog.image && (
+      {blog.image ? (
         <figure className="mb-12 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-100 border-8 border-white bg-white">
           <img 
             src={formatImage(blog.image)} 
@@ -69,6 +69,10 @@ export default function BlogDetailPage() {
             className="w-full h-auto object-cover max-h-[550px]" 
           />
         </figure>
+      ) : (
+        <div className="mb-12 h-64 bg-gray-100 rounded-[2.5rem] flex items-center justify-center opacity-50 border-4 border-white shadow-inner">
+           <i className="bx bx-image text-6xl text-gray-300"></i>
+        </div>
       )}
 
       {/* Isi Artikel */}

@@ -23,8 +23,11 @@ func NewAffiliateController(db *gorm.DB) *AffiliateController {
 func (ac *AffiliateController) TrackClick(w http.ResponseWriter, r *http.Request) {
 	refCode := r.URL.Query().Get("ref")
 	productID := r.URL.Query().Get("product_id")
+	sub1 := r.URL.Query().Get("sub1")
+	sub2 := r.URL.Query().Get("sub2")
+	sub3 := r.URL.Query().Get("sub3")
 
-	affiliate, err := ac.Service.TrackClick(refCode, productID, r.Referer(), r.RemoteAddr, r.UserAgent())
+	affiliate, err := ac.Service.TrackClick(refCode, productID, r.Referer(), r.RemoteAddr, r.UserAgent(), sub1, sub2, sub3)
 	if err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Affiliate tidak ditemukan")
 		return

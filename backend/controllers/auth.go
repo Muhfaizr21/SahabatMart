@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
@@ -101,4 +102,40 @@ func (ac *AuthController) getClientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// Impersonate memungkinkan Admin login sebagai user lain tanpa password
+func (ac *AuthController) Impersonate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TargetUserID string `json:"target_user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
+		return
+	}
+
+	var user models.User
+	// Cari user lengkap dengan relasi Merchant/Affiliate
+	if err := ac.Service.DB.Preload("Merchant").Preload("Affiliate").First(&user, "id = ?", req.TargetUserID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
+	merchantID := ""
+	if user.Merchant != nil {
+		merchantID = user.Merchant.ID
+	}
+	affiliateID := ""
+	if user.Affiliate != nil {
+		affiliateID = user.Affiliate.ID
+	}
+
+	token, _ := utils.GenerateJWT(user.ID, user.Role, user.Email, merchantID, affiliateID)
+	
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": "Ghost login berhasil",
+		"token":   token,
+		"user":    user,
+		"is_ghost": true,
+	})
 }

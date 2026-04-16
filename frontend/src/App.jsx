@@ -79,13 +79,15 @@ import AdminBlogs from './pages/admin/Blogs';
 // ── Penanganan Khusus Header/Footer ─────────
 function NavbarManager() {
   const location = useLocation();
-  if (location.pathname.startsWith('/admin')) return null;
+  const hidePaths = ['/admin', '/merchant', '/affiliate'];
+  if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return <Navbar />;
 }
 
 function FooterManager() {
   const location = useLocation();
-  if (location.pathname.startsWith('/admin')) return null;
+  const hidePaths = ['/admin', '/merchant', '/affiliate'];
+  if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return <Footer />;
 }
 
@@ -121,8 +123,31 @@ function NotFoundPage() {
   );
 }
 
+// Merchant Portal
+import MerchantLayout from './components/merchant/MerchantLayout';
+import MerchantDashboard from './pages/merchant/Dashboard';
+import MerchantProducts from './pages/merchant/ProductList';
+import MerchantAddProduct from './pages/merchant/AddProduct';
+import MerchantOrders from './pages/merchant/OrderList';
+import MerchantWallet from './pages/merchant/Wallet';
+import MerchantSettings from './pages/merchant/Settings';
+import MerchantAnalytics from './pages/merchant/Analytics';
+import MerchantVouchers from './pages/merchant/Vouchers';
+
+// Affiliate Portal
+import AffiliateLayout from './components/affiliate/AffiliateLayout';
+import AffiliateDashboard from './pages/affiliate/Dashboard';
+
+import { useEffect } from 'react';
+import { captureAffiliate } from './lib/api';
+
 // ── App Root ─────────────────────
 export default function App() {
+  useEffect(() => {
+    // Jalankan pelacakan affiliate di setiap akses pertama
+    captureAffiliate();
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-white">
@@ -146,45 +171,51 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
 
-          {/* Admin Routes (Nested Routing) */}
+          {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
-            {/* Products */}
             <Route path="products" element={<AdminProductList />} />
             <Route path="products/add" element={<AdminAddProduct />} />
             <Route path="products/edit" element={<AdminEditProduct />} />
             <Route path="categories" element={<AdminCategories />} />
-            {/* Orders */}
             <Route path="orders" element={<AdminOrders />} />
             <Route path="orders/detail" element={<AdminOrderDetail />} />
-            {/* Users & Affiliates */}
             <Route path="users" element={<AdminUsers />} />
             <Route path="affiliates" element={<AdminAffiliates />} />
-            {/* Merchants */}
             <Route path="merchants" element={<AdminMerchants />} />
-            {/* Moderation */}
             <Route path="moderation" element={<AdminModeration />} />
-            {/* Finance */}
             <Route path="finance" element={<AdminFinance />} />
-            {/* Commissions */}
             <Route path="commissions" element={<AdminCommissions />} />
-            {/* Payouts */}
             <Route path="payouts" element={<AdminPayouts />} />
-            {/* Master Data */}
             <Route path="brands" element={<AdminBrands />} />
             <Route path="attributes" element={<AdminAttributes />} />
-            {/* Disputes & Vouchers */}
             <Route path="disputes" element={<AdminDisputes />} />
             <Route path="vouchers" element={<AdminVouchers />} />
-            {/* Logistics & Regions */}
             <Route path="logistics" element={<AdminLogistics />} />
             <Route path="regions" element={<AdminRegions />} />
-            {/* Security */}
             <Route path="security" element={<AdminSecurity />} />
-            {/* Audit Log */}
             <Route path="audit" element={<AdminAuditLog />} />
-            {/* CMS */}
             <Route path="blogs" element={<AdminBlogs />} />
+          </Route>
+
+          {/* Merchant Routes */}
+          <Route path="/merchant" element={<MerchantLayout />}>
+             <Route index element={<MerchantDashboard />} />
+             <Route path="products" element={<MerchantProducts />} />
+             <Route path="products/add" element={<MerchantAddProduct />} />
+             <Route path="products/edit/:id" element={<MerchantAddProduct />} />
+             <Route path="orders" element={<MerchantOrders />} />
+             <Route path="wallet" element={<MerchantWallet />} />
+             <Route path="settings" element={<MerchantSettings />} />
+             <Route path="analytics" element={<MerchantAnalytics />} />
+             <Route path="vouchers" element={<MerchantVouchers />} />
+          </Route>
+
+          {/* Affiliate Routes */}
+          <Route path="/affiliate" element={<AffiliateLayout />}>
+             <Route index element={<AffiliateDashboard />} />
+             <Route path="links" element={<div className="p-4">Affiliate Marketing Tools (Ready)</div>} />
+             <Route path="commissions" element={<div className="p-4">Affiliate Commission History (Ready)</div>} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

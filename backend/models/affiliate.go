@@ -39,7 +39,8 @@ type AffiliateMember struct {
 	TotalConversions   int             `gorm:"default:0" json:"total_conversions"`
 	TotalEarned        float64         `gorm:"type:decimal(15,2);default:0" json:"total_earned"`
 	TotalWithdrawn     float64         `gorm:"type:decimal(15,2);default:0" json:"total_withdrawn"`
-	Flags              string          `gorm:"type:text" json:"flags"` // JSON encoded flags like "self_referral_detected"
+	PostbackURL        string          `gorm:"type:text" json:"postback_url"` // Untuk server-to-server tracking
+	Flags              string          `gorm:"type:text" json:"flags"` // JSON encoded flags
 
 	CreatedAt          time.Time       `json:"created_at"`
 	UpdatedAt          time.Time       `json:"updated_at"`

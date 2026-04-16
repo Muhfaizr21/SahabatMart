@@ -28,6 +28,8 @@ const priceRanges = [
 export default function ShopPage() {
   const [searchParams] = useSearchParams();
   const catParam = searchParams.get('cat');
+  const searchParam = searchParams.get('search');
+  
   const [activeCategory, setActiveCategory] = useState(catParam || 'Semua');
   const [sortBy, setSortBy] = useState('Default');
   const [priceRange, setPriceRange] = useState(0);
@@ -36,6 +38,10 @@ export default function ShopPage() {
   const [allProducts, setAllProducts] = useState([]);
   const [allCategories, setAllCategories] = useState(['Semua']);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setActiveCategory(catParam || 'Semua');
+  }, [catParam]);
 
   useEffect(() => {
     Promise.all([
@@ -53,6 +59,10 @@ export default function ShopPage() {
 
   let filtered = allProducts.filter(p => {
     if (activeCategory !== 'Semua' && p.category !== activeCategory) return false;
+    
+    // Global Search Sync
+    if (searchParam && !p.name.toLowerCase().includes(searchParam.toLowerCase())) return false;
+
     const price = p.price || 0;
     const range = priceRanges[priceRange];
     if (price < range.min || price > range.max) return false;
@@ -236,21 +246,31 @@ export default function ShopPage() {
                       </div>
                     </Link>
                     <div className="p-4">
-                      <Link to={`/shop?cat=${product.category}`} className="text-xs text-blue-600 font-medium hover:underline mb-0.5 block">{product.category}</Link>
-                      <Link to={`/product/${product.id}`} className="text-sm font-semibold text-gray-800 hover:text-blue-600 transition-colors leading-snug mb-2 block line-clamp-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-bold uppercase tracking-wider hover:underline">{product.category}</Link>
+                        <div className="flex items-center gap-1">
+                          <svg width="10" height="10" fill="#facc15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          <span className="text-[10px] font-bold text-gray-500">{(product.rating || 4.5).toFixed(1)}</span>
+                        </div>
+                      </div>
+                      
+                      <Link to={`/product/${product.id}`} className="text-sm font-bold text-gray-900 hover:text-blue-600 transition-colors leading-tight mb-2 block line-clamp-2 h-10">
                         {product.name}
                       </Link>
-                      <div className="flex items-center gap-1.5 mb-3">
-                        <StarRating rating={product.rating} />
-                        <span className="text-xs text-gray-400">({product.reviews})</span>
-                      </div>
-                      <div className="flex items-end justify-between mt-auto">
-                        <div className="flex flex-col">
-                          {product.oldPrice && <div className="text-[11px] text-gray-400 line-through mb-0.5">Rp{(product.oldPrice).toLocaleString('id')}</div>}
-                          <div className="font-bold text-gray-900 text-sm leading-none">Rp{(product.price || 0).toLocaleString('id')}</div>
+
+                      <div className="flex items-center gap-1.5 mb-3 bg-gray-50 p-1.5 rounded-lg border border-gray-100/50">
+                        <div className="w-4 h-4 rounded-md bg-blue-600 flex items-center justify-center text-[8px] text-white font-black">
+                             {product.store_name?.charAt(0) || "S"}
                         </div>
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 ml-2 transition-colors">
-                          + Beli
+                        <span className="text-[10px] font-bold text-gray-400 truncate">{product.store_name || "SahabatMart Official"}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">
+                        <div className="flex flex-col">
+                          <div className="font-black text-gray-900 text-sm">Rp{(product.price || 0).toLocaleString('id')}</div>
+                        </div>
+                        <button className="bg-gray-100 hover:bg-blue-600 text-gray-600 hover:text-white text-[10px] font-black w-8 h-8 rounded-lg flex items-center justify-center transition-all">
+                          <i className="bx bx-plus" />
                         </button>
                       </div>
                     </div>

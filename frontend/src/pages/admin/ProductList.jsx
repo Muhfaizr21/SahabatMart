@@ -171,25 +171,21 @@ export default function AdminProductList() {
 
   return (
     <div className="products-admin-page fade-in">
-      <section className="products-admin__hero card border-0 shadow-sm">
-        <div className="products-admin__hero-copy">
-          <div className="products-admin__eyebrow">Catalog Operations</div>
-          <h1 className="products-admin__title">Kelola produk dengan alur CRUD yang lebih rapi</h1>
-          <p className="products-admin__subtitle">
-            Pantau status katalog, lakukan edit cepat, tarik produk dari toko, atau tambah listing baru dari satu workspace.
-          </p>
+      {/* Monster Header Mini */}
+      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
+        <div>
+          <h4 className="fw-bold text-dark mb-1">Catalog Operations</h4>
+          <p className="text-secondary small mb-0">Kelola dan moderasi seluruh listing produk platform SahabatMart.</p>
         </div>
-        <div className="products-admin__hero-actions">
-          <button type="button" className="btn btn-light products-admin__ghost-btn" onClick={loadProducts}>
-            <i className="bx bx-refresh"></i>
-            Refresh
-          </button>
-          <Link to="/admin/products/add" className="btn products-admin__primary-btn">
-            <i className="bx bx-plus"></i>
-            Tambah Produk
-          </Link>
+        <div className="d-flex gap-2">
+           <button className="btn btn-outline-primary fw-bold px-4 rounded-3 border shadow-sm" onClick={loadProducts}>
+             <i className="bx bx-refresh me-1" /> Refresh
+           </button>
+           <Link to="/admin/products/add" className="btn btn-primary fw-bold px-4 rounded-3 shadow-sm text-decoration-none">
+             <i className="bx bx-plus me-1" /> Tambah Produk
+           </Link>
         </div>
-      </section>
+      </div>
 
       <section className="row g-3 mb-4">
         {[

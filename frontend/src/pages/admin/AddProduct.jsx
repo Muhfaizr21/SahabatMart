@@ -35,8 +35,9 @@ export default function AdminAddProduct() {
 
   const [p, setP] = useState({
     name: '', description: '', price: 0, old_price: 0,
-    category: '', brand: '', attributes: '{}', image: '', stock: 100, status: 'active'
+    category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active'
   });
+  const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function AdminAddProduct() {
     });
   };
 
-  const handleUpload = async (e) => {
+  const handleUpload = async (e, type = 'main') => {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
@@ -85,9 +86,27 @@ export default function AdminAddProduct() {
         body: formData
       });
       const data = await resp.json();
-      if (data.url) setP(prev => ({ ...prev, image: data.url }));
+      if (data.url) {
+        if (type === 'main') {
+           setP(prev => ({ ...prev, image: data.url }));
+        } else {
+           setGallery(prev => {
+             const next = [...prev, data.url];
+             setP(pPrev => ({ ...pPrev, images: JSON.stringify(next) }));
+             return next;
+           });
+        }
+      }
     } catch (err) { alert('Upload gagal: ' + err.message); }
     finally { setUploading(false); }
+  };
+
+  const removeGalleryImage = (idx) => {
+    setGallery(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      setP(pPrev => ({ ...pPrev, images: JSON.stringify(next) }));
+      return next;
+    });
   };
 
   const handleSubmit = (e) => {
@@ -187,11 +206,11 @@ export default function AdminAddProduct() {
                   <div key={a.id}>
                     <label style={S.label}>{a.name}</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, background: '#f8fafc', padding: '12px 16px', borderRadius: 12, border: '1.5px solid #e2e8f0' }}>
-                      {a.values?.split(',').map(v => {
+                      {a.values?.split(',').map((v, idx) => {
                         const val = v.trim();
                         const isChecked = Array.isArray(selectedAttrs[a.name]) && selectedAttrs[a.name].includes(val);
                         return (
-                          <label key={val} className="form-check-label" 
+                          <label key={`${a.id}-${val}-${idx}`} className="form-check-label" 
                             style={{ 
                               display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', 
                               fontSize: 12, fontWeight: 600, 
@@ -232,20 +251,56 @@ export default function AdminAddProduct() {
                 onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
-            <FormField label="URL Gambar">
+            <FormField label="Thumbnail Utama">
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ ...S.input, flex: 1 }} type="text" placeholder="https://..." value={p.image}
                   onChange={e => setP(prev => ({ ...prev, image: e.target.value }))}
                   onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#64748b', fontSize: 20 }}>
                   {uploading ? <div className="spinner-border spinner-border-sm" /> : <i className="bx bx-upload" />}
-                  <input type="file" className="d-none" accept="image/*" onChange={handleUpload} />
+                  <input type="file" className="d-none" accept="image/*" onChange={e => handleUpload(e, 'main')} />
                 </label>
               </div>
               {p.image && (
                 <img src={formatImage(p.image)} alt="" style={{ marginTop: 10, width: 80, height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
               )}
             </FormField>
+          </div>
+
+          <div style={S.divider} />
+
+          {/* Gallery Section */}
+          <div style={S.sectionTitle}>
+             <i className="bx bx-images" style={{ fontSize: 15 }} /> Gallery Foto Produk (Slide)
+          </div>
+          <div style={{ background: '#f8fafc', padding: 20, borderRadius: 15, border: '1.5px dashed #cbd5e1' }}>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 12 }}>
+                {gallery.map((img, idx) => (
+                   <div key={idx} style={{ position: 'relative', aspectSquare: 1, borderRadius: 12, overflow: 'hidden', border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                      <img src={formatImage(img)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                      <button type="button" onClick={() => removeGalleryImage(idx)} 
+                         style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.9)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>
+                         <i className="bx bx-x" />
+                      </button>
+                   </div>
+                ))}
+                <label style={{ 
+                   aspectSquare: 1, borderRadius: 12, border: '2px dashed #cbd5e1', background: '#fff', 
+                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+                   cursor: 'pointer', color: '#94a3b8', transition: 'all 0.2s' 
+                }} onMouseEnter={e => e.currentTarget.style.borderColor = '#4361ee'} onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}>
+                   {uploading ? <div className="spinner-border spinner-border-sm" /> : (
+                      <>
+                        <i className="bx bx-plus-circle" style={{ fontSize: 24 }} />
+                        <span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>Tambah Foto</span>
+                      </>
+                   )}
+                   <input type="file" className="d-none" accept="image/*" onChange={e => handleUpload(e, 'gallery')} />
+                </label>
+             </div>
+             <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 15, marginBottom: 0 }}>
+                <i className="bx bx-info-circle me-1" /> Maksimal 5 foto tambahan untuk mendapatkan tampilan slide terbaik di store.
+             </p>
           </div>
 
           <div style={S.divider} />

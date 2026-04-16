@@ -281,12 +281,35 @@ func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
-	if err := ac.DB.Create(&cat).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to create category")
+
+	// Monster Integrity: Ensure name uniqueness (case-insensitive)
+	var existing models.Category
+	query := ac.DB.Where("LOWER(name) = LOWER(?)", cat.Name)
+	if cat.ID > 0 {
+		query = query.Where("id <> ?", cat.ID) // Exclude self if editing
+	}
+	if err := query.First(&existing).Error; err == nil {
+		utils.JSONError(w, http.StatusConflict, fmt.Sprintf("Kategori dangan nama '%s' sudah terdaftar. Gunakan nama unik.", cat.Name))
 		return
 	}
-	ac.Audit.Log("admin", "create_category", "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
-	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
+
+	var err error
+	if cat.ID == 0 {
+		err = ac.DB.Create(&cat).Error
+	} else {
+		err = ac.DB.Save(&cat).Error
+	}
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memproses kategori")
+		return
+	}
+
+	action := "create_category"
+	if cat.ID > 0 { action = "update_category" }
+	ac.Audit.Log("admin", action, "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
+	
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data":   cat,
 	})
@@ -950,6 +973,15 @@ func (ac *AdminController) GetBrands(w http.ResponseWriter, r *http.Request) {
 func (ac *AdminController) UpsertBrand(w http.ResponseWriter, r *http.Request) {
 	var brand models.Brand
 	json.NewDecoder(r.Body).Decode(&brand)
+
+	// Monster Integrity: Cek apakah nama sudah ada (Case-Insensitive Auto-Merge)
+	if brand.ID == 0 {
+		var existing models.Brand
+		if err := ac.DB.Where("LOWER(name) = LOWER(?)", brand.Name).First(&existing).Error; err == nil {
+			brand.ID = existing.ID
+		}
+	}
+
 	if brand.ID == 0 {
 		ac.DB.Create(&brand)
 	} else {
@@ -986,6 +1018,13 @@ func (ac *AdminController) UpsertAttribute(w http.ResponseWriter, r *http.Reques
 	}
 	ac.Audit.Log("admin", "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, attr)
+}
+
+func (ac *AdminController) DeleteAttribute(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	ac.DB.Delete(&models.Attribute{}, id)
+	ac.Audit.Log("admin", "delete_attribute", "attribute", id, "", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1026,13 +1065,47 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 		DecisionNote string `json:"decision_note"`
 		DecidedBy    string `json:"decided_by"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
-	ac.DB.Model(&models.Dispute{}).Where("id = ?", req.ID).Updates(models.Dispute{
-		Status:       req.Status,
-		DecisionNote: req.DecisionNote,
-		DecidedBy:    req.DecidedBy,
-		UpdatedAt:    time.Now(),
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
+		return
+	}
+
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		var dispute models.Dispute
+		if err := tx.First(&dispute, req.ID).Error; err != nil {
+			return err
+		}
+
+		// Update Dispute status
+		dispute.Status = req.Status
+		dispute.DecisionNote = req.DecisionNote
+		dispute.DecidedBy = req.DecidedBy
+		dispute.UpdatedAt = time.Now()
+		if err := tx.Save(&dispute).Error; err != nil {
+			return err
+		}
+
+		// Jika Refund Disetujui, tarik uang dari Merchant
+		if req.Status == "refund_approved" {
+			finance := services.NewFinanceService(ac.DB)
+			desc := fmt.Sprintf("Refund Sengketa: %s", dispute.OrderID)
+			// Deduct from merchant pending/balance
+			if err := finance.ProcessTransaction(tx, dispute.MerchantID, models.WalletMerchant, models.TxRefundDeduction, dispute.Amount, fmt.Sprintf("%d", dispute.ID), "dispute", desc); err != nil {
+				return err
+			}
+			
+			// Update Order status to Refunded
+			tx.Table("orders").Where("id = ?", dispute.OrderID).Update("status", "refunded")
+		}
+
+		return nil
 	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memproses arbitrase")
+		return
+	}
+
 	ac.Audit.Log(req.DecidedBy, "arbitrate_dispute", "dispute", fmt.Sprintf("%d", req.ID), req.Status, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
@@ -1216,8 +1289,16 @@ func (ac *AdminController) GetAuditLogs(w http.ResponseWriter, r *http.Request) 
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Request) {
-	var products []models.Product
-	query := ac.DB.Where("status = 'active'") // Sync: Takedown logic
+	type ProductInfo struct {
+		models.Product
+		StoreName string `json:"store_name"`
+	}
+	var products []ProductInfo
+	query := ac.DB.Table("products").
+		Select("products.*, m.store_name").
+		Joins("LEFT JOIN merchants m ON m.id = products.merchant_id").
+		Where("products.status = 'active'")
+
 	if cat := r.URL.Query().Get("cat"); cat != "" {
 		query = query.Where("category = ?", cat)
 	}
@@ -1398,8 +1479,21 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	var product models.Product
-	if err := ac.DB.First(&product, "id = ?", id).Error; err != nil {
+	type ProductInfo struct {
+		models.Product
+		StoreName    string `json:"store_name"`
+		StoreSlug    string `json:"store_slug"`
+		StoreVerified bool   `json:"store_verified"`
+	}
+
+	var product ProductInfo
+	err := ac.DB.Table("products").
+		Select("products.*, m.store_name, m.slug as store_slug, m.is_verified as store_verified").
+		Joins("LEFT JOIN merchants m ON m.id = products.merchant_id").
+		Where("products.id = ?", id).
+		Scan(&product).Error
+
+	if err != nil || product.ID == "" {
 		utils.JSONResponse(w, http.StatusNotFound, map[string]interface{}{"message": "Product not found"})
 		return
 	}

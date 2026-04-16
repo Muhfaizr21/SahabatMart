@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Crystal Admin - Luxury Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "primary-fixed": "#ebddff",
+                        "inverse-primary": "#d3bbff",
+                        "on-surface": "#171c1f",
+                        "primary": "#5300b7",
+                        "on-primary-fixed-variant": "#5b00c5",
+                        "on-error": "#ffffff",
+                        "background": "#f6fafe",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#3e4243",
+                        "primary-fixed-dim": "#d3bbff",
+                        "on-error-container": "#93000a",
+                        "surface-bright": "#f6fafe",
+                        "on-background": "#171c1f",
+                        "tertiary-container": "#56595b",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "surface-tint": "#7331df",
+                        "tertiary-fixed": "#e0e3e5",
+                        "inverse-on-surface": "#edf1f5",
+                        "on-secondary-container": "#57657a",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#eaeef2",
+                        "on-tertiary-fixed": "#191c1e",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#f0f4f8",
+                        "on-primary-fixed": "#250059",
+                        "on-primary": "#ffffff",
+                        "on-primary-container": "#dac5ff",
+                        "surface-variant": "#dfe3e7",
+                        "primary-container": "#6d28d9",
+                        "surface": "#f6fafe",
+                        "tertiary-fixed-dim": "#c4c7c9",
+                        "inverse-surface": "#2c3134",
+                        "secondary-fixed": "#d5e3fc",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-tertiary-fixed-variant": "#444749",
+                        "secondary": "#515f74",
+                        "surface-container-highest": "#dfe3e7",
+                        "on-surface-variant": "#4a4455",
+                        "secondary-container": "#d5e3fc",
+                        "outline": "#7b7486",
+                        "outline-variant": "#ccc3d7",
+                        "on-tertiary-container": "#cdcfd1",
+                        "surface-dim": "#d6dade",
+                        "surface-container-high": "#e4e9ed"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Plus Jakarta Sans"],
+                        "label": ["Plus Jakarta Sans"]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .beveled-edge {
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="bg-surface text-on-surface selection:bg-primary-fixed selection:text-primary">
+    <!-- TopNavBar (Shared Component Execution) -->
+    <header
+        class="fixed top-0 right-0 w-full z-40 bg-white/70 backdrop-blur-xl shadow-[0_20px_40px_rgba(109,40,217,0.06)] flex justify-between items-center px-8 h-20 w-full ml-auto">
+        <div class="flex items-center gap-8">
+            <h1 class="text-2xl font-bold tracking-tighter text-slate-900">Crystal Admin</h1>
+            <div class="hidden md:flex items-center gap-6">
+                <nav class="flex space-x-8">
+                    <a class="text-violet-700 font-semibold font-plus-jakarta text-sm tracking-tight"
+                        href="#">Dashboard</a>
+                    <a class="text-slate-500 hover:text-violet-600 transition-colors font-plus-jakarta text-sm tracking-tight"
+                        href="#">Analytics</a>
+                    <a class="text-slate-500 hover:text-violet-600 transition-colors font-plus-jakarta text-sm tracking-tight"
+                        href="#">Inventory</a>
+                </nav>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="relative group">
+                <span
+                    class="material-symbols-outlined text-slate-500 p-2 hover:bg-slate-100/50 rounded-xl transition-all duration-300">notifications</span>
+                <span class="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-white"></span>
+            </div>
+            <span
+                class="material-symbols-outlined text-slate-500 p-2 hover:bg-slate-100/50 rounded-xl transition-all duration-300">dark_mode</span>
+            <div class="h-10 w-10 rounded-full overflow-hidden border-2 border-primary-fixed">
+                <img alt="Administrator Profile"
+                    data-alt="Close-up professional portrait of a man with a friendly expression in a bright high-end office setting"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBMqOG-NlGbD8QMrddOm-a-X3LEZLrRsNTJLu3TTRSkxefCvr7HaKogfBdCn6Qf6TPRtodn6e2G3uYJb-1FB_ZLxwbnRgo0Mhb7QaNXU4MZLqx4j3V9dgINUNfo0g57cxEBoK_QHOaUiQQt426MxUj1DdaqP-GR8nX40xsPl9VdKEM-tmQBgMb-G0Nlu60b3_6jlpPcE9f4OdWTRBxIbZ9MLTR9xWabFR_BwpPPx2P_1yNOkEKqH_P_BPbI14tHVQvLulrv-XofZ-G" />
+            </div>
+        </div>
+    </header>
+    <!-- SideNavBar (Shared Component Execution) -->
+    <aside class="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-50 flex flex-col py-8 px-6 space-y-2 z-50">
+        <div class="mb-10 px-2">
+            <span
+                class="text-xl font-extrabold bg-gradient-to-br from-violet-600 to-indigo-800 bg-clip-text text-transparent">Crystal</span>
+            <p class="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mt-1">Premium Curator</p>
+        </div>
+        <nav class="flex-1 space-y-1">
+            <a class="flex items-center gap-3 py-3 px-4 rounded-xl text-violet-700 font-bold border-r-4 border-violet-600 bg-white/50 hover:translate-x-1 transition-transform duration-200"
+                href="#">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                <span class="font-plus-jakarta text-[13px] font-medium tracking-wide uppercase">Dashboard</span>
+            </a>
+            <a class="flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-slate-900 hover:translate-x-1 transition-transform duration-200"
+                href="#">
+                <span class="material-symbols-outlined">insights</span>
+                <span class="font-plus-jakarta text-[13px] font-medium tracking-wide uppercase">Analytics</span>
+            </a>
+            <a class="flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-slate-900 hover:translate-x-1 transition-transform duration-200"
+                href="#">
+                <span class="material-symbols-outlined">inventory_2</span>
+                <span class="font-plus-jakarta text-[13px] font-medium tracking-wide uppercase">Inventory</span>
+            </a>
+            <a class="flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-slate-900 hover:translate-x-1 transition-transform duration-200"
+                href="#">
+                <span class="material-symbols-outlined">group</span>
+                <span class="font-plus-jakarta text-[13px] font-medium tracking-wide uppercase">Customers</span>
+            </a>
+            <a class="flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-slate-900 hover:translate-x-1 transition-transform duration-200"
+                href="#">
+                <span class="material-symbols-outlined">shopping_cart</span>
+                <span class="font-plus-jakarta text-[13px] font-medium tracking-wide uppercase">Orders</span>
+            </a>
+            <a class="flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-slate-900 hover:translate-x-1 transition-transform duration-200"
+                href="#">
+                <span class="material-symbols-outlined">settings</span>
+                <span class="font-plus-jakarta text-[13px] font-medium tracking-wide uppercase">Settings</span>
+            </a>
+        </nav>
+        <div class="mt-auto space-y-6">
+            <div
+                class="bg-gradient-to-br from-violet-600 to-indigo-800 p-6 rounded-2xl text-white shadow-lg relative overflow-hidden">
+                <div class="relative z-10">
+                    <p class="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Upgrade to Pro</p>
+                    <p class="text-[10px] leading-relaxed opacity-70">Unlock exclusive luxury analytics and priority
+                        support.</p>
+                </div>
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+            </div>
+            <div class="space-y-1">
+                <a class="flex items-center gap-3 py-2 px-4 rounded-xl text-slate-400 hover:text-slate-900 transition-all"
+                    href="#">
+                    <span class="material-symbols-outlined">help</span>
+                    <span class="font-plus-jakarta text-[11px] font-medium tracking-wide uppercase">Help Center</span>
+                </a>
+                <a class="flex items-center gap-3 py-2 px-4 rounded-xl text-slate-400 hover:text-error transition-all"
+                    href="#">
+                    <span class="material-symbols-outlined">logout</span>
+                    <span class="font-plus-jakarta text-[11px] font-medium tracking-wide uppercase">Logout</span>
+                </a>
+            </div>
+        </div>
+    </aside>
+    <!-- Main Content Canvas -->
+    <main class="ml-72 pt-20 min-h-screen bg-surface">
+        <div class="p-10 max-w-7xl mx-auto space-y-10">
+            <!-- Welcome Header & Quick Stats -->
+            <section class="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+                <div>
+                    <h2 class="text-4xl font-extrabold text-on-surface tracking-tight mb-2">Hello, Arman!</h2>
+                    <p class="text-on-surface-variant font-medium">Welcome back to your luxury command center.</p>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <!-- Stat Card 1 -->
+                    <div
+                        class="bg-surface-container-lowest beveled-edge px-8 py-5 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] border border-white/40 min-w-[180px]">
+                        <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-1">All
+                            Orders</p>
+                        <p class="text-2xl font-extrabold text-on-surface">1,284</p>
+                    </div>
+                    <!-- Stat Card 2 -->
+                    <div
+                        class="bg-surface-container-lowest beveled-edge px-8 py-5 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] border border-white/40 min-w-[180px]">
+                        <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-1">Awaiting
+                            Payment</p>
+                        <p class="text-2xl font-extrabold text-primary">42</p>
+                    </div>
+                    <!-- Stat Card 3 -->
+                    <div
+                        class="bg-surface-container-lowest beveled-edge px-8 py-5 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.03)] border border-white/40 min-w-[180px]">
+                        <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-1">
+                            Completed</p>
+                        <p class="text-2xl font-extrabold text-on-surface">1,242</p>
+                    </div>
+                </div>
+            </section>
+            <!-- Asymmetric Bento Grid Section -->
+            <div class="grid grid-cols-12 gap-8">
+                <!-- Revenue Visualization (Main Data Column) -->
+                <div class="col-span-12 lg:col-span-8 space-y-8">
+                    <div
+                        class="bg-surface-container-lowest p-8 rounded-xl shadow-[0_20px_40px_rgba(109,40,217,0.04)] beveled-edge">
+                        <div class="flex justify-between items-center mb-10">
+                            <div>
+                                <h3 class="text-xl font-bold tracking-tight text-on-surface">Revenue Analytics</h3>
+                                <p class="text-sm text-on-surface-variant">Performance metrics for the last 30 days</p>
+                            </div>
+                            <div class="flex gap-2 bg-surface-container-low p-1 rounded-xl">
+                                <button
+                                    class="px-4 py-1.5 text-xs font-bold bg-white shadow-sm rounded-lg text-primary">Weekly</button>
+                                <button class="px-4 py-1.5 text-xs font-bold text-on-surface-variant">Monthly</button>
+                            </div>
+                        </div>
+                        <!-- Simple Bar Chart Visualization -->
+                        <div class="h-64 flex items-end justify-between gap-4 px-4">
+                            <div
+                                class="w-full bg-surface-container-low rounded-t-lg relative group h-[40%] hover:bg-primary-container/20 transition-colors">
+                                <div class="absolute bottom-0 w-full bg-primary/20 h-full rounded-t-lg"></div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">
+                                    MON</div>
+                            </div>
+                            <div class="w-full bg-surface-container-low rounded-t-lg relative group h-[65%]">
+                                <div class="absolute bottom-0 w-full bg-primary/40 h-full rounded-t-lg"></div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">
+                                    TUE</div>
+                            </div>
+                            <div class="w-full bg-surface-container-low rounded-t-lg relative group h-[50%]">
+                                <div class="absolute bottom-0 w-full bg-primary/30 h-full rounded-t-lg"></div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">
+                                    WED</div>
+                            </div>
+                            <div class="w-full bg-surface-container-low rounded-t-lg relative group h-[90%]">
+                                <div
+                                    class="absolute bottom-0 w-full bg-gradient-to-t from-primary to-primary-container h-full rounded-t-lg">
+                                </div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-primary">
+                                    THU</div>
+                            </div>
+                            <div class="w-full bg-surface-container-low rounded-t-lg relative group h-[75%]">
+                                <div class="absolute bottom-0 w-full bg-primary/60 h-full rounded-t-lg"></div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">
+                                    FRI</div>
+                            </div>
+                            <div class="w-full bg-surface-container-low rounded-t-lg relative group h-[60%]">
+                                <div class="absolute bottom-0 w-full bg-primary/40 h-full rounded-t-lg"></div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">
+                                    SAT</div>
+                            </div>
+                            <div class="w-full bg-surface-container-low rounded-t-lg relative group h-[45%]">
+                                <div class="absolute bottom-0 w-full bg-primary/20 h-full rounded-t-lg"></div>
+                                <div
+                                    class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-400">
+                                    SUN</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Profile Sidebar Content (Contextual Column) -->
+                <div class="col-span-12 lg:col-span-4 space-y-8">
+                    <div
+                        class="bg-surface-container-low/50 backdrop-blur-xl p-8 rounded-xl shadow-[0_20px_40px_rgba(0,0,0,0.02)] border border-white/20">
+                        <div class="flex flex-col items-center text-center">
+                            <div class="relative mb-6">
+                                <div
+                                    class="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-xl ring-2 ring-primary-fixed">
+                                    <img alt="Arman Valdes"
+                                        data-alt="Modern high-resolution headshot of a stylish professional man with groomed beard in a minimal studio setting"
+                                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDpoBwPNdtesjmLPnCYfYyXehSeKuIhQpZCnX0ZunW23zfG3DnxWG4g3mZODCFTfN2GquCnEzkQtzGHPs4aXVCmouLPLpEqWT7Ay9N9OAi4nWAxqSB0rklg206xnVbhoTkCCF7nSIUloz22B0O1ev5eB32uE01KwJBQCNsaz311YEXGzoKEHRV00I8-1HZq6qjBqtOBtJaXi-1XVDBFeH9i6uYDg1hrT3Ax94axD6rnyokJjcND1otMeNl1OdrDuSNhzim8oivVTF9" />
+                                </div>
+                                <div
+                                    class="absolute bottom-1 right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full">
+                                </div>
+                            </div>
+                            <h4 class="text-xl font-bold text-on-surface">Arman Valdes</h4>
+                            <p class="text-sm font-medium text-primary mt-1">Lead Collection Curator</p>
+                            <div class="w-full grid grid-cols-2 gap-4 mt-8">
+                                <div class="p-4 bg-white/40 rounded-xl text-left">
+                                    <p class="text-[9px] uppercase tracking-widest text-on-surface-variant font-bold">
+                                        Invoices</p>
+                                    <p class="text-lg font-bold">284</p>
+                                </div>
+                                <div class="p-4 bg-white/40 rounded-xl text-left">
+                                    <p class="text-[9px] uppercase tracking-widest text-on-surface-variant font-bold">
+                                        Feedback</p>
+                                    <p class="text-lg font-bold">4.9/5</p>
+                                </div>
+                            </div>
+                            <button
+                                class="w-full mt-6 py-4 bg-gradient-to-r from-primary to-primary-container text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all text-sm">
+                                View Full Profile
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Luxury Inventory Section -->
+            <section class="space-y-6">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <h3 class="text-2xl font-extrabold tracking-tight text-on-surface">Luxury Inventory</h3>
+                        <p class="text-on-surface-variant">Manage your high-performance assets</p>
+                    </div>
+                    <button class="flex items-center gap-2 text-primary font-bold text-sm group">
+                        View All Items
+                        <span
+                            class="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <!-- Product Card 1 -->
+                    <div
+                        class="bg-surface-container-lowest p-5 rounded-xl border border-white/60 shadow-[0_15px_30px_rgba(0,0,0,0.02)] group hover:shadow-xl transition-all duration-300">
+                        <div class="aspect-square rounded-xl bg-surface-container-low mb-4 overflow-hidden relative">
+                            <img alt="Obsidian Chrono"
+                                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                data-alt="Luxury minimalist black wristwatch on a clean white reflective surface with soft artistic lighting"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRxdJH-T1gC6c78qR3z-t7aZ4Yo6GqqXh1bANIbBLl7zSWXErDqmQ3doHrmQmO0an0UT0U9xPx9dAscaJbCxqw3Gmwica7Vn2-ChLq5oqL7dJeKGKF4wLfBzFea9XoZJMt7D0UHIY18Vb_cIQm-lc6zGqSxMLs-0n6ECnO34z6T_gmU4g03_1n0Up4e2nMM9LvLlBIkDPf7f7JN3MYN0obaL93BL_DrW215dSML6IXx3gEA9OAak-_on4Ml_hEWkSLoZMbXZB14x9n" />
+                            <div class="absolute top-3 right-3 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full">
+                                <span class="text-[10px] font-extrabold text-on-surface">IN STOCK</span>
+                            </div>
+                        </div>
+                        <h5 class="font-bold text-on-surface truncate">Obsidian Chrono</h5>
+                        <div class="flex justify-between items-center mt-2">
+                            <p class="text-sm text-on-surface-variant">$2,450.00</p>
+                            <span
+                                class="text-[11px] font-bold py-1 px-3 bg-primary/10 text-primary rounded-full">Watches</span>
+                        </div>
+                    </div>
+                    <!-- Product Card 2 -->
+                    <div
+                        class="bg-surface-container-lowest p-5 rounded-xl border border-white/60 shadow-[0_15px_30px_rgba(0,0,0,0.02)] group hover:shadow-xl transition-all duration-300">
+                        <div class="aspect-square rounded-xl bg-surface-container-low mb-4 overflow-hidden relative">
+                            <img alt="Nova Headphones"
+                                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                data-alt="Premium gold-accented studio headphones displayed on a velvet stand with cinematic side lighting"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2E7VsTiNdrzkh8HP14Gu50lfmUcvj0GDJS_gfRnKSX_NcY4YL8dJtGzg43eseEeDlUcgKKrhR2G2K4L8PRT5UlwmU1sThv-cl5Gz8CAxS8GTAJI-WXUFMsukHllkP4FCALEEQaSehXm6Nhg2tO5Mg66jV7w7N9zmHW70QKNtaw-VUMiJcxZo6jAmuK-mqWZLUBqXn2FaioM2VwkCGXmTY5VCWpaI8k1ZGzckAxKU_ztoPfz1O2gen8btkS8IF2o4QG9lV8h1SBZWy" />
+                            <div class="absolute top-3 right-3 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full">
+                                <span class="text-[10px] font-extrabold text-on-surface">LOW STOCK</span>
+                            </div>
+                        </div>
+                        <h5 class="font-bold text-on-surface truncate">Nova Headphones</h5>
+                        <div class="flex justify-between items-center mt-2">
+                            <p class="text-sm text-on-surface-variant">$899.00</p>
+                            <span
+                                class="text-[11px] font-bold py-1 px-3 bg-primary/10 text-primary rounded-full">Audio</span>
+                        </div>
+                    </div>
+                    <!-- Product Card 3 -->
+                    <div
+                        class="bg-surface-container-lowest p-5 rounded-xl border border-white/60 shadow-[0_15px_30px_rgba(0,0,0,0.02)] group hover:shadow-xl transition-all duration-300">
+                        <div class="aspect-square rounded-xl bg-surface-container-low mb-4 overflow-hidden relative">
+                            <img alt="Sonic Flux X1"
+                                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                data-alt="High-end leather strap mechanical watch with visible internal gears on marble background"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmoDxGX3ZT1zz2d4h-Lff1TpBsVcWhvTlF2bMFbYwYrjZc59oGNaDe_mfTMNGZ8T28q3zzqJHhAGPMsNZYALijVsMH6vc_FsG09DR-O7Zr4yeWqs6rwrhAmbgfEfjbgu3jGDpg6qZftEZV1irupsxi9qMGZERwW0AX2lYBmj6ZG1BGrTuJ2rAnOkoylRtHIt3XbrFvMN0qZdjI6jqC-sXw0ZK8Cvlzy9gihOOWOWdnVVSg5fHNOWkFYXC9fYQRx8AKLUb9LFblUo__" />
+                            <div class="absolute top-3 right-3 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full">
+                                <span class="text-[10px] font-extrabold text-on-surface">IN STOCK</span>
+                            </div>
+                        </div>
+                        <h5 class="font-bold text-on-surface truncate">Sonic Flux X1</h5>
+                        <div class="flex justify-between items-center mt-2">
+                            <p class="text-sm text-on-surface-variant">$1,200.00</p>
+                            <span
+                                class="text-[11px] font-bold py-1 px-3 bg-primary/10 text-primary rounded-full">Tech</span>
+                        </div>
+                    </div>
+                    <!-- Product Card 4 -->
+                    <div
+                        class="bg-surface-container-lowest p-5 rounded-xl border border-white/60 shadow-[0_15px_30px_rgba(0,0,0,0.02)] group hover:shadow-xl transition-all duration-300">
+                        <div class="aspect-square rounded-xl bg-surface-container-low mb-4 overflow-hidden relative">
+                            <img alt="Velocity Pulse"
+                                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                data-alt="Sleek carbon-fiber fitness tracker with holographic interface display glowing in dim luxury environment"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1ni5c9fVhjP7IAAugOaYYiCqEffYMT-hVIQn26xGn6czQxVfIwddURhOnomXyu-yT5x5L6HQuYAOTHOBcXPC4AO1Hag5Ij3MSZkw63faDAv9SShhFkUmrK3NoV1ixIHHI_35bIvNc1s6KSZvz3i-0rbaQUG47BlSoOyg31If7TBRsdtFLroo55SvnjOVRUtTj63emGxNJxLLtStHCLyVF4JD8hbxKOlcT6KJbJ2_QNrJ9zG4DvtGmCZGBWipRLo8MzyF1BCg5VhW4" />
+                            <div class="absolute top-3 right-3 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full">
+                                <span class="text-[10px] font-extrabold text-on-surface">PRE-ORDER</span>
+                            </div>
+                        </div>
+                        <h5 class="font-bold text-on-surface truncate">Velocity Pulse</h5>
+                        <div class="flex justify-between items-center mt-2">
+                            <p class="text-sm text-on-surface-variant">$540.00</p>
+                            <span
+                                class="text-[11px] font-bold py-1 px-3 bg-primary/10 text-primary rounded-full">Health</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+    <!-- Contextual FAB (Restricted to Dashboard) -->
+    <button
+        class="fixed bottom-10 right-10 w-16 h-16 bg-gradient-to-br from-primary to-primary-container text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50">
+        <span class="material-symbols-outlined text-3xl">add</span>
+    </button>
+</body>
+
+</html>

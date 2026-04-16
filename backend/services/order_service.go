@@ -10,16 +10,20 @@ import (
 )
 
 type OrderService struct {
-	OrderRepo *repositories.OrderRepository
-	UserRepo  *repositories.UserRepository
-	DB        *gorm.DB
+	OrderRepo      *repositories.OrderRepository
+	UserRepo       *repositories.UserRepository
+	FinanceService *FinanceService
+	ConfigService  *ConfigService
+	DB             *gorm.DB
 }
 
 func NewOrderService(db *gorm.DB) *OrderService {
 	return &OrderService{
-		OrderRepo: repositories.NewOrderRepository(db),
-		UserRepo:  repositories.NewUserRepository(db),
-		DB:        db,
+		OrderRepo:      repositories.NewOrderRepository(db),
+		UserRepo:       repositories.NewUserRepository(db),
+		FinanceService: NewFinanceService(db),
+		ConfigService:  NewConfigService(db),
+		DB:             db,
 	}
 }
 
@@ -108,7 +112,35 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 	return order, err
 }
 
+func (s *OrderService) CompletePayment(orderID string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		if err := tx.First(&order, "id = ?", orderID).Error; err != nil {
+			return err
+		}
+
+		if order.Status != models.OrderPendingPayment {
+			return fmt.Errorf("pesanan tidak dalam status menunggu pembayaran")
+		}
+
+		now := time.Now()
+		order.Status = models.OrderPaid
+		order.PaidAt = &now
+
+		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+
+		// Distribusikan dana otomatis ke Merchant & Affiliate
+		return s.FinanceService.DistributeFunds(tx, order.ID)
+	})
+}
+
 func (s *OrderService) CalculateCommission(db *gorm.DB, item models.OrderItem, affiliateID *string) (float64, float64, error) {
+	// Ambil fee default dari config db
+	defaultPlatFee := s.ConfigService.GetFloat("default_platform_fee", 0.05)
+	defaultCommRate := s.ConfigService.GetFloat("default_affiliate_commission", 0.03)
+
 	var rule models.CommissionRule
 	
 	if err := db.Where("product_id = ? AND is_active = ?", item.ProductID, true).Order("priority DESC").First(&rule).Error; err == nil {
@@ -120,11 +152,15 @@ func (s *OrderService) CalculateCommission(db *gorm.DB, item models.OrderItem, a
 	}
 
 	if affiliateID != nil && *affiliateID != "" {
-		if _, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
-			// Logic for tier-based commission
-			return 0.05, 0.05, nil 
+		if aff, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
+			// Jika pakai tier system (MembershipTier)
+			var tier models.MembershipTier
+			if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
+				return tier.BaseCommissionRate, defaultPlatFee, nil
+			}
+			return 0.05, defaultPlatFee, nil 
 		}
 	}
 
-	return 0.03, 0.05, nil
+	return defaultCommRate, defaultPlatFee, nil
 }

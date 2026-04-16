@@ -18,6 +18,46 @@ function StarRating({ rating }) {
 function ProductCard({ product }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
+  const [wishlisting, setWishlisting] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  // Cek apakah item ini sudah ada di wishlist saat mount/login
+  useEffect(() => {
+    if (isAuthenticated() && product.id) {
+       fetchJson(`${BUYER_API_BASE}/wishlist/check?product_id=${product.id}`)
+         .then(d => setIsSaved(d.is_wishlisted))
+         .catch(() => {});
+    }
+  }, [product.id]);
+
+  const toggleWishlist = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated()) {
+      alert('Silakan login untuk menyimpan produk favorit.');
+      navigate('/login');
+      return;
+    }
+
+    setWishlisting(true);
+    try {
+      if (isSaved) {
+        await fetchJson(`${BUYER_API_BASE}/wishlist/remove?product_id=${product.id}`, { method: 'DELETE' });
+        setIsSaved(false);
+      } else {
+        await fetchJson(`${BUYER_API_BASE}/wishlist/add`, {
+          method: 'POST',
+          body: JSON.stringify({ product_id: product.id })
+        });
+        setIsSaved(true);
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setWishlisting(false);
+    }
+  };
 
   const addToCart = async (e) => {
     e.preventDefault();
@@ -53,6 +93,13 @@ function ProductCard({ product }) {
     <div className="group bg-white rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full">
       <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-square">
         <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <button 
+          onClick={toggleWishlist}
+          disabled={wishlisting}
+          className={`absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center transition-all shadow-sm z-10 ${isSaved ? 'text-red-500 scale-110' : 'text-gray-400 hover:text-red-500 hover:scale-110'}`}
+        >
+          <i className={`bx ${wishlisting ? 'bx-loader-alt animate-spin' : (isSaved ? 'bxs-heart' : 'bx-heart')}`} style={{ fontSize: 18 }}></i>
+        </button>
       </Link>
 
       <div className="p-4 flex flex-col flex-1">

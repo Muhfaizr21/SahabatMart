@@ -29,6 +29,8 @@ type User struct {
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 
 	Profile UserProfile `gorm:"foreignKey:UserID" json:"profile"`
+	Merchant *Merchant  `gorm:"foreignKey:UserID" json:"merchant,omitempty"`
+	Affiliate *AffiliateMember `gorm:"foreignKey:UserID" json:"affiliate,omitempty"`
 }
 
 type UserProfile struct {

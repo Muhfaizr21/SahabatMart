@@ -27,6 +27,10 @@ export default function LoginPage() {
       // Redirect berdasarkan role
       if (data.user.role === 'admin' || data.user.role === 'superadmin') {
         navigate('/admin');
+      } else if (data.user.role === 'merchant') {
+        navigate('/merchant');
+      } else if (data.user.role === 'affiliate') {
+        navigate('/affiliate');
       } else {
         navigate('/');
       }
