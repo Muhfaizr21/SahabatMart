@@ -61,30 +61,72 @@ const MerchantDashboard = () => {
 
       {/* Asymmetric Bento Grid Section */}
       <div className="grid grid-cols-12 gap-8">
-        {/* Revenue Visualization */}
+        {/* Activity & Revenue Visualization */}
         <div className="col-span-12 lg:col-span-8">
           <div className="bg-white p-8 rounded-2xl shadow-[0_20px_40px_rgba(109,40,217,0.04)] beveled-edge border border-gray-50 h-full">
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex justify-between items-center mb-8">
               <div>
-                <h3 className="text-xl font-bold tracking-tight text-slate-900">Revenue Analytics</h3>
-                <p className="text-sm text-slate-500">Performance metrics for your shop</p>
+                <h3 className="text-xl font-bold tracking-tight text-slate-900">Activity & Revenue</h3>
+                <p className="text-sm text-slate-500">Your shop's engagement frequency</p>
               </div>
               <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl">
-                <button className="px-4 py-1.5 text-xs font-bold bg-white shadow-sm rounded-lg text-violet-700">Weekly</button>
-                <button className="px-4 py-1.5 text-xs font-bold text-slate-400">Monthly</button>
+                <button className="px-4 py-1.5 text-xs font-bold bg-white shadow-sm rounded-lg text-violet-700 font-mono">2026</button>
               </div>
             </div>
             
-            {/* Simple Bar Chart Visualization */}
-            <div className="h-64 flex items-end justify-between gap-4 px-4">
-              {[40, 65, 50, 90, 75, 60, 45].map((height, i) => (
-                <div key={i} className="w-full bg-slate-50 rounded-t-xl relative group transition-all duration-500" style={{ height: `${height}%` }}>
-                  <div className={`absolute bottom-0 w-full rounded-t-xl transition-all ${i === 3 ? 'bg-gradient-to-t from-violet-600 to-indigo-600 h-full' : 'bg-violet-200 h-full group-hover:bg-violet-300'}`}></div>
-                  <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-black tracking-tighter ${i === 3 ? 'text-violet-700' : 'text-slate-300'}`}>
-                    {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][i]}
-                  </div>
+            {/* GitHub Style Heatmap */}
+            <div className="overflow-x-auto pb-4 custom-scrollbar">
+              <div className="inline-grid grid-rows-7 grid-flow-col gap-1.5 min-w-max">
+                {Array.from({ length: 140 }).map((_, i) => {
+                  const level = [0, 1, 2, 3, 4][Math.floor(Math.random() * 5)];
+                  const colors = [
+                    'bg-slate-50', 
+                    'bg-violet-100', 
+                    'bg-violet-300', 
+                    'bg-violet-500', 
+                    'bg-violet-700'
+                  ];
+                  return (
+                    <div 
+                      key={i} 
+                      className={`w-3.5 h-3.5 rounded-[2px] ${colors[level]} transition-all hover:ring-2 hover:ring-violet-400 cursor-help`}
+                      title={`Activity on day ${i}: ${level * 5} orders`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex justify-between mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest ps-1">
+                <span>JAN</span>
+                <span>MAR</span>
+                <span>MAY</span>
+                <span>JUL</span>
+                <span>SEP</span>
+                <span>NOV</span>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Peak Day</p>
+                  <p className="text-sm font-bold text-slate-900">Thursday</p>
                 </div>
-              ))}
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Growth</p>
+                  <p className="text-sm font-bold text-green-500">+12.5%</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                <span>Less</span>
+                <div className="flex gap-1">
+                  <div className="w-2.5 h-2.5 bg-slate-50 rounded-[1px]"></div>
+                  <div className="w-2.5 h-2.5 bg-violet-100 rounded-[1px]"></div>
+                  <div className="w-2.5 h-2.5 bg-violet-300 rounded-[1px]"></div>
+                  <div className="w-2.5 h-2.5 bg-violet-500 rounded-[1px]"></div>
+                  <div className="w-2.5 h-2.5 bg-violet-700 rounded-[1px]"></div>
+                </div>
+                <span>More</span>
+              </div>
             </div>
           </div>
         </div>

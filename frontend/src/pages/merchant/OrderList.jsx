@@ -15,7 +15,7 @@ const MerchantOrders = () => {
         setLoading(true);
         try {
             const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}`);
-            setOrders(data || []);
+            setOrders(data.data || []);
         } catch (err) {
             console.error('Failed to load orders:', err);
         } finally {

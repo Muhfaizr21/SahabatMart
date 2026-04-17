@@ -1,133 +1,110 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { PageHeader, TablePanel, idr, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
-const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
 export default function AdminModeration() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const loadPending = () => {
+  const load = () => {
     setLoading(true);
     fetchJson(`${API}/products?status=pending&search=${search}`)
       .then(d => setProducts(d.data || []))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+      .catch(console.error).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadPending(); }, []);
+  useEffect(() => { load(); }, []);
 
   const moderate = (id, status, note) => {
     if (!window.confirm('Konfirmasi tindakan moderasi ini?')) return;
     setLoading(true);
-    fetchJson(`${API}/products/moderate`, {
-      method: 'PUT',
-      body: JSON.stringify({ id, status, note })
-    }).then(() => loadPending())
-      .catch(err => alert(err.message));
+    fetchJson(`${API}/products/moderate`, { method:'PUT', body:JSON.stringify({id,status,note}) })
+      .then(load).catch(e => alert(e.message));
   };
 
   return (
-    <div className="container-fluid py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Monster Header */}
-      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
-        <div>
-          <h4 className="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-            <i className="bx bxs-shield-check text-warning" />
-            Product Quality Shield
-          </h4>
-          <p className="text-secondary small mb-0">Tinjau dan validasi produk baru sebelum dipublikasikan ke publik.</p>
+    <div style={A.page} className="fade-in">
+      <PageHeader title="Moderation Queue" subtitle="Tinjau dan validasi produk baru sebelum dipublikasikan.">
+        <div style={A.searchWrap}>
+          <i className="bx bx-search" style={A.searchIcon} />
+          <input style={A.searchInput} placeholder="Cari nama produk..." value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&load()} />
         </div>
-        <div className="d-flex gap-2">
-           <input type="text" className="form-control border-light shadow-none" placeholder="Cari nama produk..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadPending()} />
-           <button className="btn btn-primary px-4 fw-bold shadow-sm" onClick={loadPending}>Cari</button>
-        </div>
-      </div>
+        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /></button>
+      </PageHeader>
 
-      {/* Alert Banner Container */}
       {products.length > 0 && (
-         <div className="alert bg-warning-subtle border-warning p-4 rounded-4 shadow-sm mb-4 d-flex align-items-center gap-3">
-            <div className="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 48, height: 48 }}>
-               <i className="bx bxs-bell-ring fs-4" />
-            </div>
-            <div>
-               <h6 className="fw-bold text-warning-emphasis mb-1">Moderasi Antrian Terbuka</h6>
-               <p className="text-warning-emphasis small mb-0">Ada <span className="fw-bold">{products.length} produk</span> yang menunggu tinjauan segera dari tim administrator.</p>
-            </div>
-         </div>
+        <div style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', background:'#fffbeb', borderRadius:14, border:'1px solid #fde68a' }}>
+          <div style={{ width:40, height:40, borderRadius:11, background:'#f59e0b', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <i className="bx bxs-bell-ring" style={{ fontSize:20, color:'#fff' }} />
+          </div>
+          <div>
+            <div style={{ fontSize:13.5, fontWeight:800, color:'#92400e' }}>Moderasi Antrian Terbuka</div>
+            <div style={{ fontSize:12, color:'#b45309' }}><strong>{products.length} produk</strong> menunggu tinjauan administrator.</div>
+          </div>
+        </div>
       )}
 
-      {/* Modern Table List */}
-      <div className="card border-0 rounded-4 shadow-sm overflow-hidden border border-light">
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="bg-light">
-              <tr>
-                <th className="ps-4 py-3 text-uppercase small fw-bold text-secondary">Informasi Produk</th>
-                <th className="py-3 text-uppercase small fw-bold text-secondary">Toko & Merchant</th>
-                <th className="py-3 text-uppercase small fw-bold text-secondary">Nilai Jual</th>
-                <th className="pe-4 py-3 text-uppercase small fw-bold text-secondary text-end">Konfirmasi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="text-center py-5"><div className="spinner-border text-primary" /></td></tr>
-              ) : products.length === 0 ? (
-                <tr>
-                   <td colSpan={4} className="text-center py-5">
-                      <i className="bx bx-check-shield text-light-emphasis d-block mb-3" style={{ fontSize: 72 }} />
-                      <h5 className="fw-bold text-dark mb-1">Semua Bersih!</h5>
-                      <p className="text-secondary mb-0">Tidak ada produk baru dalam antrian moderasi saat ini.</p>
-                   </td>
-                </tr>
-              ) : products.map((p) => (
-                <tr key={p.id}>
-                  <td className="ps-4 py-3">
-                    <div className="d-flex align-items-center gap-3">
-                      <img src={p.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random`} className="rounded-3 border" style={{ width: 50, height: 50, objectFit: 'cover' }} alt="" />
-                      <div>
-                        <div className="fw-bold text-dark fs-6">{p.name}</div>
-                        <div className="text-muted" style={{ fontSize: 11 }}>PROD-ID: {p.id.slice(0, 8).toUpperCase()}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="d-flex align-items-center gap-2">
-                       <div className="bg-light p-2 rounded-circle" style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                         <i className="bx bx-store text-primary" />
-                       </div>
-                       <span className="fw-600 text-dark small">{p.store_name || 'Merchant SahabatMart'}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="fw-bold text-dark">{fmt(p.price)}</div>
-                    <div className="text-success small fw-bold" style={{ fontSize: 10 }}><i className="bx bxs-up-arrow-alt" /> Optimal Price</div>
-                  </td>
-                  <td className="pe-4 text-end">
-                    <div className="d-flex flex-column flex-md-row justify-content-end gap-2">
-                      <button className="btn btn-success btn-sm px-3 rounded-pill fw-bold shadow-sm d-flex align-items-center justify-content-center gap-1" onClick={() => moderate(p.id, 'active', 'Disetujui Admin')}>
-                        <i className="bx bx-check-circle fs-5" /> Setujui
-                      </button>
-                      <button className="btn btn-outline-danger btn-sm px-3 rounded-pill fw-bold d-flex align-items-center justify-content-center gap-1" onClick={() => moderate(p.id, 'taken_down', 'Produk tidak memenuhi syarat')}>
-                        <i className="bx bx-x-circle fs-5" /> Tolak
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+      <TablePanel loading={loading}>
+        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:680 }}>
+          <thead>
+            <tr>
+              {['Produk','Toko','Harga','Aksi Moderasi'].map((h,i)=>(
+                <th key={h} style={{ ...A.th, textAlign:i===3?'right':'left', paddingLeft:i===0?24:16, paddingRight:i===3?24:16 }}>{h}</th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      {!loading && products.length > 0 && (
-         <div className="mt-3 p-3 bg-white rounded-4 shadow-sm border text-secondary small d-flex justify-content-between">
-            <span>Menampilkan <strong>{products.length}</strong> produk dalam antrian review</span>
-            <span>Update status: manual refresh</span>
-         </div>
-      )}
+            </tr>
+          </thead>
+          <tbody>
+            {products.length === 0 ? (
+              <tr><td colSpan={4} style={{ padding:'64px', textAlign:'center', color:'#94a3b8' }}>
+                <i className="bx bxs-check-shield" style={{ fontSize:52, display:'block', marginBottom:12, opacity:0.2, color:'#10b981' }} />
+                <div style={{ fontWeight:700, fontSize:15, color:'#475569', marginBottom:4 }}>Semua Bersih!</div>
+                <div style={{ fontSize:13 }}>Tidak ada produk dalam antrian moderasi.</div>
+              </td></tr>
+            ) : products.map((p, idx) => (
+              <tr key={p.id}
+                style={{ background:idx%2===0?'#fff':'#fafafa' }}
+                onMouseEnter={e=>e.currentTarget.style.background='#f5f7ff'}
+                onMouseLeave={e=>e.currentTarget.style.background=idx%2===0?'#fff':'#fafafa'}
+              >
+                <td style={{ ...A.td, paddingLeft:24 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <img src={p.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=eef2ff&color=6366f1`} alt="" style={{ width:48, height:48, borderRadius:10, objectFit:'cover', border:'1px solid #f1f5f9', flexShrink:0 }} />
+                    <div>
+                      <div style={{ fontWeight:700, color:'#0f172a', fontSize:14 }}>{p.name}</div>
+                      <div style={{ fontSize:11, fontFamily:'monospace', color:'#94a3b8' }}>#{p.id?.slice(0,8).toUpperCase()}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={A.td}>
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, background:'#eff6ff', color:'#2563eb', fontSize:12, fontWeight:700 }}>
+                    <i className="bx bx-store" style={{ fontSize:13 }} />{p.store_name||'Platform'}
+                  </span>
+                </td>
+                <td style={A.td}><span style={{ fontWeight:800, color:'#0f172a', fontSize:15 }}>{idr(p.price)}</span></td>
+                <td style={{ ...A.td, paddingRight:24, textAlign:'right' }}>
+                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                    <button
+                      onClick={() => moderate(p.id, 'active', 'Disetujui Admin')}
+                      style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:11, border:'none', background:'#f0fdf4', color:'#16a34a', fontSize:12.5, fontWeight:700, cursor:'pointer' }}
+                    >
+                      <i className="bx bx-check-circle" style={{ fontSize:16 }} /> Setujui
+                    </button>
+                    <button
+                      onClick={() => moderate(p.id, 'taken_down', 'Tidak memenuhi syarat')}
+                      style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:11, border:'none', background:'#fff1f2', color:'#dc2626', fontSize:12.5, fontWeight:700, cursor:'pointer' }}
+                    >
+                      <i className="bx bx-x-circle" style={{ fontSize:16 }} /> Tolak
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablePanel>
     </div>
   );
 }

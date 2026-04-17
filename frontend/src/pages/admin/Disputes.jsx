@@ -1,33 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
 
-const S = {
-  page: { fontFamily: "'Inter', sans-serif", paddingTop: 20 },
-  card: { background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden' },
-  cardHeader: { padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  thCell: { padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.6px', textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', whiteSpace: 'nowrap' },
-  tdCell: { padding: '14px 16px', borderBottom: '1px solid #f8fafc', verticalAlign: 'middle' },
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050 },
-  modalBox: { background: '#fff', borderRadius: 20, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', overflow: 'hidden' },
-  label: { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#64748b', letterSpacing: '0.4px', textTransform: 'uppercase', marginBottom: 5 },
-  select: { width: '100%', padding: '10px 13px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
-  textarea: { width: '100%', padding: '10px 13px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 13.5, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' },
+const D_STATUS = {
+  open:             { color:'#dc2626', bg:'#fff1f2', label:'Terbuka' },
+  pending:          { color:'#d97706', bg:'#fffbeb', label:'Menunggu Bukti' },
+  refund_approved:  { color:'#16a34a', bg:'#f0fdf4', label:'Refund Disetujui' },
+  rejected:         { color:'#64748b', bg:'#f1f5f9', label:'Ditolak' },
 };
 
-const STATUS_MAP = {
-  open:             { bg: '#ffe4e6', color: '#9f1239', dot: '#f43f5e', label: 'Terbuka' },
-  pending:          { bg: '#fef3c7', color: '#92400e', dot: '#f59e0b', label: 'Menunggu Bukti' },
-  refund_approved:  { bg: '#d1fae5', color: '#065f46', dot: '#10b981', label: 'Refund Disetujui' },
-  rejected:         { bg: '#f1f5f9', color: '#475569', dot: '#94a3b8', label: 'Ditolak' },
-};
-
-const StatusBadge = ({ status }) => {
-  const s = STATUS_MAP[status] || STATUS_MAP.open;
+const DSpan = ({ status }) => {
+  const s = D_STATUS[status] || D_STATUS.open;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: s.bg, color: s.color, fontSize: 12, fontWeight: 600 }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
+    <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, background:s.bg, color:s.color, fontSize:11, fontWeight:700 }}>
+      <span style={{ width:6, height:6, borderRadius:'50%', background:s.color }} />
       {s.label}
     </span>
   );
@@ -37,204 +25,150 @@ export default function AdminDisputes() {
   const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const [decision, setDecision] = useState({ status: 'refund_approved', note: '' });
+  const [decision, setDecision] = useState({ status:'refund_approved', note:'' });
   const [submitting, setSubmitting] = useState(false);
 
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/disputes`)
       .then(d => setDisputes(d.data || []))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+      .catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
-  const handleArbitrate = () => {
+  const arbitrate = () => {
     if (!selected) return;
     setSubmitting(true);
     fetch(`${API}/disputes/arbitrate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: selected.id, status: decision.status, decision_note: decision.note, decided_by: 'admin-super' }),
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ id:selected.id, status:decision.status, decision_note:decision.note, decided_by:'admin-super' }),
     }).then(() => {
-      load();
-      setSelected(null);
-      setDecision({ status: 'refund_approved', note: '' });
+      load(); setSelected(null); setDecision({ status:'refund_approved', note:'' });
     }).finally(() => setSubmitting(false));
   };
 
   const openCount = disputes.filter(d => d.status === 'open').length;
 
   return (
-    <div style={S.page} className="fade-in">
-      {/* Breadcrumb */}
-      <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
-        <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>Dispute Center</span>
-        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
-        <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Arbitrasi Sengketa</span>
-      </div>
+    <div style={A.page} className="fade-in">
+      <PageHeader title="Dispute Center" subtitle="Arbitrasi dan penyelesaian sengketa transaksi platform.">
+        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
+      </PageHeader>
 
-      {/* Alert Banner jika ada dispute open */}
+      <StatRow stats={[
+        { label:'Total Sengketa', val:disputes.length, icon:'bxs-error-circle', color:'#6366f1' },
+        { label:'Terbuka', val:openCount, icon:'bxs-error', color:'#dc2626' },
+        { label:'Selesai', val:disputes.filter(d=>d.status!=='open').length, icon:'bxs-check-circle', color:'#10b981' },
+      ]} />
+
       {openCount > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#ffe4e6', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
-            <i className="bx bx-error-circle" />
+        <div style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', background:'#fff1f2', borderRadius:14, border:'1px solid #fecdd3' }}>
+          <div style={{ width:40, height:40, borderRadius:11, background:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <i className="bx bxs-error" style={{ fontSize:20, color:'#dc2626' }} />
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#9f1239' }}>
-              {openCount} Sengketa Memerlukan Arbitrasi
-            </div>
-            <div style={{ fontSize: 13, color: '#be123c', marginTop: 2 }}>
-              Tindakan admin diperlukan untuk menyelesaikan sengketa yang masih terbuka.
-            </div>
+          <div>
+            <div style={{ fontSize:13.5, fontWeight:800, color:'#9f1239' }}>{openCount} Sengketa Memerlukan Arbitrasi</div>
+            <div style={{ fontSize:12, color:'#be123c' }}>Tindakan admin diperlukan segera.</div>
           </div>
-          <span style={{ padding: '4px 14px', borderRadius: 20, background: '#ffe4e6', color: '#be123c', fontSize: 13, fontWeight: 700, border: '1px solid #fecdd3' }}>
-            {openCount} Open
-          </span>
         </div>
       )}
 
-      <div style={S.card}>
-        <div style={S.cardHeader}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Daftar Sengketa</div>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>{disputes.length} sengketa tercatat</div>
-          </div>
-          <button onClick={load} style={{ width: 36, height: 36, borderRadius: 9, border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 19 }}>
-            <i className="bx bx-refresh" />
-          </button>
-        </div>
+      <TablePanel loading={loading}>
+        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:700 }}>
+          <thead>
+            <tr>
+              {['Order ID','Alasan','Pembeli','Status','Tanggal','Aksi'].map((h,i)=>(
+                <th key={h} style={{ ...A.th, textAlign:i===5?'right':'left', paddingLeft:i===0?24:16, paddingRight:i===5?24:16 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {disputes.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding:'64px', textAlign:'center', color:'#94a3b8' }}>
+                <i className="bx bxs-check-shield" style={{ fontSize:48, display:'block', marginBottom:12, opacity:0.2, color:'#10b981' }} />
+                <div style={{ fontWeight:700, fontSize:15, color:'#475569', marginBottom:4 }}>Tidak ada sengketa</div>
+                <div style={{ fontSize:13 }}>Semua transaksi berjalan lancar.</div>
+              </td></tr>
+            ) : disputes.map((d, idx) => (
+              <tr key={d.id}
+                style={{ background:idx%2===0?'#fff':'#fafafa' }}
+                onMouseEnter={e=>e.currentTarget.style.background='#fff5f5'}
+                onMouseLeave={e=>e.currentTarget.style.background=idx%2===0?'#fff':'#fafafa'}
+              >
+                <td style={{ ...A.td, paddingLeft:24 }}>
+                  <span style={{ fontFamily:'monospace', fontWeight:800, color:'#6366f1', fontSize:14 }}>#{d.order_id?.slice(0,8).toUpperCase()}</span>
+                </td>
+                <td style={{ ...A.td, maxWidth:200 }}>
+                  <span style={{ fontSize:13.5, fontWeight:600, color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'block' }}>{d.reason}</span>
+                </td>
+                <td style={A.td}>
+                  <span style={{ fontFamily:'monospace', fontSize:12, color:'#64748b' }}>#{d.buyer_id?.slice(0,8)}</span>
+                </td>
+                <td style={A.td}><DSpan status={d.status} /></td>
+                <td style={A.td}><span style={{ fontSize:13 }}>{new Date(d.created_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</span></td>
+                <td style={{ ...A.td, paddingRight:24, textAlign:'right' }}>
+                  {d.status === 'open' ? (
+                    <button
+                      onClick={() => setSelected(d)}
+                      style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:11, border:'none', background:'#fff1f2', color:'#dc2626', fontSize:12.5, fontWeight:700, cursor:'pointer' }}
+                    >
+                      <i className="bx bx-gavel" style={{ fontSize:15 }} /> Arbitrasi
+                    </button>
+                  ) : (
+                    <span style={{ fontSize:12, color:'#94a3b8', fontStyle:'italic' }}>Selesai</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablePanel>
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <div className="spinner-border" style={{ color: '#4361ee', width: 32, height: 32, borderWidth: 3 }} />
-            <div style={{ marginTop: 12, fontSize: 13, color: '#94a3b8' }}>Memuat sengketa...</div>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
-              <thead>
-                <tr>
-                  {[['Order ID', 'left', 24], ['Alasan Sengketa', 'left', 16], ['Pembeli', 'left', 16], ['Status', 'left', 16], ['Tanggal', 'left', 16], ['Aksi', 'right', 24]].map(([h, align, pl]) => (
-                    <th key={h} style={{ ...S.thCell, textAlign: align, paddingLeft: pl, paddingRight: h === 'Aksi' ? 24 : 16 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {disputes.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '64px 0', color: '#94a3b8' }}>
-                      <i className="bx bx-check-shield" style={{ fontSize: 48, display: 'block', marginBottom: 12, opacity: 0.3 }} />
-                      <div style={{ fontWeight: 600, fontSize: 15, color: '#475569', marginBottom: 6 }}>Tidak ada sengketa</div>
-                      <div style={{ fontSize: 13 }}>Semua transaksi berjalan lancar tanpa konflik.</div>
-                    </td>
-                  </tr>
-                ) : disputes.map((d, idx) => (
-                  <tr key={d.id}
-                    style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
-                  >
-                    <td style={{ ...S.tdCell, paddingLeft: 24 }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: 13.5, fontWeight: 700, color: '#4361ee' }}>
-                        #{d.order_id?.slice(0, 8).toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={S.tdCell}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0f172a', maxWidth: 220 }}>{d.reason}</div>
-                    </td>
-                    <td style={S.tdCell}>
-                      <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>
-                        #{d.buyer_id?.slice(0, 8)}
-                      </span>
-                    </td>
-                    <td style={S.tdCell}>
-                      <StatusBadge status={d.status} />
-                    </td>
-                    <td style={S.tdCell}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                        {new Date(d.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </div>
-                    </td>
-                    <td style={{ ...S.tdCell, paddingRight: 24, textAlign: 'right' }}>
-                      {d.status === 'open' ? (
-                        <button onClick={() => setSelected(d)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, border: 'none', background: '#fff1f2', color: '#be123c', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                          <i className="bx bx-gavel" style={{ fontSize: 16 }} /> Arbitrasi
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Selesai</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Arbitration Modal */}
       {selected && (
-        <div style={S.modalOverlay} onClick={e => e.target === e.currentTarget && setSelected(null)}>
-          <div style={S.modalBox}>
-            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff1f2', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                  <i className="bx bx-gavel" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Panel Arbitrasi</div>
-                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Order #{selected.order_id?.slice(0, 8).toUpperCase()}</div>
-                </div>
-              </div>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 22 }}>
-                <i className="bx bx-x" />
-              </button>
-            </div>
-
-            <div style={{ padding: '20px 24px' }}>
-              {/* Case Summary */}
-              <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 16px', marginBottom: 20, borderLeft: '3px solid #e11d48' }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 }}>Alasan Sengketa</div>
-                <div style={{ fontSize: 13.5, color: '#334155', fontWeight: 500 }}>{selected.reason}</div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <label style={S.label}>Keputusan Arbitrasi</label>
-                  <select style={S.select} value={decision.status} onChange={e => setDecision({ ...decision, status: e.target.value })}>
-                    <option value="refund_approved">✅ Setujui Refund — Uang kembali ke pembeli</option>
-                    <option value="rejected">❌ Tolak Refund — Uang diteruskan ke penjual</option>
-                    <option value="pending">⏳ Minta Bukti Tambahan</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={S.label}>Catatan Keputusan (Wajib)</label>
-                  <textarea style={{ ...S.textarea, minHeight: 90 }} rows={3} placeholder="Jelaskan alasan keputusan berdasarkan kebijakan platform..."
-                    value={decision.note} onChange={e => setDecision({ ...decision, note: e.target.value })}
-                    onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-                </div>
-              </div>
-
-              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '10px 14px', marginTop: 16, fontSize: 13, color: '#92400e', display: 'flex', gap: 8 }}>
-                <i className="bx bx-info-circle" style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>Keputusan arbitrasi bersifat final dan akan langsung mempengaruhi saldo wallet pihak terkait.</span>
-              </div>
-            </div>
-
-            <div style={{ padding: '0 24px 20px', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setSelected(null)} style={{ padding: '9px 20px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
-                Batal
-              </button>
-              <button onClick={handleArbitrate} disabled={!decision.note.trim() || submitting}
-                style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: decision.note.trim() ? '#e11d48' : '#fca5a5', color: '#fff', fontSize: 13.5, fontWeight: 600, cursor: decision.note.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 7 }}>
-                {submitting ? <div className="spinner-border spinner-border-sm" style={{ width: 16, height: 16 }} /> : <i className="bx bx-gavel" />}
-                Kirim Keputusan
-              </button>
-            </div>
+        <Modal title="Panel Arbitrasi" onClose={() => setSelected(null)}>
+          <div style={{ background:'#f8fafc', borderRadius:12, padding:'14px 16px', marginBottom:20, borderLeft:'3px solid #dc2626' }}>
+            <div style={{ fontSize:10, fontWeight:800, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Alasan Sengketa</div>
+            <div style={{ fontSize:14, color:'#334155', fontWeight:600 }}>{selected.reason}</div>
+            <div style={{ fontSize:11, color:'#94a3b8', marginTop:6, fontFamily:'monospace' }}>Order #{selected.order_id?.slice(0,8).toUpperCase()}</div>
           </div>
-        </div>
+
+          <div style={{ marginBottom:16 }}>
+            <FieldLabel>Keputusan Arbitrasi</FieldLabel>
+            <select style={{ ...A.select, width:'100%' }} value={decision.status} onChange={e=>setDecision({...decision,status:e.target.value})}>
+              <option value="refund_approved">✅ Setujui Refund — Uang kembali ke pembeli</option>
+              <option value="rejected">❌ Tolak Refund — Uang diteruskan ke penjual</option>
+              <option value="pending">⏳ Minta Bukti Tambahan</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom:16 }}>
+            <FieldLabel>Catatan Keputusan (Wajib)</FieldLabel>
+            <textarea
+              style={{ ...A.textarea, minHeight:90 }}
+              placeholder="Jelaskan alasan keputusan berdasarkan kebijakan platform..."
+              value={decision.note}
+              onChange={e=>setDecision({...decision,note:e.target.value})}
+            />
+          </div>
+
+          <div style={{ padding:'12px 16px', background:'#fffbeb', borderRadius:11, border:'1px solid #fde68a', fontSize:12.5, color:'#92400e', display:'flex', gap:8, marginBottom:20 }}>
+            <i className="bx bxs-info-circle" style={{ flexShrink:0, fontSize:16, marginTop:1 }} />
+            Keputusan arbitrasi bersifat final dan langsung mempengaruhi saldo wallet pihak terkait.
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <button style={A.btnGhost} onClick={()=>setSelected(null)}>Batal</button>
+            <button
+              onClick={arbitrate}
+              disabled={!decision.note.trim() || submitting}
+              style={{ ...A.btnPrimary, background:'linear-gradient(135deg,#dc2626,#b91c1c)', justifyContent:'center', padding:'11px', opacity:decision.note.trim()?1:0.6 }}
+            >
+              {submitting ? '...' : <><i className="bx bx-gavel" /> Kirim Keputusan</>}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

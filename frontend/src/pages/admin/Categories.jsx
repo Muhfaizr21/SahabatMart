@@ -1,173 +1,126 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ name: '', slug: '', description: '', order: 0 });
+  const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const EMPTY = { name: '', slug: '', description: '', order: 0 };
   const load = () => {
     setLoading(true);
-    fetchJson(`${API}/categories`)
-      .then(d => setCategories(d.data || []))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+    fetchJson(`${API}/categories`).then(d => setCategories(d.data || [])).catch(console.error).finally(() => setLoading(false));
   };
-
   useEffect(() => { load(); }, []);
 
-  const openForm = (cat = null) => {
-    if (cat) {
-      setFormData(cat);
-    } else {
-      setFormData({ name: '', slug: '', description: '', order: 0 });
-    }
-    setShowModal(true);
+  const handleName = (name) => {
+    const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    setModal(p => ({ ...p, name, slug }));
   };
 
-  const handleSubmit = (e) => {
+  const save = (e) => {
     e.preventDefault();
     setSaving(true);
-    fetchJson(`${API}/categories/add`, {
-      method: 'POST',
-      body: JSON.stringify({ ...formData, parent_id: null }),
-    }).then(() => {
-      load();
-      setShowModal(false);
-    }).catch(err => alert("Gagal: " + err.message))
-      .finally(() => setSaving(false));
+    fetchJson(`${API}/categories/add`, { method: 'POST', body: JSON.stringify({ ...modal, parent_id: null }) })
+      .then(() => { load(); setModal(null); }).catch(e => alert(e.message)).finally(() => setSaving(false));
   };
 
-  const handleDelete = (id) => {
-    if (!window.confirm('Hapus kategori ini secara permanen?')) return;
-    fetchJson(`${API}/categories/delete?id=${id}`, { method: 'DELETE' })
-      .then(() => load())
-      .catch(err => alert("Gagal: " + err.message));
-  };
-
-  const handleNameChange = (name) => {
-    const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    setFormData(prev => ({ ...prev, name, slug }));
+  const del = (id) => {
+    if (!window.confirm('Hapus kategori ini?')) return;
+    fetchJson(`${API}/categories/delete?id=${id}`, { method: 'DELETE' }).then(load).catch(e => alert(e.message));
   };
 
   return (
-    <div className="container-fluid py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Monster Header */}
-      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
-        <div>
-          <h4 className="fw-bold text-dark mb-1">Product Categories</h4>
-          <p className="text-secondary small mb-0">Atur hirarki kategori produk untuk navigasi yang lebih baik.</p>
-        </div>
-        <button className="btn btn-primary px-4 py-2 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow" onClick={() => openForm()}>
-          <i className="bx bx-plus fs-5" /> Tambah Kategori
+    <div style={A.page} className="fade-in">
+      <PageHeader title="Product Categories" subtitle="Atur hirarki kategori produk untuk navigasi yang lebih baik.">
+        <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY })}>
+          <i className="bx bx-plus" /> Tambah Kategori
         </button>
-      </div>
+      </PageHeader>
 
-      {/* Modern Table List */}
-      <div className="card border-0 rounded-4 shadow-sm overflow-hidden border border-light">
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="bg-light">
-              <tr>
-                <th className="ps-4 py-3 text-uppercase small fw-bold text-secondary">Identitas Kategori</th>
-                <th className="py-3 text-uppercase small fw-bold text-secondary">URL Slug</th>
-                <th className="py-3 text-uppercase small fw-bold text-secondary text-center">Urutan</th>
-                <th className="pe-4 py-3 text-uppercase small fw-bold text-secondary text-end">Opsi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="text-center py-5"><div className="spinner-border text-primary" /></td></tr>
-              ) : categories.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-5 text-muted">Belum ada kategori terdaftar.</td></tr>
-              ) : categories.map((cat, idx) => (
-                <tr key={cat.id}>
-                  <td className="ps-4">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="rounded-3 bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style={{ width: 40, height: 40 }}>
-                        <i className="bx bx-tag fs-5" />
-                      </div>
-                      <div>
-                        <div className="fw-bold text-dark fs-6">{cat.name}</div>
-                        <div className="text-muted" style={{ fontSize: 11 }}>UID: {cat.id}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <code className="bg-light text-primary px-2 py-1 rounded small">/{cat.slug}</code>
-                  </td>
-                  <td className="text-center">
-                    <span className="badge bg-light text-dark border px-3 py-2 rounded-pill small fw-bold">{cat.order}</span>
-                  </td>
-                  <td className="pe-4 text-end">
-                    <div className="btn-group shadow-sm rounded-3 overflow-hidden">
-                      <button className="btn btn-white btn-sm border-end px-3" onClick={() => openForm(cat)} title="Edit">
-                        <i className="bx bx-edit-alt text-warning fs-5" />
-                      </button>
-                      <button className="btn btn-white btn-sm px-3" onClick={() => handleDelete(cat.id)} title="Hapus">
-                        <i className="bx bx-trash text-danger fs-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+      <TablePanel loading={loading}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+          <thead>
+            <tr>
+              {['Identitas Kategori', 'URL Slug', 'Urutan', 'Opsi'].map((h, i) => (
+                <th key={h} style={{ ...A.th, textAlign: i === 3 ? 'right' : i === 2 ? 'center' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 3 ? 24 : 16 }}>{h}</th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.length === 0 && !loading ? (
+              <tr><td colSpan={4} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                <i className="bx bx-tag" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.2 }} />
+                Belum ada kategori.
+              </td></tr>
+            ) : categories.map((cat, idx) => (
+              <tr key={cat.id}
+                style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+              >
+                <td style={{ ...A.td, paddingLeft: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 11, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <i className="bx bxs-category" style={{ fontSize: 18, color: '#6366f1' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{cat.name}</div>
+                      <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>ID: {cat.id}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={A.td}>
+                  <code style={{ background: '#f1f5f9', color: '#6366f1', padding: '3px 8px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>/{cat.slug}</code>
+                </td>
+                <td style={{ ...A.td, textAlign: 'center' }}>
+                  <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, background: '#f8fafc', border: '1px solid #e2e8f0', fontWeight: 700, fontSize: 13, color: '#475569' }}>{cat.order}</span>
+                </td>
+                <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                  <div style={{ display: 'inline-flex', gap: 6 }}>
+                    <button style={A.iconBtn('#f59e0b', '#fffbeb')} onClick={() => setModal({ ...cat })} title="Edit"><i className="bx bx-pencil" /></button>
+                    <button style={A.iconBtn('#ef4444', '#fff1f2')} onClick={() => del(cat.id)} title="Hapus"><i className="bx bx-trash" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablePanel>
 
-      {/* MONSTER MODAL */}
-      {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(10px)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg">
-              <div className="modal-header border-0 p-4 pb-0">
-                <h5 className="modal-title fw-bold text-dark">
-                  {formData.id ? 'Perbarui Kategori' : 'Buat Kategori Baru'}
-                </h5>
-                <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
+      {modal && (
+        <Modal title={modal.id ? 'Edit Kategori' : 'Tambah Kategori'} onClose={() => setModal(null)}>
+          <form onSubmit={save}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <FieldLabel>Nama Kategori</FieldLabel>
+                <input style={{ ...A.select, width: '100%' }} placeholder="Misal: Fashion Pria" value={modal.name} onChange={e => handleName(e.target.value)} required />
               </div>
-              <div className="modal-body p-4 pt-0">
-                <form onSubmit={handleSubmit}>
-                  <div className="mb-3 mt-3">
-                    <label className="form-label small fw-bold text-uppercase text-secondary">Nama Kategori</label>
-                    <input type="text" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
-                      placeholder="Misal: Fashion Pria, Elektronik" value={formData.name} 
-                      onChange={e => handleNameChange(e.target.value)} required />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold text-uppercase text-secondary">URL Slug (Auto)</label>
-                    <input type="text" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
-                      placeholder="fashion-pria" value={formData.slug} 
-                      onChange={e => setFormData({...formData, slug: e.target.value})} required />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-bold text-uppercase text-secondary">Urutan Tampil</label>
-                    <input type="number" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
-                      value={formData.order} onChange={e => setFormData({...formData, order: parseInt(e.target.value) || 0})} />
-                  </div>
-                  <div className="mb-4">
-                    <label className="form-label small fw-bold text-uppercase text-secondary">Deskripsi Singkat</label>
-                    <textarea className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" rows="3"
-                      placeholder="Jelaskan isi kategori ini..." value={formData.description}
-                      onChange={e => setFormData({...formData, description: e.target.value})} />
-                  </div>
-                  <div className="d-flex gap-2 pt-2">
-                    <button type="button" className="btn btn-light w-50 py-3 rounded-3 fw-bold text-secondary" onClick={() => setShowModal(false)}>Batal</button>
-                    <button type="submit" className="btn btn-primary w-50 py-3 rounded-3 fw-bold shadow" disabled={saving}>
-                      {saving ? <span className="spinner-border spinner-border-sm me-2" /> : <i className="bx bx-save me-2" />}
-                      Simpan Data
-                    </button>
-                  </div>
-                </form>
+              <div>
+                <FieldLabel>URL Slug (Auto)</FieldLabel>
+                <input style={{ ...A.select, width: '100%', fontFamily: 'monospace', color: '#6366f1', fontWeight: 700 }} placeholder="fashion-pria" value={modal.slug} onChange={e => setModal(p => ({ ...p, slug: e.target.value }))} required />
+              </div>
+              <div>
+                <FieldLabel>Urutan Tampil</FieldLabel>
+                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.order} onChange={e => setModal(p => ({ ...p, order: parseInt(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <FieldLabel>Deskripsi</FieldLabel>
+                <textarea style={{ ...A.textarea, minHeight: 80 }} placeholder="Jelaskan isi kategori ini..." value={modal.description} onChange={e => setModal(p => ({ ...p, description: e.target.value }))} />
               </div>
             </div>
-          </div>
-        </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
+              <button type="button" style={A.btnGhost} onClick={() => setModal(null)}>Batal</button>
+              <button type="submit" style={A.btnPrimary} disabled={saving}>
+                {saving ? '...' : <><i className="bx bx-save" /> Simpan</>}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

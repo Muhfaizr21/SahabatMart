@@ -1,169 +1,123 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
 
-const AdminBrands = () => {
+export default function AdminBrands() {
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ name: '', logo_url: '', is_featured: false });
+  const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const loadBrands = () => {
+  const EMPTY = { name: '', logo_url: '', is_featured: false };
+  const load = () => {
     setLoading(true);
-    fetchJson(`${API}/brands`)
-      .then(d => setBrands(d.data || []))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+    fetchJson(`${API}/brands`).then(d => setBrands(d.data || [])).catch(console.error).finally(() => setLoading(false));
   };
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => { loadBrands(); }, []);
-
-  const openForm = (brand = null) => {
-    if (brand) {
-      setFormData(brand);
-    } else {
-      setFormData({ name: '', logo_url: '', is_featured: false });
-    }
-    setShowModal(true);
-  };
-
-  const handleSubmit = (e) => {
+  const save = (e) => {
     e.preventDefault();
     setSaving(true);
-    fetchJson(`${API}/brands/upsert`, {
-      method: 'POST',
-      body: JSON.stringify(formData),
-    }).then(() => {
-      loadBrands();
-      setShowModal(false);
-    }).catch(err => alert("Gagal: " + err.message))
-      .finally(() => setSaving(false));
+    fetchJson(`${API}/brands/upsert`, { method: 'POST', body: JSON.stringify(modal) })
+      .then(() => { load(); setModal(null); }).catch(e => alert(e.message)).finally(() => setSaving(false));
   };
 
-  const deleteBrand = (id) => {
-    if (!window.confirm("Hapus brand ini secara permanen?")) return;
-    fetchJson(`${API}/brands/delete?id=${id}`, { method: 'DELETE' })
-      .then(() => loadBrands())
-      .catch(err => alert("Gagal: " + err.message));
+  const del = (id) => {
+    if (!window.confirm('Hapus brand ini?')) return;
+    fetchJson(`${API}/brands/delete?id=${id}`, { method: 'DELETE' }).then(load).catch(e => alert(e.message));
   };
 
   return (
-    <div className="container-fluid py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Monster Header */}
-      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
-        <div>
-          <h4 className="fw-bold text-dark mb-1">Brand Portfolio</h4>
-          <p className="text-secondary small mb-0">Kelola daftar merk produk yang beredar di platform SahabatMart.</p>
-        </div>
-        <button className="btn btn-primary px-4 py-2 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow" onClick={() => openForm()}>
-          <i className="bx bx-plus fs-5" /> Tambah Brand
+    <div style={A.page} className="fade-in">
+      <PageHeader title="Brand Portfolio" subtitle="Kelola daftar merk produk yang beredar di platform SahabatMart.">
+        <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY })}>
+          <i className="bx bx-plus" /> Tambah Brand
         </button>
-      </div>
+      </PageHeader>
 
-      {/* Modern Table List */}
-      <div className="card border-0 rounded-4 shadow-sm overflow-hidden border border-light">
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="bg-light">
-              <tr>
-                <th className="ps-4 py-3 text-uppercase small fw-bold text-secondary">Identitas Merk</th>
-                <th className="py-3 text-uppercase small fw-bold text-secondary text-center">Status</th>
-                <th className="py-3 text-uppercase small fw-bold text-secondary text-center">Produk Terkait</th>
-                <th className="pe-4 py-3 text-uppercase small fw-bold text-secondary text-end">Opsi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="text-center py-5"><div className="spinner-border text-primary" /></td></tr>
-              ) : brands.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-5 text-muted">Belum ada brand terdaftar.</td></tr>
-              ) : brands.map(b => (
-                <tr key={b.id}>
-                  <td className="ps-4">
-                    <div className="d-flex align-items-center gap-3">
-                      <img src={b.logo_url || 'https://via.placeholder.com/40'} 
-                        className="rounded-3 border shadow-sm" style={{ width: 44, height: 44, objectFit: 'contain', background: '#fff' }} alt="" />
-                      <div>
-                        <div className="fw-bold text-dark fs-6">{b.name}</div>
-                        <div className="text-muted" style={{ fontSize: 11 }}>UID: {b.id}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="text-center">
-                    {b.is_featured ? 
-                      <span className="badge bg-warning-subtle text-warning px-3 py-2 rounded-pill small fw-bold">Unggulan</span> : 
-                      <span className="badge bg-light text-secondary px-3 py-2 rounded-pill small">Reguler</span>
-                    }
-                  </td>
-                  <td className="text-center">
-                     <span className="fw-bold text-primary">0</span> <small className="text-muted small">Items</small>
-                  </td>
-                  <td className="pe-4 text-end">
-                    <div className="btn-group shadow-sm rounded-3 overflow-hidden">
-                      <button className="btn btn-white btn-sm border-end px-3" onClick={() => openForm(b)} title="Edit">
-                        <i className="bx bx-edit-alt text-warning fs-5" />
-                      </button>
-                      <button className="btn btn-white btn-sm px-3" onClick={() => deleteBrand(b.id)} title="Hapus">
-                        <i className="bx bx-trash text-danger fs-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+      <TablePanel loading={loading}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+          <thead>
+            <tr>
+              {['Identitas Merk', 'Status', 'Produk', 'Opsi'].map((h, i) => (
+                <th key={h} style={{ ...A.th, textAlign: i >= 1 && i <= 2 ? 'center' : i === 3 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 3 ? 24 : 16 }}>{h}</th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* MONSTER MODAL */}
-      {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(10px)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg">
-              <div className="modal-header border-0 p-4 pb-0">
-                <h5 className="modal-title fw-bold text-dark">
-                  {formData.id ? 'Perbarui Identitas Brand' : 'Daftarkan Brand Baru'}
-                </h5>
-                <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
-              </div>
-              <div className="modal-body p-4 pt-0">
-                <form onSubmit={handleSubmit}>
-                  <div className="mb-4 mt-3">
-                    <label className="form-label small fw-bold text-uppercase text-secondary">Nama Brand</label>
-                    <input type="text" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
-                      placeholder="Misal: Apple, Samsung, Nike" value={formData.name} 
-                      onChange={e => setFormData({...formData, name: e.target.value})} required />
-                  </div>
-                  <div className="mb-4">
-                    <label className="form-label small fw-bold text-uppercase text-secondary">URL Logo (.png/.webp)</label>
-                    <input type="text" className="form-control form-control-lg border-2 rounded-3 fs-6 mt-1" 
-                      placeholder="https://link-logo.com/image.png" value={formData.logo_url} 
-                      onChange={e => setFormData({...formData, logo_url: e.target.value})} />
-                  </div>
-                  <div className="mb-4">
-                    <div className="form-check form-switch bg-light p-3 rounded-3 border">
-                      <input className="form-check-input ms-0 me-2" type="checkbox" id="flexSwitchCheckDefault"
-                         checked={formData.is_featured} onChange={e => setFormData({...formData, is_featured: e.target.checked})} />
-                      <label className="form-check-label fw-bold text-dark" htmlFor="flexSwitchCheckDefault">Tampilkan sebagai Unggulan</label>
+            </tr>
+          </thead>
+          <tbody>
+            {brands.length === 0 && !loading ? (
+              <tr><td colSpan={4} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                <i className="bx bxs-flag" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.2 }} />
+                Belum ada brand terdaftar.
+              </td></tr>
+            ) : brands.map((b, idx) => (
+              <tr key={b.id}
+                style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+              >
+                <td style={{ ...A.td, paddingLeft: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <img
+                      src={b.logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(b.name)}&background=eef2ff&color=6366f1&size=80`}
+                      alt={b.name}
+                      style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'contain', border: '1px solid #f1f5f9', background: '#fff', padding: 4, flexShrink: 0 }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{b.name}</div>
+                      <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>ID: {b.id}</div>
                     </div>
                   </div>
-                  <div className="d-flex gap-2 pt-3">
-                    <button type="button" className="btn btn-light w-50 py-3 rounded-3 fw-bold text-secondary" onClick={() => setShowModal(false)}>Batal</button>
-                    <button type="submit" className="btn btn-primary w-50 py-3 rounded-3 fw-bold shadow" disabled={saving}>
-                      {saving ? <span className="spinner-border spinner-border-sm me-2" /> : <i className="bx bx-save me-2" />}
-                      Simpan Data
-                    </button>
+                </td>
+                <td style={{ ...A.td, textAlign: 'center' }}>
+                  <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: b.is_featured ? '#fffbeb' : '#f8fafc', color: b.is_featured ? '#d97706' : '#94a3b8' }}>
+                    {b.is_featured ? '⭐ Unggulan' : 'Reguler'}
+                  </span>
+                </td>
+                <td style={{ ...A.td, textAlign: 'center' }}>
+                  <span style={{ fontWeight: 800, color: '#0f172a' }}>0</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>items</span>
+                </td>
+                <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                  <div style={{ display: 'inline-flex', gap: 6 }}>
+                    <button style={A.iconBtn('#f59e0b', '#fffbeb')} onClick={() => setModal({ ...b })} title="Edit"><i className="bx bx-pencil" /></button>
+                    <button style={A.iconBtn('#ef4444', '#fff1f2')} onClick={() => del(b.id)} title="Hapus"><i className="bx bx-trash" /></button>
                   </div>
-                </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablePanel>
+
+      {modal && (
+        <Modal title={modal.id ? 'Edit Brand' : 'Tambah Brand Baru'} onClose={() => setModal(null)}>
+          <form onSubmit={save}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <FieldLabel>Nama Brand</FieldLabel>
+                <input style={{ ...A.select, width: '100%' }} placeholder="Misal: Apple, Samsung" value={modal.name} onChange={e => setModal(p => ({ ...p, name: e.target.value }))} required />
+              </div>
+              <div>
+                <FieldLabel>URL Logo (.png/.webp)</FieldLabel>
+                <input style={{ ...A.select, width: '100%' }} placeholder="https://link-logo.com/image.png" value={modal.logo_url} onChange={e => setModal(p => ({ ...p, logo_url: e.target.value }))} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f8fafc', borderRadius: 11 }}>
+                <input type="checkbox" id="featuredBrand" checked={modal.is_featured} onChange={e => setModal(p => ({ ...p, is_featured: e.target.checked }))} style={{ width: 16, height: 16 }} />
+                <label htmlFor="featuredBrand" style={{ fontSize: 13.5, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Tampilkan sebagai Brand Unggulan</label>
               </div>
             </div>
-          </div>
-        </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
+              <button type="button" style={A.btnGhost} onClick={() => setModal(null)}>Batal</button>
+              <button type="submit" style={A.btnPrimary} disabled={saving}>
+                {saving ? '...' : <><i className="bx bx-save" /> Simpan</>}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
-};
-
-export default AdminBrands;
+}

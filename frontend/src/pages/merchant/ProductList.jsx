@@ -14,7 +14,7 @@ const MerchantProducts = () => {
     const loadProducts = async () => {
         try {
             const data = await fetchJson(`${MERCHANT_API_BASE}/products`);
-            setProducts(data || []);
+            setProducts(data.data || []);
         } catch (err) {
             console.error('Failed to load products:', err);
         } finally {

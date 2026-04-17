@@ -16,7 +16,7 @@ const MerchantVouchers = () => {
     const loadVouchers = async () => {
         try {
             const data = await fetchJson(`${MERCHANT_API_BASE}/vouchers`);
-            setVouchers(data || []);
+            setVouchers(data.data || []);
         } catch (err) {
             console.error('Failed to load vouchers:', err);
         } finally {

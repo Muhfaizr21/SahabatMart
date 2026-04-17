@@ -3,40 +3,120 @@ import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
-const fmt = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
-const StatCard = ({ icon, label, value, color, sub, trend }) => (
-  <div className="card border-0 shadow-sm rounded-4 h-100 transition-all border border-light overflow-hidden">
-    <div className="card-body p-4">
-      <div className="d-flex justify-content-between align-items-start mb-3">
-        <div style={{
-          width: 48, height: 48, borderRadius: '12px',
-          background: color + '15',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.4rem', color
+const idr = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
+
+// ─── KPI CARD ─────────────────────────────────────────
+const KpiCard = ({ icon, label, value, trend, trendUp = true, color, sub }) => (
+  <div style={{
+    background: '#fff', borderRadius: 20, padding: '24px 24px 20px',
+    border: '1px solid #f1f5f9',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)',
+    display: 'flex', flexDirection: 'column', gap: 16,
+    transition: 'all 0.2s', cursor: 'default',
+  }}
+  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.08)'}
+  onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)'}
+  >
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{
+        width: 44, height: 44, borderRadius: 12,
+        background: color + '14',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <i className={`bx ${icon}`} style={{ fontSize: 20, color }} />
+      </div>
+      {trend && (
+        <span style={{
+          fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+          background: trendUp ? '#f0fdf4' : '#fff1f2',
+          color: trendUp ? '#16a34a' : '#dc2626',
         }}>
-          <i className={`bx ${icon}`}></i>
-        </div>
-        {trend && (
-           <span className="badge bg-success-subtle text-success rounded-pill px-2 py-1" style={{ fontSize: '0.7rem' }}>
-              <i className="bx bx-up-arrow-alt me-1" />{trend}
-           </span>
-        )}
+          {trendUp ? '↑' : '↓'} {trend}
+        </span>
+      )}
+    </div>
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+        {label}
       </div>
-      <div>
-        <div className="text-secondary small fw-bold text-uppercase mb-1" style={{ letterSpacing: '0.05em', fontSize: '0.65rem' }}>{label}</div>
-        <h3 className="fw-bold mb-0 text-dark" style={{ letterSpacing: '-0.02em' }}>{value}</h3>
-        {sub && <div className="text-muted mt-2 small d-flex align-items-center gap-1" style={{ fontSize: '0.7rem' }}><i className="bx bxs-info-circle opacity-50" /> {sub}</div>}
+      <div style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1 }}>
+        {value}
       </div>
+      {sub && <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 6, fontWeight: 500 }}>{sub}</div>}
     </div>
   </div>
 );
 
+// ─── SECTION TITLE ────────────────────────────────────
+const SectionTitle = ({ text }) => (
+  <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 0, letterSpacing: '-0.01em' }}>{text}</h2>
+);
+
+// ─── ACTION ROW ───────────────────────────────────────
+const QuickAction = ({ to, icon, label, sub, color }) => (
+  <Link to={to} style={{
+    display: 'flex', alignItems: 'center', gap: 14,
+    padding: '14px 16px', borderRadius: 14,
+    background: '#f8fafc', border: '1px solid #f1f5f9',
+    textDecoration: 'none', transition: 'all 0.18s',
+  }}
+  onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.07)'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#f1f5f9'; }}
+  >
+    <div style={{
+      width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+      background: color + '12',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <i className={`bx ${icon}`} style={{ fontSize: 18, color }} />
+    </div>
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{sub}</div>
+    </div>
+    <i className="bx bx-chevron-right" style={{ fontSize: 18, color: '#cbd5e1' }} />
+  </Link>
+);
+
+// ─── CHART BAR ────────────────────────────────────────
+const BarChart = ({ data }) => {
+  const max = Math.max(...data.map(d => d.revenue), 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 180, padding: '0 4px' }}>
+      {data.map((d, i) => {
+        const h = (d.revenue / max) * 100;
+        const isLast = i === data.length - 1;
+        return (
+          <div key={d.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div title={idr(d.revenue)} style={{
+              width: '100%', height: `${Math.max(h, 8)}%`,
+              borderRadius: '8px 8px 0 0',
+              background: isLast
+                ? 'linear-gradient(180deg, #6366f1, #4f46e5)'
+                : 'linear-gradient(180deg, #e0e7ff, #c7d2fe)',
+              transition: 'all 0.3s',
+              boxShadow: isLast ? '0 8px 24px rgba(99,102,241,0.3)' : 'none',
+              position: 'relative'
+            }}
+            onMouseEnter={e => !isLast && (e.currentTarget.style.background = 'linear-gradient(180deg, #a5b4fc, #818cf8)')}
+            onMouseLeave={e => !isLast && (e.currentTarget.style.background = 'linear-gradient(180deg, #e0e7ff, #c7d2fe)')}
+            />
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase' }}>
+              {d.month.slice(5)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── MAIN DASHBOARD ───────────────────────────────────
 export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const loadData = () => {
     setLoading(true);
@@ -46,192 +126,187 @@ export default function AdminDashboard() {
     ]).then(([ov, mo]) => {
       setOverview(ov);
       setMonthly(mo.data || []);
-      setError('');
-    }).catch((err) => {
-      setError(err.message || 'Gagal memuat dashboard admin');
-    }).finally(() => setLoading(false));
+    }).catch(console.error)
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { loadData(); }, []);
 
   if (loading) return (
-    <div className="d-flex align-items-center justify-content-center" style={{ height: '60vh' }}>
-      <div className="spinner-border text-primary border-3" style={{ width: '2.5rem', height: '2.5rem' }}></div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
+      <div style={{
+        width: 40, height: 40, borderRadius: '50%',
+        border: '3px solid #e0e7ff', borderTopColor: '#6366f1',
+        animation: 'spin 0.8s linear infinite'
+      }} />
+      <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>Loading analytics...</span>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
     </div>
   );
 
-  if (error) return (
-     <div className="alert alert-danger rounded-4 shadow-sm border-0 d-flex align-items-center gap-3">
-        <i className="bx bx-error fs-4" /> {error}
-     </div>
-  );
-
-  const stats = [
-    { icon: 'bx-group', label: 'Total Pengguna', value: (overview?.total_users || 0).toLocaleString(), color: '#4361ee', trend: '+12%' },
-    { icon: 'bx-store-alt', label: 'Merchant Aktif', value: (overview?.total_merchants || 0).toLocaleString(), color: '#7209b7', sub: `${overview?.pending_payouts || 0} payout menunggu` },
-    { icon: 'bx-link-alt', label: 'Global Affiliates', value: (overview?.total_affiliates || 0).toLocaleString(), color: '#3a0ca3' },
-    { icon: 'bx-shopping-bag', label: 'Total Pesanan', value: (overview?.total_orders || 0).toLocaleString(), color: '#f72585', trend: '+8%' },
-    { icon: 'bx-wallet', label: 'GMV (Gross Merchandise)', value: fmt(overview?.total_revenue), color: '#4cc9f0' },
-    { icon: 'bx-line-chart', label: 'Net Platform Fee', value: fmt(overview?.total_fee), color: '#06d6a0', sub: 'Pendapatan Bersih' },
+  const kpis = [
+    { icon: 'bxs-group', label: 'Total Users', value: (overview?.total_users || 0).toLocaleString('id-ID'), trend: '12.5%', color: '#6366f1', sub: 'Platform-wide registrations' },
+    { icon: 'bxs-store-alt', label: 'Active Merchants', value: (overview?.total_merchants || 0).toLocaleString('id-ID'), trend: '2.3%', color: '#8b5cf6', sub: `${overview?.pending_payouts || 0} payout pending` },
+    { icon: 'bxs-link-alt', label: 'Affiliates', value: (overview?.total_affiliates || 0).toLocaleString('id-ID'), trend: '5.8%', color: '#06b6d4', sub: 'Active referral network' },
+    { icon: 'bxs-shopping-bag', label: 'Total Orders', value: (overview?.total_orders || 0).toLocaleString('id-ID'), trend: '8.1%', color: '#f59e0b', sub: 'All-time transactions' },
+    { icon: 'bxs-dollar-circle', label: 'Gross Revenue', value: idr(overview?.total_revenue), trend: '18%', color: '#10b981', sub: 'Platform GMV' },
+    { icon: 'bx-line-chart', label: 'Platform Fee', value: idr(overview?.total_fee), trend: '14%', color: '#ef4444', sub: 'Net earnings' },
   ];
 
   return (
-    <div className="container-fluid py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Monster Header */}
-      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
+    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* ─── PAGE HEADER ─── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h4 className="fw-bold text-dark mb-1">Business Analytics Center</h4>
-          <p className="text-secondary small mb-0">Selamat datang kembali, Super Admin. Pantau ekosistem SahabatMart Anda hari ini.</p>
-        </div>
-        <div className="d-flex gap-2">
-           <button className="btn btn-outline-primary fw-bold px-4 rounded-3 border shadow-sm" onClick={loadData}>
-             <i className="bx bx-refresh me-1" /> Refresh Data
-           </button>
-           <button className="btn btn-primary fw-bold px-4 rounded-3 shadow-sm">
-             <i className="bx bx-cloud-download me-1" /> Report
-           </button>
-        </div>
-      </div>
-
-      {/* KPI Stats Grid */}
-      <div className="row g-3 mb-4">
-        {stats.map(s => (
-          <div key={s.label} className="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <StatCard {...s} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 800, color: '#6366f1',
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+              background: '#eef2ff', padding: '4px 10px', borderRadius: 20,
+            }}>Live Analytics</span>
           </div>
-        ))}
+          <h1 style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', marginBottom: 4 }}>
+            Command Center
+          </h1>
+          <p style={{ fontSize: 14, color: '#64748b', fontWeight: 500, marginBottom: 0 }}>
+            Monitor and manage your entire SahabatMart ecosystem in real-time.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={loadData} style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+            borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff',
+            fontSize: 13, fontWeight: 700, color: '#475569', cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}>
+            <i className="bx bx-refresh" style={{ fontSize: 17 }} /> Refresh
+          </button>
+          <button style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+            borderRadius: 12, border: 'none',
+            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+            fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(99,102,241,0.3)',
+          }}>
+            <i className="bx bx-cloud-download" style={{ fontSize: 17 }} /> Export
+          </button>
+        </div>
       </div>
 
-      <div className="row g-4">
-        <div className="col-12 col-xl-8">
-          <div className="card bg-white border-0 rounded-4 shadow-sm h-100 border border-light overflow-hidden">
-            <div className="card-header bg-white border-0 p-4 pb-0">
-               <div className="d-flex align-items-center justify-content-between">
-                  <h6 className="fw-bold text-dark mb-0">Skala Penjualan Bulanan</h6>
-                  <span className="badge bg-light text-primary rounded-pill px-3 py-2 border">Real-time Analytics</span>
-               </div>
+      {/* ─── KPI GRID ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+        {kpis.map(k => <KpiCard key={k.label} {...k} />)}
+      </div>
+
+      {/* ─── MAIN GRID ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+
+        {/* Chart */}
+        <div style={{
+          background: '#fff', borderRadius: 20, padding: 28,
+          border: '1px solid #f1f5f9',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+            <div>
+              <SectionTitle text="Revenue Growth" />
+              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, marginBottom: 0, fontWeight: 500 }}>
+                Monthly GMV & platform fee breakdown
+              </p>
             </div>
-            <div className="card-body p-4">
-              {monthly.length === 0 ? (
-                <div className="text-center text-muted py-5 mt-4">
-                   <i className="bx bx-bar-chart-alt text-light-emphasis fs-1 d-block mb-3" />
-                   Data transaksi belum masuk.
+            <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 4, borderRadius: 10, border: '1px solid #f1f5f9' }}>
+              <button style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#fff', fontSize: 12, fontWeight: 700, color: '#6366f1', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer' }}>Monthly</button>
+              <button style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'transparent', fontSize: 12, fontWeight: 600, color: '#94a3b8', cursor: 'pointer' }}>Yearly</button>
+            </div>
+          </div>
+
+          {monthly.length > 0 ? (
+            <>
+              <BarChart data={monthly} />
+              <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 24, paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 32 }}>
+                  {[
+                    { label: 'Total GMV', value: idr(overview?.total_revenue), color: '#6366f1' },
+                    { label: 'Platform Fee', value: idr(overview?.total_fee), color: '#10b981' },
+                    { label: 'Orders', value: (overview?.total_orders || 0).toLocaleString('id-ID'), color: '#f59e0b' },
+                  ].map(s => (
+                    <div key={s.label}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: s.color, letterSpacing: '-0.03em' }}>{s.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <>
-                  <div className="d-flex align-items-end gap-2 mb-4" style={{ height: 200 }}>
-                    {monthly.map(m => {
-                      const max = Math.max(...monthly.map(x => x.revenue), 1);
-                      const height = (m.revenue / max) * 100;
-                      return (
-                        <div key={m.month} className="flex-grow-1 d-flex flex-column align-items-center gap-2 group">
-                           <div className="bg-primary-subtle border-start border-primary border-4 w-100 transition-all rounded-top-2" 
-                                style={{ height: `${Math.max(height, 5)}%`, opacity: 0.8 }} 
-                                title={fmt(m.revenue)}></div>
-                           <div style={{ fontSize: 9 }} className="text-muted fw-bold">{m.month.split('-')[1]}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0 mt-3 border rounded-3 overflow-hidden">
-                      <thead className="bg-light">
-                        <tr className="small text-uppercase text-secondary fw-bold">
-                           <th className="ps-3">Periode</th>
-                           <th>Revenue</th>
-                           <th>Admin Fee</th>
-                           <th className="pe-3 text-end">Orders</th>
-                        </tr>
-                      </thead>
-                      <tbody className="small">
-                        {monthly.map(m => (
-                          <tr key={m.month}>
-                            <td className="ps-3 fw-bold text-dark">{m.month}</td>
-                            <td className="fw-bold">{fmt(m.revenue)}</td>
-                            <td className="text-success fw-bold">+{fmt(m.fee)}</td>
-                            <td className="pe-3 text-end"><span className="badge bg-indigo rounded-pill px-3 py-1 fw-bold">{m.orders} Sales</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
+                <Link to="/admin/finance" style={{
+                  fontSize: 12, fontWeight: 700, color: '#6366f1',
+                  textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  View Ledger <i className="bx bx-right-arrow-alt" style={{ fontSize: 18 }} />
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200 }}>
+              <i className="bx bx-bar-chart-alt-2" style={{ fontSize: 48, color: '#e2e8f0', marginBottom: 12 }} />
+              <p style={{ fontSize: 14, color: '#cbd5e1', fontWeight: 600, marginBottom: 0 }}>No transaction data yet</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* System Status */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)',
+            borderRadius: 20, padding: 24, position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, color: 'rgba(255,255,255,0.02)' }}>
+              <i className="bx bxs-shield-alt-2" />
+            </div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.1em' }}>All Systems Operational</span>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: 8 }}>
+                99.9% Uptime
+              </div>
+              <p style={{ fontSize: 12, color: '#475569', fontWeight: 500, marginBottom: 20 }}>
+                Database, API & worker services are running without issues.
+              </p>
+              <Link to="/admin/audit" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#94a3b8', fontSize: 11, fontWeight: 700,
+                textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em',
+              }}>
+                <i className="bx bxs-file-find" style={{ fontSize: 14 }} /> Audit Logs
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div style={{
+            background: '#fff', borderRadius: 20, padding: 24,
+            border: '1px solid #f1f5f9',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            display: 'flex', flexDirection: 'column', gap: 0,
+          }}>
+            <div style={{ marginBottom: 16 }}>
+              <SectionTitle text="Quick Actions" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <QuickAction to="/admin/merchants" icon="bxs-store-alt" label="Merchant Audit" sub="Review & verify partners" color="#8b5cf6" />
+              <QuickAction to="/admin/payouts" icon="bxs-wallet" label="Payout Queue" sub={`${overview?.pending_payouts || 0} request pending`} color="#10b981" />
+              <QuickAction to="/admin/products" icon="bxs-package" label="Product Catalog" sub="Manage inventory" color="#f59e0b" />
+              <QuickAction to="/admin/finance" icon="bx-line-chart" label="Financial Ledger" sub="Revenue & fee breakdown" color="#6366f1" />
             </div>
           </div>
         </div>
-
-        <div className="col-12 col-xl-4">
-           {/* System Health Card */}
-           <div className="card rounded-4 border-0 shadow-sm mb-4 bg-dark text-white overflow-hidden position-relative" style={{ minHeight: 180 }}>
-              <div className="card-body p-4 position-relative" style={{ zIndex: 1 }}>
-                 <div className="d-flex align-items-center gap-2 text-success mb-2">
-                    <span className="dot dot-success pulse" />
-                    <span className="small fw-bold text-uppercase" style={{ letterSpacing: '0.1em' }}>System Operational</span>
-                 </div>
-                 <h2 className="fw-bold mb-1">99.8% Efficiency</h2>
-                 <p className="mb-4 small opacity-50">Node Server & DB Optimized for SahabatMart Enterprise</p>
-                 <div className="d-flex gap-2">
-                    <Link to="/admin" className="btn btn-primary btn-sm rounded-pill px-3 fw-bold">Live Stats</Link>
-                    <Link to="/admin/finance" className="btn btn-outline-light btn-sm rounded-pill px-3 fw-bold">Ledger Overview</Link>
-                 </div>
-              </div>
-              <div className="position-absolute end-0 bottom-0 p-3 opacity-10">
-                 <i className="bx bx-analyse" style={{ fontSize: '8rem' }}></i>
-              </div>
-           </div>
-
-           <div className="card rounded-4 border-0 shadow-sm border border-light">
-             <div className="card-body p-4">
-               <h6 className="fw-bold text-dark mb-4 d-flex align-items-center gap-2">
-                 <i className="bx bxs-bolt text-warning" /> Quick Shortcuts
-               </h6>
-               <div className="d-grid gap-3">
-                  <Link to="/admin/products/add" className="btn btn-light text-start rounded-3 p-3 border shadow-sm d-flex align-items-center gap-3">
-                    <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: 32, height: 32 }}>
-                       <i className="bx bx-plus" />
-                    </div>
-                    <div>
-                       <div className="fw-bold text-dark small">Tambah Inventori</div>
-                       <div className="text-muted" style={{ fontSize: 10 }}>Global product expansion</div>
-                    </div>
-                  </Link>
-                  <Link to="/admin/merchants" className="btn btn-light text-start rounded-3 p-3 border shadow-sm d-flex align-items-center gap-3">
-                    <div className="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: 32, height: 32 }}>
-                       <i className="bx bx-store" />
-                    </div>
-                    <div>
-                       <div className="fw-bold text-dark small">Audit Merchant</div>
-                       <div className="text-muted" style={{ fontSize: 10 }}>Review and verify partners</div>
-                    </div>
-                  </Link>
-                  <Link to="/admin/finance" className="btn btn-light text-start rounded-3 p-3 border shadow-sm d-flex align-items-center gap-3">
-                    <div className="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: 32, height: 32 }}>
-                       <i className="bx bx-wallet" />
-                    </div>
-                    <div>
-                       <div className="fw-bold text-dark small">Pencairan Dana</div>
-                       <div className="text-muted" style={{ fontSize: 10 }}>Process payout queue</div>
-                    </div>
-                  </Link>
-               </div>
-             </div>
-           </div>
-        </div>
       </div>
-      
-      <style>{`
-        .bg-indigo { background: #6610f2; }
-        .bg-primary-subtle { background: #e7f0ff; }
-        .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
-        .dot-success { background-color: #06d6a0; box-shadow: 0 0 10px #06d6a0; }
-        .pulse { animation: pulse-animation 2s infinite; }
-        @keyframes pulse-animation {
-          0% { box-shadow: 0 0 0 0px rgba(6, 214, 160, 0.7); }
-          100% { box-shadow: 0 0 0 10px rgba(6, 214, 160, 0); }
-        }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
     </div>
   );
 }
