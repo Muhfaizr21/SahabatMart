@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"SahabatMart/backend/models"
@@ -14,12 +15,14 @@ import (
 type MerchantController struct {
 	DB      *gorm.DB
 	Service *services.MerchantService
+	Notif   *services.NotificationService
 }
 
 func NewMerchantController(db *gorm.DB) *MerchantController {
 	return &MerchantController{
 		DB:      db,
 		Service: services.NewMerchantService(db),
+		Notif:   services.NewNotificationService(db),
 	}
 }
 
@@ -177,6 +180,12 @@ func (mc *MerchantController) RequestPayout(w http.ResponseWriter, r *http.Reque
 		utils.JSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	// Notify Super Admin
+	store, _ := mc.Service.GetStoreProfile(merchantID)
+	msg := fmt.Sprintf("Merchant '%s' mengajukan penarikan dana sebesar %.0f.", store.StoreName, req.Amount)
+	mc.Notif.Push("admin", "admin", "payout_request", "Pengajuan Payout Baru", msg, "/admin/payouts")
+
 	utils.JSONResponse(w, http.StatusCreated, payout)
 }
 
@@ -289,7 +298,10 @@ func (mc *MerchantController) GetStoreProfile(w http.ResponseWriter, r *http.Req
 		utils.JSONError(w, http.StatusNotFound, "Data toko tidak ditemukan")
 		return
 	}
-	utils.JSONResponse(w, http.StatusOK, store)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   store,
+	})
 }
 
 // POST /api/merchant/store/update
@@ -307,7 +319,10 @@ func (mc *MerchantController) UpdateStoreProfile(w http.ResponseWriter, r *http.
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal update profil toko")
 		return
 	}
-	utils.JSONResponse(w, http.StatusOK, store)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   store,
+	})
 }
 
 // ─────────────────────────────────────────
@@ -323,4 +338,30 @@ func (mc *MerchantController) GetAffiliateStats(w http.ResponseWriter, r *http.R
 		return
 	}
 	utils.JSONResponse(w, http.StatusOK, stats)
+}
+
+// GET /api/merchant/notifications
+func (mc *MerchantController) GetNotifications(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	notifs, err := mc.Notif.GetNotifications(merchantID, "merchant", 20)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": notifs})
+}
+
+// PUT /api/merchant/notifications/read
+func (mc *MerchantController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	var req struct {
+		ID uint `json:"id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	if req.ID == 0 {
+		mc.Notif.MarkAllAsRead(merchantID, "merchant")
+	} else {
+		mc.Notif.MarkAsRead(req.ID)
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

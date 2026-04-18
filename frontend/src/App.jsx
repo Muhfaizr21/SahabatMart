@@ -137,6 +137,11 @@ import MerchantVouchers from './pages/merchant/Vouchers';
 // Affiliate Portal
 import AffiliateLayout from './components/affiliate/AffiliateLayout';
 import AffiliateDashboard from './pages/affiliate/Dashboard';
+import AffiliateLinks from './pages/affiliate/Links';
+import AffiliateProducts from './pages/affiliate/Products';
+import AffiliateCommissions from './pages/affiliate/Commissions';
+import AffiliateWithdrawals from './pages/affiliate/Withdrawals';
+import AffiliateSettings from './pages/affiliate/Settings';
 
 import { useEffect } from 'react';
 import { captureAffiliate } from './lib/api';
@@ -214,8 +219,11 @@ export default function App() {
           {/* Affiliate Routes */}
           <Route path="/affiliate" element={<AffiliateLayout />}>
              <Route index element={<AffiliateDashboard />} />
-             <Route path="links" element={<div className="p-4">Affiliate Marketing Tools (Ready)</div>} />
-             <Route path="commissions" element={<div className="p-4">Affiliate Commission History (Ready)</div>} />
+             <Route path="links" element={<AffiliateLinks />} />
+             <Route path="products" element={<AffiliateProducts />} />
+             <Route path="commissions" element={<AffiliateCommissions />} />
+             <Route path="withdrawals" element={<AffiliateWithdrawals />} />
+             <Route path="settings" element={<AffiliateSettings />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

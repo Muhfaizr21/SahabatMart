@@ -46,12 +46,22 @@ func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua strin
 
 func (s *AffiliateService) GetDashboardStats(affiliateID string) (*models.AffiliateMember, int64, error) {
 	var affiliate models.AffiliateMember
-	if err := s.DB.Preload("Tier").First(&affiliate, "id = ?", affiliateID).Error; err != nil {
+	// First fetch the affiliate member
+	if err := s.DB.First(&affiliate, "id = ?", affiliateID).Error; err != nil {
 		return nil, 0, err
+	}
+
+	// Try to preload tier separately — don't fail if tier is missing
+	if affiliate.MembershipTierID > 0 {
+		var tier models.MembershipTier
+		if err := s.DB.First(&tier, "id = ?", affiliate.MembershipTierID).Error; err == nil {
+			affiliate.Tier = &tier
+		}
 	}
 
 	var totalClicks int64
 	s.DB.Model(&models.AffiliateClick{}).Where("affiliate_id = ?", affiliateID).Count(&totalClicks)
-	
+
 	return &affiliate, totalClicks, nil
 }
+

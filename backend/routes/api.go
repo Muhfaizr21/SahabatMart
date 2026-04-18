@@ -70,12 +70,22 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/store", merchantOnly(merchantCtrl.GetStoreProfile))
 	mux.HandleFunc("/api/merchant/store/update", merchantOnly(merchantCtrl.UpdateStoreProfile))
 	
-	// Marketing Insights
+	mux.HandleFunc("/api/merchant/notifications", merchantOnly(merchantCtrl.GetNotifications))
+	mux.HandleFunc("/api/merchant/notifications/read", merchantOnly(merchantCtrl.MarkNotificationRead))
 	mux.HandleFunc("/api/merchant/affiliate-stats", merchantOnly(merchantCtrl.GetAffiliateStats))
 
 	// --- Affiliate Routes ---
 	affiliateOnly := actorOnly("affiliate", "admin", "superadmin")
 	mux.HandleFunc("/api/affiliate/dashboard", affiliateOnly(affiliateCtrl.GetDashboard))
+	mux.HandleFunc("/api/affiliate/commissions", affiliateOnly(affiliateCtrl.GetCommissions))
+	mux.HandleFunc("/api/affiliate/links", affiliateOnly(affiliateCtrl.GetLinks))
+	mux.HandleFunc("/api/affiliate/links/create", affiliateOnly(affiliateCtrl.CreateLink))
+	mux.HandleFunc("/api/affiliate/links/delete", affiliateOnly(affiliateCtrl.DeleteLink))
+	mux.HandleFunc("/api/affiliate/products", affiliateOnly(affiliateCtrl.GetTopProducts))
+	mux.HandleFunc("/api/affiliate/withdrawals", affiliateOnly(affiliateCtrl.GetWithdrawals))
+	mux.HandleFunc("/api/affiliate/withdrawals/request", affiliateOnly(affiliateCtrl.RequestWithdrawal))
+	mux.HandleFunc("/api/affiliate/profile", affiliateOnly(affiliateCtrl.GetProfile))
+	mux.HandleFunc("/api/affiliate/profile/update", affiliateOnly(affiliateCtrl.UpdateProfile))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
 
 	// --- Admin Routes ---
@@ -128,9 +138,11 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	// Affiliate & Marketing
 	mux.HandleFunc("/api/admin/affiliates", adminOnly(adminCtrl.GetAffiliates))
 	mux.HandleFunc("/api/admin/affiliates/configs", adminOnly(adminCtrl.GetAffiliateConfigs))
-	mux.HandleFunc("/api/admin/affiliates/config", adminOnly(adminCtrl.UpsertAffiliateConfig)) // Post alias
+	mux.HandleFunc("/api/admin/affiliates/config", adminOnly(adminCtrl.UpsertAffiliateConfig))
 	mux.HandleFunc("/api/admin/affiliates/configs/upsert", adminOnly(adminCtrl.UpsertAffiliateConfig))
 	mux.HandleFunc("/api/admin/affiliates/clicks", adminOnly(adminCtrl.GetAffiliateClicks))
+	mux.HandleFunc("/api/admin/affiliates/withdrawals", adminOnly(adminCtrl.GetAffiliateWithdrawals))
+	mux.HandleFunc("/api/admin/affiliates/withdrawals/process", adminOnly(adminCtrl.ProcessAffiliateWithdrawal))
 	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
 	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
 

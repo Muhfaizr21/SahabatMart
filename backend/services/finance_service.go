@@ -87,9 +87,18 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, group.MerchantPayout, order.ID, "order", desc); err != nil {
 			return err
 		}
+
+		// 2. Record Platform Fee
+		if group.PlatformFee > 0 {
+			pfDesc := fmt.Sprintf("Biaya Layanan Platform: %s", order.OrderNumber)
+			// Kita catat sebagai earning untuk SYSTEM (ID: system-platform)
+			if err := s.ProcessTransaction(tx, "system-platform", models.WalletBuyer, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc); err != nil {
+				return err
+			}
+		}
 	}
 
-	// 2. Distribute ke Affiliate (jika ada)
+	// 3. Distribute ke Affiliate (jika ada)
 	if order.AffiliateID != nil && *order.AffiliateID != "" {
 		desc := fmt.Sprintf("Komisi Affiliate: %s", order.OrderNumber)
 		if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, order.TotalCommission, order.ID, "order", desc); err != nil {
@@ -142,4 +151,41 @@ func (s *FinanceService) ProcessSettlements() error {
 		}
 		return nil
 	})
+}
+
+// ReleaseEscrow secara langsung menarik dana dari Pending ke Available Balance
+func (s *FinanceService) ReleaseEscrow(tx *gorm.DB, ownerID string, ownerType models.WalletOwnerType, amount float64, refID, desc string) error {
+	wallet, err := s.Repo.GetWalletWithLock(ownerID, ownerType)
+	if err != nil {
+		return err
+	}
+
+	if wallet.PendingBalance < amount {
+		amount = wallet.PendingBalance // safety fallback
+	}
+
+	balanceBefore := wallet.Balance
+	pendingBefore := wallet.PendingBalance
+
+	wallet.PendingBalance -= amount
+	wallet.Balance += amount
+
+	if err := tx.Save(wallet).Error; err != nil {
+		return err
+	}
+
+	txn := &models.WalletTransaction{
+		WalletID:      wallet.ID,
+		Type:          models.TxAdjustment,
+		Amount:        amount,
+		BalanceBefore: balanceBefore,
+		BalanceAfter:  wallet.Balance,
+		PendingBefore: pendingBefore,
+		PendingAfter:  wallet.PendingBalance,
+		Description:   desc,
+		ReferenceID:   refID,
+		ReferenceType: "order_escrow",
+	}
+
+	return tx.Create(txn).Error
 }

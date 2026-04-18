@@ -4,6 +4,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/repositories"
 	"errors"
+	"fmt"
 	"gorm.io/gorm"
 	"time"
 )
@@ -121,27 +122,35 @@ func (s *MerchantService) GetWallet(merchantID string) (map[string]interface{}, 
 		return nil, err
 	}
 
-	// Calculate pending balance (orders not yet completed)
-	var pending float64
-	s.DB.Model(&models.OrderMerchantGroup{}).
-		Where("merchant_id = ? AND status IN ?", merchantID, []string{"processing", "shipped", "delivered"}).
-		Select("SUM(merchant_payout)").
-		Scan(&pending)
+	financeSvc := NewFinanceService(s.DB)
+	wallet, err := financeSvc.Repo.GetWalletWithLock(merchantID, models.WalletMerchant)
+	if err != nil {
+		return nil, err
+	}
+
+	var comm models.MerchantCommission
+	s.DB.Where("merchant_id = ?", merchantID).First(&comm)
+	fee := comm.FeePercent
+	if fee == 0 {
+		fee = 0.05 // Default platform fee
+	}
 
 	return map[string]interface{}{
-		"available_balance": merchant.Balance,
-		"pending_balance":   pending,
-		"total_sales":       merchant.TotalSales,
+		"available_balance": wallet.Balance,
+		"pending_balance":   wallet.PendingBalance,
+		"total_sales":       wallet.TotalEarned,
+		"service_fee":       fee * 100,
 	}, nil
 }
 
 func (s *MerchantService) RequestPayout(merchantID string, amount float64, note string) (*models.PayoutRequest, error) {
-	var merchant models.Merchant
-	if err := s.DB.Where("id = ?", merchantID).First(&merchant).Error; err != nil {
+	financeSvc := NewFinanceService(s.DB)
+	wallet, err := financeSvc.Repo.GetWalletWithLock(merchantID, models.WalletMerchant)
+	if err != nil {
 		return nil, err
 	}
 
-	if merchant.Balance < amount {
+	if wallet.Balance < amount {
 		return nil, errors.New("saldo tidak mencukupi")
 	}
 
@@ -153,13 +162,29 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 		RequestedAt: time.Now(),
 	}
 
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(payout).Error; err != nil {
 			return err
 		}
-		// Potong saldo merchant
-		return tx.Model(&merchant).Update("balance", gorm.Expr("balance - ?", amount)).Error
+		
+		desc := fmt.Sprintf("Penarikan Dana / Payout PID:%s", payout.ID)
+		if payout.ID == "" {
+			desc = "Penarikan Dana / Payout"
+		}
+
+		err = financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxWithdrawalRequest, amount, payout.ID, "payout_request", desc)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	})
+
+	// Add payout.ID generated to description if possible?
+	if payout.ID != "" {
+		desc := fmt.Sprintf("Penarikan Dana / Payout PID:%s", payout.ID)
+		s.DB.Model(&models.WalletTransaction{}).Where("reference_id = ? AND type = ?", payout.ID, models.TxWithdrawalRequest).Update("description", desc)
+	}
 
 	return payout, err
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
 
@@ -137,6 +137,29 @@ const AdminLayout = () => {
   const user = getStoredUser();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [notifs, setNotifs] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchNotifs = async () => {
+    try {
+      const res = await fetch('/api/admin/notifications', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setNotifs(data.data || []);
+        setUnreadCount((data.data || []).filter(n => !n.is_read).length);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifs", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifs();
+    const timer = setInterval(fetchNotifs, 30000); // Poll every 30s
+    return () => clearInterval(timer);
+  }, []);
 
   if (!user || user.role !== 'superadmin') {
     return <Navigate to="/login" replace />;
@@ -302,11 +325,18 @@ const AdminLayout = () => {
               }}>
                 <i className="bx bx-bell" style={{ fontSize: 18, color: '#64748b' }} />
               </div>
-              <span style={{
-                position: 'absolute', top: 6, right: 6, width: 8, height: 8,
-                background: '#6366f1', borderRadius: '50%',
-                border: '2px solid #f8fafc',
-              }} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
+                  background: '#ef4444', borderRadius: 9,
+                  border: '2px solid #f8fafc',
+                  color: 'white', fontSize: 10, fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </div>
 
             {/* Avatar */}

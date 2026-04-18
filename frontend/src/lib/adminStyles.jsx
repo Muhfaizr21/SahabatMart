@@ -144,6 +144,14 @@ export const A = {
     outline: 'none', cursor: 'pointer', fontFamily: "'Inter', sans-serif",
   },
 
+  // Standard Text Input
+  input: {
+    padding: '11px 16px', borderRadius: 11, border: '1px solid #e2e8f0',
+    fontSize: 13, color: '#334155', background: '#f8fafc',
+    outline: 'none', width: '100%', fontFamily: "'Inter', sans-serif",
+    transition: 'all 0.2s', boxSizing: 'border-box'
+  },
+
   // Textarea
   textarea: {
     padding: '10px 14px', borderRadius: 11, border: '1px solid #e2e8f0',

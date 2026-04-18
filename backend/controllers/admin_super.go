@@ -17,10 +17,11 @@ import (
 )
 
 type AdminController struct {
-	DB       *gorm.DB
-	Service  *services.AdminService
-	Audit    *services.AuditService
-	Storage  *services.StorageService
+	DB      *gorm.DB
+	Service *services.AdminService
+	Audit   *services.AuditService
+	Notif   *services.NotificationService
+	Storage *services.StorageService
 }
 
 func NewAdminController(db *gorm.DB) *AdminController {
@@ -29,6 +30,7 @@ func NewAdminController(db *gorm.DB) *AdminController {
 		DB:      db,
 		Service: services.NewAdminService(db, audit),
 		Audit:   audit,
+		Notif:   services.NewNotificationService(db),
 		Storage: services.NewStorageService("http://localhost:8080", "uploads"),
 	}
 }
@@ -344,19 +346,21 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type OrderRow struct {
-		ID          string    `json:"id"`
-		MerchantID  string    `json:"merchant_id"`
-		StoreName   string    `json:"store_name"`
-		BuyerName   string    `json:"buyer_name"`
-		BuyerEmail  string    `json:"buyer_email"`
-		Status      string    `json:"status"`
-		Subtotal    float64   `json:"subtotal"`
-		TotalAmount float64   `json:"total_amount"`
-		CreatedAt   time.Time `json:"created_at"`
+		ID             string    `json:"id"`
+		MerchantID     string    `json:"merchant_id"`
+		StoreName      string    `json:"store_name"`
+		BuyerName      string    `json:"buyer_name"`
+		BuyerEmail     string    `json:"buyer_email"`
+		Status         string    `json:"status"`
+		Subtotal       float64   `json:"subtotal"`
+		TotalAmount    float64   `json:"total_amount"`
+		TrackingNumber string    `json:"tracking_number"`
+		CourierCode    string    `json:"courier_code"`
+		CreatedAt      time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("order_merchant_groups omg").
-		Select("omg.id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.created_at").
+		Select("omg.id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
 		Joins("JOIN merchants m ON m.id = omg.merchant_id").
 		Joins("JOIN orders o ON o.id = omg.order_id").
 		Joins("JOIN users u ON u.id = o.buyer_id").
@@ -385,44 +389,237 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 
 // GET /api/admin/affiliates
 func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request) {
-	var affiliates []models.User
-	ac.DB.Preload("Profile").Where("role = 'affiliate'").Find(&affiliates)
+	search := r.URL.Query().Get("search")
+	status := r.URL.Query().Get("status")
+
+	type AffRow struct {
+		ID               string    `json:"id"`
+		Email            string    `json:"email"`
+		FullName         string    `json:"full_name"`
+		Status           string    `json:"status"`
+		RefCode          string    `json:"ref_code"`
+		TierName         string    `json:"tier_name"`
+		TierLevel        int       `json:"tier_level"`
+		CommRate         float64   `json:"comm_rate"`
+		TotalEarned      float64   `json:"total_earned"`
+		TotalWithdrawn   float64   `json:"total_withdrawn"`
+		TotalClicks      int64     `json:"total_clicks"`
+		TotalConversions int       `json:"total_conversions"`
+		BankName         string    `json:"bank_name"`
+		AffStatus        string    `json:"affiliate_status"`
+		JoinedAt         time.Time `json:"joined_at"`
+		Balance          float64   `json:"balance"`
+	}
+
+	q := `
+		SELECT u.id, u.email, u.status, up.full_name,
+		       am.ref_code, mt.name AS tier_name, mt.level AS tier_level,
+		       mt.base_commission_rate AS comm_rate,
+		       am.total_earned, am.total_withdrawn, am.total_clicks, am.total_conversions,
+		       am.bank_name, am.status AS aff_status, am.created_at AS joined_at,
+		       GREATEST(am.total_earned - am.total_withdrawn, 0) AS balance
+		FROM users u
+		LEFT JOIN user_profiles up ON up.user_id = u.id
+		LEFT JOIN affiliate_members am ON am.user_id = u.id
+		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
+		WHERE u.role = 'affiliate'
+	`
+	args := []interface{}{}
+	if search != "" {
+		q += " AND (u.email ILIKE ? OR up.full_name ILIKE ? OR am.ref_code ILIKE ?)"
+		like := "%" + search + "%"
+		args = append(args, like, like, like)
+	}
+	if status != "" {
+		q += " AND am.status = ?"
+		args = append(args, status)
+	}
+	q += " ORDER BY am.total_earned DESC"
+
+	var rows []AffRow
+	ac.DB.Raw(q, args...).Scan(&rows)
+	if rows == nil {
+		rows = []AffRow{}
+	}
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
-		"total":  len(affiliates),
-		"data":   affiliates,
+		"total":  len(rows),
+		"data":   rows,
 	})
 }
 
-// GET /api/admin/affiliates/configs  → list tier komisi afiliasi
+// GET /api/admin/affiliates/configs  → list membership tiers
 func (ac *AdminController) GetAffiliateConfigs(w http.ResponseWriter, r *http.Request) {
-	var configs []models.AffiliateConfig
-	ac.DB.Find(&configs)
+	var tiers []models.MembershipTier
+	ac.DB.Order("level ASC").Find(&tiers)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
-		"data":   configs,
+		"data":   tiers,
 	})
 }
 
-// POST/PUT /api/admin/affiliates/config
+// POST/PUT /api/admin/affiliates/config → upsert membership_tier
 func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.Request) {
-	var cfg models.AffiliateConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	var req struct {
+		ID                 uint    `json:"id"`
+		Name               string  `json:"tier_name"`
+		Level              int     `json:"level"`
+		BaseCommissionRate float64 `json:"comm_rate"`
+		MinEarningsUpgrade float64 `json:"min_sales"`
+		MonthlyFee         float64 `json:"monthly_fee"`
+		CommissionHoldDays int     `json:"commission_hold_days"`
+		IsActive           bool    `json:"is_active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
-	if cfg.ID == 0 {
-		ac.DB.Create(&cfg)
-	} else {
-		ac.DB.Save(&cfg)
+	if req.Name == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Nama tier wajib diisi")
+		return
 	}
-	ac.Audit.Log("admin", "upsert_affiliate_config", "affiliate_config",
-		fmt.Sprintf("%d", cfg.ID), cfg.TierName, r.RemoteAddr)
-
+	if req.CommissionHoldDays == 0 {
+		req.CommissionHoldDays = 7
+	}
+	tier := models.MembershipTier{
+		ID:                 req.ID,
+		Name:               req.Name,
+		Level:              req.Level,
+		BaseCommissionRate: req.BaseCommissionRate,
+		MinEarningsUpgrade: req.MinEarningsUpgrade,
+		MonthlyFee:         req.MonthlyFee,
+		CommissionHoldDays: req.CommissionHoldDays,
+	}
+	if tier.ID == 0 {
+		ac.DB.Create(&tier)
+	} else {
+		ac.DB.Save(&tier)
+	}
+	ac.Audit.Log("admin", "upsert_membership_tier", "membership_tier",
+		fmt.Sprintf("%d", tier.ID), tier.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
-		"data":   cfg,
+		"data":   tier,
 	})
+}
+
+// GET /api/admin/affiliates/withdrawals
+func (ac *AdminController) GetAffiliateWithdrawals(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+
+	type WRow struct {
+		ID            string     `json:"id"`
+		AffiliateID   string     `json:"affiliate_id"`
+		FullName      string     `json:"full_name"`
+		Email         string     `json:"email"`
+		RefCode       string     `json:"ref_code"`
+		Amount        float64    `json:"amount"`
+		BankName      string     `json:"bank_name"`
+		AccountNumber string     `json:"account_number"`
+		AccountName   string     `json:"account_name"`
+		Status        string     `json:"status"`
+		Note          string     `json:"note"`
+		CreatedAt     time.Time  `json:"created_at"`
+		ProcessedAt   *time.Time `json:"processed_at"`
+	}
+
+	q := `
+		SELECT aw.id, aw.affiliate_id, up.full_name, u.email, am.ref_code,
+		       aw.amount, aw.bank_name,
+		       aw.bank_account_number AS account_number,
+		       aw.bank_account_name AS account_name,
+		       aw.status, aw.note, aw.created_at, aw.processed_at
+		FROM affiliate_withdrawals aw
+		LEFT JOIN affiliate_members am ON am.id = aw.affiliate_id
+		LEFT JOIN users u ON u.id = am.user_id
+		LEFT JOIN user_profiles up ON up.user_id = u.id
+	`
+	args := []interface{}{}
+	if status != "" {
+		q += " WHERE aw.status = ?"
+		args = append(args, status)
+	}
+	q += " ORDER BY aw.created_at DESC"
+
+	var rows []WRow
+	ac.DB.Raw(q, args...).Scan(&rows)
+	if rows == nil {
+		rows = []WRow{}
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"total":  len(rows),
+		"data":   rows,
+	})
+}
+
+// POST /api/admin/affiliates/withdrawals/process
+func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID     string `json:"id"`
+		Action string `json:"action"` // "approve" or "reject"
+		Note   string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+	if req.ID == "" || (req.Action != "approve" && req.Action != "reject") {
+		utils.JSONError(w, http.StatusBadRequest, "ID dan action (approve/reject) wajib diisi")
+		return
+	}
+
+	now := time.Now()
+	newStatus := map[string]string{"approve": "completed", "reject": "rejected"}[req.Action]
+
+	var affUserID string
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		var wd models.AffiliateWithdrawal
+		if err := tx.First(&wd, "id = ?", req.ID).Error; err != nil {
+			return fmt.Errorf("withdrawal tidak ditemukan")
+		}
+		if wd.Status != "pending" && wd.Status != "processed" {
+			return fmt.Errorf("withdrawal sudah diproses sebelumnya")
+		}
+		wd.Status = newStatus
+		wd.Note = req.Note
+		wd.ProcessedAt = &now
+		if err := tx.Save(&wd).Error; err != nil {
+			return err
+		}
+		// Update total_withdrawn only on approval
+		if newStatus == "completed" {
+			tx.Model(&models.AffiliateMember{}).Where("id = ?", wd.AffiliateID).
+				Updates(map[string]interface{}{
+					"total_withdrawn": gorm.Expr("total_withdrawn + ?", wd.Amount),
+				})
+		}
+		// Get affiliate user_id for notification
+		var aff models.AffiliateMember
+		tx.Select("user_id").First(&aff, "id = ?", wd.AffiliateID)
+		affUserID = aff.UserID
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Push notification to affiliate
+	if affUserID != "" {
+		msgMap := map[string]string{
+			"completed": "disetujui dan sedang diproses ke rekening Anda",
+			"rejected":  "ditolak oleh Admin",
+		}
+		msg := fmt.Sprintf("Permintaan penarikan komisi Anda telah %s. %s", msgMap[newStatus], req.Note)
+		ac.Notif.Push(affUserID, "affiliate", "withdrawal_"+newStatus,
+			"Update Penarikan Komisi", msg, "/affiliate/withdrawals")
+	}
+
+	ac.Audit.Log("admin", "process_affiliate_withdrawal", "affiliate_withdrawal",
+		req.ID, newStatus, r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success", "result": newStatus})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -487,8 +684,21 @@ func (ac *AdminController) ModerateProduct(w http.ResponseWriter, r *http.Reques
 		Status string `json:"status"` // active, taken_down
 		Note   string `json:"note"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
+		return
+	}
+	var prod models.Product
+	ac.DB.First(&prod, "id = ?", req.ID)
 	ac.DB.Table("products").Where("id = ?", req.ID).Update("status", req.Status)
+	
+	// Notify Merchant
+	msg := fmt.Sprintf("Produk '%s' Anda telah %s oleh tim moderasi.", prod.Name, req.Status)
+	if req.Status == "active" {
+		msg = fmt.Sprintf("Hore! Produk '%s' Anda telah disetujui dan kini live.", prod.Name)
+	}
+	ac.Notif.Push(prod.MerchantID, "merchant", "product_moderated", "Status Produk Update", msg, "/merchant/products")
+
 	ac.Audit.Log("admin", "moderate_product", "product", req.ID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.Note), r.RemoteAddr)
 
@@ -855,7 +1065,7 @@ func (ac *AdminController) ManageCommissions(w http.ResponseWriter, r *http.Requ
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
 		ac.Audit.Log("admin", "upsert_commission", "category_commission",
-			fmt.Sprintf("%d", comm.ID), fmt.Sprintf("cat=%d fee=%.4f", comm.CategoryID, comm.FeePercent),
+			fmt.Sprintf("%d", comm.ID), fmt.Sprintf("cat=%s fee=%.4f", comm.CategoryName, comm.FeePercent),
 			r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
@@ -947,16 +1157,47 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
-	now := time.Now()
-	ac.DB.Model(&models.PayoutRequest{}).Where("id = ?", req.PayoutID).Updates(map[string]interface{}{
-		"status":       req.Status,
-		"note":         req.Note,
-		"processed_at": &now,
-		"processed_by": req.ProcessedBy,
-	})
-	ac.Audit.Log(req.ProcessedBy, "process_payout", "payout", req.PayoutID,
-		fmt.Sprintf("status=%s", req.Status), r.RemoteAddr)
+	var payout models.PayoutRequest
+	if err := ac.DB.First(&payout, "id = ?", req.PayoutID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Payout request not found")
+		return
+	}
 
+	if payout.Status != "pending" {
+		utils.JSONError(w, http.StatusBadRequest, "Payout is already processed")
+		return
+	}
+
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		payout.Status = req.Status
+		payout.Note = req.Note
+		payout.ProcessedAt = &now
+		payout.ProcessedBy = req.ProcessedBy
+
+		if err := tx.Save(&payout).Error; err != nil {
+			return err
+		}
+
+		financeSvc := services.NewFinanceService(tx)
+		
+		if req.Status == "paid" || req.Status == "approved" {
+			desc := fmt.Sprintf("Penarikan Berhasil (Admin: %s)", req.ProcessedBy)
+			return financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalCompleted, payout.Amount, payout.ID, "payout_request", desc)
+		} else if req.Status == "rejected" {
+			desc := fmt.Sprintf("Penarikan Ditolak, Dana Dikembalikan: %s", req.Note)
+			return financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalRejected, payout.Amount, payout.ID, "payout_request", desc)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memproses payout: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(req.ProcessedBy, "process_payout", "payout", req.PayoutID, fmt.Sprintf("status=%s", req.Status), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1096,6 +1337,14 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 			
 			// Update Order status to Refunded
 			tx.Table("orders").Where("id = ?", dispute.OrderID).Update("status", "refunded")
+		} else if req.Status == "rejected" {
+			finance := services.NewFinanceService(ac.DB)
+			desc := fmt.Sprintf("Sengketa Ditolak, Dana Diteruskan: %s", dispute.OrderID)
+			if err := finance.ReleaseEscrow(tx, dispute.MerchantID, models.WalletMerchant, dispute.Amount, fmt.Sprintf("%d", dispute.ID), desc); err != nil {
+				return err
+			}
+			// Update Order status back to Completed so the funds are no longer heavily contested
+			tx.Table("orders").Where("id = ?", dispute.OrderID).Update("status", "completed")
 		}
 
 		return nil
@@ -1166,22 +1415,6 @@ func (ac *AdminController) UpsertRegion(w http.ResponseWriter, r *http.Request) 
 	ac.DB.Save(&reg)
 	ac.Audit.Log("admin", "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, reg)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN NOTIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (ac *AdminController) GetNotifications(w http.ResponseWriter, r *http.Request) {
-	var notifs []models.AdminNotification
-	ac.DB.Order("created_at DESC").Limit(20).Find(&notifs)
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": notifs})
-}
-
-func (ac *AdminController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	ac.DB.Model(&models.AdminNotification{}).Where("id = ?", id).Update("is_read", true)
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1296,8 +1529,8 @@ func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Requ
 	var products []ProductInfo
 	query := ac.DB.Table("products").
 		Select("products.*, m.store_name").
-		Joins("LEFT JOIN merchants m ON m.id = products.merchant_id").
-		Where("products.status = 'active'")
+		Joins("JOIN merchants m ON m.id = products.merchant_id").
+		Where("products.status = 'active' AND m.status = 'active'")
 
 	if cat := r.URL.Query().Get("cat"); cat != "" {
 		query = query.Where("category = ?", cat)
@@ -1499,4 +1732,28 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": product})
+}
+
+// GET /api/admin/notifications
+func (ac *AdminController) GetNotifications(w http.ResponseWriter, r *http.Request) {
+	notifs, err := ac.Notif.GetNotifications("", "admin", 20)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": notifs})
+}
+
+// PUT /api/admin/notifications/read
+func (ac *AdminController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID uint `json:"id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	if req.ID == 0 {
+		ac.Notif.MarkAllAsRead("", "admin")
+	} else {
+		ac.Notif.MarkAsRead(req.ID)
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

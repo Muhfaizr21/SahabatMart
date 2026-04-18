@@ -95,17 +95,79 @@ func seedProducts(db *gorm.DB) {
 
 func seedTiers(db *gorm.DB) {
 	fmt.Println("  -> Seeding Membership Tiers...")
+
+	// Auto-seed tiers if table is empty
+	var count int64
+	db.Model(&models.MembershipTier{}).Count(&count)
+	if count > 0 {
+		log.Println("    [=] Membership Tiers already seeded, skipping")
+		return
+	}
+
 	tiers := []models.MembershipTier{
-		{ID: 1, Name: "Bronze", Level: 1, BaseCommissionRate: 0.03},
-		{ID: 2, Name: "Silver", Level: 2, BaseCommissionRate: 0.05, MinEarningsUpgrade: 5000000},
-		{ID: 3, Name: "Gold", Level: 3, BaseCommissionRate: 0.08, MinEarningsUpgrade: 20000000},
-		{ID: 4, Name: "Platinum", Level: 4, BaseCommissionRate: 0.12, MinEarningsUpgrade: 100000000},
+		{
+			ID:                   1,
+			Name:                 "Bronze",
+			Level:                1,
+			BaseCommissionRate:   0.03,
+			MonthlyFee:           0,
+			MinEarningsUpgrade:   5000000,
+			MinWithdrawalAmount:  50000,
+			MaxWithdrawalMonthly: 2000000,
+			CommissionHoldDays:   14,
+			CookieDurationDays:   30,
+			IsActive:             true,
+		},
+		{
+			ID:                   2,
+			Name:                 "Silver",
+			Level:                2,
+			BaseCommissionRate:   0.05,
+			MonthlyFee:           0,
+			MinEarningsUpgrade:   20000000,
+			MinWithdrawalAmount:  100000,
+			MaxWithdrawalMonthly: 10000000,
+			CommissionHoldDays:   10,
+			CookieDurationDays:   45,
+			IsActive:             true,
+		},
+		{
+			ID:                   3,
+			Name:                 "Gold",
+			Level:                3,
+			BaseCommissionRate:   0.08,
+			MonthlyFee:           0,
+			MinEarningsUpgrade:   100000000,
+			MinWithdrawalAmount:  200000,
+			MaxWithdrawalMonthly: 50000000,
+			CommissionHoldDays:   7,
+			CookieDurationDays:   60,
+			IsActive:             true,
+		},
+		{
+			ID:                   4,
+			Name:                 "Platinum",
+			Level:                4,
+			BaseCommissionRate:   0.12,
+			MonthlyFee:           0,
+			MinEarningsUpgrade:   0, // Top tier, no upgrade
+			MinWithdrawalAmount:  500000,
+			MaxWithdrawalMonthly: 0, // unlimited
+			CommissionHoldDays:   3,
+			CookieDurationDays:   90,
+			IsActive:             true,
+		},
 	}
 
 	for _, t := range tiers {
-		db.FirstOrCreate(&t, models.MembershipTier{ID: t.ID})
+		if err := db.Create(&t).Error; err != nil {
+			log.Printf("    [!] Tier %s sudah ada atau error: %v", t.Name, err)
+		} else {
+			log.Printf("    [+] Created tier: %s (%.0f%%)", t.Name, t.BaseCommissionRate*100)
+		}
 	}
 }
+
 
 func seedUsers(db *gorm.DB) {
 	fmt.Println("  -> Seeding Professional Account Samples...")

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -18,4 +19,16 @@ func GenerateRefCode(name string) string {
 
 	timestamp := time.Now().UnixNano() % 1000000
 	return strings.ToUpper(fmt.Sprintf("%s%d", cleanName, timestamp))
+}
+
+// GenerateShortCode generates a random alphanumeric short code of given length
+func GenerateShortCode(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	src := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(src)
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[r.Intn(len(charset))]
+	}
+	return string(b)
 }

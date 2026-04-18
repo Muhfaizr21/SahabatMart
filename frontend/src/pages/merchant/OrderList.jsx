@@ -1,212 +1,170 @@
 import React, { useState, useEffect } from 'react';
-import { fetchJson, MERCHANT_API_BASE } from '../../lib/api';
+import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
+import { PageHeader, A, idr, fmtDate } from '../../lib/adminStyles.jsx';
 
-const MerchantOrders = () => {
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [activeStatus, setActiveStatus] = useState('');
-    const [updating, setUpdating] = useState(null);
+export default function MerchantOrders() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeStatus, setActiveStatus] = useState('');
+  const [updating, setUpdating] = useState(null);
 
-    useEffect(() => {
-        loadOrders();
-    }, [activeStatus]);
+  useEffect(() => { loadOrders(); }, [activeStatus]);
 
-    const loadOrders = async () => {
-        setLoading(true);
-        try {
-            const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}`);
-            setOrders(data.data || []);
-        } catch (err) {
-            console.error('Failed to load orders:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const loadOrders = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}`);
+      setOrders(data.data || []);
+    } catch (err) {
+      console.error('Failed to load orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleUpdateStatus = async (groupId, newStatus) => {
-        let trackingNumber = '';
-        let courierCode = '';
+  const handleUpdateStatus = async (groupId, newStatus) => {
+    let trackingNumber = '';
+    let courierCode = '';
+    if (newStatus === 'shipped') {
+      trackingNumber = window.prompt('Masukkan Nomor Resi (Tracking Number):');
+      if (!trackingNumber) return;
+      courierCode = window.prompt('Masukkan Kode Kurir (misal: JNE, SICEPAT):', 'JNE');
+      if (!courierCode) return;
+    }
 
-        if (newStatus === 'shipped') {
-            trackingNumber = window.prompt('Masukkan Nomor Resi (Tracking Number):');
-            if (!trackingNumber) return;
-            courierCode = window.prompt('Masukkan Kode Kurir (misal: JNE, J&T):', 'JNE');
-            if (!courierCode) return;
-        }
+    setUpdating(groupId);
+    try {
+      await fetchJson(`${MERCHANT_API_BASE}/orders/status`, {
+        method: 'POST',
+        body: JSON.stringify({ group_id: groupId, status: newStatus, tracking_number: trackingNumber, courier_code: courierCode })
+      });
+      loadOrders();
+    } catch (err) {
+      alert('Gagal update status: ' + err.message);
+    } finally {
+      setUpdating(null);
+    }
+  };
 
-        setUpdating(groupId);
-        try {
-            await fetchJson(`${MERCHANT_API_BASE}/orders/status`, {
-                method: 'POST',
-                body: JSON.stringify({ group_id: groupId, status: newStatus, tracking_number: trackingNumber, courier_code: courierCode })
-            });
-            loadOrders();
-        } catch (err) {
-            alert('Gagal update status: ' + err.message);
-        } finally {
-            setUpdating(null);
-        }
-    };
+  const statuses = [
+    { label: 'All Orders', value: '' },
+    { label: 'New', value: 'new' },
+    { label: 'Confirmed', value: 'confirmed' },
+    { label: 'Processing', value: 'processing' },
+    { label: 'Shipped', value: 'shipped' },
+    { label: 'Completed', value: 'completed' },
+  ];
 
-    const statuses = [
-        { label: 'All Orders', value: '' },
-        { label: 'New', value: 'new' },
-        { label: 'Confirmed', value: 'confirmed' },
-        { label: 'Processing', value: 'processing' },
-        { label: 'Shipped', value: 'shipped' },
-        { label: 'Completed', value: 'completed' },
-    ];
+  return (
+    <div style={A.page} className="fade-in">
+      <PageHeader title="Order Fulfillment" subtitle="Lacak dan atur pengiriman barang mewah Anda.">
+        <div style={{ display: 'flex', gap: 6, background: '#f8fafc', padding: 6, borderRadius: 12, border: '1px solid #f1f5f9' }}>
+          {statuses.map(s => {
+            const isActive = activeStatus === s.value;
+            return (
+              <button
+                key={s.value}
+                onClick={() => setActiveStatus(s.value)}
+                style={{
+                  ...A.btnGhost,
+                  background: isActive ? '#fff' : 'transparent',
+                  color: isActive ? '#4f46e5' : '#64748b',
+                  boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                  border: isActive ? '1px solid #e2e8f0' : '1px solid transparent'
+                }}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+      </PageHeader>
 
-    return (
-        <div className="space-y-10 animate-fade-in">
-            <header>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Order Management</h2>
-                <p className="text-slate-500 font-medium">Track and fulfill your luxury shipments.</p>
-            </header>
-
-            {/* Status Tabs */}
-            <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100/50 rounded-2xl w-fit border border-slate-100">
-                {statuses.map(s => (
-                    <button
-                        key={s.value}
-                        onClick={() => setActiveStatus(s.value)}
-                        className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                            activeStatus === s.value 
-                                ? 'bg-white text-violet-700 shadow-sm' 
-                                : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                    >
-                        {s.label}
-                    </button>
-                ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13, background: '#fff', borderRadius: 16 }}>Loading orders...</div>
+        ) : orders.length === 0 ? (
+          <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: 16, border: '1px dashed #cbd5e1' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>No active orders found</div>
+          </div>
+        ) : orders.map(order => (
+          <div key={order.id} style={{ ...A.card, transition: 'all 0.2s', border: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#c7d2fe'} onMouseLeave={e => e.currentTarget.style.borderColor = '#f1f5f9'}>
+            
+            <div style={{ padding: 24, borderBottom: '1px solid #f1f5f9', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16, background: '#f8fafc' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                 <div style={A.iconBox('#8b5cf6')}><i className="bx bx-receipt" style={{ fontSize: 20, color:'#8b5cf6' }} /></div>
+                 <div>
+                   <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Order #{order.id.slice(0,8).toUpperCase()}</div>
+                   <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginTop: 3 }}>Placed {fmtDate(order.created_at)}</div>
+                 </div>
+               </div>
+               
+               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                 <div style={{ padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5,
+                   background: order.status === 'completed' ? '#ecfdf5' : '#fffbeb',
+                   color: order.status === 'completed' ? '#10b981' : '#f59e0b'
+                 }}>
+                   {order.status}
+                 </div>
+                 <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{idr(order.merchant_payout || 0)}</div>
+               </div>
             </div>
 
-            {/* Orders List */}
-            <div className="space-y-6">
-                {loading ? (
-                    [...Array(3)].map((_, i) => <SkeletonOrder key={i} />)
-                ) : orders.length > 0 ? orders.map((order) => (
-                    <div key={order.id} className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-50 overflow-hidden group hover:border-violet-100 transition-all">
-                        {/* Order Header */}
-                        <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="flex items-center gap-6">
-                                <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400">
-                                    <span className="material-symbols-outlined">receipt_long</span>
-                                </div>
-                                <div>
-                                    <h4 className="font-black text-slate-900 leading-tight">Order #{order.id.slice(0,8).toUpperCase()}</h4>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">
-                                        Placed on {new Date(order.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                                    order.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                                }`}>
-                                    {order.status}
-                                </div>
-                                <div className="h-8 w-[1px] bg-slate-100 hidden md:block"></div>
-                                <p className="text-xl font-black text-slate-900">Rp{order.merchant_payout.toLocaleString('id-ID')}</p>
-                            </div>
-                        </div>
-
-                        {/* Order Content */}
-                        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
-                            {/* Items */}
-                            <div className="space-y-4">
-                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Contract Items</p>
-                                {order.items?.map((item, idx) => (
-                                    <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-slate-50/50 border border-transparent hover:border-slate-100 transition-all">
-                                        <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden border border-slate-100 shrink-0">
-                                            <img src={item.product_image_url} alt="" className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-black text-slate-900 truncate">{item.product_name}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{item.variant_name || 'Original Edition'}</p>
-                                            <p className="text-xs font-bold text-violet-600 mt-2">Qty: {item.quantity} × Rp{item.unit_price.toLocaleString('id-ID')}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Logistics & Actions */}
-                            <div className="space-y-8">
-                                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100">
-                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Logistics Details</p>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-xs font-bold">
-                                            <span className="text-slate-400">Carrier</span>
-                                            <span className="text-slate-900 uppercase">{order.courier_code || 'Pending Discovery'}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs font-bold">
-                                            <span className="text-slate-400">Tracking Info</span>
-                                            <span className="text-slate-900">{order.tracking_number || 'Awaiting Shipment'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    {order.status === 'new' && (
-                                        <button 
-                                            onClick={() => handleUpdateStatus(order.id, 'confirmed')}
-                                            disabled={updating === order.id}
-                                            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg"
-                                        >
-                                            Confirm Order
-                                        </button>
-                                    )}
-                                    {order.status === 'confirmed' && (
-                                        <button 
-                                            onClick={() => handleUpdateStatus(order.id, 'processing')}
-                                            disabled={updating === order.id}
-                                            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg"
-                                        >
-                                            Process Item
-                                        </button>
-                                    )}
-                                    {order.status === 'processing' && (
-                                        <button 
-                                            onClick={() => handleUpdateStatus(order.id, 'shipped')}
-                                            disabled={updating === order.id}
-                                            className="flex-1 py-4 bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg"
-                                        >
-                                            Input Resi & Ship
-                                        </button>
-                                    )}
-                                    {order.status === 'shipped' && (
-                                        <p className="text-center w-full py-4 text-slate-400 font-bold text-xs uppercase tracking-widest bg-slate-50 rounded-2xl">Package in Transit</p>
-                                    )}
-                                    {order.status === 'completed' && (
-                                        <p className="text-center w-full py-4 text-emerald-600 font-bold text-xs uppercase tracking-widest bg-emerald-50 rounded-2xl">Transaction Finalized</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr minmax(300px, 400px)', gap: 30, padding: 24 }}>
+               
+               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                 <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Contract Items</div>
+                 {order.items?.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 16, padding: 12, background: '#f8fafc', borderRadius: 12, border: '1px solid #f1f5f9' }}>
+                       <div style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', background: '#fff', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+                         <img src={formatImage(item.product_image_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                       </div>
+                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                         <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{item.product_name}</div>
+                         <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.variant_name || 'Original Edition'}</div>
+                         <div style={{ fontSize: 12, fontWeight: 800, color: '#4f46e5', marginTop: 6 }}>Qty: {item.quantity} × {idr(item.unit_price)}</div>
+                       </div>
                     </div>
-                )) : (
-                    <div className="py-32 text-center bg-white rounded-3xl border border-slate-50">
-                        <span className="material-symbols-outlined text-6xl text-slate-100 mb-4 block">package_2</span>
-                        <p className="text-slate-400 font-black text-sm uppercase tracking-widest">No active orders found</p>
-                    </div>
-                )}
+                 ))}
+               </div>
+
+               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                 <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                   <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Logistics Details</div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Carrier</span>
+                     <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.courier_code || 'Pending Discovery'}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Tracking Info</span>
+                     <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.tracking_number || 'Awaiting Shipment'}</span>
+                   </div>
+                 </div>
+
+                 <div style={{ display: 'flex', gap: 12 }}>
+                   {order.status === 'new' && (
+                     <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'confirmed')} disabled={updating === order.id}>Confirm Order</button>
+                   )}
+                   {order.status === 'confirmed' && (
+                     <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'processing')} disabled={updating === order.id}>Process Item</button>
+                   )}
+                   {order.status === 'processing' && (
+                     <button style={{ ...A.btnPrimary, flex: 1, height: 48, background: '#4f46e5', borderColor: '#4f46e5' }} onClick={() => handleUpdateStatus(order.id, 'shipped')} disabled={updating === order.id}>Input Resi & Ship</button>
+                   )}
+                   {order.status === 'shipped' && (
+                     <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Package in Transit</div>
+                   )}
+                   {order.status === 'completed' && (
+                     <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#ecfdf5', color: '#10b981', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Transaction Finalized</div>
+                   )}
+                 </div>
+               </div>
+
             </div>
-        </div>
-    );
-};
-
-const SkeletonOrder = () => (
-    <div className="bg-white rounded-3xl h-64 border border-slate-100 animate-pulse">
-        <div className="p-8 border-b border-slate-50 flex justify-between">
-            <div className="w-1/3 h-10 bg-slate-100 rounded-xl"></div>
-            <div className="w-20 h-10 bg-slate-100 rounded-xl"></div>
-        </div>
-        <div className="p-8 flex gap-10">
-            <div className="flex-1 h-32 bg-slate-50 rounded-2xl"></div>
-            <div className="flex-1 h-32 bg-slate-50 rounded-2xl"></div>
-        </div>
+          </div>
+        ))}
+      </div>
     </div>
-);
-
-export default MerchantOrders;
+  );
+}

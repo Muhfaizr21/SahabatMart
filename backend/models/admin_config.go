@@ -17,20 +17,21 @@ type PlatformConfig struct {
 
 // CategoryCommission mengatur komisi berdasarkan kategori produk
 type CategoryCommission struct {
-	ID         uint    `gorm:"primaryKey" json:"id"`
-	CategoryID uint    `gorm:"uniqueIndex" json:"category_id"`
-	FeePercent float64 `gorm:"type:decimal(5,4);not null" json:"fee_percent"` // 0.05 = 5%
-	FixedFee   float64 `gorm:"type:decimal(15,2);default:0" json:"fixed_fee"`
-	IsActive   bool    `gorm:"default:true" json:"is_active"`
+	ID           uint    `gorm:"primaryKey" json:"id"`
+	CategoryName string  `gorm:"type:varchar(100);uniqueIndex;not null" json:"category_name"`
+	FeePercent   float64 `gorm:"type:decimal(5,2);not null" json:"fee_percent"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // MerchantCommission Override komisi per merchant (Special Deal)
 type MerchantCommission struct {
-	ID         string     `gorm:"type:uuid;primaryKey" json:"id"`
-	MerchantID string     `gorm:"type:uuid;uniqueIndex;not null" json:"merchant_id"`
-	FeePercent float64    `gorm:"type:decimal(5,4)" json:"fee_percent"`
-	FixedFee   float64    `gorm:"type:decimal(15,2)" json:"fixed_fee"`
-	ValidUntil *time.Time `json:"valid_until"`
+	ID         uint    `gorm:"primaryKey" json:"id"`
+	MerchantID string  `gorm:"type:uuid;uniqueIndex;not null" json:"merchant_id"`
+	FeePercent float64 `gorm:"type:decimal(5,2);not null" json:"fee_percent"`
+	Note       string  `gorm:"type:text" json:"note"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // AuditLog mencatat semua aksi admin ke sistem
@@ -184,14 +185,16 @@ type Region struct {
 	ZipCode  string `gorm:"type:varchar(10)" json:"zip_code"`
 }
 
-// AdminNotification untuk alert admin
-type AdminNotification struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Type      string    `gorm:"type:varchar(50)" json:"type"` // payout_request, merchant_registration, dispute_new
-	Message   string    `gorm:"type:text" json:"message"`
-	IsRead    bool      `gorm:"default:false" json:"is_read"`
-	Link      string    `gorm:"type:varchar(255)" json:"link"`
-	CreatedAt time.Time `json:"created_at"`
+type Notification struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	ReceiverID   string    `gorm:"type:uuid;index" json:"receiver_id"`     // Global ID (User ID or Merchant ID)
+	ReceiverType string    `gorm:"type:varchar(20);index" json:"receiver_type"` // admin, merchant, buyer
+	Type         string    `gorm:"type:varchar(50)" json:"type"`           // order_new, payout_approved, product_approved, dispute_new
+	Title        string    `gorm:"type:varchar(100)" json:"title"`
+	Message      string    `gorm:"type:text" json:"message"`
+	Link         string    `gorm:"type:varchar(255)" json:"link"`
+	IsRead       bool      `gorm:"default:false" json:"is_read"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // BlogPost untuk CMS SahabatMart
@@ -282,28 +285,6 @@ type Banner struct {
 	IsActive bool      `gorm:"default:true" json:"is_active"`
 }
 
-func (PlatformConfig) TableName() string    { return "platform_configs" }
-func (CategoryCommission) TableName() string { return "category_commissions" }
-func (MerchantCommission) TableName() string { return "merchant_commissions" }
-func (AuditLog) TableName() string           { return "audit_logs" }
-func (PayoutRequest) TableName() string      { return "payout_requests" }
-func (Merchant) TableName() string           { return "merchants" }
-func (Category) TableName() string           { return "categories" }
-func (Brand) TableName() string              { return "brands" }
-func (Attribute) TableName() string          { return "attributes" }
-func (Voucher) TableName() string            { return "vouchers" }
-func (Dispute) TableName() string            { return "disputes" }
-func (LogisticChannel) TableName() string    { return "logistic_channels" }
-func (AffiliateClick) TableName() string     { return "affiliate_clicks" }
-func (Region) TableName() string             { return "regions" }
-func (ProductVariant) TableName() string      { return "product_variants" }
-func (Cart) TableName() string                { return "carts" }
-func (CartItem) TableName() string            { return "cart_items" }
-func (AdminNotification) TableName() string  { return "admin_notifications" }
-func (BlogPost) TableName() string           { return "blog_posts" }
-func (Product) TableName() string            { return "products" }
-func (Banner) TableName() string             { return "banners" }
-
 // Wishlist menyimpan produk favorit buyer
 type Wishlist struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
@@ -312,4 +293,25 @@ type Wishlist struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (Wishlist) TableName() string { return "wishlists" }
+func (PlatformConfig) TableName() string     { return "platform_configs" }
+func (CategoryCommission) TableName() string  { return "category_commissions" }
+func (MerchantCommission) TableName() string  { return "merchant_commissions" }
+func (AuditLog) TableName() string            { return "audit_logs" }
+func (PayoutRequest) TableName() string       { return "payout_requests" }
+func (Merchant) TableName() string            { return "merchants" }
+func (Category) TableName() string            { return "categories" }
+func (Brand) TableName() string               { return "brands" }
+func (Attribute) TableName() string           { return "attributes" }
+func (Voucher) TableName() string             { return "vouchers" }
+func (Dispute) TableName() string             { return "disputes" }
+func (LogisticChannel) TableName() string     { return "logistic_channels" }
+func (AffiliateClick) TableName() string      { return "affiliate_clicks" }
+func (Region) TableName() string              { return "regions" }
+func (ProductVariant) TableName() string      { return "product_variants" }
+func (Cart) TableName() string                { return "carts" }
+func (CartItem) TableName() string            { return "cart_items" }
+func (Notification) TableName() string        { return "notifications" }
+func (BlogPost) TableName() string            { return "blog_posts" }
+func (Product) TableName() string             { return "products" }
+func (Banner) TableName() string              { return "banners" }
+func (Wishlist) TableName() string            { return "wishlists" }

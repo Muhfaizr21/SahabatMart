@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;400;600;800&amp;family=Manrope:wght@300;400;600&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#5a357e",
+                        "surface-container-highest": "#2e3447",
+                        "surface": "#0c1324",
+                        "inverse-surface": "#dce1fb",
+                        "secondary-container": "#5a357e",
+                        "secondary": "#ddb7ff",
+                        "tertiary": "#fabc4e",
+                        "surface-container-high": "#23293c",
+                        "surface-container-low": "#151b2d",
+                        "on-primary-container": "#400071",
+                        "outline-variant": "#4d4354",
+                        "on-background": "#dce1fb",
+                        "error": "#ffb4ab",
+                        "on-primary": "#490080",
+                        "surface-container-lowest": "#070d1f",
+                        "surface-variant": "#2e3447",
+                        "tertiary-container": "#bd871a",
+                        "surface-dim": "#0c1324",
+                        "inverse-primary": "#842bd2",
+                        "secondary-fixed": "#f0dbff",
+                        "on-primary-fixed-variant": "#6900b3",
+                        "outline": "#988d9f",
+                        "on-secondary-fixed": "#2c014f",
+                        "on-tertiary": "#432c00",
+                        "on-primary-fixed": "#2c0051",
+                        "on-error": "#690005",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "on-tertiary-container": "#3a2600",
+                        "primary-fixed": "#f0dbff",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "tertiary-fixed": "#ffdead",
+                        "on-secondary-container": "#cea4f5",
+                        "surface-container": "#191f31",
+                        "error-container": "#93000a",
+                        "on-surface": "#dce1fb",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "on-secondary": "#421d65",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#cfc2d6",
+                        "on-tertiary-fixed": "#281900",
+                        "tertiary-fixed-dim": "#fabc4e",
+                        "surface-tint": "#ddb7ff",
+                        "background": "#0c1324",
+                        "primary-container": "#b76dff",
+                        "inverse-on-surface": "#2a3043",
+                        "surface-bright": "#33394c",
+                        "primary": "#ddb7ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0c1324;
+            color: #dce1fb;
+            font-family: 'Manrope', sans-serif;
+        }
+
+        .glass-panel {
+            background: rgba(35, 41, 60, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(77, 67, 84, 0.15);
+        }
+
+        .neon-glow-purple {
+            box-shadow: 0 0 20px rgba(183, 109, 255, 0.15);
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #ddb7ff 0%, #b76dff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+
+<body class="bg-background min-h-screen">
+    <!-- TopNavBar -->
+    <header
+        class="fixed top-0 w-full z-50 bg-slate-950/40 backdrop-blur-xl shadow-[0px_24px_48px_rgba(0,0,0,0.5)] flex justify-between items-center px-8 py-4 w-full">
+        <div class="flex items-center gap-8">
+            <span class="text-xl font-bold tracking-[0.2em] text-white font-headline">OBSIDIAN</span>
+            <div class="hidden md:flex items-center bg-white/5 rounded-full px-4 py-2 border border-outline-variant/10">
+                <span class="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+                <input class="bg-transparent border-none focus:ring-0 text-sm text-on-surface ml-2 w-64 font-label"
+                    placeholder="Search..." type="text" />
+            </div>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="flex gap-4">
+                <button class="text-slate-400 hover:bg-white/5 transition-colors p-2 rounded-full">
+                    <span class="material-symbols-outlined">notifications</span>
+                </button>
+                <button class="text-slate-400 hover:bg-white/5 transition-colors p-2 rounded-full">
+                    <span class="material-symbols-outlined">settings</span>
+                </button>
+            </div>
+            <div class="flex items-center gap-3 pl-6 border-l border-outline-variant/20">
+                <div class="text-right hidden sm:block">
+                    <p class="text-sm font-bold text-white font-headline">Arman</p>
+                    <p class="text-[10px] text-purple-400 tracking-widest uppercase font-label">Premium Tier</p>
+                </div>
+                <img alt="User Profile" class="w-10 h-10 rounded-full border-2 border-primary/20 object-cover"
+                    data-alt="professional male portrait with minimalist lighting and dark background high-end aesthetic"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuANIW1MxOJJI2gpU10-GyykMzqGih8WIl71cpTcrP2PzbHZJ7Aa6dNqdt8fz0GOfSDi43_kpK8Xynsjzu55n44I1jTPF4frDgUENdmQbAHM7Fy00SusyRFgOFeag3fRDUI7dhUMkPppoPPDPBBQPj3DhkpGKPV3RMWlGnJZs5nGOw6B_-aOcswBExqRoYeNzTB5IgKoZUkE_v0mza2CuFGqYHjghJjxMAAGVd6EXb277PJtI1k0p8pLSp6MfB1H3Bx4vhsr5vk53sWs" />
+            </div>
+        </div>
+    </header>
+    <!-- SideNavBar -->
+    <aside
+        class="fixed left-0 top-0 h-screen w-64 z-40 bg-[#151b2d]/40 backdrop-blur-2xl shadow-2xl shadow-purple-900/10 flex flex-col h-full py-8 pt-24">
+        <div class="px-6 mb-8">
+            <h2 class="text-lg font-black text-white font-headline tracking-wider uppercase">Portfolio</h2>
+            <p class="text-[10px] text-slate-400 font-label tracking-widest uppercase mt-1">Global Assets</p>
+        </div>
+        <nav class="flex-1 space-y-2">
+            <!-- Active: Analytics as suggested by dashboard context -->
+            <a class="bg-gradient-to-r from-purple-500/20 to-transparent text-purple-300 border-l-4 border-purple-400 py-3 px-6 flex items-center gap-4 transition-all duration-300"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="insert_chart">insert_chart</span>
+                <span class="font-['Plus_Jakarta_Sans'] tracking-wider text-sm">Analytics</span>
+            </a>
+            <a class="text-slate-400 py-3 px-6 flex items-center gap-4 hover:text-white hover:bg-white/5 transition-all duration-300"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="diamond">diamond</span>
+                <span class="font-['Plus_Jakarta_Sans'] tracking-wider text-sm">Assets</span>
+            </a>
+            <a class="text-slate-400 py-3 px-6 flex items-center gap-4 hover:text-white hover:bg-white/5 transition-all duration-300"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="swap_horiz">swap_horiz</span>
+                <span class="font-['Plus_Jakarta_Sans'] tracking-wider text-sm">Exchange</span>
+            </a>
+            <a class="text-slate-400 py-3 px-6 flex items-center gap-4 hover:text-white hover:bg-white/5 transition-all duration-300"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="shield">shield</span>
+                <span class="font-['Plus_Jakarta_Sans'] tracking-wider text-sm">Security</span>
+            </a>
+            <a class="text-slate-400 py-3 px-6 flex items-center gap-4 hover:text-white hover:bg-white/5 transition-all duration-300"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="history">history</span>
+                <span class="font-['Plus_Jakarta_Sans'] tracking-wider text-sm">History</span>
+            </a>
+        </nav>
+        <div class="px-6 mt-auto">
+            <button
+                class="w-full py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 transition-transform duration-200">
+                Upgrade Plan
+            </button>
+            <div class="mt-8 space-y-4">
+                <a class="text-slate-400 flex items-center gap-4 text-sm hover:text-white transition-colors" href="#">
+                    <span class="material-symbols-outlined" data-icon="help">help</span>
+                    <span>Support</span>
+                </a>
+                <a class="text-slate-400 flex items-center gap-4 text-sm hover:text-error transition-colors" href="#">
+                    <span class="material-symbols-outlined" data-icon="logout">logout</span>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </div>
+    </aside>
+    <!-- Main Content Canvas -->
+    <main class="ml-64 pt-24 px-8 pb-12">
+        <!-- Header Section -->
+        <div class="mb-12">
+            <h1 class="text-5xl font-extrabold font-headline tracking-tight text-white mb-2">Hello, <span
+                    class="text-gradient">Arman!</span></h1>
+            <p class="text-on-surface-variant font-body">Your store's performance is up by <span
+                    class="text-tertiary">+12.5%</span> this week.</p>
+        </div>
+        <!-- Stats Bento Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div
+                class="glass-panel rounded-full p-8 relative overflow-hidden group hover:bg-surface-container-high transition-colors duration-500">
+                <div
+                    class="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-primary/10 rounded-xl">
+                        <span class="material-symbols-outlined text-primary">shopping_bag</span>
+                    </div>
+                    <span class="text-primary text-xs font-bold tracking-widest font-label">+4.2%</span>
+                </div>
+                <p class="text-on-surface-variant text-sm font-label uppercase tracking-[0.15em] mb-1">All Orders</p>
+                <h3 class="text-3xl font-bold font-headline text-white">2,481</h3>
+            </div>
+            <div
+                class="glass-panel rounded-full p-8 relative overflow-hidden group hover:bg-surface-container-high transition-colors duration-500">
+                <div
+                    class="absolute -right-4 -top-4 w-24 h-24 bg-tertiary/10 rounded-full blur-3xl group-hover:bg-tertiary/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-tertiary/10 rounded-xl">
+                        <span class="material-symbols-outlined text-tertiary">pending_actions</span>
+                    </div>
+                    <span class="text-tertiary text-xs font-bold tracking-widest font-label">Action Required</span>
+                </div>
+                <p class="text-on-surface-variant text-sm font-label uppercase tracking-[0.15em] mb-1">Awaiting Payment
+                </p>
+                <h3 class="text-3xl font-bold font-headline text-white">124</h3>
+            </div>
+            <div
+                class="glass-panel rounded-full p-8 relative overflow-hidden group hover:bg-surface-container-high transition-colors duration-500">
+                <div
+                    class="absolute -right-4 -top-4 w-24 h-24 bg-secondary/10 rounded-full blur-3xl group-hover:bg-secondary/20 transition-all">
+                </div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-secondary/10 rounded-xl">
+                        <span class="material-symbols-outlined text-secondary">verified</span>
+                    </div>
+                    <span class="text-secondary text-xs font-bold tracking-widest font-label">98% Ratio</span>
+                </div>
+                <p class="text-on-surface-variant text-sm font-label uppercase tracking-[0.15em] mb-1">Completed</p>
+                <h3 class="text-3xl font-bold font-headline text-white">2,105</h3>
+            </div>
+        </div>
+        <!-- Charts & Profile Split -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <!-- Revenue Chart Area -->
+            <div class="lg:col-span-2 glass-panel rounded-full p-8 flex flex-col">
+                <div class="flex justify-between items-center mb-10">
+                    <div>
+                        <h4 class="text-white font-headline text-xl font-bold">Revenue Analytics</h4>
+                        <p class="text-on-surface-variant text-sm font-label">Monthly performance overview</p>
+                    </div>
+                    <div class="flex bg-surface-container-lowest rounded-xl p-1">
+                        <button
+                            class="px-4 py-1 text-xs font-bold text-white bg-surface-variant rounded-lg">Month</button>
+                        <button class="px-4 py-1 text-xs font-bold text-on-surface-variant">Year</button>
+                    </div>
+                </div>
+                <!-- Simulated Glowing Chart -->
+                <div class="flex-1 w-full h-[240px] relative flex items-end justify-between gap-2 px-4 pb-4">
+                    <div class="absolute inset-0 flex flex-col justify-between py-4 opacity-10">
+                        <div class="border-b border-white w-full"></div>
+                        <div class="border-b border-white w-full"></div>
+                        <div class="border-b border-white w-full"></div>
+                        <div class="border-b border-white w-full"></div>
+                    </div>
+                    <!-- Chart Bars/Lines Simulation -->
+                    <div class="w-12 bg-primary/20 h-1/3 rounded-t-lg relative group transition-all duration-300">
+                        <div class="absolute bottom-0 w-full bg-primary h-[80%] rounded-t-lg neon-glow-purple"></div>
+                    </div>
+                    <div class="w-12 bg-primary/20 h-1/2 rounded-t-lg relative group transition-all duration-300">
+                        <div class="absolute bottom-0 w-full bg-primary h-[70%] rounded-t-lg neon-glow-purple"></div>
+                    </div>
+                    <div class="w-12 bg-primary/20 h-3/4 rounded-t-lg relative group transition-all duration-300">
+                        <div class="absolute bottom-0 w-full bg-primary h-[90%] rounded-t-lg neon-glow-purple"></div>
+                    </div>
+                    <div class="w-12 bg-primary/20 h-2/3 rounded-t-lg relative group transition-all duration-300">
+                        <div class="absolute bottom-0 w-full bg-primary h-[85%] rounded-t-lg neon-glow-purple"></div>
+                    </div>
+                    <div class="w-12 bg-primary/20 h-full rounded-t-lg relative group transition-all duration-300">
+                        <div class="absolute bottom-0 w-full bg-primary h-[95%] rounded-t-lg neon-glow-purple"></div>
+                    </div>
+                    <div class="w-12 bg-primary/20 h-4/5 rounded-t-lg relative group transition-all duration-300">
+                        <div class="absolute bottom-0 w-full bg-primary h-[75%] rounded-t-lg neon-glow-purple"></div>
+                    </div>
+                </div>
+                <div
+                    class="flex justify-between px-6 mt-4 text-[10px] text-on-surface-variant font-label tracking-widest uppercase">
+                    <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+                </div>
+            </div>
+            <!-- Profile Overview Card -->
+            <div class="glass-panel rounded-full p-8 flex flex-col items-center text-center">
+                <div class="relative mb-6">
+                    <div
+                        class="absolute -inset-1 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-25">
+                    </div>
+                    <img alt="Avatar Detail"
+                        class="w-24 h-24 rounded-full border-2 border-surface-container-highest object-cover relative z-10"
+                        data-alt="high resolution detail portrait of business professional in deep navy studio lighting"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCasuTUaKgKQDYcM1fZR7ItsXjnVu-OJiQmkJG7y_TDIbzmQWPhv7maz5Q2sTWFiMo9A2UGhua2NfwZj2bcY82_7ZyXq7iWa08iPlXAviELPQIbk_HtHxF-6luXRSLqR-DNIsCbLzf4GfsRPOdyCV1-FwDDOKCS9NKKGDhWqK9pHjEOkpDSIRQnhn6Cp9XZTcUkXdqvc_WlEDvcZ1dAVfSR_yNHdcfB0LWfiHsLFywVdsphJ7ONCzWILSCfKDh_L5Ztt7DA51zApGY6" />
+                </div>
+                <h4 class="text-2xl font-extrabold font-headline text-white mb-1">Arman Valdes</h4>
+                <p class="text-primary text-xs font-bold tracking-widest uppercase font-label mb-6">Executive Director
+                </p>
+                <div class="w-full space-y-4 text-left">
+                    <div class="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant/10">
+                        <p class="text-[10px] text-on-surface-variant font-label uppercase tracking-widest mb-1">Recent
+                            Activity</p>
+                        <p class="text-sm text-on-surface font-body font-semibold">Processed 48 orders today</p>
+                    </div>
+                    <div class="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant/10">
+                        <p class="text-[10px] text-on-surface-variant font-label uppercase tracking-widest mb-1">Last
+                            Logged In</p>
+                        <p class="text-sm text-on-surface font-body font-semibold">Today, 09:42 AM</p>
+                    </div>
+                </div>
+                <button
+                    class="w-full mt-8 py-3 rounded-xl border border-primary/20 text-primary font-bold text-xs uppercase tracking-widest hover:bg-primary/5 transition-all">
+                    Edit Profile
+                </button>
+            </div>
+        </div>
+        <!-- Product List - Luxury Style -->
+        <div>
+            <div class="flex justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-3xl font-extrabold font-headline text-white tracking-tight">Luxury Inventory</h2>
+                    <p class="text-on-surface-variant font-body mt-1">High-value product movements</p>
+                </div>
+                <a class="text-primary text-sm font-bold font-label flex items-center gap-2 group" href="#">
+                    View Full Catalog
+                    <span
+                        class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <!-- Product Card 1 -->
+                <div class="glass-panel rounded-full overflow-hidden group cursor-pointer">
+                    <div class="h-48 overflow-hidden">
+                        <img alt="Product"
+                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            data-alt="luxury minimalist wrist watch on charcoal grey background with dramatic lighting"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDh9ZPSq0pxfG_gJXNJcdPxcNag6HxXNBO6DJLzhEXgKylL6RWRXicKW--_4mx0cdqYk7TtH16oX5n2NtisdmcqD9WwxWiATKw1Ib4608tLAR-ORQtDOOXWMtYUQcxIL6LNfWRVAGKEbuO4sT1TYgGx9ytORN8h5V2y9I3K8L1zVzu0t7zNcC5kz6hxlrw9s5pynSdB3l3N2lR7D9ytMLiarGyhiCWXxFfYnt_D9h_3lgtEHHkfJ_jIis6pJIK9YQureDWQUx06ZtYq" />
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-2">
+                            <h5 class="text-white font-headline font-bold text-lg">Obsidian Chrono</h5>
+                            <span class="text-tertiary font-bold">$1,240</span>
+                        </div>
+                        <p class="text-on-surface-variant text-xs font-body mb-4">Limited Edition Volcanic Series</p>
+                        <div class="flex gap-2">
+                            <span
+                                class="bg-surface-container-highest px-3 py-1 rounded-full text-[10px] font-bold text-on-surface uppercase tracking-widest">In
+                                Stock</span>
+                            <span
+                                class="bg-primary/10 px-3 py-1 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest">New</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Product Card 2 -->
+                <div class="glass-panel rounded-full overflow-hidden group cursor-pointer">
+                    <div class="h-48 overflow-hidden">
+                        <img alt="Product"
+                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            data-alt="high-end minimalist audio equipment on matte black surface with purple neon highlights"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuChFxv6hqVaAeewhTS5mubUdy987OJHNV5N3VIb2gLOqrjB-vU0Z5GpPIE1D3Fo-lsySXFh-tQbm4WtzL8d8LD62jI85tB4Nrd9nk4u9O330YdtkLPDfhUwj9CNOiH_GnOJwEEPYeT-PuqCLpMKBahcEcrT6Gy4NhQh_VI0vTuMTjzbB3DWbvsthxBfJqX4u3HB-_77_6x0_P2HWOjugtzkpGyC3s2pa7vJwecPHybG38aQhyfjfvHXt6aFIfePf138pQeEv55ockK-" />
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-2">
+                            <h5 class="text-white font-headline font-bold text-lg">Sonic Flux X1</h5>
+                            <span class="text-tertiary font-bold">$890</span>
+                        </div>
+                        <p class="text-on-surface-variant text-xs font-body mb-4">Acoustic Precision Module</p>
+                        <div class="flex gap-2">
+                            <span
+                                class="bg-surface-container-highest px-3 py-1 rounded-full text-[10px] font-bold text-on-surface uppercase tracking-widest">Low
+                                Stock</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Product Card 3 -->
+                <div class="glass-panel rounded-full overflow-hidden group cursor-pointer">
+                    <div class="h-48 overflow-hidden">
+                        <img alt="Product"
+                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            data-alt="premium leather headphones on dark studio background with soft overhead glow"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTTinwijEa3J3fUM7HaBMPEmqcLFBKIhbCEwE043pRxpoA7Y5lI20WPa3FATnA9M9-Pgv40TzPNPiTClfA3G443wSaD6nHn9wKXSa7a_R3Ylhi8UKRJ2yGLVY6W0Qi1sC-zDzw20CDy2cgSRTRCuPc8Xx5OLvj2obmsdoafru_2NEUteXRSo9I3OFEae5uRuWuzlmCcXEdfEjooe7XyQmP3h4X-gduX-xLe8-rrX1NUNZbjBiPwTXAEV4nZZwnMbePr6rtJZpXk-0v" />
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-2">
+                            <h5 class="text-white font-headline font-bold text-lg">Nova Headphones</h5>
+                            <span class="text-tertiary font-bold">$450</span>
+                        </div>
+                        <p class="text-on-surface-variant text-xs font-body mb-4">Spatial Audio Experience</p>
+                        <div class="flex gap-2">
+                            <span
+                                class="bg-surface-container-highest px-3 py-1 rounded-full text-[10px] font-bold text-on-surface uppercase tracking-widest">In
+                                Stock</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Product Card 4 -->
+                <div class="glass-panel rounded-full overflow-hidden group cursor-pointer">
+                    <div class="h-48 overflow-hidden">
+                        <img alt="Product"
+                            class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            data-alt="vibrant red athletic shoe on dark reflective floor with professional lighting"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVq8cjeTpoTWtO-9vygJrmiBsbQlATTtPO71lgYZplLRrVMkvRmaUctN15zAXkEtVZdz_iAK-T_qQbplSz_n6BKF_8pkunNwfMXI1Rmg8g22OSQGV6RSude6jwJ3H34hqecd_36dywbKHHp_cAbkkTbcr7FSHE4tGrqN-0vixJMyxevM3FhPThPM2w_rryYvkw3-WehJ332fniYRUAU7ugeTsEccRk7eL6GbwHyMs1VlxmK383nuJmMJOzRaaRcEcrKGK6S4ugIicW" />
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-2">
+                            <h5 class="text-white font-headline font-bold text-lg">Velocity Pulse</h5>
+                            <span class="text-tertiary font-bold">$210</span>
+                        </div>
+                        <p class="text-on-surface-variant text-xs font-body mb-4">Elite Dynamic Performance</p>
+                        <div class="flex gap-2">
+                            <span
+                                class="bg-surface-container-highest px-3 py-1 rounded-full text-[10px] font-bold text-on-surface uppercase tracking-widest">Pre-Order</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>

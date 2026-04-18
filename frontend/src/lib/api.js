@@ -6,6 +6,8 @@ export const PUBLIC_API_BASE = `${API_BASE}/api/public`;
 export const ADMIN_API_BASE = `${API_BASE}/api/admin`;
 export const BUYER_API_BASE = `${API_BASE}/api/buyer`;
 export const MERCHANT_API_BASE = `${API_BASE}/api/merchant`;
+export const AFFILIATE_API_BASE = `${API_BASE}/api/affiliate`;
+
 
 export async function fetchJson(url, options = {}) {
   const token = localStorage.getItem('token');
