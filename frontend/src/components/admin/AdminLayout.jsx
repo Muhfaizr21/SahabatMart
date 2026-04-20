@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
+import { fetchJson, ADMIN_API_BASE } from '../../lib/api';
 
 // ─── DESIGN TOKENS ────────────────────────────────────
 const C = {
@@ -139,16 +140,26 @@ const AdminLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [openNotif, setOpenNotif] = useState(false);
+
+  // Close notif when click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (openNotif && !e.target.closest('.notif-wrapper')) {
+        setOpenNotif(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openNotif]);
 
   const fetchNotifs = async () => {
     try {
-      const res = await fetch('/api/admin/notifications', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setNotifs(data.data || []);
-        setUnreadCount((data.data || []).filter(n => !n.is_read).length);
+      const data = await fetchJson(`${ADMIN_API_BASE}/notifications`);
+      // data is already the array because fetchJson unwraps 'data' property
+      if (Array.isArray(data)) {
+        setNotifs(data);
+        setUnreadCount(data.filter(n => !n.is_read).length);
       }
     } catch (err) {
       console.error("Failed to fetch notifs", err);
@@ -316,26 +327,88 @@ const AdminLayout = () => {
 
           {/* Right */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Notification */}
-            <div style={{ position: 'relative', cursor: 'pointer' }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0',
-                background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-              }}>
+            {/* Notification Dropdown */}
+            <div style={{ position: 'relative' }} className="notif-wrapper">
+              <button
+                id="notif-bell"
+                onClick={() => setOpenNotif(!openNotif)}
+                style={{
+                  width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0',
+                  background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', position: 'relative'
+                }}
+              >
                 <i className="bx bx-bell" style={{ fontSize: 18, color: '#64748b' }} />
-              </div>
-              {unreadCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
-                  background: '#ef4444', borderRadius: 9,
-                  border: '2px solid #f8fafc',
-                  color: 'white', fontSize: 10, fontWeight: 900,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 4px'
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
+                    background: '#ef4444', borderRadius: 9,
+                    border: '2px solid #f8fafc', color: 'white', fontSize: 10, fontWeight: 900,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px'
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {openNotif && (
+                <div style={{
+                  position: 'absolute', top: 48, right: 0, width: 320,
+                  background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                  zIndex: 100, overflow: 'hidden'
                 }}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={async () => {
+                          try {
+                            await fetchJson(`${ADMIN_API_BASE}/notifications/read-all`, { method: 'POST' });
+                            fetchNotifs();
+                          } catch(e){}
+                        }}
+                        style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: 350, overflowY: 'auto' }}>
+                    {notifs.length === 0 ? (
+                      <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                        <i className="bx bx-bell-off" style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
+                        <span style={{ fontSize: 12 }}>No new notifications</span>
+                      </div>
+                    ) : (
+                      notifs.map(n => (
+                        <div 
+                          key={n.id}
+                          onClick={() => {
+                            setOpenNotif(false);
+                            navigate(n.link);
+                          }}
+                          style={{
+                            padding: '12px 16px', borderBottom: '1px solid #f8fafc',
+                            cursor: 'pointer', transition: 'all 0.1s',
+                            background: n.is_read ? 'transparent' : '#f5f7ff',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = n.is_read ? 'transparent' : '#f5f7ff'}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>{n.title}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4, marginBottom: 4 }}>{n.message}</div>
+                          <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>{new Date(n.created_at).toLocaleString()}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+                    <button style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      View all activities
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 

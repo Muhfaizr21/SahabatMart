@@ -8,7 +8,8 @@ export default function CategorySection() {
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/categories`)
     .then(d => {
-      if (d && d.data) setCats(d.data.slice(0, 5));
+      const data = Array.isArray(d) ? d : (d.data || []);
+      setCats(data.slice(0, 5));
     })
     .catch(() => setCats([]))
     .finally(() => setLoading(false));

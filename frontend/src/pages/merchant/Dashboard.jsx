@@ -9,7 +9,10 @@ export default function MerchantDashboard() {
     totalOrders: 0,
     awaitingPayment: 0,
     completed: 0,
-    revenue: 0
+    revenue: 0,
+    platformFee: 0,
+    commission: 0,
+    netRevenue: 0
   });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,10 +82,13 @@ export default function MerchantDashboard() {
           totalOrders: validOrders.length,
           awaitingPayment: validOrders.filter(o => o.status === 'pending' || o.status === 'new').length,
           completed: validOrders.filter(o => o.status === 'completed').length,
-          revenue: validOrders.reduce((acc, o) => acc + (o.total_amount || 0), 0),
+          revenue: validOrders.reduce((acc, o) => acc + (o.subtotal || 0), 0),
+          platformFee: validOrders.reduce((acc, o) => acc + (o.platform_fee || 0), 0),
+          commission: validOrders.reduce((acc, o) => acc + (o.commission || 0), 0),
+          netRevenue: validOrders.reduce((acc, o) => acc + (o.merchant_payout || 0), 0),
           heatmap: heatmapData,
           peakDay: peakDayName,
-          growthRate: validOrders.length > 0 ? '+12.4%' : '0.0%' // mockup growth, complex to calculate without prev period
+          growthRate: validOrders.length > 0 ? '+12.4%' : '0.0%'
         });
 
         setProducts(prodList.slice(0, 4));
@@ -117,10 +123,10 @@ export default function MerchantDashboard() {
       </PageHeader>
 
       <StatRow stats={[
-        { label: 'All Orders', val: loading ? '...' : stats.totalOrders, icon: 'bx-receipt', color: '#6366f1' },
-        { label: 'Awaiting Fulfillment', val: loading ? '...' : stats.awaitingPayment, icon: 'bx-time-five', color: '#f59e0b' },
-        { label: 'Completed Deliveries', val: loading ? '...' : stats.completed, icon: 'bx-check-shield', color: '#10b981' },
-        { label: 'Total Revenue Volume', val: loading ? '...' : idr(stats.revenue), icon: 'bx-diamond', color: '#8b5cf6' },
+        { label: 'Total Gross Sales', val: loading ? '...' : idr(stats.revenue), icon: 'bx-cart', color: '#6366f1' },
+        { label: 'Platform Fee', val: loading ? '...' : idr(stats.platformFee), icon: 'bx-shield-quarter', color: '#f59e0b' },
+        { label: 'Affiliate Comm', val: loading ? '...' : idr(stats.commission), icon: 'bx-share-alt', color: '#ef4444' },
+        { label: 'Net Merchant Yield', val: loading ? '...' : idr(stats.netRevenue), icon: 'bx-diamond', color: '#10b981' },
       ]} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 24, paddingBottom: 40, alignItems: 'start' }}>

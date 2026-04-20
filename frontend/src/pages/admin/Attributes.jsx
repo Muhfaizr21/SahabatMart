@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { A } from '../../lib/adminStyles';
 
 const API = ADMIN_API_BASE;
 
@@ -75,179 +77,153 @@ const AdminAttributes = () => {
       .catch(err => alert("Gagal: " + err.message));
   };
 
+  const getTypeIcon = (type) => {
+    switch(type) {
+      case 'color': return 'bx-palette';
+      case 'checkbox': return 'bx-check-square';
+      default: return 'bx-list-ul';
+    }
+  };
+
   return (
-    <div className="fade-in pb-5">
-      {/* Premium Header */}
-      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-5 bg-white p-4 rounded-4 shadow-sm border border-light gap-3">
-        <div className="d-flex align-items-center gap-3">
-          <div className="w-12 h-12 rounded-3 bg-primary text-white d-flex align-items-center justify-content-center shadow-lg">
-             <i className="bx bx-slider-alt fs-3" />
+    <div style={{ padding: '0 20px 40px' }} className="fade-in">
+      {/* Header Section */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b', marginBottom: 6 }}>
+            <Link to="/admin" style={{ color: 'inherit', textDecoration: 'none' }}>Dashboard</Link>
+            <i className="bx bx-chevron-right" />
+            <span style={{ fontWeight: 600, color: '#1e293b' }}>Global Attributes</span>
           </div>
-          <div>
-            <h4 className="fw-black text-dark mb-0 tracking-tight">Master Atribut</h4>
-            <p className="text-secondary small mb-0 font-medium">Global specifications management system.</p>
-          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
+             Platform Specifications
+          </h2>
         </div>
         <button 
-          className="btn btn-dark px-4 py-2.5 rounded-3 fw-black d-flex align-items-center gap-2 shadow-sm transform transition-all hover:scale-105" 
           onClick={() => openForm()}
+          style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: '#4361ee', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(67, 97, 238, 0.25)', display: 'flex', alignItems: 'center', gap: 8 }}
         >
-          <i className="bx bx-plus-circle fs-5" /> Tambah Atribut
+          <i className="bx bx-plus-circle fs-5" /> Define New Attribute
         </button>
       </div>
 
-      {/* Modern Data Management Area */}
-      <div className="bg-white rounded-4 shadow-sm border border-light overflow-hidden">
-        <div className="p-4 bg-light/30 border-bottom border-light flex items-center justify-between">
-            <h6 className="mb-0 fw-black text-secondary uppercase tracking-widest" style={{ fontSize: 10 }}>Active Variations Inventory</h6>
-            <div className="badge bg-primary-subtle text-primary rounded-pill px-3 py-1.5 fw-bold">{attrs.length} Total Atribut</div>
+      {loading ? (
+        <div style={{ padding: 100, textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '4px solid #f3f3f3', borderTop: '4px solid #4361ee', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
-        
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead>
-              <tr className="bg-light/30">
-                <th className="ps-4 py-3 text-uppercase small fw-black text-muted-foreground tracking-tighter" style={{ fontSize: 11 }}>Details</th>
-                <th className="py-3 text-uppercase small fw-black text-muted-foreground tracking-tighter" style={{ fontSize: 11 }}>Input Logic</th>
-                <th className="py-3 text-uppercase small fw-black text-muted-foreground tracking-tighter" style={{ fontSize: 11 }}>Selection Values</th>
-                <th className="pe-4 py-3 text-uppercase small fw-black text-muted-foreground tracking-tighter text-end" style={{ fontSize: 11 }}>Control</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="text-center py-5 border-0"><div className="spinner-border text-primary opacity-50" /></td></tr>
-              ) : attrs.length === 0 ? (
-                <tr>
-                   <td colSpan={4} className="text-center py-20 border-0">
-                      <div className="opacity-20 fs-1 mb-3">🧺</div>
-                      <h6 className="fw-black text-muted">Belum ada atribut global.</h6>
-                      <p className="text-secondary small">Klik tombol di atas untuk membuat variasi pertama Anda.</p>
-                   </td>
-                </tr>
-              ) : attrs.map(a => (
-                <tr key={a.id} className="group hover:bg-slate-50/50 transition-colors">
-                  <td className="ps-4 py-4">
-                    <div className="fw-black text-dark mb-1">{a.name}</div>
-                    <div className="font-mono text-muted uppercase" style={{ fontSize: 10 }}>ID Reference: <span className="text-primary fw-bold">#{a.id}</span></div>
-                  </td>
-                  <td>
-                    <div className={`d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-pill fw-black uppercase tracking-tighter shadow-sm border ${
-                      a.type === 'color' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                      a.type === 'checkbox' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                      'bg-indigo-50 text-indigo-600 border-indigo-100'
-                    }`} style={{ fontSize: 9 }}>
-                        <i className={`bx ${a.type === 'color' ? 'bx-palette' : a.type === 'checkbox' ? 'bx-check-square' : 'bx-chevron-down-circle'}`} />
-                        {a.type}
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 20 }}>
+          {attrs.length === 0 ? (
+             <div style={{ gridColumn: '1/-1', ...A.card, padding: '100px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                <i className="bx bx-slider-alt" style={{ fontSize: 48, marginBottom: 15, opacity: 0.3 }} />
+                <h5 style={{ fontWeight: 700, color: '#64748b' }}>No Attributes Found</h5>
+                <p style={{ fontSize: 13 }}>Click the button above to start defining product specifications.</p>
+             </div>
+          ) : attrs.map(a => (
+            <div key={a.id} style={{ ...A.card, padding: 0, overflow: 'hidden' }}>
+               <div style={{ padding: '20px 20px 15px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 10, background: '#f5f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4361ee' }}>
+                      <i className={`bx ${getTypeIcon(a.type)} fs-4`} />
                     </div>
-                  </td>
-                  <td>
-                    <div className="d-flex flex-wrap gap-2 py-2 max-w-md">
-                      {a.values.map((v, i) => (
-                        <span key={i} className="px-2 py-1 bg-white border border-light rounded-2 small text-dark fw-bold shadow-sm" style={{ fontSize: 11 }}>{v}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="pe-4 text-end">
-                    <div className="d-flex justify-content-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="btn btn-outline-warning btn-sm rounded-3 px-3 py-1.5 border-dashed" onClick={() => openForm(a)}>
-                        <i className="bx bx-edit-alt" />
-                      </button>
-                      <button className="btn btn-outline-danger btn-sm rounded-3 px-3 py-1.5 border-dashed" onClick={() => deleteAttr(a.id)}>
-                        <i className="bx bx-trash" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* MONSTER MODAL - REDESIGNED */}
-      {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(2, 6, 23, 0.75)', backdropFilter: 'blur(12px)', zIndex: 9999 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-[2rem] shadow-2xl overflow-hidden transform animate-in zoom-in duration-300">
-              <div className="modal-header border-0 bg-slate-50 px-5 py-4 flex items-center justify-between">
-                <div className="d-flex align-items-center gap-3">
-                   <div className="w-10 h-10 rounded-2 bg-white shadow-sm d-flex align-items-center justify-center text-primary border border-light">
-                      <i className="bx bx-layer fs-4" />
-                   </div>
-                   <h5 className="modal-title fw-black text-dark tracking-tighter">
-                     {formData.id ? 'Modify Attribute' : 'New Configuration'}
-                   </h5>
-                </div>
-                <button type="button" className="btn-close shadow-none" onClick={() => setShowModal(false)} />
-              </div>
-              <div className="modal-body p-5 bg-white">
-                <form onSubmit={handleSubmit}>
-                  <div className="mb-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Friendly Property Name</label>
-                    <input 
-                      type="text" 
-                      className="form-control form-control-lg border-2 rounded-3 fw-bold bg-light/50 focus:bg-white transition-all text-sm h-14" 
-                      placeholder="e.g. Storage Capacity, Fabric Type" 
-                      value={formData.name} 
-                      onChange={e => setFormData({...formData, name: e.target.value})} 
-                      required 
-                    />
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Interaction Method</label>
-                    <div className="grid grid-cols-3 gap-3">
-                        {[
-                            { id: 'dropdown', label: 'Dropdown', icon: 'bx-list-ul' },
-                            { id: 'checkbox', label: 'Multi Chk', icon: 'bx-checkbox-checked' },
-                            { id: 'color', label: 'Colors', icon: 'bx-palette' }
-                        ].map(type => (
-                            <button 
-                                key={type.id}
-                                type="button"
-                                onClick={() => setFormData({...formData, type: type.id})}
-                                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border-2 transition-all ${
-                                    formData.type === type.id ? 'border-primary bg-primary/5 text-primary' : 'border-gray-50 text-gray-400 hover:border-gray-200'
-                                }`}
-                            >
-                                <i className={`bx ${type.icon} text-xl`} />
-                                <span className="text-[9px] font-black uppercase tracking-tighter">{type.label}</span>
-                            </button>
-                        ))}
+                    <div>
+                      <h6 style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', margin: 0 }}>{a.name}</h6>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type: {a.type}</span>
                     </div>
                   </div>
-
-                  <div className="mb-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Value Options Collection</label>
-                    <div className="p-3 border-2 border-dashed rounded-3 bg-slate-50/50 flex flex-wrap gap-2 align-items-center min-h-24">
-                      {formData.values.map((v, i) => (
-                        <div key={i} className="bg-white border text-dark font-bold px-3 py-2 rounded-xl text-xs d-flex align-items-center gap-2 shadow-sm animate-in slide-in-from-left">
-                          {v} 
-                          <button type="button" className="border-0 bg-transparent text-gray-300 hover:text-danger p-0 leading-none" onClick={() => removeTag(i)}>
-                             <i className="bx bx-x text-base" />
-                          </button>
-                        </div>
-                      ))}
-                      <input 
-                        className="bg-transparent border-0 flex-grow-1 p-2 outline-none text-sm fw-bold text-dark" 
-                        placeholder={formData.values.length === 0 ? "Type & Hit Enter..." : "Add more..."}
-                        value={tagInput}
-                        onChange={e => setTagInput(e.target.value)}
-                        onKeyDown={handleAddTag}
-                        style={{ outline: 'none' }}
-                      />
-                    </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => openForm(a)} style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: '#ecf0ff', color: '#4361ee', cursor: 'pointer' }}><i className="bx bx-edit-alt" /></button>
+                    <button onClick={() => deleteAttr(a.id)} style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: '#fff1f2', color: '#ef4444', cursor: 'pointer' }}><i className="bx bx-trash" /></button>
                   </div>
-
-                  <div className="d-flex gap-3 mt-8">
-                    <button type="button" className="btn btn-light flex-1 py-3 rounded-2xl fw-black text-secondary uppercase tracking-tighter" onClick={() => setShowModal(false)}>Cancel</button>
-                    <button type="submit" className="btn btn-primary flex-1 py-3 rounded-2xl fw-black shadow-lg shadow-primary/20 uppercase tracking-tighter" disabled={saving}>
-                      {saving ? <span className="spinner-border spinner-border-sm" /> : <span>Confirm & Save</span>}
-                    </button>
+               </div>
+               <div style={{ padding: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.02em' }}>Available Values ({a.values.length})</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {a.values.map((v, i) => (
+                      <span key={i} style={{ padding: '4px 10px', borderRadius: 6, background: '#fff', border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 600, color: '#475569', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>{v}</span>
+                    ))}
                   </div>
-                </form>
-              </div>
+               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modern Modal */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ width: '100%', maxWidth: 450, background: '#fff', borderRadius: 20, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', overflow: 'hidden' }} className="zoom-in">
+            <div style={{ padding: '25px 30px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h5 style={{ fontWeight: 800, color: '#0f172a', margin: 0 }}>{formData.id ? 'Modify Attribute' : 'New Attribute'}</h5>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 24, cursor: 'pointer' }}><i className="bx bx-x" /></button>
+            </div>
+            
+            <form onSubmit={handleSubmit} style={{ padding: 30 }}>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>Property Name</label>
+                <input 
+                  type="text" 
+                  value={formData.name} 
+                  onChange={e => setFormData({...formData, name: e.target.value})} 
+                  placeholder="e.g. Size, Material, Storage"
+                  required 
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>U.I. Interaction</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  {[
+                    { id: 'dropdown', label: 'Dropdown', icon: 'bx-list-ul' },
+                    { id: 'checkbox', label: 'Multi Chk', icon: 'bx-checkbox-checked' },
+                    { id: 'color', label: 'Color Chip', icon: 'bx-palette' }
+                  ].map(t => (
+                    <button 
+                      key={t.id} type="button" onClick={() => setFormData({...formData, type: t.id})}
+                      style={{ 
+                        padding: '12px 6px', borderRadius: 12, border: `2px solid ${formData.type === t.id ? '#4361ee' : '#f1f5f9'}`,
+                        background: formData.type === t.id ? '#edf0ff' : '#fff', color: formData.type === t.id ? '#4361ee' : '#64748b',
+                        cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4
+                      }}
+                    >
+                      <i className={`bx ${t.icon} fs-4`} />
+                      <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 25 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>Options Values</label>
+                <div style={{ 
+                  width: '100%', minHeight: 100, padding: 12, borderRadius: 12, border: '2px dashed #f1f5f9', background: '#f8fafc',
+                  display: 'flex', flexWrap: 'wrap', gap: 6, alignContent: 'flex-start'
+                }}>
+                  {formData.values.map((v, i) => (
+                    <div key={i} style={{ padding: '6px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#1e293b', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                      {v}
+                      <i className="bx bx-x" style={{ cursor: 'pointer', color: '#94a3b8' }} onClick={() => removeTag(i)} />
+                    </div>
+                  ))}
+                  <input 
+                    style={{ border: 'none', background: 'transparent', outline: 'none', padding: 6, fontSize: 13, flex: 1, minWidth: 100, fontWeight: 600 }}
+                    placeholder={formData.values.length === 0 ? "Type & Hit Enter..." : "Add more..."}
+                    value={tagInput}
+                    onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={saving} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: '#4361ee', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(67, 97, 238, 0.25)' }}>
+                  {saving ? 'Syncing...' : 'Save Configuration'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

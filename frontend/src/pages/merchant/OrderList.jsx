@@ -14,7 +14,7 @@ export default function MerchantOrders() {
     setLoading(true);
     try {
       const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}`);
-      setOrders(data.data || []);
+      setOrders(Array.isArray(data) ? data : (data.data || []));
     } catch (err) {
       console.error('Failed to load orders:', err);
     } finally {
@@ -122,6 +122,24 @@ export default function MerchantOrders() {
                        </div>
                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                          <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{item.product_name}</div>
+                         
+                         {/* GLOBAL ATTRIBUTES METADATA */}
+                         {(() => {
+                              try {
+                                 const meta = JSON.parse(item.metadata || '{}');
+                                 if (Object.keys(meta).length === 0) return null;
+                                 return (
+                                    <div style={{display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap'}}>
+                                       {Object.entries(meta).map(([k, v]) => (
+                                          <span key={k} style={{padding: '1px 5px', background: '#fff', borderRadius: 4, fontSize: 8, fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'}}>
+                                             {k}: {v}
+                                          </span>
+                                       ))}
+                                    </div>
+                                 );
+                              } catch(e) { return null; }
+                          })()}
+
                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{item.variant_name || 'Original Edition'}</div>
                          <div style={{ fontSize: 12, fontWeight: 800, color: '#4f46e5', marginTop: 6 }}>Qty: {item.quantity} × {idr(item.unit_price)}</div>
                        </div>

@@ -2,6 +2,7 @@ package services
 
 import (
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/utils"
 	"gorm.io/gorm"
 	"time"
 )
@@ -26,8 +27,20 @@ func (ns *NotificationService) Push(receiverID, receiverType, notifType, title, 
 		IsRead:       false,
 		CreatedAt:    time.Now(),
 	}
-	return ns.DB.Create(&notif).Error
+	if err := ns.DB.Create(&notif).Error; err != nil {
+		return err
+	}
+
+	// Real-time broadcast via SSE
+	utils.Hub.Broadcast(receiverID, map[string]interface{}{
+		"type":    "notification",
+		"data":    notif,
+		"trigger": "new_notif",
+	})
+
+	return nil
 }
+
 
 // GetNotifications mengambil list notifikasi untuk receiver tertentu
 func (ns *NotificationService) GetNotifications(receiverID, receiverType string, limit int) ([]models.Notification, error) {

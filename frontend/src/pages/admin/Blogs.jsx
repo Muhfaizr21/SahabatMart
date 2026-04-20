@@ -13,7 +13,7 @@ export default function AdminBlogs() {
   const loadBlogs = () => {
     setLoading(true);
     fetchJson(API + '/blogs')
-      .then(d => setBlogs(d.data || []))
+      .then(d => setBlogs(d || []))
       .finally(() => setLoading(false));
   };
 

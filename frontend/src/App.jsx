@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
@@ -8,6 +9,7 @@ import PromoBanner from './components/PromoBanner';
 import VoucherSection from './components/VoucherSection';
 import Footer from './components/Footer';
 import { getStoredUser, isAdminUser } from './lib/auth';
+import { captureAffiliate } from './lib/api';
 
 // ── Protected Route Wrapper ─────────
 function ProtectedRoute({ children }) {
@@ -143,8 +145,16 @@ import AffiliateCommissions from './pages/affiliate/Commissions';
 import AffiliateWithdrawals from './pages/affiliate/Withdrawals';
 import AffiliateSettings from './pages/affiliate/Settings';
 
-import { useEffect } from 'react';
-import { captureAffiliate } from './lib/api';
+// ── Scroll To Top on Route Change ─────────
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 
 // ── App Root ─────────────────────
 export default function App() {
@@ -155,6 +165,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <div className="min-h-screen bg-white">
         <NavbarManager />
         <Routes>
@@ -184,7 +195,7 @@ export default function App() {
             <Route path="products/edit" element={<AdminEditProduct />} />
             <Route path="categories" element={<AdminCategories />} />
             <Route path="orders" element={<AdminOrders />} />
-            <Route path="orders/detail" element={<AdminOrderDetail />} />
+            <Route path="orders/detail/:id" element={<AdminOrderDetail />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="affiliates" element={<AdminAffiliates />} />
             <Route path="merchants" element={<AdminMerchants />} />

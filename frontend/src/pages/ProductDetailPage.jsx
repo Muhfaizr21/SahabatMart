@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PUBLIC_API_BASE, BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
 import { isAuthenticated } from '../lib/auth';
+import { ShoppingBag } from 'lucide-react';
+import ReviewSection from '../components/ReviewSection';
 
 function StarRating({ rating, size = 16 }) {
   return (
@@ -17,10 +19,7 @@ function StarRating({ rating, size = 16 }) {
 
 const tabs = ['Deskripsi', 'Informasi Tambahan', 'Ulasan'];
 
-const reviewsData = [
-  { id: 1, name: 'Ahmad Fauzi', rating: 5, date: '15 Mar 2024', comment: 'Produk sangat bagus, sesuai deskripsi. Pengiriman cepat dan packaging aman. Sangat merekomendasikan seller ini!' },
-  { id: 2, name: 'Siti Rahma', rating: 4, date: '10 Mar 2024', comment: 'Kualitas produk memuaskan, harga terjangkau. Hanya saja pengirimannya agak lama, tapi overall puas.' },
-];
+
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -32,17 +31,56 @@ export default function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState('Deskripsi');
   const [addedToCart, setAddedToCart] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedAttributes, setSelectedAttributes] = useState({}); // Track user selections
+
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+
+  // ── AFFILIATE TRACKING SYNC ───────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref && id) {
+      fetchJson(`${PUBLIC_API_BASE}/affiliate/track?ref=${ref}&product_id=${id}`)
+        .then(res => {
+          if (res && res.affiliate_id) {
+            localStorage.setItem('affiliate_id', res.affiliate_id);
+            console.log('Affiliate tracked:', res.affiliate_id);
+          }
+        })
+        .catch(err => console.error('Tracking failed:', err));
+    }
+  }, [id]);
 
   useEffect(() => {
     let cancelled = false;
     const loadProduct = async () => {
       try {
         const d = await fetchJson(`${PUBLIC_API_BASE}/products/detail?id=${id}`);
-        if (d && d.data) {
+        // fetchJson unwrap means d is likely the object itself, but might be {data: {...}}
+        const productData = d.data || d;
+        
+        if (productData && productData.id) {
           if (cancelled) return;
-          setProduct(d.data);
+          setProduct(productData);
+          
+          // Initial Attribute Selection (Default to first value of each)
+          try {
+             const attrs = JSON.parse(productData.attributes || '{}');
+             const initial = {};
+             Object.entries(attrs).forEach(([k, v]) => {
+                if (Array.isArray(v) && v.length > 0) initial[k] = v[0];
+             });
+             setSelectedAttributes(initial);
+          } catch(e){}
+
+          if (productData.variants && productData.variants.length > 0) {
+            setSelectedVariant(productData.variants[0]);
+          }
           const pd = await fetchJson(`${PUBLIC_API_BASE}/products`);
-          const filtered = (pd.data || []).filter(p => String(p.id) !== String(d.data.id) && p.category === d.data.category).slice(0, 4);
+          const productList = Array.isArray(pd) ? pd : (pd.data || []);
+          const filtered = productList.filter(p => String(p.id) !== String(productData.id) && p.category === productData.category).slice(0, 4);
           setRelated(filtered);
         }
       } catch (err) {
@@ -62,26 +100,34 @@ export default function ProductDetailPage() {
       return;
     }
 
+    if (product.variants && product.variants.length > 0 && !selectedVariant) {
+      alert('Silakan pilih varian produk terlebih dahulu.');
+      return;
+    }
+
     setAddedToCart(true);
     try {
       await fetchJson(`${BUYER_API_BASE}/cart/add`, {
         method: 'POST',
         body: JSON.stringify({
           product_id: product.id,
-          product_variant_id: product.id, // Using product ID as default variant
-          quantity: qty
+          product_variant_id: selectedVariant ? selectedVariant.id : product.id,
+          quantity: qty,
+          metadata: JSON.stringify(selectedAttributes) // Send selected attributes as metadata
         })
       });
+      window.dispatchEvent(new Event('cartUpdate'));
       alert('Berhasil ditambahkan ke keranjang!');
-      window.location.reload(); 
     } catch (err) {
       alert('Gagal: ' + err.message);
       setAddedToCart(false);
     }
   };
 
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const user = isAuthenticated() ? JSON.parse(localStorage.getItem('user')) : null;
+  const isAffiliate = user && user.role === 'affiliate';
+  const refCode = user?.affiliate_ref_code || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -135,19 +181,19 @@ export default function ProductDetailPage() {
 
   return (
     <main className="bg-gray-50/30 min-h-screen pb-20">
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:py-12 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
           
           {/* Visual Gallery Partition */}
-          <div className="sticky top-24">
-            <div className="bg-white rounded-[2.5rem] overflow-hidden aspect-square border-8 border-white shadow-2xl shadow-gray-200/50 group relative">
+          <div className="lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24">
+            <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden aspect-square sm:aspect-[4/5] lg:aspect-square border-4 sm:border-8 border-white shadow-2xl shadow-gray-200/50 group relative">
               <img 
-                src={formatImage(selectedImage || product.image) || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80'} 
+                src={formatImage(selectedImage || product.image)} 
                 alt={product.name} 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
               />
-              <div className="absolute top-6 left-6">
-                <span className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">Premium Quality</span>
+              <div className="absolute top-4 left-4 sm:top-6 sm:left-6">
+                <span className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-3 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg">Premium Quality</span>
               </div>
             </div>
 
@@ -158,12 +204,12 @@ export default function ProductDetailPage() {
                    const all = [product.image, ...gallery].filter(x => x);
                    if (all.length <= 1) return null;
                    return (
-                      <div className="flex gap-4 mt-8 overflow-x-auto pb-4 scrollbar-hide">
+                      <div className="flex gap-3 sm:gap-4 mt-6 sm:mt-8 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
                          {all.map((img, idx) => (
                             <button 
                                key={idx} 
                                onClick={() => setSelectedImage(img)}
-                               className={`w-20 h-20 rounded-2xl overflow-hidden border-4 transition-all flex-shrink-0 ${ (selectedImage === img || (!selectedImage && idx === 0)) ? 'border-blue-600 scale-105 shadow-lg' : 'border-white hover:border-gray-200'}`}
+                               className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden border-2 sm:border-4 transition-all flex-shrink-0 ${ (selectedImage === img || (!selectedImage && idx === 0)) ? 'border-blue-600 scale-105 shadow-lg' : 'border-white hover:border-gray-200'}`}
                             >
                                <img src={formatImage(img)} className="w-full h-full object-cover" alt="" />
                             </button>
@@ -175,34 +221,92 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Configuration & Detail Partition */}
-          <div className="flex flex-col pt-4">
-            <nav className="flex items-center gap-3 text-[10px] font-black text-blue-600 uppercase tracking-widest mb-6">
+          <div className="lg:col-span-6 xl:col-span-5 flex flex-col pt-4 sm:pt-0">
+            <nav className="flex items-center gap-2 sm:gap-3 text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4 sm:mb-6">
               <Link to="/" className="hover:opacity-70 transition-opacity">Marketplace</Link> 
               <span className="text-gray-300">/</span> 
               <Link to="/shop" className="hover:opacity-70 transition-opacity">{product.category}</Link>
             </nav>
             
-            <h1 className="text-4xl md:text-5xl font-black text-gray-900 leading-[1.1] mb-6">{product.name}</h1>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 leading-tight mb-4 sm:mb-6">{product.name}</h1>
             
-            <div className="flex items-center gap-6 mb-8 bg-white/50 w-fit p-2 rounded-2xl border border-white">
+            <div className="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8 bg-white/50 w-fit p-2 rounded-2xl border border-white backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <StarRating rating={product.rating || 4.5} size={20} />
-                <span className="text-sm font-black text-gray-900">{(product.rating || 4.5).toFixed(1)}</span>
+                <StarRating rating={product.rating || 4.5} size={18} />
+                <span className="text-xs sm:text-sm font-black text-gray-900">{(product.rating || 4.5).toFixed(1)}</span>
               </div>
               <div className="w-px h-4 bg-gray-200"></div>
-              <span className="text-sm font-bold text-gray-400">Sold {product.sold || '2.4k'}+</span>
+              <span className="text-xs sm:text-sm font-bold text-gray-400">Sold {product.sold || '2.4k'}+</span>
             </div>
 
-            <div className="flex items-baseline gap-4 mb-10">
-              <div className="text-5xl font-black text-blue-600">
-                Rp{(product.price || 0).toLocaleString('id-ID')}
+            <div className="flex items-baseline gap-4 mb-2">
+              <div className="text-4xl sm:text-5xl font-black text-blue-600">
+                Rp{(selectedVariant ? selectedVariant.price : product.price || 0).toLocaleString('id-ID')}
               </div>
               {product.old_price > 0 && (
-                <div className="text-xl text-gray-300 line-through font-bold">
+                <div className="text-lg sm:text-xl text-gray-300 line-through font-bold">
                    Rp{product.old_price.toLocaleString('id-ID')}
                 </div>
               )}
             </div>
+            
+            <div className="text-sm font-bold text-gray-400 mb-10 flex items-center gap-2">
+               <i className="bx bx-package"></i> Stock: {selectedVariant ? selectedVariant.stock : product.stock} pcs
+            </div>
+
+            {/* GLOBAL ATTRIBUTES SELECTOR (Dynamic from Super Admin) */}
+            {(() => {
+                try {
+                  const attrs = JSON.parse(product.attributes || '{}');
+                  if (Object.keys(attrs).length === 0) return null;
+                  return (
+                    <div className="mb-8 flex flex-col gap-6">
+                      {Object.entries(attrs).map(([key, vals]) => (
+                        <div key={key}>
+                          <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">{key}</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {vals.map(v => (
+                              <button 
+                                key={v}
+                                onClick={() => setSelectedAttributes(prev => ({ ...prev, [key]: v }))}
+                                className={`px-4 py-2 rounded-xl border-2 text-xs font-black transition-all ${
+                                  selectedAttributes[key] === v 
+                                    ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md' 
+                                    : 'border-gray-100 bg-white text-gray-400 hover:border-gray-300'
+                                }`}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                } catch(e) { return null; }
+            })()}
+
+            {/* Variants Selector */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="mb-10">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Pilih Varian</h4>
+                <div className="flex flex-wrap gap-3">
+                  {product.variants.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVariant(v)}
+                      className={`px-5 py-3 rounded-xl border-2 transition-all text-sm font-black ${
+                        selectedVariant?.id === v.id
+                          ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-lg shadow-blue-100'
+                          : 'border-gray-100 bg-white text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl shadow-gray-200/20 mb-10 overflow-hidden relative group">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -223,45 +327,75 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch gap-4">
-              <div className="flex items-center bg-white border border-gray-100 rounded-[1.25rem] p-1.5 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-6 sm:mt-10">
+              <div className="flex items-center justify-between bg-white/50 backdrop-blur-sm border border-white rounded-[1.25rem] p-1.5 shadow-sm sm:w-fit">
                 <button 
-                    onClick={() => qty > 1 && setQty(qty-1)} 
-                    className="w-12 h-12 flex items-center justify-center rounded-xl hover:bg-gray-50 transition-all font-black text-xl text-gray-400 hover:text-gray-900"
-                >
-                    −
-                </button>
-                <span className="w-12 text-center font-black text-xl text-gray-900">{qty}</span>
+                  onClick={() => qty > 1 && setQty(qty-1)} 
+                  className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl hover:bg-white transition-all font-black text-xl text-gray-400 hover:text-gray-900"
+                >-</button>
+                <span className="px-4 text-center font-black text-lg sm:text-xl text-gray-900">{qty}</span>
                 <button 
-                    onClick={() => setQty(qty+1)} 
-                    className="w-12 h-12 flex items-center justify-center rounded-xl hover:bg-gray-50 transition-all font-black text-xl text-gray-400 hover:text-gray-900"
-                >
-                    +
-                </button>
+                  onClick={() => setQty(qty+1)} 
+                  className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-xl hover:bg-white transition-all font-black text-xl text-gray-400 hover:text-gray-900"
+                >+</button>
               </div>
               
-              <button 
-                onClick={handleAddToCart}
-                disabled={addedToCart}
-                className="flex-1 bg-gray-900 hover:bg-blue-600 disabled:bg-gray-300 text-white font-black px-10 rounded-[1.25rem] shadow-2xl shadow-gray-200 transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02] active:scale-95"
-              >
-                <i className="bx bx-shopping-bag text-xl" />
-                {addedToCart ? 'Product Added!' : 'Add to Bag'}
-              </button>
+              <div className="flex gap-3 flex-1">
+                <button 
+                  onClick={handleAddToCart}
+                  disabled={addedToCart}
+                  className="flex-1 h-14 sm:h-16 bg-gray-900 hover:bg-blue-600 disabled:bg-gray-300 text-white font-black px-6 sm:px-10 rounded-[1.25rem] shadow-2xl shadow-gray-200/50 transition-all flex items-center justify-center gap-3 active:scale-95"
+                >
+                  <ShoppingBag size={20} />
+                  <span className="text-sm sm:text-base uppercase tracking-widest">{addedToCart ? 'Product Added!' : 'Add to Bag'}</span>
+                </button>
 
-              {/* Wishlist Toggle Button */}
-              <button 
-                onClick={toggleWishlist}
-                disabled={wishlistLoading}
-                className={`w-14 h-14 flex items-center justify-center rounded-[1.25rem] border transition-all ${isWishlisted ? 'bg-red-50 border-red-100 text-red-500 shadow-lg shadow-red-100' : 'bg-white border-gray-100 text-gray-400 hover:text-red-500 hover:bg-gray-50'}`}
-              >
-                 {wishlistLoading ? (
-                   <i className="bx bx-loader-alt animate-spin text-xl" />
-                 ) : (
-                   <svg width="24" height="24" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                 )}
-              </button>
+                <button 
+                  onClick={toggleWishlist}
+                  disabled={wishlistLoading}
+                  className={`w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center rounded-[1.25rem] border-2 transition-all flex-shrink-0 ${isWishlisted ? 'bg-red-50 border-red-100 text-red-500 shadow-lg shadow-red-100' : 'bg-white border-white text-gray-400 hover:text-red-500 hover:bg-gray-50'}`}
+                >
+                   {wishlistLoading ? (
+                     <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                   ) : (
+                     <svg width="24" height="24" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                   )}
+                </button>
+              </div>
             </div>
+
+            {/* Affiliate Share Section - Premium Magic UI */}
+            {isAffiliate && refCode && (
+              <div className="mt-8 p-6 rounded-[2rem] bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 relative overflow-hidden group">
+                <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Affiliate Partner Program</span>
+                  </div>
+                  <h4 className="font-black text-gray-900 mb-1">Dapatkan Komisi dari Produk Ini!</h4>
+                  <p className="text-xs text-slate-500 mb-4 leading-relaxed">Bagikan link khusus Anda dan dapatkan komisi hingga {(product.commission_rate * 100) || 5}% untuk setiap pembelian.</p>
+                  
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        const url = `${window.location.origin}${window.location.pathname}?ref=${refCode}`;
+                        navigator.clipboard.writeText(url);
+                        setCopying(true);
+                        setTimeout(() => setCopying(false), 2000);
+                      }}
+                      className="flex-1 bg-white border border-indigo-200 text-indigo-600 font-black text-xs py-3 px-4 rounded-xl shadow-sm hover:shadow-md hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                    >
+                      {copying ? (
+                        <><i className="bx bx-check text-lg" /> Berhasil Disalin!</>
+                      ) : (
+                        <><i className="bx bx-copy-alt text-lg" /> Salin Link Affiliate</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -317,25 +451,7 @@ export default function ProductDetailPage() {
                  ))}
                </div>
              )}
-             {activeTab === 'Ulasan' && (
-               <div className="space-y-8">
-                 {reviewsData.map(r => (
-                   <div key={r.id} className="bg-white p-8 rounded-3xl border border-gray-50 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center font-black text-blue-600">{r.name.charAt(0)}</div>
-                            <div>
-                                <div className="font-black text-gray-900">{r.name}</div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase">{r.date}</div>
-                            </div>
-                        </div>
-                        <StarRating rating={r.rating} size={14} />
-                      </div>
-                      <p className="text-gray-500 leading-relaxed italic">"{r.comment}"</p>
-                   </div>
-                 ))}
-               </div>
-             )}
+              {activeTab === "Ulasan" && <ReviewSection productID={product.id} />}
            </div>
         </div>
       </div>

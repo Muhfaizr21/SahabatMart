@@ -125,9 +125,9 @@ export default function AdminDashboard() {
       fetchJson(API + '/finance/monthly'),
     ]).then(([ov, mo]) => {
       setOverview(ov);
-      setMonthly(mo.data || []);
-    }).catch(console.error)
-      .finally(() => setLoading(false));
+      const data = Array.isArray(mo) ? mo : (mo.data || []);
+      setMonthly(data);
+    }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadData(); }, []);

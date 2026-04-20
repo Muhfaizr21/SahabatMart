@@ -42,6 +42,10 @@ type UserProfile struct {
 	Gender      *string   `gorm:"type:gender_type" json:"gender"`
 	DateOfBirth *string   `gorm:"type:date" json:"date_of_birth"`
 	Bio         *string   `gorm:"type:text" json:"bio"`
+	Address     string    `gorm:"type:text" json:"address"`
+	City        string    `gorm:"type:varchar(100)" json:"city"`
+	Province    string    `gorm:"type:varchar(100)" json:"province"`
+	ZipCode     string    `gorm:"type:varchar(10)" json:"zip_code"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

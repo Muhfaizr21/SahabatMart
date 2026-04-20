@@ -10,7 +10,7 @@ const AdminLogistics = () => {
     const loadLogistics = () => {
         setLoading(true);
         fetchJson(`${API}/logistics`)
-            .then(d => setChannels(d.data || []))
+            .then(d => setChannels(d || []))
             .catch(err => console.error("Error loading logistics:", err))
             .finally(() => setLoading(false));
     };

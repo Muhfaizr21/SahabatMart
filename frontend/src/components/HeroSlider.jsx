@@ -10,7 +10,8 @@ export default function HeroSlider() {
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/banners`)
       .then(d => {
-        if (d.data && d.data.length > 0) setBanners(d.data);
+        const data = Array.isArray(d) ? d : (d.data || []);
+        if (data.length > 0) setBanners(data);
         else setBanners(sliders); // Fallback to static if empty
       })
       .catch(() => setBanners(sliders));

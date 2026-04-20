@@ -22,25 +22,44 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchCart = async () => {
+    const fetchCheckoutData = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
           navigate('/login');
           return;
         }
-        const data = await fetchJson(`${BUYER_API_BASE}/cart`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        setCart(data);
+
+        // Parallel fetch for speed
+        const [cartData, profileData] = await Promise.all([
+          fetchJson(`${BUYER_API_BASE}/cart`),
+          fetchJson(`${BUYER_API_BASE}/profile`)
+        ]);
+
+        if (cartData) setCart(cartData);
+        if (profileData && profileData.user) {
+          const u = profileData.user;
+          const names = u.profile?.full_name?.split(' ') || ['', ''];
+          setForm(f => ({
+            ...f,
+            firstName: names[0],
+            lastName: names.slice(1).join(' ') || u.profile?.full_name,
+            email: u.email,
+            phone: u.phone || '',
+            address: u.profile?.address || '',
+            city: u.profile?.city || '',
+            province: u.profile?.province || '',
+            postalCode: u.profile?.zip_code || ''
+          }));
+        }
       } catch (err) {
-        console.error('Failed to fetch cart:', err);
+        console.error('Failed to pre-fill checkout:', err);
       }
     };
-    fetchCart();
+    fetchCheckoutData();
   }, [navigate]);
 
-  const subtotal = cart.items?.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0) || 0;
+  const subtotal = cart.items?.reduce((s, i) => s + (i.product_variant?.price || 0) * i.quantity, 0) || 0;
   const shipping = 0;
   const total = subtotal + shipping;
 
@@ -219,8 +238,9 @@ export default function CheckoutPage() {
                         <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white">{item.quantity}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-gray-700 font-medium leading-tight line-clamp-2">ID: {item.product_variant_id.substring(0,8)}</div>
-                        <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{((item.unit_price || 0) * item.quantity).toLocaleString('id-ID')}</div>
+                        <div className="text-[11px] text-gray-900 font-bold leading-tight line-clamp-1 truncate">{item.product?.name}</div>
+                        <div className="text-[10px] text-blue-600 font-medium leading-tight line-clamp-1">{item.product_variant?.name || 'Default Varian'}</div>
+                        <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{((item.product_variant?.price || 0) * item.quantity).toLocaleString('id-ID')}</div>
                       </div>
                     </div>
                   ))}

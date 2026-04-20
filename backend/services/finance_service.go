@@ -10,14 +10,16 @@ import (
 )
 
 type FinanceService struct {
-	Repo *repositories.FinanceRepository
-	DB   *gorm.DB
+	Repo         *repositories.FinanceRepository
+	DB           *gorm.DB
+	Notification *NotificationService
 }
 
 func NewFinanceService(db *gorm.DB) *FinanceService {
 	return &FinanceService{
-		Repo: repositories.NewFinanceRepository(db),
-		DB:   db,
+		Repo:         repositories.NewFinanceRepository(db),
+		DB:           db,
+		Notification: NewNotificationService(db),
 	}
 }
 
@@ -104,6 +106,18 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, order.TotalCommission, order.ID, "order", desc); err != nil {
 			return err
 		}
+
+		// Notifikasi ke Affiliate
+		_ = s.Notification.Push(*order.AffiliateID, "affiliate", "commission_earned", "Komisi Baru!", 
+			fmt.Sprintf("Anda mendapatkan estimasi komisi Rp%.2f dari pesanan %s", order.TotalCommission, order.OrderNumber), 
+			fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
+	}
+	
+	// Notifikasi ke Merchant
+	for _, group := range order.MerchantGroups {
+		_ = s.Notification.Push(group.MerchantID, "merchant", "order_paid", "Pesanan Dibayar", 
+			fmt.Sprintf("Pesanan %s telah dibayar. Dana Rp%.2f masuk ke saldo tertunda.", order.OrderNumber, group.MerchantPayout), 
+			fmt.Sprintf("/merchant/orders/%s", order.ID))
 	}
 
 	return nil
@@ -126,7 +140,7 @@ func (s *FinanceService) ProcessSettlements() error {
 		
 		var txs []models.WalletTransaction
 		// Cari transaksi pending yang sudah melewati batas waktu dan belum di-settle
-		err := tx.Where("pending_after > pending_before AND created_at < ?", limitDate).Find(&txs).Error
+		err := tx.Where("pending_after > pending_before AND is_settled = ? AND created_at < ?", false, limitDate).Find(&txs).Error
 		if err != nil {
 			return err
 		}
@@ -146,8 +160,32 @@ func (s *FinanceService) ProcessSettlements() error {
 				return err
 			}
 
-			// Update transaction status atau buat log baru
-			// Di sini kita asumsikan sistem track via timestamp
+			// Update transaction status (Idempotency)
+			now := time.Now()
+			txn.IsSettled = true
+			txn.SettledAt = &now
+			if err := tx.Save(&txn).Error; err != nil {
+				return err
+			}
+
+			// Update Affiliate Commissions status jika reference adalah order
+			if txn.ReferenceType == "order" && wallet.OwnerType == models.WalletAffiliate {
+				tx.Model(&models.AffiliateCommission{}).
+					Where("order_id = ? AND affiliate_id = ?", txn.ReferenceID, wallet.OwnerID).
+					Updates(map[string]interface{}{
+						"status":  models.CommissionPaid,
+						"paid_at": &now,
+					})
+				
+				// Notifikasi pencairan komisi
+				_ = s.Notification.Push(wallet.OwnerID, "affiliate", "commission_settled", "Komisi Cair!", 
+					fmt.Sprintf("Komisi dari pesanan %s sebesar Rp%.2f sudah masuk ke saldo utama.", txn.ReferenceID, amount), "/affiliate/wallet")
+			}
+			
+			if wallet.OwnerType == models.WalletMerchant {
+				_ = s.Notification.Push(wallet.OwnerID, "merchant", "payout_settled", "Saldo Cair", 
+					fmt.Sprintf("Dana Rp%.2f dari pesanan %s sudah masuk ke saldo utama.", amount, txn.ReferenceID), "/merchant/wallet")
+			}
 		}
 		return nil
 	})
@@ -189,3 +227,28 @@ func (s *FinanceService) ReleaseEscrow(tx *gorm.DB, ownerID string, ownerType mo
 
 	return tx.Create(txn).Error
 }
+
+func (s *FinanceService) SyncPlatformLedger() (map[string]interface{}, error) {
+	var results struct {
+		TotalBalance   float64 `gorm:"column:total_balance"`
+		TotalPending   float64 `gorm:"column:total_pending"`
+		TotalEarned    float64 `gorm:"column:total_earned"`
+		TotalWithdrawn float64 `gorm:"column:total_withdrawn"`
+	}
+
+	err := s.DB.Table("wallets").Select("SUM(balance) as total_balance, SUM(pending_balance) as total_pending, SUM(total_earned) as total_earned, SUM(total_withdrawn) as total_withdrawn").Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+
+	platformLiquidity := results.TotalBalance + results.TotalPending
+
+	return map[string]interface{}{
+		"total_user_balance":       results.TotalBalance,
+		"total_user_pending":       results.TotalPending,
+		"total_platform_liquidity": platformLiquidity,
+		"sync_status":              "healthy",
+		"checked_at":               time.Now(),
+	}, nil
+}
+

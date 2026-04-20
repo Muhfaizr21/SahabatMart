@@ -47,7 +47,7 @@ export default function AdminOrders() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/orders?status=${tab}`)
-      .then(d => setOrders(d.data || []))
+      .then(d => setOrders(d || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -112,7 +112,7 @@ export default function AdminOrders() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{fmtDate(o.created_at)}</div>
                 </td>
                 <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                  <Link to={`/admin/orders/detail?id=${o.id}`} style={{
+                  <Link to={`/admin/orders/detail/${o.id}`} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                     padding: '7px 14px', borderRadius: 10,
                     background: '#f8fafc', border: '1px solid #e2e8f0',

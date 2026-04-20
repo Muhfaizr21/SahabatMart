@@ -14,7 +14,7 @@ export default function AdminDisputes() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/disputes`)
-      .then(d => setDisputes(d.data || []))
+      .then(d => setDisputes(d || []))
       .catch(console.error).finally(() => setLoading(false));
   };
 

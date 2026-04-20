@@ -26,7 +26,7 @@ export default function AdminRegions() {
 
   useEffect(() => {
     fetchJson(`${API}/regions?parent_id=0`)
-      .then(d => setProvinces(d.data || []));
+      .then(d => setProvinces(d || []));
   }, []);
 
   const handleProvClick = (prov) => {
@@ -35,7 +35,7 @@ export default function AdminRegions() {
     setDistricts([]);
     setLoadingCities(true);
     fetchJson(`${API}/regions?parent_id=${prov.id}`)
-      .then(d => setCities(d.data || []))
+      .then(d => setCities(d || []))
       .finally(() => setLoadingCities(false));
   };
 
@@ -43,7 +43,7 @@ export default function AdminRegions() {
     setSelectedCity(city);
     setLoadingDistricts(true);
     fetchJson(`${API}/regions?parent_id=${city.id}`)
-      .then(d => setDistricts(d.data || []))
+      .then(d => setDistricts(d || []))
       .finally(() => setLoadingDistricts(false));
   };
 

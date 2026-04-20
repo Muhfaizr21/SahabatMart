@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // NotificationHub mengelola koneksi SSE untuk real-time updates
@@ -72,10 +73,19 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: {\"status\":\"connected\"}\n\n")
 	flusher.Flush()
 
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case msg := <-clientChan:
-			fmt.Fprintf(w, "data: %s\n\n", msg)
+			if msg != "" {
+				fmt.Fprintf(w, "data: %s\n\n", msg)
+				flusher.Flush()
+			}
+		case <-ticker.C:
+			// Heartbeat untuk menjaga koneksi tetap hidup
+			fmt.Fprintf(w, ": heartbeat\n\n")
 			flusher.Flush()
 		case <-r.Context().Done():
 			return

@@ -41,6 +41,7 @@ func ConnectDB() {
 		&models.BlogPost{}, &models.Banner{},
 		&models.Wishlist{}, &models.CategoryCommission{}, &models.MerchantCommission{},
 		&models.AuditLog{}, &models.PayoutRequest{}, &models.Notification{},
+		&models.Review{},
 		// Affiliate portal models
 		&models.AffiliateCommission{}, &models.AffiliateLink{},
 		&models.AffiliateClickLog{}, &models.AffiliateWithdrawal{},
@@ -115,29 +116,44 @@ func startHousekeeping(db *gorm.DB) {
 	log.Println("🧹 Housekeeping Background Worker Started")
 	financeService := services.NewFinanceService(db)
 	notifService := services.NewNotificationService(db)
+	affiliateService := services.NewAffiliateService(db, notifService)
+	orderService := services.NewOrderService(db)
 
-	ticker := time.NewTicker(1 * time.Hour) // Jalankan setiap jam
+	ticker := time.NewTicker(30 * time.Minute) // More frequent check
 	for range ticker.C {
 		log.Println("🔄 Running Platform Housekeeping...")
 
-		// 1. Process Merchant Settlements (7-day delay)
+		// 1. Process Merchant Settlements
 		if err := financeService.ProcessSettlements(); err != nil {
 			log.Printf("❌ Housekeeping Error (Settlement): %v", err)
 		}
 
-		// 2. Auto-update Logistics Status (Mock simulation)
-		if err := autoUpdateLogistics(db); err != nil {
+		// 2. Auto-update Logistics & Order Completion
+		if err := autoUpdateLogistics(db, notifService); err != nil {
 			log.Printf("❌ Housekeeping Error (Logistics): %v", err)
 		}
 
-		// 3. Release Affiliate Commissions (hold period expired)
+		// 3. Release Affiliate Commissions
 		if err := releaseAffiliateCommissions(db, notifService); err != nil {
 			log.Printf("❌ Housekeeping Error (Affiliate Commissions): %v", err)
 		}
 
-		// 4. Auto-upgrade Affiliate Tiers
-		if err := autoUpgradeAffiliateTiers(db, notifService); err != nil {
-			log.Printf("❌ Housekeeping Error (Affiliate Tier Upgrade): %v", err)
+		// 4. Auto-expire unpaid orders & return stock
+		if err := orderService.ExpireOrders(); err != nil {
+			log.Printf("❌ Housekeeping Error (Order Expiry): %v", err)
+		}
+
+		// 5. Auto-upgrade Affiliate Tiers (Now handled by service)
+		var affiliates []models.AffiliateMember
+		db.Where("status = 'active'").Find(&affiliates)
+		for _, aff := range affiliates {
+			affiliateService.TriggerTierUpgrade(aff.ID)
+		}
+
+		// 6. Sync Platform Ledger
+		ledger, err := financeService.SyncPlatformLedger()
+		if err == nil {
+			log.Printf("📊 Platform Ledger Sync: %+v", ledger)
 		}
 	}
 }
@@ -185,46 +201,10 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *services.NotificationServic
 	return nil
 }
 
-// autoUpgradeAffiliateTiers: check if affiliate earned enough to upgrade
-func autoUpgradeAffiliateTiers(db *gorm.DB, notif *services.NotificationService) error {
-	var affiliates []models.AffiliateMember
-	db.Preload("Tier").Where("status = 'active'").Find(&affiliates)
-
-	var tiers []models.MembershipTier
-	db.Order("level ASC").Find(&tiers)
-
-	for _, aff := range affiliates {
-		if aff.Tier == nil {
-			continue
-		}
-		for _, tier := range tiers {
-			// Skip current and lower tiers
-			if tier.Level <= aff.Tier.Level {
-				continue
-			}
-			// Check if affiliate qualifies for this tier
-			if aff.TotalEarned >= tier.MinEarningsUpgrade && tier.MinEarningsUpgrade > 0 {
-				oldTierName := aff.Tier.Name
-				db.Model(&aff).Update("membership_tier_id", tier.ID)
-
-				// Get user_id for notification
-				var u models.AffiliateMember
-				db.Select("user_id").First(&u, "id = ?", aff.ID)
-				if u.UserID != "" {
-					msg := fmt.Sprintf("Selamat! Tier Anda telah naik dari %s ke %s. Nikmati komisi yang lebih besar! 🚀", oldTierName, tier.Name)
-					notif.Push(u.UserID, "affiliate", "tier_upgrade",
-						"Tier Naik! 🎉", msg, "/affiliate")
-				}
-				log.Printf("⬆️  Affiliate %s upgraded from %s to %s", aff.ID, oldTierName, tier.Name)
-				break // Only upgrade one tier at a time
-			}
-		}
-	}
-	return nil
-}
+// autoUpgradeAffiliateTiers is now handled within AffiliateService.TriggerTierUpgrade
 
 
-func autoUpdateLogistics(db *gorm.DB) error {
+func autoUpdateLogistics(db *gorm.DB, notif *services.NotificationService) error {
 	var groups []models.OrderMerchantGroup
 	// Find merchant groups that are SHIPPED but not yet DELIVERED
 	db.Where("status = ? AND tracking_number IS NOT NULL AND tracking_number <> ''", models.MOrderShipped).Find(&groups)
@@ -237,9 +217,26 @@ func autoUpdateLogistics(db *gorm.DB) error {
 			group.DeliveredAt = &now
 			db.Save(&group)
 			log.Printf("📦 Merchant Order %s: Automated delivery sync completed", group.ID)
-			
-			// Optional: If all groups in an order are delivered, mark the top-level Order as Delivered
-			// (Logic can be added here)
+
+			// SYNC: Check if all groups in this order are now Delivered/Completed
+			var totalGroups int64
+			var deliveredGroups int64
+			db.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", group.OrderID).Count(&totalGroups)
+			db.Model(&models.OrderMerchantGroup{}).Where("order_id = ? AND status IN ?", group.OrderID, []string{string(models.MOrderDelivered), string(models.MOrderCompleted)}).Count(&deliveredGroups)
+
+			if totalGroups > 0 && totalGroups == deliveredGroups {
+				// All items delivered, update parent Order status
+				db.Model(&models.Order{}).Where("id = ?", group.OrderID).Update("status", models.OrderCompleted)
+				log.Printf("🎉 Parent Order %s marked as COMPLETED automatically", group.OrderID)
+				
+				// Send notification to Buyer
+				var order models.Order
+				db.Select("buyer_id").First(&order, "id = ?", group.OrderID)
+				if order.BuyerID != "" {
+					notif.Push(order.BuyerID, "buyer", "order_completed", 
+						"Pesanan Selesai! 🎁", "Seluruh item pesanan Anda telah diterima. Terima kasih sudah berbelanja!", "/orders")
+				}
+			}
 		}
 	}
 	return nil

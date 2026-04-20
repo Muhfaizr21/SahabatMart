@@ -6,11 +6,12 @@ import (
 )
 
 type AffiliateService struct {
-	DB *gorm.DB
+	DB    *gorm.DB
+	Notif *NotificationService
 }
 
-func NewAffiliateService(db *gorm.DB) *AffiliateService {
-	return &AffiliateService{DB: db}
+func NewAffiliateService(db *gorm.DB, notif *NotificationService) *AffiliateService {
+	return &AffiliateService{DB: db, Notif: notif}
 }
 
 func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua string, subID1, subID2, subID3 string) (*models.AffiliateMember, error) {
@@ -65,3 +66,43 @@ func (s *AffiliateService) GetDashboardStats(affiliateID string) (*models.Affili
 	return &affiliate, totalClicks, nil
 }
 
+func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
+	var affiliate models.AffiliateMember
+	if err := s.DB.Preload("Tier").First(&affiliate, "id = ?", affiliateMemberID).Error; err != nil {
+		return err
+	}
+
+	if affiliate.Tier == nil {
+		return nil
+	}
+
+	// Cari tier berikutnya (Level > current level)
+	var nextTier models.MembershipTier
+	err := s.DB.Order("level ASC").Where("level > ?", affiliate.Tier.Level).First(&nextTier).Error
+	if err != nil {
+		return nil // Sudah mencapai tier maksimal
+	}
+
+	// Cek apakah syarat terpenuhi (MinEarningsUpgrade)
+	if affiliate.TotalEarned >= nextTier.MinEarningsUpgrade && nextTier.MinEarningsUpgrade > 0 {
+		oldTierName := affiliate.Tier.Name
+		if err := s.DB.Model(&affiliate).Update("membership_tier_id", nextTier.ID).Error; err != nil {
+			return err
+		}
+		
+		// Push Notification
+		if s.Notif != nil {
+			msg := "Selamat! Tier Anda naik dari " + oldTierName + " ke " + nextTier.Name + ". Nikmati komisi yang lebih besar! 🚀"
+			s.Notif.Push(affiliate.UserID, "affiliate", "tier_upgrade", "Tier Naik! 🎉", msg, "/affiliate")
+		}
+	}
+
+	return nil
+}
+
+// CancelCommission: Membatalkan komisi pending jika pesanan di-refund atau dispute dimenangkan buyer
+func (s *AffiliateService) CancelCommission(orderID string) error {
+	return s.DB.Model(&models.AffiliateCommission{}).
+		Where("order_id = ? AND status = 'pending'", orderID).
+		Update("status", "cancelled").Error
+}

@@ -65,6 +65,9 @@ type Order struct {
 	TotalDiscount       float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_discount"`
 	GrandTotal          float64        `gorm:"type:decimal(15,2);not null" json:"grand_total"`
 	TotalWeight         float64        `gorm:"type:decimal(10,3);default:0" json:"total_weight"`
+	
+	VoucherID           *uint          `gorm:"index" json:"voucher_id"`
+	VoucherCode         string         `gorm:"type:varchar(50)" json:"voucher_code"`
 
 	Status              OrderStatus    `gorm:"type:varchar(50);default:'pending_payment';not null" json:"status"`
 	Notes               string         `gorm:"type:text" json:"notes"`
@@ -124,6 +127,7 @@ type OrderItem struct {
 	Quantity             int     `gorm:"not null" json:"quantity"`
 	UnitPrice            float64 `gorm:"type:decimal(15,2);not null" json:"unit_price"`
 	Subtotal             float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
+	Metadata             string  `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
 	PlatformFeeAmount    float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee_amount"`
 	CommissionRate       float64 `gorm:"type:decimal(5,4);not null;default:0" json:"commission_rate"`
 	CommissionAmount     float64 `gorm:"type:decimal(15,2);not null;default:0" json:"commission_amount"`

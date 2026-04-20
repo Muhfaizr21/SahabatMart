@@ -8,7 +8,7 @@ export default function BlogPage() {
 
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/blogs`)
-      .then(d => setPosts(d.data || []))
+      .then(d => setPosts(d || []))
       .catch(() => setPosts([]))
       .finally(() => setLoading(false));
   }, []);

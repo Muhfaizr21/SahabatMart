@@ -25,7 +25,8 @@ export default function AdminMerchants() {
       fetchJson(`${API}/merchants?${p}`),
       fetchJson(`${API}/merchants/stats`),
     ]).then(([list, s]) => {
-      setMerchants(list.data || []);
+      const data = Array.isArray(list) ? list : (list.data || []);
+      setMerchants(data);
       setStats(s || {});
     }).catch(console.error).finally(() => setLoading(false));
   };
@@ -36,7 +37,8 @@ export default function AdminMerchants() {
     setCommission({ ...commission, loading: true });
     fetchJson(`${API}/merchants/commissions?merchant_id=${merchantId}`)
       .then(res => {
-         const data = res.data && res.data.length > 0 ? res.data[0] : { fee_percent: 0.05 }; // Default 5%
+         const list = Array.isArray(res) ? res : (res.data || []);
+         const data = list.length > 0 ? list[0] : { fee_percent: 0.05 }; // Default 5%
          setCommission({ fee_percent: data.fee_percent * 100, loading: false, id: data.id });
       })
       .catch(() => setCommission({ fee_percent: 5, loading: false }));

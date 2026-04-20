@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PUBLIC_API_BASE, BUYER_API_BASE, fetchJson } from '../lib/api';
+import { PUBLIC_API_BASE, BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
 import { isAuthenticated } from '../lib/auth';
 
 function StarRating({ rating }) {
@@ -92,7 +92,7 @@ function ProductCard({ product }) {
   return (
     <div className="group bg-white rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full">
       <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-square">
-        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         <button 
           onClick={toggleWishlist}
           disabled={wishlisting}
@@ -137,7 +137,9 @@ export default function ProductSection() {
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/products`)
       .then(d => {
-        if (d && d.data) setTrending(d.data.slice(0, 10));
+        // fetchJson unwrap means d is likely the array itself
+        const data = Array.isArray(d) ? d : (d.data || []);
+        setTrending(data.slice(0, 10));
       })
       .catch(() => setTrending([]))
       .finally(() => setLoading(false));

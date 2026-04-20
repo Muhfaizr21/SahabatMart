@@ -16,18 +16,17 @@ func JSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	
-	// Default response
 	resp := map[string]interface{}{
 		"status": "success",
 	}
 
-	// If data is a map, merge it to keep it "flat" for frontend compatibility
+	// Jika data adalah map, kita "merge" agar tetap datar untuk kompatibilitas frontend
 	if m, ok := data.(map[string]interface{}); ok {
 		for k, v := range m {
 			resp[k] = v
 		}
-	} else {
-		// If it's a slice or primitive, put it in 'data' field
+	} else if data != nil {
+		// Jika struct atau primitive, masukkan ke field 'data'
 		resp["data"] = data
 	}
 

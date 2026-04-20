@@ -18,9 +18,9 @@ type AffiliateController struct {
 	DB      *gorm.DB
 }
 
-func NewAffiliateController(db *gorm.DB) *AffiliateController {
+func NewAffiliateController(db *gorm.DB, notif *services.NotificationService) *AffiliateController {
 	return &AffiliateController{
-		Service: services.NewAffiliateService(db),
+		Service: services.NewAffiliateService(db, notif),
 		DB:      db,
 	}
 }

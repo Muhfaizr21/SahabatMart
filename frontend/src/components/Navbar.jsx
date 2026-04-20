@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getStoredUser, isAuthenticated, logout, isAdminUser } from '../lib/auth';
 import { BUYER_API_BASE, PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
@@ -25,6 +25,7 @@ const categories = ['Electronics', 'Smartphones', 'Computers', 'Smart Watches', 
 
 export default function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [userDropdown, setUserDropdown] = useState(false);
@@ -37,20 +38,66 @@ export default function Navbar() {
   const user = getStoredUser();
   const isAdmin = isAdminUser(user);
 
+  const fetchCounts = async () => {
+    if (!localStorage.getItem('token')) return;
+    try {
+      const cartData = await fetchJson(`${BUYER_API_BASE}/cart`);
+      if (cartData) {
+        const items = cartData.items || cartData.Items || [];
+        const total = items.reduce((acc, item) => acc + (item.quantity || 0), 0) || 0;
+        setCartCount(total);
+      }
+
+      const wishlistData = await fetchJson(`${BUYER_API_BASE}/wishlist`);
+      if (wishlistData) {
+        setWishCount(Array.isArray(wishlistData) ? wishlistData.length : (wishlistData.data?.length || 0));
+      }
+    } catch (err) {
+      console.error('Navbar Sync Error:', err);
+    }
+  };
+
   useEffect(() => {
     // Sync Categories via Public API
     fetchJson(`${PUBLIC_API_BASE}/categories`).then(res => setDynamicCats(res.data || [])).catch(() => {});
     
-    if (loggedIn) {
-      fetchJson(`${BUYER_API_BASE}/cart`)
-        .then(data => setCartCount(data?.items?.length || 0))
-        .catch(() => {});
-      
-      fetchJson(`${BUYER_API_BASE}/wishlist`)
-        .then(data => setWishCount(Array.isArray(data) ? data.length : (data?.data?.length || 0)))
-        .catch(() => {});
+    fetchCounts();
+    
+    // Real-time Sync via SSE (Server-Sent Events)
+    let eventSource = null;
+    if (localStorage.getItem('token') && user?.id) {
+       // Melalui SSE, perubahan di keranjang/wishlist/notif akan langsung terdeteksi
+       eventSource = new EventSource(`${PUBLIC_API_BASE.replace('/public', '')}/notifications/stream?user_id=${user.id}`);
+       
+       eventSource.onmessage = (event) => {
+         if (!event.data || event.data.trim() === "") return;
+         try {
+           const payload = JSON.parse(event.data);
+           if (payload.type === 'cart_update' || payload.type === 'wishlist_update' || payload.type === 'notification') {
+             fetchCounts(); // Auto sync state navbar
+           }
+         } catch (err) {
+           console.error('SSE Error:', err);
+         }
+       };
+
+       eventSource.onerror = () => {
+         eventSource.close();
+       };
     }
-  }, [loggedIn]);
+    
+    // Listen for custom updates (e.g. from AddToCart)
+    window.addEventListener('cartUpdate', fetchCounts);
+    
+    // Polling as safety net (lebih lambat karena sudah ada SSE)
+    const interval = setInterval(fetchCounts, 60000);
+    
+    return () => {
+      if (eventSource) eventSource.close();
+      window.removeEventListener('cartUpdate', fetchCounts);
+      clearInterval(interval);
+    };
+  }, [location.pathname, user?.id]);
 
   const handleSearch = (e) => {
     e.preventDefault();

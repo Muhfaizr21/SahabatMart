@@ -9,19 +9,144 @@ import (
 	"gorm.io/gorm"
 )
 
-func SeedAll(db *gorm.DB) {
-	fmt.Println("🌱 Starting Seeding Process...")
+// Valid UUIDs for Seeding
+const (
+	AdminID    = "00000000-0000-0000-0000-000000000001"
+	MerchantID = "00000000-0000-0000-0000-000000000002"
+	BuyerID    = "00000000-0000-0000-0000-000000000003"
+	AffiliateID = "00000000-0000-0000-0000-000000000004"
+)
 
-	// 1. Seed Tiers
+func SeedAll(db *gorm.DB) {
+	// 0. RESET ALL DATA (MEGA CLEAN)
+	// [MONSTER FIX] Drop legacy trigger that causes errors with missing average_rating column
+	db.Exec("DROP TRIGGER IF EXISTS update_average_rating ON reviews")
+	
+	tables := []string{
+		"reviews", "cart_items", "carts", "wishlists",
+		"order_items", "order_merchant_groups", "orders",
+		"wallet_transactions", "wallets", "payout_requests",
+		"affiliate_commissions", "affiliate_withdrawals", "affiliate_click_logs",
+		"product_variants", "products", "vouchers", "banners",
+		"affiliate_members", "membership_tiers", "categories", "brands",
+		"user_profiles", "users",
+	}
+
+	for _, table := range tables {
+		db.Exec(fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", table))
+	}
+
+	// 1. Seed Categories (Matches UI)
+	seedCategories(db)
+
+	// 2. Seed Tiers
 	seedTiers(db)
 
-	// 2. Seed Users & Merchants
+	// 3. Seed Users & Merchants
 	seedUsers(db)
 
-	// 3. Seed Products
+	// 4. Seed Products
 	seedProducts(db)
 
-	fmt.Println("✅ Seeding Completed Successfully!")
+	// 5. Seed Orders (NEW: To fix Super Admin Empty Stats)
+	seedOrders(db)
+
+	// 6. Seed Reviews
+	seedReviews(db)
+
+	// 7. Seed Marketing (Banners & Vouchers)
+	seedMarketing(db)
+
+	fmt.Println("✅ Seeding Completed Successfully! All data is fresh and active.")
+}
+
+func seedOrders(db *gorm.DB) {
+	fmt.Println("  -> Seeding Sample Orders...")
+
+	var merchant models.Merchant
+	db.First(&merchant)
+
+	// Create a Wallet for Merchant so stats look good
+	db.Create(&models.Wallet{
+		OwnerID:   merchant.ID,
+		OwnerType: models.WalletMerchant,
+		Balance:   45000000,
+	})
+
+	orderID := "00000000-0000-0000-0000-000000000001"
+	order := models.Order{
+		ID:          orderID,
+		OrderNumber: "ORD-2026-0001",
+		BuyerID:     BuyerID,
+		GrandTotal:  45000000,
+		Subtotal:    45000000,
+		Status:      models.OrderCompleted,
+		ShippingName: "Budi SahabatMart",
+		ShippingPhone: "08123456789",
+		ShippingAddress: "Jl. Merdeka No. 10",
+		ShippingCity: "Jakarta",
+		ShippingProvince: "DKI Jakarta",
+		ShippingPostalCode: "12345",
+	}
+	db.Create(&order)
+
+	omgID := "00000000-0000-0000-0000-000000000001"
+	omg := models.OrderMerchantGroup{
+		ID:             omgID,
+		OrderID:        orderID,
+		MerchantID:     merchant.ID,
+		Status:         models.MOrderCompleted,
+		Subtotal:       45000000,
+		PlatformFee:    450000, // 1%
+	}
+	db.Create(&omg)
+
+	db.Create(&models.OrderItem{
+		OrderMerchantGroupID: omgID,
+		OrderID:              orderID,
+		MerchantID:           merchant.ID,
+		ProductID:            "00000000-1111-0000-0000-000000000001",
+		ProductVariantID:     "00000000-2222-0000-0000-000000000001",
+		ProductName:          "MacBook Pro M3 Max - 14 Inch",
+		UnitPrice:            45000000,
+		Quantity:             1,
+		Subtotal:             45000000,
+	})
+}
+
+func seedCategories(db *gorm.DB) {
+	fmt.Println("  -> Seeding Categories...")
+	categories := []models.Category{
+		{Name: "Elektronik", Slug: "elektronik", Order: 1},
+		{Name: "Fashion", Slug: "fashion", Order: 2},
+		{Name: "Kebutuhan Pokok", Slug: "kebutuhan-pokok", Order: 3},
+		{Name: "Kesehatan", Slug: "kesehatan", Order: 4},
+		{Name: "Hobi & Hiburan", Slug: "hobi-hiburan", Order: 5},
+	}
+	for _, c := range categories {
+		db.Create(&c)
+	}
+}
+
+func seedMarketing(db *gorm.DB) {
+	fmt.Println("  -> Seeding Marketing Assets...")
+	// Banners
+	banners := []models.Banner{
+		{Title: "Gadget Impian Jadi Kenyataan", SubTitle: "Dapatkan MacBook Pro M3 terbaru dengan promo cicilan 0%", Badge: "NEW ARRIVAL", Offer: "Potongan 10%", Image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800", BgColor: "#1e293b", IsActive: true},
+		{Title: "Gaya Sultan Harga Teman", SubTitle: "Koleksi Air Jordan 1 Original hanya di SahabatMart", Badge: "TRENDING", Offer: "Diskon 20%", Image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?w=800", BgColor: "#1d4ed8", IsActive: true},
+	}
+	for _, b := range banners {
+		db.Create(&b)
+	}
+
+	// Vouchers
+	vouchers := []models.Voucher{
+		{Code: "SAHABATBARU", Title: "Diskon Pengguna Baru", DiscountType: "fixed", DiscountValue: 50000, MinOrder: 200000, Quota: 100, Status: "active"},
+		{Code: "PROMOGADGET", Title: "Cashback Elektronik", DiscountType: "percent", DiscountValue: 10, MinOrder: 5000000, Quota: 50, Status: "active"},
+	}
+	for _, v := range vouchers {
+		db.Create(&v)
+	}
 }
 
 func seedProducts(db *gorm.DB) {
@@ -35,220 +160,149 @@ func seedProducts(db *gorm.DB) {
 
 	products := []models.Product{
 		{
-			ID: "p1-uuid-gadget-001",
+			ID: "00000000-1111-0000-0000-000000000001",
 			MerchantID: merchant.ID,
 			Name: "MacBook Pro M3 Max - 14 Inch",
 			Slug: "macbook-pro-m3-max",
-			Description: "The most advanced chips ever built for a personal computer. M3 Max brings massive performance and capability for the most extreme workflows.",
+			Description: "Prosesor paling kencang untuk profesional kreatif. Chip M3 Max memberikan performa ekstrem untuk workflow berat.",
 			Price: 45000000,
 			OldPrice: 48000000,
 			Stock: 10,
-			Category: "Electronics",
+			Category: "Elektronik",
 			Brand: "Apple",
 			Image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80",
 			Status: "active",
-			Rating: 4.9,
-			Reviews: 128,
+			Rating: 5.0,
+			Reviews: 2,
+			Variants: []models.ProductVariant{
+				{
+					ID: "00000000-2222-0000-0000-000000000001",
+					ProductID: "00000000-1111-0000-0000-000000000001",
+					Name: "Space Black - 1TB",
+					SKU: "MBP-M3-SB-1TB",
+					Price: 45000000,
+					Stock: 5,
+				},
+			},
 		},
 		{
-			ID: "p2-uuid-gadget-002",
-			MerchantID: merchant.ID,
-			Name: "iPhone 15 Pro Titanium",
-			Slug: "iphone-15-pro-titanium",
-			Description: "Forged in titanium. Featuring the groundbreaking A17 Pro chip, a customizable Action button, and a more versatile Pro camera system.",
-			Price: 20000000,
-			OldPrice: 21000000,
-			Stock: 25,
-			Category: "Electronics",
-			Brand: "Apple",
-			Image: "https://images.unsplash.com/photo-1696446701796-da61225697cc?w=800&q=80",
-			Status: "active",
-			Rating: 4.8,
-			Reviews: 540,
-		},
-		{
-			ID: "p3-uuid-fashion-001",
+			ID: "00000000-1111-0000-0000-000000000002",
 			MerchantID: merchant.ID,
 			Name: "Air Jordan 1 Retro High OG",
 			Slug: "air-jordan-1-retro",
-			Description: "Classic style meets legendary performance. The Air Jordan 1 Retro High OG features luxury leather and iconic branding.",
-			Price: 2500000,
-			OldPrice: 3000000,
-			Stock: 5,
+			Description: "Sneakers legendaris dengan balutan kulit premium.",
+			Price: 3500000,
+			OldPrice: 4000000,
+			Stock: 20,
 			Category: "Fashion",
 			Brand: "Nike",
 			Image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?w=800&q=80",
 			Status: "active",
-			Rating: 5.0,
-			Reviews: 89,
+			Rating: 0,
+			Reviews: 0,
 		},
 	}
 
-	for _, p := range products {
-		var existing models.Product
-		if err := db.Where("slug = ?", p.Slug).First(&existing).Error; err != nil {
-			db.Create(&p)
-			log.Printf("    [+] Created product: %s", p.Name)
+	for i := range products {
+		if err := db.Create(&products[i]).Error; err != nil {
+			log.Printf("    [!] Error seeding product %s: %v", products[i].Name, err)
+		} else {
+			log.Printf("    [+] Created product: %s", products[i].Name)
 		}
 	}
 }
 
 func seedTiers(db *gorm.DB) {
 	fmt.Println("  -> Seeding Membership Tiers...")
-
-	// Auto-seed tiers if table is empty
-	var count int64
-	db.Model(&models.MembershipTier{}).Count(&count)
-	if count > 0 {
-		log.Println("    [=] Membership Tiers already seeded, skipping")
-		return
-	}
-
 	tiers := []models.MembershipTier{
-		{
-			ID:                   1,
-			Name:                 "Bronze",
-			Level:                1,
-			BaseCommissionRate:   0.03,
-			MonthlyFee:           0,
-			MinEarningsUpgrade:   5000000,
-			MinWithdrawalAmount:  50000,
-			MaxWithdrawalMonthly: 2000000,
-			CommissionHoldDays:   14,
-			CookieDurationDays:   30,
-			IsActive:             true,
-		},
-		{
-			ID:                   2,
-			Name:                 "Silver",
-			Level:                2,
-			BaseCommissionRate:   0.05,
-			MonthlyFee:           0,
-			MinEarningsUpgrade:   20000000,
-			MinWithdrawalAmount:  100000,
-			MaxWithdrawalMonthly: 10000000,
-			CommissionHoldDays:   10,
-			CookieDurationDays:   45,
-			IsActive:             true,
-		},
-		{
-			ID:                   3,
-			Name:                 "Gold",
-			Level:                3,
-			BaseCommissionRate:   0.08,
-			MonthlyFee:           0,
-			MinEarningsUpgrade:   100000000,
-			MinWithdrawalAmount:  200000,
-			MaxWithdrawalMonthly: 50000000,
-			CommissionHoldDays:   7,
-			CookieDurationDays:   60,
-			IsActive:             true,
-		},
-		{
-			ID:                   4,
-			Name:                 "Platinum",
-			Level:                4,
-			BaseCommissionRate:   0.12,
-			MonthlyFee:           0,
-			MinEarningsUpgrade:   0, // Top tier, no upgrade
-			MinWithdrawalAmount:  500000,
-			MaxWithdrawalMonthly: 0, // unlimited
-			CommissionHoldDays:   3,
-			CookieDurationDays:   90,
-			IsActive:             true,
-		},
+		{ID: 1, Name: "Bronze", Level: 1, BaseCommissionRate: 0.03, MinWithdrawalAmount: 50000, CommissionHoldDays: 14, IsActive: true},
+		{ID: 2, Name: "Silver", Level: 2, BaseCommissionRate: 0.05, MinWithdrawalAmount: 100000, CommissionHoldDays: 10, IsActive: true},
+		{ID: 3, Name: "Gold", Level: 3, BaseCommissionRate: 0.08, MinWithdrawalAmount: 200000, CommissionHoldDays: 7, IsActive: true},
+		{ID: 4, Name: "Platinum", Level: 4, BaseCommissionRate: 0.12, MinWithdrawalAmount: 500000, CommissionHoldDays: 3, IsActive: true},
 	}
 
 	for _, t := range tiers {
-		if err := db.Create(&t).Error; err != nil {
-			log.Printf("    [!] Tier %s sudah ada atau error: %v", t.Name, err)
-		} else {
-			log.Printf("    [+] Created tier: %s (%.0f%%)", t.Name, t.BaseCommissionRate*100)
-		}
+		db.Create(&t)
 	}
 }
 
-
 func seedUsers(db *gorm.DB) {
-	fmt.Println("  -> Seeding Professional Account Samples...")
+	fmt.Println("  -> Seeding Professional Accounts...")
 
 	password, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	pwHash := string(password)
 
 	accounts := []struct {
+		id   string
 		user models.User
 		name string
+		slug string
 	}{
 		{
-			user: models.User{
-				Email:        "admin@sahabatmart.com",
-				PasswordHash: pwHash,
-				Role:         "superadmin",
-				AdminRole:    "super",
-				Status:       "active",
-			},
+			id:   AdminID,
+			user: models.User{Email: "admin@sahabatmart.com", PasswordHash: pwHash, Role: "superadmin", AdminRole: "super", Status: "active"},
 			name: "Super Administrator",
 		},
 		{
-			user: models.User{
-				Email:        "merchant@sahabatmart.com",
-				PasswordHash: pwHash,
-				Role:         "merchant",
-				Status:       "active",
-			},
+			id:   MerchantID,
+			user: models.User{Email: "merchant@sahabatmart.com", PasswordHash: pwHash, Role: "merchant", Status: "active"},
 			name: "Modern Gadget Store",
+			slug: "modern-gadget",
 		},
 		{
-			user: models.User{
-				Email:        "affiliate@sahabatmart.com",
-				PasswordHash: pwHash,
-				Role:         "affiliate",
-				Status:       "active",
-			},
-			name: "Budi Affiliator",
-		},
-		{
-			user: models.User{
-				Email:        "buyer@sahabatmart.com",
-				PasswordHash: pwHash,
-				Role:         "buyer",
-				Status:       "active",
-			},
-			name: "Rizky Pembeli Amanah",
+			id:   BuyerID,
+			user: models.User{Email: "buyer@sahabatmart.com", PasswordHash: pwHash, Role: "buyer", Status: "active"},
+			name: "Budi SahabatMart",
 		},
 	}
 
 	for _, acc := range accounts {
-		var existing models.User
-		if err := db.Where("email = ?", acc.user.Email).First(&existing).Error; err != nil {
-			// Create User
-			db.Create(&acc.user)
+		acc.user.ID = acc.id
+		db.Create(&acc.user)
 
-			// Create Profile
-			db.Create(&models.UserProfile{
-				UserID:   acc.user.ID,
-				FullName: acc.name,
+		db.Create(&models.UserProfile{
+			UserID:   acc.user.ID,
+			FullName: acc.name,
+		})
+
+		if acc.user.Role == "merchant" {
+			db.Create(&models.Merchant{
+				UserID:     acc.user.ID,
+				StoreName:  acc.name,
+				Slug:       acc.slug,
+				Status:     "active",
+				IsVerified: true,
 			})
-
-			// Create extra relations based on role
-			switch acc.user.Role {
-			case "merchant":
-				db.Create(&models.Merchant{
-					UserID:     acc.user.ID,
-					StoreName:  acc.name,
-					Slug:       "modern-gadget",
-					Status:     "active",
-					IsVerified: true,
-				})
-			case "affiliate":
-				db.Create(&models.AffiliateMember{
-					UserID:           acc.user.ID,
-					MembershipTierID: 1,
-					RefCode:          "BUDI123",
-					Status:           models.AffiliateActive,
-				})
-			}
-			log.Printf("    [+] Created account: %s", acc.user.Email)
 		}
+		log.Printf("    [+] Created: %s", acc.user.Email)
+	}
+}
+
+func seedReviews(db *gorm.DB) {
+	fmt.Println("  -> Seeding Reviews...")
+	
+	reviews := []models.Review{
+		{
+			ProductID: "00000000-1111-0000-0000-000000000001",
+			MerchantID: MerchantID,
+			BuyerID:   BuyerID,
+			OrderID:   "00000000-0000-0000-0000-000000000001", // Valid UUID
+			OrderItemID: "00000000-0000-0000-0000-000000000001",
+			Rating:    5,
+			Comment:   "Barang original, pengiriman super cepat!",
+		},
+		{
+			ProductID: "00000000-1111-0000-0000-000000000001",
+			MerchantID: MerchantID,
+			BuyerID:   BuyerID,
+			OrderID:   "00000000-0000-0000-0000-000000000002", // Valid UUID
+			OrderItemID: "00000000-0000-0000-0000-000000000002",
+			Rating:    5,
+			Comment:   "Seller responsif, MacBook aman sampai tujuan.",
+		},
+	}
+
+	for _, r := range reviews {
+		db.Create(&r)
 	}
 }

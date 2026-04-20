@@ -229,6 +229,8 @@ type Product struct {
 	Images      string     `gorm:"type:text" json:"images"` // JSON Array: ["url1", "url2", "url3"]
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 	Rating      float64   `gorm:"type:decimal(2,1);default:0" json:"rating"`
+	AverageRating float64 `gorm:"type:decimal(2,1);default:0" json:"average_rating"` // Satisfy legacy triggers
+	TotalReviews  int     `gorm:"default:0" json:"total_reviews"`               // Satisfy legacy triggers
 	Reviews     int       `gorm:"default:0" json:"reviews"`
 	Badge       string    `gorm:"type:varchar(50)" json:"badge"`
 	BadgeClass  string    `gorm:"type:varchar(50)" json:"badge_class"`
@@ -264,11 +266,16 @@ type Cart struct {
 type CartItem struct {
 	ID               string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	CartID           string  `gorm:"type:uuid;not null;index" json:"cart_id"`
+	MerchantID       string  `gorm:"type:uuid;not null" json:"merchant_id"`
 	ProductID        string  `gorm:"type:uuid;not null" json:"product_id"`
 	ProductVariantID string  `gorm:"type:uuid;not null" json:"product_variant_id"`
-	Quantity         int     `gorm:"not null" json:"quantity"`
+	Quantity         int       `gorm:"not null" json:"quantity"`
+	Metadata         string    `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+
+	Product          Product        `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	ProductVariant   ProductVariant `gorm:"foreignKey:ProductVariantID" json:"product_variant,omitempty"`
 }
 
 // Banner untuk Hero Slider Home Page
@@ -287,7 +294,7 @@ type Banner struct {
 
 // Wishlist menyimpan produk favorit buyer
 type Wishlist struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
+	ID        string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	BuyerID   string    `gorm:"type:uuid;not null;index:idx_buyer_product,unique" json:"buyer_id"`
 	ProductID string    `gorm:"type:uuid;not null;index:idx_buyer_product,unique" json:"product_id"`
 	CreatedAt time.Time `json:"created_at"`

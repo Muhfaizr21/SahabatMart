@@ -82,7 +82,7 @@ export default function AdminProductList() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/products?status=${tab}&search=${search}`)
-      .then(d => setProducts(d.data || []))
+      .then(d => setProducts(d || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };

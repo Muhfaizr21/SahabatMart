@@ -36,7 +36,7 @@ export default function AdminAuditLog() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/audit-logs?search=${search}&action=${actionFilter}`)
-      .then(d => setLogs(d.data || []))
+      .then(d => setLogs(d || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };

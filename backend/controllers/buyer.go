@@ -15,12 +15,14 @@ import (
 type BuyerController struct {
 	DB           *gorm.DB
 	OrderService *services.OrderService
+	BuyerService *services.BuyerService
 }
 
 func NewBuyerController(db *gorm.DB) *BuyerController {
 	return &BuyerController{
 		DB:           db,
 		OrderService: services.NewOrderService(db),
+		BuyerService: services.NewBuyerService(db),
 	}
 }
 
@@ -29,21 +31,52 @@ func (bc *BuyerController) GetCart(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 
 	var cart models.Cart
-	if err := bc.DB.Preload("Items").Where("buyer_id = ?", buyerID).First(&cart).Error; err != nil {
+	// Deep Preload: Mengambil cart -> items -> product & variant sekaligus
+	err := bc.DB.Preload("Items.Product").Preload("Items.ProductVariant").Where("buyer_id = ?", buyerID).First(&cart).Error
+	
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
+			log.Printf("[Cart] No cart found for buyer %s, creating empty cart", buyerID)
 			cart = models.Cart{BuyerID: buyerID}
 			bc.DB.Create(&cart)
 		} else {
-			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil keranjang")
+			log.Printf("[Cart] ERROR fetching cart for %s: %v", buyerID, err)
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil keranjang: "+err.Error())
 			return
 		}
 	}
 
+	log.Printf("[Cart] Found cart %s for buyer %s with %d items", cart.ID, buyerID, len(cart.Items))
 	utils.JSONResponse(w, http.StatusOK, cart)
 }
 
 // POST /api/buyer/cart/add
 func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+
+	var req struct {
+		ProductID        string `json:"product_id"`
+		ProductVariantID string `json:"product_variant_id"`
+		Quantity         int    `json:"quantity"`
+		Metadata         string `json:"metadata"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	if err := bc.BuyerService.AddToCart(buyerID, req.ProductID, req.ProductVariantID, req.Quantity, req.Metadata); err != nil {
+		log.Printf("Add to Cart error (BuyerID: %s, ProductID: %s): %v", buyerID, req.ProductID, err)
+		utils.JSONError(w, http.StatusBadRequest, "Gagal menambah ke keranjang: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Item berhasil ditambahkan ke keranjang"})
+}
+
+// POST /api/buyer/cart/move-from-wishlist
+func (bc *BuyerController) MoveToCart(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 
 	var req struct {
@@ -57,30 +90,12 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cart models.Cart
-	bc.DB.Where("buyer_id = ?", buyerID).First(&cart)
-	if cart.ID == "" {
-		cart = models.Cart{BuyerID: buyerID}
-		bc.DB.Create(&cart)
+	if err := bc.BuyerService.MoveFromWishlistToCart(buyerID, req.ProductID, req.ProductVariantID, req.Quantity); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
-	var item models.CartItem
-	bc.DB.Where("cart_id = ? AND product_variant_id = ?", cart.ID, req.ProductVariantID).First(&item)
-
-	if item.ID != "" {
-		item.Quantity += req.Quantity
-		bc.DB.Save(&item)
-	} else {
-		item = models.CartItem{
-			CartID:           cart.ID,
-			ProductID:        req.ProductID,
-			ProductVariantID: req.ProductVariantID,
-			Quantity:         req.Quantity,
-		}
-		bc.DB.Create(&item)
-	}
-
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Item berhasil ditambahkan ke keranjang"})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Produk berhasil dipindahkan ke keranjang"})
 }
 
 // POST /api/buyer/checkout
@@ -127,6 +142,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 			SKU:              variant.SKU,
 			UnitPrice:        variant.Price,
 			Quantity:         ci.Quantity,
+			Metadata:         ci.Metadata, // Propagate metadata from cart to order
 			ProductImageURL:  product.Image,
 		})
 	}
@@ -154,13 +170,12 @@ func (bc *BuyerController) GetWishlist(w http.ResponseWriter, r *http.Request) {
 
 	var products []models.Product
 	
-	// Refactored query for better GORM compatibility and field mapping
-	// Using Table("products") + Scan to ensure columns match correctly
-	err := bc.DB.Table("products").
-		Select("products.*").
+	// Standard GORM query with Preload to get all needed associations (variants, etc)
+	err := bc.DB.Model(&models.Product{}).
 		Joins("INNER JOIN wishlists ON wishlists.product_id = products.id").
 		Where("wishlists.buyer_id = ?", buyerID).
-		Scan(&products).Error
+		Preload("Variants").
+		Find(&products).Error
 
 	if err != nil {
 		log.Printf("[Wishlist] Error: %v", err)
@@ -175,8 +190,6 @@ func (bc *BuyerController) GetWishlist(w http.ResponseWriter, r *http.Request) {
 // POST /api/buyer/wishlist/add
 func (bc *BuyerController) AddToWishlist(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
-	
-	log.Printf("[Wishlist] Adding item... Buyer: %s", buyerID)
 
 	var req struct {
 		ProductID string `json:"product_id"`
@@ -186,34 +199,21 @@ func (bc *BuyerController) AddToWishlist(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if req.ProductID == "" {
-		utils.JSONError(w, http.StatusBadRequest, "Product ID tidak boleh kosong")
+	saved, err := bc.BuyerService.ToggleWishlist(buyerID, req.ProductID)
+	if err != nil {
+		log.Printf("Wishlist error (BuyerID: %s, ProductID: %s): %v", buyerID, req.ProductID, err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengelola wishlist: "+err.Error())
 		return
 	}
 
-	// Check if already exist
-	var exist models.Wishlist
-	if err := bc.DB.Where("buyer_id = ? AND product_id = ?", buyerID, req.ProductID).First(&exist).Error; err == nil {
-		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-			"message": "Produk sudah ada di wishlist",
-			"saved": true,
-		})
-		return
+	message := "Produk ditambahkan ke wishlist"
+	if !saved {
+		message = "Produk dihapus dari wishlist"
 	}
 
-	wish := models.Wishlist{
-		BuyerID:   buyerID,
-		ProductID: req.ProductID,
-	}
-
-	if err := bc.DB.Create(&wish).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menambah ke wishlist")
-		return
-	}
-
-	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
-		"message": "Produk ditambahkan ke wishlist",
-		"saved": true,
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": message,
+		"saved":   saved,
 	})
 }
 
@@ -239,20 +239,22 @@ func (bc *BuyerController) CheckWishlist(w http.ResponseWriter, r *http.Request)
 func (bc *BuyerController) RemoveFromWishlist(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 	productID := r.URL.Query().Get("product_id")
-
-	if productID == "" {
-		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
-		return
-	}
-
-	if err := bc.DB.Where("buyer_id = ? AND product_id = ?", buyerID, productID).Delete(&models.Wishlist{}).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus dari wishlist")
+ 
+ 	if productID == "" {
+ 		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
+ 		return
+ 	}
+ 
+ 	_, err := bc.BuyerService.ToggleWishlist(buyerID, productID)
+	if err != nil {
+		log.Printf("Remove from Wishlist error (BuyerID: %s, ProductID: %s): %v", buyerID, productID, err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus dari wishlist: "+err.Error())
 		return
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Produk dihapus dari wishlist",
-		"saved": false,
+		"saved":   false,
 	})
 }
 
@@ -264,4 +266,118 @@ func (bc *BuyerController) GetOrders(w http.ResponseWriter, r *http.Request) {
 	bc.DB.Preload("MerchantGroups.Items").Where("buyer_id = ?", buyerID).Order("created_at desc").Find(&orders)
 
 	utils.JSONResponse(w, http.StatusOK, orders)
+}
+
+// DELETE /api/buyer/cart/item?product_id=...&variant_id=...
+func (bc *BuyerController) RemoveFromCart(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+	productID := r.URL.Query().Get("product_id")
+	variantID := r.URL.Query().Get("variant_id")
+
+	if productID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
+		return
+	}
+
+	var cart models.Cart
+	if err := bc.DB.Where("buyer_id = ?", buyerID).First(&cart).Error; err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Keranjang tidak ditemukan")
+		return
+	}
+
+	query := bc.DB.Where("cart_id = ? AND product_id = ?", cart.ID, productID)
+	if variantID != "" {
+		query = query.Where("product_variant_id = ?", variantID)
+	}
+
+	if err := query.Delete(&models.CartItem{}).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus item dari keranjang")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Item dihapus dari keranjang"})
+}
+
+// GET /api/buyer/profile
+func (bc *BuyerController) GetProfile(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+	var user models.User
+
+	err := bc.DB.Preload("Profile").Where("id = ?", buyerID).First(&user).Error
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Profil tidak ditemukan")
+		return
+	}
+
+	var orders []models.Order
+	bc.DB.Preload("MerchantGroups.Items").Where("buyer_id = ?", buyerID).Order("created_at desc").Find(&orders)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"user":   user,
+		"orders": orders,
+	})
+}
+
+func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Metode tidak diizinkan")
+		return
+	}
+
+	buyerID := r.Context().Value("user_id").(string)
+
+	var req struct {
+		FullName    string `json:"full_name"`
+		Gender      string `json:"gender"`
+		DateOfBirth string `json:"date_of_birth"`
+		Phone       string `json:"phone"`
+		Address     string `json:"address"`
+		City        string `json:"city"`
+		Province    string `json:"province"`
+		ZipCode     string `json:"zip_code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	err := bc.DB.Transaction(func(tx *gorm.DB) error {
+		// Update User Phone
+		if err := tx.Model(&models.User{}).Where("id = ?", buyerID).Update("phone", req.Phone).Error; err != nil {
+			return err
+		}
+
+		// Update Profile
+		var profile models.UserProfile
+		if err := tx.Where("user_id = ?", buyerID).First(&profile).Error; err != nil {
+			return err
+		}
+
+		profile.FullName = req.FullName
+		profile.Gender = &req.Gender
+		profile.Address = req.Address
+		profile.City = req.City
+		profile.Province = req.Province
+		profile.ZipCode = req.ZipCode
+
+		if req.DateOfBirth != "" {
+			profile.DateOfBirth = &req.DateOfBirth
+		}
+
+		if err := tx.Save(&profile).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui profil: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": "Profil berhasil diperbarui",
+	})
 }

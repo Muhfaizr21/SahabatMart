@@ -9,7 +9,8 @@ export default function VoucherSection() {
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/vouchers`)
       .then(d => {
-        if (d && d.data) setVouchers(d.data.slice(0, 3)); // Ambil 3 saja untuk landing page
+        const data = Array.isArray(d) ? d : (d.data || []);
+        setVouchers(data.slice(0, 3)); // Ambil 3 saja untuk landing page
       })
       .catch(() => setVouchers([]))
       .finally(() => setLoading(false));

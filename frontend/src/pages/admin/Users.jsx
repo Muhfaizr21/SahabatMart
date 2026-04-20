@@ -23,7 +23,7 @@ export default function AdminUsers() {
       fetchJson(`${API}/users?${p}`),
       fetchJson(`${API}/users/stats`),
     ]).then(([list, s]) => {
-      setUsers(list.data || []);
+      setUsers(list || []);
       setStats(s || {});
     }).catch(console.error).finally(() => setLoading(false));
   };

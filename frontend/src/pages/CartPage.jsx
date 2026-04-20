@@ -1,31 +1,83 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { products } from '../data/products';
-
-const cartItems = [
-  { ...products[0], qty: 1 },
-  { ...products[2], qty: 2 },
-  { ...products[3], qty: 1 },
-];
+import { BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState(cartItems);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [coupon, setCoupon] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
 
-  const updateQty = (id, delta) => {
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item
-    ));
+  const loadCart = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await fetchJson(`${BUYER_API_BASE}/cart`);
+      console.log("DEBUG RESPONSE:", resp);
+      
+      const cartItems = resp.items || resp.Items || [];
+      setItems(cartItems);
+    } catch (err) {
+      console.error('Cart Load Error:', err);
+      setError('Gagal memuat keranjang');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCart(); }, [loadCart]);
+
+  const updateQty = async (id, variantId, productId, currentQty, delta) => {
+    const newQty = Math.max(1, currentQty + delta);
+    if (newQty === currentQty) return;
+
+    try {
+      // Logic AddToCart in backend handles updates if exists, 
+      // but for decrementing/specific set we might need a dedicated PUT endpoint.
+      // However, for now, we'll re-add carefully or provide UX feedback.
+      await fetchJson(`${BUYER_API_BASE}/cart/add`, {
+        method: 'POST',
+        body: JSON.stringify({
+          product_id: productId,
+          product_variant_id: variantId,
+          quantity: delta
+        })
+      });
+      window.dispatchEvent(new Event('cartUpdate'));
+      loadCart();
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
-  const removeItem = (id) => setItems(prev => prev.filter(item => item.id !== id));
+  const removeItem = async (productId, variantId) => {
+    if (!window.confirm('Hapus item ini?')) return;
+    try {
+      let url = `${BUYER_API_BASE}/cart/item?product_id=${productId}`;
+      if (variantId) url += `&variant_id=${variantId}`;
+      
+      const cartData = await fetchJson(url, { method: 'DELETE' });
+      window.dispatchEvent(new Event('cartUpdate'));
+      setItems(prev => prev.filter(item => !(item.product_id === productId && item.product_variant_id === variantId)));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
-  const subtotal = items.reduce((sum, item) => sum + (item.price * 16000) * item.qty, 0);
+  const subtotal = items.reduce((sum, item) => sum + (item.product_variant?.price || 0) * item.quantity, 0);
   const discount = couponApplied ? subtotal * 0.1 : 0;
-  const shipping = subtotal > 500000 ? 0 : 15000;
+  const shipping = subtotal > 500000 || subtotal === 0 ? 0 : 15000;
   const total = subtotal - discount + shipping;
+
+  if (loading) return (
+     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+           <p className="text-gray-500 font-bold">Sinkronisasi Keranjang...</p>
+        </div>
+     </main>
+  );
 
   return (
     <main className="bg-gray-50 min-h-screen">
@@ -70,43 +122,42 @@ export default function CartPage() {
                     <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-5 items-center">
                       {/* Product */}
                       <div className="md:col-span-5 flex items-center gap-4">
-                        <Link to={`/product/${item.id}`} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        <Link to={`/product/${item.product_id}`} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
+                          <img src={formatImage(item.product?.image)} alt={item.product?.name} className="w-full h-full object-cover" />
                         </Link>
                         <div>
-                          <div className="text-xs text-blue-600 mb-0.5 font-medium">{item.category}</div>
-                          <Link to={`/product/${item.id}`} className="text-sm font-semibold text-gray-800 hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
-                            {item.name}
+                          <div className="text-[10px] text-blue-600 mb-0.5 font-black uppercase tracking-widest">{item.product?.category}</div>
+                          <Link to={`/product/${item.product_id}`} className="text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+                            {item.product?.name}
                           </Link>
+                          {item.product_variant?.name !== "Default" && (
+                             <span className="text-[10px] text-gray-400 font-bold uppercase mt-1 block">Varian: {item.product_variant?.name}</span>
+                          )}
                         </div>
                       </div>
                       {/* Price */}
                       <div className="md:col-span-2 text-center">
-                        <div className="text-sm font-bold text-gray-700">Rp{(item.price * 16000).toLocaleString('id')}</div>
+                        <div className="text-sm font-bold text-gray-700">Rp{(item.product_variant?.price || 0).toLocaleString('id')}</div>
                       </div>
                       {/* Qty */}
                       <div className="md:col-span-2 flex items-center justify-center">
-                        <div className="flex items-center border-2 border-gray-200 rounded-xl overflow-hidden">
-                          <button onClick={() => updateQty(item.id, -1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-500 hover:bg-gray-50">-</button>
-                          <span className="w-10 text-center text-sm font-bold">{item.qty}</span>
-                          <button onClick={() => updateQty(item.id, 1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-500 hover:bg-gray-50">+</button>
+                        <div className="flex items-center border-2 border-gray-100 rounded-xl overflow-hidden">
+                          <button onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.quantity, -1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-400 hover:bg-gray-50 transition-colors">-</button>
+                          <span className="w-10 text-center text-sm font-black text-blue-700">{item.quantity}</span>
+                          <button onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.quantity, 1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-400 hover:bg-gray-50 transition-colors">+</button>
                         </div>
                       </div>
                       {/* Total */}
                       <div className="md:col-span-2 text-center">
-                        <div className="text-sm font-bold text-gray-900">Rp{(item.price * 16000 * item.qty).toLocaleString('id')}</div>
+                        <div className="text-sm font-black text-gray-900">Rp{((item.product_variant?.price || 0) * item.quantity).toLocaleString('id')}</div>
                       </div>
                       {/* Remove */}
                       <div className="md:col-span-1 flex justify-center">
                         <button
-                          onClick={() => removeItem(item.id)}
-                          className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 flex items-center justify-center transition-colors"
+                          onClick={() => removeItem(item.product_id, item.product_variant_id)}
+                          className="w-10 h-10 rounded-xl bg-red-50 hover:bg-red-500 text-red-400 hover:text-white flex items-center justify-center transition-all group"
                         >
-                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                            <path d="M10 11v6"/><path d="M14 11v6"/>
-                            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
-                          </svg>
+                          <i className="bx bx-trash text-lg"></i>
                         </button>
                       </div>
                     </div>
@@ -116,74 +167,77 @@ export default function CartPage() {
 
               {/* Coupon */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mt-5">
-                <h3 className="font-semibold text-gray-900 mb-3">Kode Kupon</h3>
+                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                   <i className="bx bxs-coupon text-blue-600"></i> Kode Kupon
+                </h3>
                 <div className="flex gap-3">
                   <input
                     type="text"
                     value={coupon}
                     onChange={e => setCoupon(e.target.value)}
                     placeholder="Masukkan kode kupon..."
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors"
+                    className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 transition-colors font-medium"
                   />
                   <button
                     onClick={() => { if (coupon.toUpperCase() === 'SAHABAT10') setCouponApplied(true); }}
-                    className="bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl text-sm transition-all shadow-lg shadow-blue-100 active:scale-95"
                   >
                     Terapkan
                   </button>
                 </div>
                 {couponApplied && (
-                  <div className="mt-2 text-sm text-green-600 font-medium">✓ Kupon berhasil diterapkan! Diskon 10%</div>
+                  <div className="mt-3 text-xs bg-green-50 text-green-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                     <i className="bx bxs-check-circle"></i> Kupon Berhasil! Diskon 10%
+                  </div>
                 )}
-                <p className="text-xs text-gray-400 mt-2">Coba kupon: SAHABAT10</p>
               </div>
             </div>
 
             {/* Summary */}
             <div className="lg:w-80 flex-shrink-0">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24">
-                <h3 className="font-bold text-gray-900 text-lg mb-5">Ringkasan Pesanan</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between text-gray-600">
+              <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 p-8 sticky top-24">
+                <h3 className="font-black text-gray-900 text-xl mb-6">Order Summary</h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex justify-between text-gray-500 font-medium">
                     <span>Subtotal ({items.length} item)</span>
-                    <span className="font-medium text-gray-900">Rp{subtotal.toLocaleString('id')}</span>
+                    <span className="font-bold text-gray-900">Rp{subtotal.toLocaleString('id')}</span>
                   </div>
                   {couponApplied && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Diskon Kupon (10%)</span>
+                    <div className="flex justify-between text-green-600 font-bold">
+                      <span>Diskon Kupon</span>
                       <span>-Rp{discount.toLocaleString('id')}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-gray-500 font-medium">
                     <span>Ongkos Kirim</span>
-                    <span className={shipping === 0 ? 'text-green-600 font-medium' : 'font-medium text-gray-900'}>
+                    <span className={shipping === 0 ? 'text-green-600 font-bold' : 'font-bold text-gray-900'}>
                       {shipping === 0 ? 'GRATIS' : `Rp${shipping.toLocaleString('id')}`}
                     </span>
                   </div>
-                  {shipping > 0 && (
-                    <p className="text-xs text-gray-400">Gratis ongkir untuk pembelian di atas Rp500.000</p>
-                  )}
-                  <div className="border-t border-gray-100 pt-3 flex justify-between font-bold text-gray-900 text-base">
+                  <div className="border-t border-gray-100 pt-5 flex justify-between font-black text-gray-900 text-xl">
                     <span>Total</span>
-                    <span>Rp{total.toLocaleString('id')}</span>
+                    <span className="text-blue-700">Rp{total.toLocaleString('id')}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => navigate('/checkout')}
-                  className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm"
+                  className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2"
                 >
-                  Lanjut ke Checkout →
+                  Checkout Now <i className="bx bx-right-arrow-alt text-xl"></i>
                 </button>
-                <Link to="/shop" className="w-full mt-3 border-2 border-gray-200 hover:border-blue-400 text-gray-600 hover:text-blue-600 font-semibold py-3 rounded-xl transition-colors text-sm text-center block">
-                  Lanjut Belanja
+                <Link to="/shop" className="w-full mt-4 flex items-center justify-center font-bold text-gray-400 hover:text-blue-600 transition-colors text-sm">
+                   Lanjut Belanja
                 </Link>
 
-                {/* Payment icons */}
-                <div className="mt-5 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 text-center mb-3">Metode Pembayaran</p>
-                  <div className="flex justify-center gap-2">
-                    {['VISA', 'MC', 'BCA', 'OVO', 'GoPay'].map(m => (
-                      <span key={m} className="text-xs bg-gray-50 border border-gray-200 px-2 py-1 rounded font-bold text-gray-500">{m}</span>
+                {/* Secure info */}
+                <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                   <div className="flex items-center justify-center gap-2 mb-4">
+                      <i className="bx bxs-lock-alt text-gray-300"></i>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Secure Payment</span>
+                   </div>
+                  <div className="flex justify-center gap-3 opacity-30 grayscale hover:grayscale-0 transition-all">
+                    {['VISA', 'MC', 'BCA', 'BWA'].map(m => (
+                      <span key={m} className="text-[9px] bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded font-black text-gray-500">{m}</span>
                     ))}
                   </div>
                 </div>

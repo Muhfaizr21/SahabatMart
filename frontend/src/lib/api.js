@@ -27,6 +27,7 @@ export async function fetchJson(url, options = {}) {
     if (response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      window.location.href = '/login'; // Force redirect to login
     }
 
     if (!response.ok) {
@@ -40,7 +41,24 @@ export async function fetchJson(url, options = {}) {
       throw new Error(message);
     }
     
-    return await response.json();
+    const text = await response.text();
+    if (!text) return null;
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      console.error("Server returned non-JSON response:", text);
+      throw new Error("Format respons server tidak valid");
+    }
+    
+    // Pelindung Rekursif: Mengupas lapisan 'success' sampai ketemu data inti
+    // Ini menangani kasus double-wrapping jika backend belum direstart
+    while (result && result.status === 'success' && result.data !== undefined) {
+      result = result.data;
+    }
+    
+    return result;
   } catch (err) {
     throw err;
   }
@@ -48,8 +66,17 @@ export async function fetchJson(url, options = {}) {
 
 // Fungsi yang hilang dan menyebabkan error
 export function formatImage(path) {
-  if (!path || path === "") return null;
+  const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; // Premium Placeholder
+  if (!path || path === "") return fallback;
   if (path.startsWith('http')) return path;
+  if (path.startsWith('photo-')) {
+    // Exact format for Unsplash source
+    return `https://images.unsplash.com/${path}?auto=format&fit=crop&q=80&w=800`;
+  }
+  if (!path.includes('/') && !path.includes('.')) {
+    // Probably a broken ID or partial path
+    return fallback;
+  }
   return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 

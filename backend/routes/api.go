@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 	"gorm.io/gorm"
 )
@@ -14,11 +15,14 @@ import (
 func SetupRoutes(db *gorm.DB) http.Handler {
 	mux := http.NewServeMux()
 
+	notifService := services.NewNotificationService(db)
+
 	authCtrl := controllers.NewAuthController(db)
 	buyerCtrl := controllers.NewBuyerController(db)
 	merchantCtrl := controllers.NewMerchantController(db)
 	adminCtrl := controllers.NewAdminController(db)
-	affiliateCtrl := controllers.NewAffiliateController(db)
+	affiliateCtrl := controllers.NewAffiliateController(db, notifService)
+	productCtrl := controllers.NewProductController(db)
 
 	// Middleware
 	cors := corsMiddleware
@@ -33,12 +37,18 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	buyerOnly := actorOnly("buyer", "admin", "superadmin", "merchant", "affiliate")
 	mux.HandleFunc("/api/buyer/cart", buyerOnly(buyerCtrl.GetCart))
 	mux.HandleFunc("/api/buyer/cart/add", buyerOnly(buyerCtrl.AddToCart))
+	mux.HandleFunc("/api/buyer/cart/item", buyerOnly(buyerCtrl.RemoveFromCart))
+	mux.HandleFunc("/api/buyer/cart/move-from-wishlist", buyerOnly(buyerCtrl.MoveToCart))
 	mux.HandleFunc("/api/buyer/checkout", buyerOnly(buyerCtrl.Checkout))
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
+	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
+	mux.HandleFunc("/api/buyer/profile/update", buyerOnly(buyerCtrl.UpdateProfile))
 	mux.HandleFunc("/api/buyer/wishlist", buyerOnly(buyerCtrl.GetWishlist))
 	mux.HandleFunc("/api/buyer/wishlist/add", buyerOnly(buyerCtrl.AddToWishlist))
 	mux.HandleFunc("/api/buyer/wishlist/check", buyerOnly(buyerCtrl.CheckWishlist))
 	mux.HandleFunc("/api/buyer/wishlist/remove", buyerOnly(buyerCtrl.RemoveFromWishlist))
+	mux.HandleFunc("/api/buyer/products/can-review", buyerOnly(productCtrl.CheckCanReview))
+	mux.HandleFunc("/api/buyer/products/review", buyerOnly(productCtrl.SubmitReview))
 
 	// --- Merchant Routes ---
 	merchantOnly := actorOnly("merchant", "admin", "superadmin")
@@ -129,7 +139,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// Order & Transactions
 	mux.HandleFunc("/api/admin/orders", adminOnly(adminCtrl.GetAllOrders))
-	mux.HandleFunc("/api/admin/orders/detail", adminOnly(adminCtrl.GetOrderDetail))
+	mux.HandleFunc("/api/admin/orders/", adminOnly(adminCtrl.GetOrderDetail))
 	mux.HandleFunc("/api/admin/orders/status", adminOnly(adminCtrl.UpdateOrderStatus))
 	mux.HandleFunc("/api/admin/orders/freeze", adminOnly(adminCtrl.FreezeOrder))
 	mux.HandleFunc("/api/admin/disputes", adminOnly(adminCtrl.GetDisputes))
@@ -181,6 +191,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/config", adminCtrl.GetPublicConfig)
 	mux.HandleFunc("/api/public/products/detail", adminCtrl.GetPublicProductDetail)
 	mux.HandleFunc("/api/public/products", adminCtrl.GetPublicProducts)
+	mux.HandleFunc("/api/public/products/reviews", productCtrl.GetReviews)
 	
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)

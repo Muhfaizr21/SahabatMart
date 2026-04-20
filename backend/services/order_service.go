@@ -13,15 +13,20 @@ type OrderService struct {
 	OrderRepo      *repositories.OrderRepository
 	UserRepo       *repositories.UserRepository
 	FinanceService *FinanceService
+	Affiliate      *AffiliateService
+	Notification   *NotificationService
 	ConfigService  *ConfigService
 	DB             *gorm.DB
 }
 
 func NewOrderService(db *gorm.DB) *OrderService {
+	notif := NewNotificationService(db)
 	return &OrderService{
 		OrderRepo:      repositories.NewOrderRepository(db),
 		UserRepo:       repositories.NewUserRepository(db),
 		FinanceService: NewFinanceService(db),
+		Affiliate:      NewAffiliateService(db, notif),
+		Notification:   notif,
 		ConfigService:  NewConfigService(db),
 		DB:             db,
 	}
@@ -33,7 +38,6 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		merchantItems[item.MerchantID] = append(merchantItems[item.MerchantID], item)
 	}
 
-	// Resolve affiliate by ID or ref_code (in AffiliateRefCode field)
 	var resolvedAffiliate *models.AffiliateMember
 	if affiliateID != nil && *affiliateID != "" {
 		var aff models.AffiliateMember
@@ -83,6 +87,18 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			for _, item := range gItems {
 				commRate, platRate, _ := s.CalculateCommission(tx, item, affiliateID)
 
+				// Decrement Stock
+				var variant models.ProductVariant
+				if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&variant, "id = ?", item.ProductVariantID).Error; err != nil {
+					return fmt.Errorf("varian produk tidak ditemukan: %w", err)
+				}
+				if variant.Stock < item.Quantity {
+					return fmt.Errorf("stok produk '%s' tidak mencukupi (Tersisa: %d)", item.ProductName, variant.Stock)
+				}
+				if err := tx.Model(&variant).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+					return err
+				}
+
 				item.OrderID = order.ID
 				item.OrderMerchantGroupID = group.ID
 				item.Subtotal = item.UnitPrice * float64(item.Quantity)
@@ -95,30 +111,39 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					return err
 				}
 
-				// ── AFFILIATE COMMISSION RECORDING ──────────────────────────────
 				if resolvedAffiliate != nil && item.CommissionAmount > 0 {
-					holdDays := 7
-					if resolvedAffiliate.Tier != nil {
-						holdDays = resolvedAffiliate.Tier.CommissionHoldDays
+					var lastClick models.AffiliateClick
+					err := tx.Where("affiliate_id = ? AND product_id = ?", resolvedAffiliate.ID, item.ProductID).
+						Order("created_at DESC").First(&lastClick).Error
+					
+					if err == nil && lastClick.IsFraud {
+						item.CommissionAmount = 0
+						item.CommissionRate = 0
 					}
-					holdUntil := time.Now().AddDate(0, 0, holdDays)
-					commission := models.AffiliateCommission{
-						AffiliateID: resolvedAffiliate.ID,
-						OrderID:     order.ID,
-						OrderItemID: item.ID,
-						ProductID:   item.ProductID,
-						MerchantID:  item.MerchantID,
-						GrossAmount: item.Subtotal,
-						RateApplied: commRate,
-						Amount:      item.CommissionAmount,
-						Status:      models.CommissionPending,
-						HoldUntil:   &holdUntil,
-					}
-					if err := tx.Create(&commission).Error; err != nil {
-						return err
+
+					if item.CommissionAmount > 0 {
+						holdDays := 7
+						if resolvedAffiliate.Tier != nil {
+							holdDays = resolvedAffiliate.Tier.CommissionHoldDays
+						}
+						holdUntil := time.Now().AddDate(0, 0, holdDays)
+						commission := models.AffiliateCommission{
+							AffiliateID: resolvedAffiliate.ID,
+							OrderID:     order.ID,
+							OrderItemID: item.ID,
+							ProductID:   item.ProductID,
+							MerchantID:  item.MerchantID,
+							GrossAmount: item.Subtotal,
+							RateApplied: commRate,
+							Amount:      item.CommissionAmount,
+							Status:      models.CommissionPending,
+							HoldUntil:   &holdUntil,
+						}
+						if err := tx.Create(&commission).Error; err != nil {
+							return err
+						}
 					}
 				}
-				// ────────────────────────────────────────────────────────────────
 
 				gSub += item.Subtotal
 				gPlat += item.PlatformFeeAmount
@@ -148,17 +173,31 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			return err
 		}
 
-		// ── INCREMENT AFFILIATE CONVERSION COUNTER ───────────────────────────
-		if resolvedAffiliate != nil {
-			tx.Model(&models.AffiliateMember{}).Where("id = ?", resolvedAffiliate.ID).
-				Updates(map[string]interface{}{
-					"total_conversions": gorm.Expr("total_conversions + 1"),
-				})
+		if order.VoucherCode != "" {
+			var voucher models.Voucher
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&voucher, "code = ? AND status = ?", order.VoucherCode, "active").Error; err == nil {
+				if voucher.Quota > voucher.Used {
+					order.VoucherID = &voucher.ID
+					// Sync: Decrement quota atomically
+					if err := tx.Model(&voucher).Update("used", gorm.Expr("used + 1")).Error; err != nil {
+						return err
+					}
+				} else {
+					return fmt.Errorf("voucher '%s' sudah habis", order.VoucherCode)
+				}
+			}
 		}
-		// ────────────────────────────────────────────────────────────────────
 
 		return nil
 	})
+
+	if err == nil {
+		// [NOTIF] Kirim ke Admin Topbar (Pesanan Baru)
+		adminID := "00000000-0000-0000-0000-000000000001"
+		_ = s.Notification.Push(adminID, "admin", "order_new", "Pesanan Baru Masuk!", 
+			fmt.Sprintf("Pesanan %s menunggu pembayaran.", order.OrderNumber), 
+			fmt.Sprintf("/admin/orders/%s", order.ID))
+	}
 
 	return order, err
 }
@@ -184,7 +223,31 @@ func (s *OrderService) CompletePayment(orderID string) error {
 		}
 
 		// Distribusikan dana otomatis ke Merchant & Affiliate
-		return s.FinanceService.DistributeFunds(tx, order.ID)
+		if err := s.FinanceService.DistributeFunds(tx, order.ID); err != nil {
+			return err
+		}
+
+		// Notifikasi ke Buyer
+		_ = s.Notification.Push(order.BuyerID, "buyer", "payment_success", "Pembayaran Berhasil", 
+			fmt.Sprintf("Pembayaran untuk pesanan %s telah kami terima.", order.OrderNumber), 
+			fmt.Sprintf("/orders/%s", order.ID))
+
+		// [NOTIF] Kirim ke Admin Topbar (Pembayaran Masuk)
+		adminID := "00000000-0000-0000-0000-000000000001"
+		_ = s.Notification.Push(adminID, "admin", "payment_received", "Pembayaran Diterima!", 
+			fmt.Sprintf("Pembayaran untuk pesanan %s telah divalidasi.", order.OrderNumber), 
+			fmt.Sprintf("/admin/orders/%s", order.ID))
+
+		// Cek Upgrade Tier Affiliate jika ada
+		if order.AffiliateID != nil {
+			// Increment Conversion Count
+			tx.Model(&models.AffiliateMember{}).Where("id = ?", *order.AffiliateID).
+				UpdateColumn("total_conversions", gorm.Expr("total_conversions + 1"))
+
+			_ = s.Affiliate.TriggerTierUpgrade(*order.AffiliateID)
+		}
+
+		return nil
 	})
 }
 
@@ -219,8 +282,9 @@ func (s *OrderService) CalculateCommission(db *gorm.DB, item models.OrderItem, a
 	}
 
 	// 4. Calculate Affiliate Commission
-	commRate := defaultCommRate
+	commRate := 0.0 // [FIX] Default harus 0 jika tidak lewat affiliate
 	if affiliateID != nil && *affiliateID != "" {
+		commRate = defaultCommRate // Gunakan default jika lewat affiliate tapi tier tidak ditemukan
 		if aff, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
 			var tier models.MembershipTier
 			if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
@@ -231,3 +295,62 @@ func (s *OrderService) CalculateCommission(db *gorm.DB, item models.OrderItem, a
 
 	return commRate, platFee, nil
 }
+
+func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		if err := tx.Preload("Items").First(&order, "id = ?", orderID).Error; err != nil {
+			return err
+		}
+
+		if order.Status == models.OrderCancelled || order.Status == models.OrderCompleted {
+			return fmt.Errorf("pesanan sudah dalam status akhir")
+		}
+
+		// Return Stock
+		for _, item := range order.Items {
+			if err := tx.Model(&models.ProductVariant{}).Where("id = ?", item.ProductVariantID).
+				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+				return err
+			}
+		}
+
+		now := time.Now()
+		order.Status = models.OrderCancelled
+		order.CancelReason = reason
+		order.CancelledBy = &cancelledBy
+		order.CancelledAt = &now
+
+		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+
+		// Sync Merchant Group Status
+		if err := tx.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", order.ID).
+			Update("status", models.MOrderCancelled).Error; err != nil {
+			return err
+		}
+
+		// Refund/Reversal logic if paid (simplified for now as only pending_payment can be cancelled by user)
+		// ...
+
+		return nil
+	})
+}
+
+func (s *OrderService) ExpireOrders() error {
+	// Find orders pending_payment older than 24 hours
+	expiryTime := time.Now().Add(-24 * time.Hour)
+	var orders []models.Order
+	if err := s.DB.Where("status = ? AND created_at < ?", models.OrderPendingPayment, expiryTime).Find(&orders).Error; err != nil {
+		return err
+	}
+
+	for _, order := range orders {
+		if err := s.CancelOrder(order.ID, "Sistem: Waktu pembayaran habis", "system"); err != nil {
+			fmt.Printf("❌ Gagal membatalkan pesanan %s: %v\n", order.ID, err)
+		}
+	}
+	return nil
+}
+

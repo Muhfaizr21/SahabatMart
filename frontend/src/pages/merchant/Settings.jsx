@@ -10,7 +10,7 @@ const MerchantSettings = () => {
 
     useEffect(() => {
         fetchJson(`${MERCHANT_API_BASE}/store`)
-            .then(res => setStore(res.data || res))
+            .then(res => setStore(res || {}))
             .finally(() => setLoading(false));
     }, []);
 

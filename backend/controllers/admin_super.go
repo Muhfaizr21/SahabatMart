@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -347,6 +348,7 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 
 	type OrderRow struct {
 		ID             string    `json:"id"`
+		OrderID        string    `json:"order_id"`
 		MerchantID     string    `json:"merchant_id"`
 		StoreName      string    `json:"store_name"`
 		BuyerName      string    `json:"buyer_name"`
@@ -359,8 +361,9 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 		CreatedAt      time.Time `json:"created_at"`
 	}
 
+	// [FIX] Mengambil o.id agar detail pesanan bisa ditemukan di tabel orders
 	query := ac.DB.Table("order_merchant_groups omg").
-		Select("omg.id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
+		Select("o.id, o.id as order_id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
 		Joins("JOIN merchants m ON m.id = omg.merchant_id").
 		Joins("JOIN orders o ON o.id = omg.order_id").
 		Joins("JOIN users u ON u.id = o.buyer_id").
@@ -372,6 +375,9 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 
 	var orders []OrderRow
 	query.Order("omg.created_at DESC").Scan(&orders)
+
+	fmt.Printf("[DEBUG] GetAllOrders returning %d rows. Sample ID[0]: %s\n", len(orders), "")
+	if len(orders) > 0 { fmt.Printf("[DEBUG] Top Order ID: %s\n", orders[0].ID) }
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -638,17 +644,21 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 		Description string    `json:"description"`
 		Slug        string    `json:"slug"`
 		Price       float64   `json:"price"`
+		OldPrice    float64   `json:"old_price"`
+		Category    string    `json:"category"`
+		Brand       string    `json:"brand"`
+		Stock       int       `json:"stock"`
+		Attributes  string    `json:"attributes"`
+		Image       string    `json:"image"`
+		Images      string    `json:"images"`
 		Status      string    `json:"status"`
 		MerchantID  string    `json:"merchant_id"`
 		StoreName   string    `json:"store_name"`
-		Category    string    `json:"category"`
-		Attributes  string    `json:"attributes"`
-		Image       string    `json:"image"`
 		CreatedAt   time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("products p").
-		Select("p.id, p.name, p.description, p.image, p.slug, p.price, p.status, p.merchant_id, m.store_name, p.category, p.attributes, p.created_at").
+		Select("p.id, p.name, p.description, p.image, p.images, p.slug, p.price, p.old_price, p.stock, p.status, p.merchant_id, m.store_name, p.category, p.brand, p.attributes, p.created_at").
 		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id")
 
 	if status != "" {
@@ -787,6 +797,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		Attributes  string  `json:"attributes"`
 		Stock       int     `json:"stock"`
 		Image       string  `json:"image"`
+		Images      string  `json:"images"` // Added missing images field
 		Status      string  `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -804,6 +815,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"attributes":  req.Attributes,
 		"stock":       req.Stock,
 		"image":       req.Image,
+		"images":      req.Images, // Ensuring gallery images are updated
 		"status":      req.Status,
 	}
 
@@ -953,10 +965,25 @@ func (ac *AdminController) GetFinanceLedger(w http.ResponseWriter, r *http.Reque
 // GET /api/admin/orders/:id  → Detail pesanan lengkap (Req 1, 6)
 func (ac *AdminController) GetOrderDetail(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/admin/orders/")
+	fmt.Printf("[DEBUG] Fetching Order Detail. Path: %s, ID: '%s'\n", r.URL.Path, id)
 	var order models.Order
-	if err := ac.DB.Preload("MerchantGroups.Items").First(&order, "id = ?", id).Error; err != nil {
-		utils.JSONError(w, http.StatusNotFound, "Order not found")
+	// Gunakan CAST agar Postgres tidak bingung dengan tipe data UUID
+	if err := ac.DB.Preload("MerchantGroups.Items").First(&order, "id = CAST(? AS UUID)", id).Error; err != nil {
+		fmt.Printf("[ERROR] Order Detail Failed for ID '%s': %v\n", id, err)
+		utils.JSONError(w, http.StatusNotFound, "Order not found in database")
 		return
+	}
+
+	// [HOTFIX] Jika pesanan mandiri (tanpa affiliate), pastikan komisi tampil 0 (bersihkan data lama)
+	if order.AffiliateID == nil || *order.AffiliateID == "" {
+		order.TotalCommission = 0
+		for i := range order.MerchantGroups {
+			order.MerchantGroups[i].Commission = 0
+			for j := range order.MerchantGroups[i].Items {
+				order.MerchantGroups[i].Items[j].CommissionAmount = 0
+				order.MerchantGroups[i].Items[j].CommissionRate = 0
+			}
+		}
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -1001,14 +1028,29 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Audit Trail (Req 9)
-	adminID := "admin-system"
-	utils.LogAudit(ac.DB, adminID, "update_order_status", "order", order.ID, fmt.Sprintf("Changed status from %s to %s. Note: %s", oldStatus, req.Status, req.Note), oldStatus, req.Status, r.RemoteAddr, r.UserAgent())
+	// [FIX] Sinkronkan status ke semua Merchant Groups dengan mapping yang benar
+	mStatus := string(req.Status)
+	if req.Status == models.OrderPaid { mStatus = "confirmed" }
+	
+	if err := ac.DB.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", order.ID).Update("status", mStatus).Error; err != nil {
+		fmt.Printf("[WARNING] Failed to sync status to merchant groups: %v\n", err)
+	}
+
+	// Audit Trail (Req 9) - Fix: Split host from port for inet type
+	adminID := "00000000-0000-0000-0000-000000000001" 
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip == "" { ip = r.RemoteAddr }
+	utils.LogAudit(ac.DB, adminID, "update_order_status", "order", order.ID, fmt.Sprintf("Changed status from %s to %s. Note: %s", oldStatus, req.Status, req.Note), string(oldStatus), string(req.Status), ip, r.UserAgent())
 
 	// If status is PAID, trigger background work (Commissions, etc - Req 13)
 	if req.Status == models.OrderPaid {
 		// Mock triggering commission approval/processing
 	}
+
+	// [NOTIF] Kirim Notifikasi ke Admin Topbar
+	notifTitle := fmt.Sprintf("Pesanan #%s Berubah", order.OrderNumber)
+	notifMsg := fmt.Sprintf("Status pesanan kini menjadi %s.", strings.ToUpper(string(req.Status)))
+	_ = ac.Notif.Push(adminID, "admin", "status_update", notifTitle, notifMsg, fmt.Sprintf("/admin/orders/%s", order.ID))
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",
@@ -1292,6 +1334,7 @@ func (ac *AdminController) ToggleLogistic(w http.ResponseWriter, r *http.Request
 // ─────────────────────────────────────────────────────────────────────────────
 // DISPUTE & ARBITRATION
 // ─────────────────────────────────────────────────────────────────────────────
+
 
 func (ac *AdminController) GetDisputes(w http.ResponseWriter, r *http.Request) {
 	var disputes []models.Dispute
@@ -1599,11 +1642,16 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 	ac.DB.Model(&models.User{}).Where("role = 'affiliate'").Count(&totalAffiliates)
 	if ac.hasTable("order_merchant_groups") {
 		ac.DB.Table("order_merchant_groups").Count(&totalOrders)
+		
+		// [FIX] Gunakan MerchantOrderStatus yang benar agar SUM tidak 0
+		activeStats := []string{"confirmed", "processing", "packed", "handed_to_courier", "shipped", "delivered", "completed"}
+		
 		ac.DB.Table("order_merchant_groups").
-			Where("status = 'completed'").
+			Where("status IN ?", activeStats).
 			Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
+		
 		ac.DB.Table("order_merchant_groups").
-			Where("status = 'completed'").
+			Where("status IN ?", activeStats).
 			Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalFee)
 	}
 	if ac.hasTable("payout_requests") {

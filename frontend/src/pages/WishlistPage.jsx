@@ -32,24 +32,32 @@ export default function WishlistPage() {
     if (!window.confirm('Hapus produk ini dari wishlist?')) return;
     try {
       await fetchJson(`${BUYER_API_BASE}/wishlist/remove?product_id=${id}`, { method: 'DELETE' });
+      window.dispatchEvent(new Event('cartUpdate'));
       setItems(prev => prev.filter(x => x.id !== id));
     } catch (err) { alert(err.message); }
   };
 
-  const addToCart = async (p) => {
+  const moveToCart = async (p) => {
     setActing(p.id);
     try {
-      await fetchJson(`${BUYER_API_BASE}/cart/add`, {
+      // Find the first variant ID, or fallback to product ID if no variants preloaded
+      const variantId = p.variants && p.variants.length > 0 ? p.variants[0].id : p.id;
+      
+      await fetchJson(`${BUYER_API_BASE}/cart/move-from-wishlist`, {
         method: 'POST',
         body: JSON.stringify({
           product_id: p.id,
-          product_variant_id: p.id, // default variant used here
+          product_variant_id: variantId,
           quantity: 1
         })
       });
-      alert('Berhasil ditambahkan ke keranjang!');
+      window.dispatchEvent(new Event('cartUpdate'));
+      
+      // Update UI: Remove from list after successful move
+      setItems(prev => prev.filter(x => x.id !== p.id));
+      alert('Produk berhasil dipindahkan ke keranjang belanja! 🛒✨');
     } catch (err) { 
-      alert(err.message); 
+      alert(err.message || 'Gagal memindahkan produk'); 
     } finally { 
       setActing(null); 
     }
@@ -154,28 +162,32 @@ export default function WishlistPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex-1">
-                      <Link to={`/product/${item.id}`} className="block">
-                         <h3 className="font-extrabold text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors uppercase tracking-tight truncate">{item.name}</h3>
-                      </Link>
-                      <p className="text-slate-400 text-xs font-bold uppercase mt-1">ID: #{item.id.slice(-6).toUpperCase()}</p>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-indigo-600 font-black text-xl leading-none">Rp{(item.price || 0).toLocaleString('id-ID')}</p>
+                  <div className="flex flex-col gap-2">
+                    <Link to={`/product/${item.id}`} className="block">
+                      <h3 className="font-extrabold text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors uppercase tracking-tight line-clamp-1">
+                        {item.name}
+                      </h3>
+                    </Link>
+                    <div className="flex items-center justify-between">
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                        ID: #{item.id?.slice(-6).toUpperCase() || 'N/A'}
+                      </p>
+                      <p className="text-indigo-600 font-black text-xl tracking-tight">
+                        Rp{(item.price || 0).toLocaleString('id-ID')}
+                      </p>
                     </div>
                   </div>
 
                   <div className="pt-2">
                     <button 
-                      onClick={() => addToCart(item)}
+                      onClick={() => moveToCart(item)}
                       disabled={acting === item.id || item.stock <= 0}
                       className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 ${item.stock > 0 ? 'bg-slate-900 text-white hover:bg-indigo-600 shadow-xl shadow-slate-200' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                     >
                       {acting === item.id ? (
                         <i className="bx bx-loader-alt animate-spin text-lg"></i>
                       ) : (
-                        <><i className="bx bx-cart-add text-lg"></i> Tambahkan Ke Keranjang</>
+                        <><i className="bx bx-cart-add text-lg"></i> Pindahkan Ke Keranjang</>
                       )}
                     </button>
                   </div>

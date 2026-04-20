@@ -39,7 +39,8 @@ export default function AdminFinance() {
       fetchJson(`${API}/finance/monthly`),
     ]).then(([ov, mo]) => {
       setOverview(ov);
-      setMonthly(mo.data || []);
+      const data = Array.isArray(mo) ? mo : (mo.data || []);
+      setMonthly(data);
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
@@ -49,10 +50,10 @@ export default function AdminFinance() {
       const params = new URLSearchParams();
       if (dateFrom) params.append('from', dateFrom);
       if (dateTo)   params.append('to', dateTo);
-      fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(d.data || []));
+      fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(d || []));
     }
     if (tab === 'ledger') {
-      fetchJson(`${API}/finance/ledger`).then(d => setLedger(d.data || []));
+      fetchJson(`${API}/finance/ledger`).then(d => setLedger(d || []));
     }
   }, [tab]);
 
@@ -60,7 +61,7 @@ export default function AdminFinance() {
     const params = new URLSearchParams();
     if (dateFrom) params.append('from', dateFrom);
     if (dateTo)   params.append('to', dateTo);
-    fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(d.data || []));
+    fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(d || []));
   };
 
   const maxRevenue = Math.max(...monthly.map(m => m.revenue), 1);
@@ -242,7 +243,7 @@ export default function AdminFinance() {
               <div style={{ fontWeight:800, color:'#3730a3', fontSize:14 }}>Immutable Financial Ledger</div>
               <div style={{ fontSize:12, color:'#4f46e5', marginTop:2 }}>Atomic reconciliation log dengan 99.9% data integrity via Postgres Engine.</div>
             </div>
-            <button style={{ ...A.btnGhost, marginLeft:'auto', fontSize:12 }} onClick={() => fetchJson(`${API}/finance/ledger`).then(d => setLedger(d.data || []))}>
+            <button style={{ ...A.btnGhost, marginLeft:'auto', fontSize:12 }} onClick={() => fetchJson(`${API}/finance/ledger`).then(d => setLedger(d || []))}>
               <i className="bx bx-refresh" /> Reload
             </button>
           </div>
