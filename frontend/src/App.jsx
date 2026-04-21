@@ -81,6 +81,7 @@ import AdminBlogs from './pages/admin/Blogs';
 import AdminBanners from './pages/admin/Banners';
 import AdminInbox from './pages/admin/Inbox';
 import AdminPOS from './pages/admin/POS';
+import AdminRBAC from './pages/admin/RBAC';
 import WishlistStats from './pages/admin/WishlistStats';
 
 // ── Penanganan Khusus Header/Footer ─────────
@@ -222,6 +223,7 @@ export default function App() {
             <Route path="blogs" element={<AdminBlogs />} />
             <Route path="banners" element={<AdminBanners />} />
             <Route path="inbox" element={<AdminInbox />} />
+            <Route path="rbac" element={<AdminRBAC />} />
           </Route>
 
           {/* Merchant Routes */}

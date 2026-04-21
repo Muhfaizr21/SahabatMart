@@ -5,7 +5,7 @@ import (
 )
 
 type Review struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
+	ID         string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	ProductID  string    `gorm:"type:uuid;not null;index" json:"product_id"`
 	MerchantID string    `gorm:"type:uuid;not null;index" json:"merchant_id"`
 	BuyerID    string    `gorm:"type:uuid;not null" json:"buyer_id"`

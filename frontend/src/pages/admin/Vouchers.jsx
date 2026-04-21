@@ -37,9 +37,11 @@ export default function AdminVouchers() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Marketing Vouchers" subtitle="Kelola kampanye diskon dan insentif belanja platform.">
-        <button style={A.btnPrimary} onClick={() => setModal({...EMPTY})}>
-          <i className="bx bx-plus" /> Buat Voucher
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
+          <button style={{ ...A.btnPrimary, flex: '1 1 auto' }} onClick={() => setModal({...EMPTY})}>
+            <i className="bx bx-plus" /> Buat Voucher
+          </button>
+        </div>
       </PageHeader>
 
       {loading ? (
@@ -50,7 +52,11 @@ export default function AdminVouchers() {
           <p style={{ color:'#94a3b8', fontWeight:600 }}>Belum ada voucher. Buat yang pertama!</p>
         </div>
       ) : (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:16 }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: window.innerWidth < 400 ? '1fr' : '1fr 1fr', 
+          gap: 16 
+        }}>
           {vouchers.map(v => {
             const usedPct = v.quota > 0 ? Math.round((v.used||0)/v.quota*100) : 0;
             const isActive = v.status === 'active';
@@ -104,8 +110,8 @@ export default function AdminVouchers() {
 
       {modal && (
         <Modal title={modal.id ? 'Edit Voucher' : 'Buat Voucher Baru'} onClose={() => setModal(null)} wide>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-            <div style={{ gridColumn:'1/-1' }}>
+          <div style={{ display:'grid', gridTemplateColumns: window.innerWidth < 640 ? '1fr' : '1fr 1fr', gap:14 }}>
+            <div style={{ gridColumn: window.innerWidth < 640 ? 'span 1' : '1/-1' }}>
               <FieldLabel>Judul Voucher</FieldLabel>
               <input style={{ ...A.select, width:'100%' }} placeholder="Promo Ramadhan Berkah" value={modal.title} onChange={e=>setModal(p=>({...p,title:e.target.value}))} />
             </div>

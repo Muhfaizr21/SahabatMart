@@ -9,6 +9,7 @@ const API = ADMIN_API_BASE;
 const STATUS_TABS = [
   { val: '', label: 'Semua' },
   { val: 'active', label: 'Aktif' },
+  { val: 'out_of_stock', label: 'Stok Habis' },
   { val: 'taken_down', label: 'Ditarik' },
   { val: 'pending', label: 'Pending' },
 ];
@@ -195,20 +196,24 @@ export default function AdminProductList() {
       )}
 
       <PageHeader title="Product Catalog" subtitle="Kelola dan moderasi seluruh listing produk platform SahabatMart.">
-        <div style={A.searchWrap}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input
-            style={A.searchInput}
-            placeholder="Cari nama produk..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && load()}
-          />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
+          <div style={{ ...A.searchWrap, minWidth: 250, flex: 1 }}>
+            <i className="bx bx-search" style={A.searchIcon} />
+            <input
+              style={A.searchInput}
+              placeholder="Cari nama produk..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && load()}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button style={{ ...A.btnGhost, flex: '1 1 auto' }} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
+            <Link to="/admin/products/add" style={{ ...A.btnPrimary, flex: '1 1 auto', textDecoration: 'none' }}>
+              <i className="bx bx-plus" /> Tambah Produk
+            </Link>
+          </div>
         </div>
-        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
-        <Link to="/admin/products/add" style={A.btnPrimary}>
-          <i className="bx bx-plus" /> Tambah Produk
-        </Link>
       </PageHeader>
 
       <StatRow stats={[
@@ -218,17 +223,22 @@ export default function AdminProductList() {
         { label: 'Pending',      val: stats.pending,  icon: 'bxs-hourglass',    color: '#f59e0b' },
       ]} />
 
-      <TablePanel
-        loading={loading}
-        tabs={STATUS_TABS.map(t => (
-          <button key={t.val} style={A.tab(tab === t.val)} onClick={() => setTab(t.val)}>{t.label}</button>
-        ))}
-        toolbar={
-          <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-            {loading ? 'Memuat...' : `${products.length} produk`}
-          </span>
-        }
-      >
+      <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+        <TablePanel
+          loading={loading}
+          tabs={
+            <div style={{ display: 'flex', overflowX: 'auto', gap: 10, paddingBottom: 4 }}>
+              {STATUS_TABS.map(t => (
+                <button key={t.val} style={{ ...A.tab(tab === t.val), whiteSpace: 'nowrap' }} onClick={() => setTab(t.val)}>{t.label}</button>
+              ))}
+            </div>
+          }
+          toolbar={
+            <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
+              {loading ? 'Memuat...' : `${products.length} produk`}
+            </span>
+          }
+        >
         {products.length === 0 && !loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 20px', gap: 12 }}>
             <i className="bx bxs-package" style={{ fontSize: 52, opacity: 0.15, color: '#6366f1' }} />
@@ -298,7 +308,11 @@ export default function AdminProductList() {
                     </td>
                     {/* Status */}
                     <td style={A.td}>
-                      <span style={statusBadge(p.status)}>{sCfg?.label || p.status}</span>
+                      {p.stock <= 0 ? (
+                        <span style={statusBadge('out_of_stock')}>Stok Habis</span>
+                      ) : (
+                        <span style={statusBadge(p.status)}>{sCfg?.label || p.status}</span>
+                      )}
                     </td>
                     {/* Date */}
                     <td style={A.td}>
@@ -323,46 +337,8 @@ export default function AdminProductList() {
           </div>
         )}
       </TablePanel>
+      </div>
 
-      <Modal 
-        show={!!showQR} 
-        onClose={() => setShowQR(null)} 
-        title="QR Label Produk"
-        width={380}
-      >
-        {showQR && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ background: '#fff', padding: 25, borderRadius: 24, boxShadow: '0 8px 30px rgba(0,0,0,0.05)', display: 'inline-block', border: '1px solid #f1f5f9' }}>
-                  <QRCodeCanvas 
-                      value={showQR.sku || showQR.id} 
-                      size={220}
-                      level="H"
-                      includeMargin={true}
-                  />
-              </div>
-              <div style={{ marginTop: 25 }}>
-                 <h4 style={{ margin: '0 0 5px', fontSize: 18, color: '#0f172a' }}>{showQR.name}</h4>
-                 <p style={{ margin: 0, fontSize: 13, color: '#6366f1', fontWeight: 800, fontFamily: 'monospace' }}>
-                     CODE: {showQR.sku || showQR.id}
-                 </p>
-              </div>
-              <div style={{ marginTop: 30, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <button 
-                    onClick={() => window.print()}
-                    style={{ padding: '12px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    <i className="bx bx-printer" /> Cetak Label
-                  </button>
-                  <button 
-                    onClick={() => setShowQR(null)}
-                    style={{ padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Tutup
-                  </button>
-              </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

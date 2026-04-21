@@ -12,7 +12,9 @@ import (
 func jwtKey() []byte {
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
-		secret = "dev-only-change-this-jwt-secret"
+		// Logika Keamanan: Jangan biarkan aplikasi jalan dengan secret default jika di env tidak ada.
+		// Ini mencegah serangan signature forgery di environment produksi.
+		panic("CRITICAL ERROR: JWT_SECRET environment variable is not set!")
 	}
 	return []byte(secret)
 }

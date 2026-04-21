@@ -105,6 +105,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ShippingInfo models.Order `json:"shipping_info"`
 		AffiliateID  *string      `json:"affiliate_id"`
+		VoucherCode  string       `json:"voucher_code"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -147,6 +148,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	req.ShippingInfo.VoucherCode = req.VoucherCode
 	order, err := bc.OrderService.CreateOrder(buyerID, orderItems, req.AffiliateID, req.ShippingInfo)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat pesanan: "+err.Error())

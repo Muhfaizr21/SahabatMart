@@ -20,6 +20,9 @@ export default function CheckoutPage() {
     address: '', city: '', province: '', postalCode: '', notes: '',
   });
   const [loading, setLoading] = useState(false);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [checkingVoucher, setCheckingVoucher] = useState(false);
 
   useEffect(() => {
     const fetchCheckoutData = async () => {
@@ -61,7 +64,34 @@ export default function CheckoutPage() {
 
   const subtotal = cart.items?.reduce((s, i) => s + (i.product_variant?.price || 0) * i.quantity, 0) || 0;
   const shipping = 0;
-  const total = subtotal + shipping;
+  
+  // Calculate Discount
+  let discount = 0;
+  if (appliedVoucher) {
+    if (appliedVoucher.discount_type === 'percent') {
+      discount = subtotal * (appliedVoucher.discount_value / 100);
+    } else {
+      discount = appliedVoucher.discount_value;
+    }
+  }
+
+  const total = subtotal + shipping - discount;
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode) return;
+    setCheckingVoucher(true);
+    try {
+      const res = await fetchJson(`/api/public/vouchers/check?code=${voucherCode}&subtotal=${subtotal}`);
+      if (res.status === 'success' && res.data) {
+        setAppliedVoucher(res.data);
+      }
+    } catch (err) {
+      alert(err.message);
+      setAppliedVoucher(null);
+    } finally {
+      setCheckingVoucher(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -79,6 +109,7 @@ export default function CheckoutPage() {
           notes: form.notes,
         },
         affiliate_id: localStorage.getItem('affiliate_id') || null,
+        voucher_code: appliedVoucher?.code || '',
       };
 
       await fetchJson(`${BUYER_API_BASE}/checkout`, {
@@ -245,6 +276,32 @@ export default function CheckoutPage() {
                     </div>
                   ))}
                 </div>
+                <div className="mb-5 pt-2">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Masukkan voucher..." 
+                      className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 uppercase"
+                      value={voucherCode}
+                      onChange={e => setVoucherCode(e.target.value.toUpperCase())}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleApplyVoucher}
+                      disabled={checkingVoucher || !voucherCode}
+                      className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-800 disabled:bg-gray-300"
+                    >
+                      {checkingVoucher ? '...' : 'Pasang'}
+                    </button>
+                  </div>
+                  {appliedVoucher && (
+                    <div className="bg-green-50 text-green-700 text-[10px] px-3 py-2 rounded-lg mt-2 font-medium flex justify-between items-center">
+                      <span>Voucher {appliedVoucher.code} terpasang</span>
+                      <button onClick={() => setAppliedVoucher(null)} className="font-bold">Hapus</button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
@@ -254,6 +311,12 @@ export default function CheckoutPage() {
                     <span>Pengiriman</span>
                     <span className="text-green-600 font-medium text-xs">GRATIS (Promo)</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Diskon Voucher</span>
+                      <span className="font-medium">-Rp{discount.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
                     <span>Total</span>
                     <span>Rp{total.toLocaleString('id-ID')}</span>

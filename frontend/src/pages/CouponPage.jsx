@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import toast from 'react-hot-toast';
 
 export default function CouponPage() {
   const [coupons, setCoupons] = useState([]);
@@ -9,11 +10,25 @@ export default function CouponPage() {
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/vouchers`)
       .then(d => {
-        if (d && d.data) setCoupons(d.data);
+        const data = Array.isArray(d) ? d : (d.data || []);
+        setCoupons(data);
       })
       .catch(() => setCoupons([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleCopy = (code) => {
+    navigator.clipboard.writeText(code);
+    toast.success(`Kode ${code} disalin!`, {
+      style: {
+        borderRadius: '16px',
+        background: '#111827',
+        color: '#fff',
+        fontSize: '14px',
+        fontWeight: 'bold',
+      },
+    });
+  };
 
   return (
     <main className="min-h-screen bg-gray-50 py-12">
@@ -66,7 +81,10 @@ export default function CouponPage() {
                   <div className="flex-1 bg-gray-50 border border-dashed border-gray-300 rounded-xl px-2 py-3 font-mono font-bold text-gray-900 text-center tracking-widest text-base sm:text-lg">
                     {c.code}
                   </div>
-                  <button className="bg-gray-900 hover:bg-blue-600 text-white font-bold p-3 rounded-xl transition-colors shrink-0">
+                  <button 
+                    onClick={() => handleCopy(c.code)}
+                    className="bg-gray-900 hover:bg-blue-600 text-white font-bold p-3 rounded-xl transition-colors shrink-0"
+                  >
                     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                   </button>
                 </div>

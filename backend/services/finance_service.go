@@ -139,8 +139,17 @@ func (s *FinanceService) ProcessSettlements() error {
 		limitDate := time.Now().AddDate(0, 0, -7) // Settlement delay 7 hari
 		
 		var txs []models.WalletTransaction
-		// Cari transaksi pending yang sudah melewati batas waktu dan belum di-settle
-		err := tx.Where("pending_after > pending_before AND is_settled = ? AND created_at < ?", false, limitDate).Find(&txs).Error
+		// Hardening: Gabungkan dengan tabel orders untuk memastikan status order valid (tidak sengketa/dibekukan)
+		// Kita hanya mencairkan transaksi yang ReferenceType-nya 'order' DAN order tersebut sudah 'completed'
+		err := tx.Table("wallet_transactions").
+			Select("wallet_transactions.*").
+			Joins("JOIN orders ON orders.id = wallet_transactions.reference_id").
+			Where("wallet_transactions.pending_after > wallet_transactions.pending_before").
+			Where("wallet_transactions.is_settled = ?", false).
+			Where("wallet_transactions.created_at < ?", limitDate).
+			Where("wallet_transactions.reference_type = ?", "order").
+			Where("orders.status = ?", models.OrderCompleted). // Hanya yang sudah selesai
+			Find(&txs).Error
 		if err != nil {
 			return err
 		}

@@ -99,6 +99,12 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					return err
 				}
 
+				// SYNC: Update stok di tabel Product utama juga agar Homepage tersinkron
+				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+					Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+					return err
+				}
+
 				item.OrderID = order.ID
 				item.OrderMerchantGroupID = group.ID
 				item.Subtotal = item.UnitPrice * float64(item.Quantity)
@@ -168,24 +174,48 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		order.TotalPlatformFee = totalPlatformFee
 		order.TotalCommission = totalCommission
 		order.GrandTotal = totalSubtotal
-
-		if err := tx.Save(order).Error; err != nil {
-			return err
-		}
+		order.VoucherCode = shippingInfo.VoucherCode
 
 		if order.VoucherCode != "" {
 			var voucher models.Voucher
-			if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&voucher, "code = ? AND status = ?", order.VoucherCode, "active").Error; err == nil {
+			// Validate voucher: active, not expired, min_order met
+			err := tx.Set("gorm:query_option", "FOR UPDATE").
+				Where("code = ? AND status = ? AND min_order <= ? AND expiry_date > ?", order.VoucherCode, "active", order.Subtotal, time.Now()).
+				First(&voucher).Error
+
+			if err == nil {
 				if voucher.Quota > voucher.Used {
+					// Calculate Discount
+					var discount float64
+					if voucher.DiscountType == "percent" {
+						discount = order.Subtotal * (voucher.DiscountValue / 100.0)
+					} else {
+						discount = voucher.DiscountValue
+					}
+
+					// Cap discount to subtotal
+					if discount > order.Subtotal {
+						discount = order.Subtotal
+					}
+
 					order.VoucherID = &voucher.ID
-					// Sync: Decrement quota atomically
+					order.TotalDiscount = discount
+					order.GrandTotal = order.Subtotal - discount
+					
+					// Increment used count
 					if err := tx.Model(&voucher).Update("used", gorm.Expr("used + 1")).Error; err != nil {
 						return err
 					}
 				} else {
 					return fmt.Errorf("voucher '%s' sudah habis", order.VoucherCode)
 				}
+			} else {
+				return fmt.Errorf("voucher '%s' tidak valid atau minimal belanja tidak terpenuhi", order.VoucherCode)
 			}
+		}
+
+		if err := tx.Save(order).Error; err != nil {
+			return err
 		}
 
 		return nil

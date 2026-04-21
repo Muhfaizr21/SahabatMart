@@ -31,6 +31,7 @@ func SeedAll(db *gorm.DB) {
 		"product_variants", "products", "vouchers", "banners",
 		"affiliate_members", "membership_tiers", "categories", "brands",
 		"user_profiles", "users",
+		"roles", "permissions", "role_permissions",
 	}
 
 	for _, table := range tables {
@@ -57,6 +58,7 @@ func SeedAll(db *gorm.DB) {
 
 	// 7. Seed Marketing (Banners & Vouchers)
 	seedMarketing(db)
+	seedRBAC(db)
 
 	fmt.Println("✅ Seeding Completed Successfully! All data is fresh and active.")
 }
@@ -181,6 +183,7 @@ func seedProducts(db *gorm.DB) {
 			MerchantID: merchant.ID,
 			Name: "MacBook Pro M3 Max - 14 Inch",
 			Slug: "macbook-pro-m3-max",
+			SKU: "APPLE-MBP-M3",
 			Description: "Prosesor paling kencang untuk profesional kreatif. Chip M3 Max memberikan performa ekstrem untuk workflow berat.",
 			Price: 45000000,
 			OldPrice: 48000000,
@@ -204,17 +207,18 @@ func seedProducts(db *gorm.DB) {
 		},
 		{
 			ID: "00000000-1111-0000-0000-000000000002",
-			MerchantID: merchant.ID,
-			Name: "Air Jordan 1 Retro High OG",
+			MerchantID: merchant.ID, 
+			Name: "Air Jordan 1 Retro High OG", 
 			Slug: "air-jordan-1-retro",
+			SKU: "NIKE-AJ1-RED",
 			Description: "Sneakers legendaris dengan balutan kulit premium.",
-			Price: 3500000,
-			OldPrice: 4000000,
-			Stock: 20,
-			Category: "Fashion",
-			Brand: "Nike",
-			Image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?w=800&q=80",
+			Price: 3500000, 
+			OldPrice: 4000000, 
+			Stock: 20, 
+			Category: "Fashion", 
+			Brand: "Nike", 
 			Status: "active",
+			Image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?w=800&q=80",
 			Rating: 0,
 			Reviews: 0,
 		},
@@ -257,7 +261,7 @@ func seedUsers(db *gorm.DB) {
 	}{
 		{
 			id:   AdminID,
-			user: models.User{Email: "admin@sahabatmart.com", PasswordHash: pwHash, Role: "superadmin", AdminRole: "super", Status: "active"},
+			user: models.User{Email: "admin@sahabatmart.com", PasswordHash: pwHash, Role: "superadmin", AdminRole: "CEO / Owners", Department: "IT & SYSTEMS", Status: "active"},
 			name: "Super Administrator",
 		},
 		{
@@ -298,21 +302,27 @@ func seedUsers(db *gorm.DB) {
 func seedReviews(db *gorm.DB) {
 	fmt.Println("  -> Seeding Reviews...")
 	
+	var merchant models.Merchant
+	db.Where("slug = ?", "modern-gadget").First(&merchant)
+	
+	var buyer models.User
+	db.Where("email = ?", "buyer@sahabatmart.com").First(&buyer)
+
 	reviews := []models.Review{
 		{
 			ProductID: "00000000-1111-0000-0000-000000000001",
-			MerchantID: MerchantID,
-			BuyerID:   BuyerID,
-			OrderID:   "00000000-0000-0000-0000-000000000001", // Valid UUID
+			MerchantID: merchant.ID,
+			BuyerID:   buyer.ID,
+			OrderID:   "00000000-0000-0000-0000-000000000001",
 			OrderItemID: "00000000-0000-0000-0000-000000000001",
 			Rating:    5,
 			Comment:   "Barang original, pengiriman super cepat!",
 		},
 		{
 			ProductID: "00000000-1111-0000-0000-000000000001",
-			MerchantID: MerchantID,
-			BuyerID:   BuyerID,
-			OrderID:   "00000000-0000-0000-0000-000000000002", // Valid UUID
+			MerchantID: merchant.ID,
+			BuyerID:   buyer.ID,
+			OrderID:   "00000000-0000-0000-0000-000000000002",
 			OrderItemID: "00000000-0000-0000-0000-000000000002",
 			Rating:    5,
 			Comment:   "Seller responsif, MacBook aman sampai tujuan.",
@@ -322,4 +332,71 @@ func seedReviews(db *gorm.DB) {
 	for _, r := range reviews {
 		db.Create(&r)
 	}
+}
+
+func seedRBAC(db *gorm.DB) {
+	fmt.Println("  -> Seeding RBAC Permissions...")
+	perms := []models.Permission{
+		// Produk & Katalog
+		{Code: "view_products", Name: "Lihat Produk", Group: "Katalog", Description: "Melihat daftar dan detail produk"},
+		{Code: "create_products", Name: "Tambah Produk", Group: "Katalog", Description: "Menambah produk baru ke sistem"},
+		{Code: "edit_products", Name: "Edit Produk", Group: "Katalog", Description: "Mengubah informasi produk existing"},
+		{Code: "delete_products", Name: "Hapus Produk", Group: "Katalog", Description: "Menghapus produk dari sistem"},
+		{Code: "approve_products", Name: "Otorisasi Produk", Group: "Katalog", Description: "Menyetujui produk dari merchant"},
+
+		// Pesanan & Transaksi
+		{Code: "view_orders", Name: "Lihat Pesanan", Group: "Transaksi", Description: "Melihat riwayat pesanan pelanggan"},
+		{Code: "process_orders", Name: "Proses Pesanan", Group: "Transaksi", Description: "Update status pesanan (Packing/Kirim)"},
+		{Code: "manage_refunds", Name: "Kelola Refund", Group: "Transaksi", Description: "Menyetujui atau menolak pengembalian dana"},
+		{Code: "handle_disputes", Name: "Resolusi Komplain", Group: "Transaksi", Description: "Menangani sengketa pembeli & merchant"},
+
+		// Pengguna & Merchant
+		{Code: "view_users", Name: "Lihat User", Group: "User & Merchant", Description: "Melihat data pelanggan"},
+		{Code: "edit_users", Name: "Edit User", Group: "User & Merchant", Description: "Mengubah status atau data pelanggan"},
+		{Code: "manage_merchants", Name: "Kelola Merchant", Group: "User & Merchant", Description: "Verifikasi dan moderasi toko"},
+		{Code: "suspend_accounts", Name: "Blokir Akun", Group: "User & Merchant", Description: "Menonaktifkan akun bermasalah"},
+
+		// Keuangan
+		{Code: "view_finance", Name: "Lihat Laporan Keuangan", Group: "Keuangan", Description: "Melihat statistik pendapatan platform"},
+		{Code: "manage_payouts", Name: "Kelola Penarikan", Group: "Keuangan", Description: "Proses transfer saldo ke merchant"},
+		{Code: "edit_commission", Name: "Atur Komisi", Group: "Keuangan", Description: "Mengubah persentase fee platform"},
+
+		// Marketing & Konten
+		{Code: "manage_banners", Name: "Kelola Banner", Group: "Marketing", Description: "Update promo di halaman depan"},
+		{Code: "manage_vouchers", Name: "Kelola Voucher", Group: "Marketing", Description: "Buat dan atur kode promo"},
+		{Code: "manage_blogs", Name: "Kelola Artikel/Blog", Group: "Marketing", Description: "Posting dan edit konten berita"},
+
+		// Sistem & Keamanan
+		{Code: "manage_rbac", Name: "Kelola RBAC", Group: "Sistem", Description: "Mengatur Role dan Permission staf"},
+		{Code: "view_audit_logs", Name: "Lihat Audit Log", Group: "Sistem", Description: "Melihat rekam jejak aktivitas semua admin"},
+		{Code: "manage_settings", Name: "Pengaturan Utama", Group: "Sistem", Description: "Mengubah konfigurasi dasar aplikasi"},
+	}
+
+	for _, p := range perms {
+		db.FirstOrCreate(&p, models.Permission{Code: p.Code})
+	}
+
+	// Create Default Roles
+	var allPerms []models.Permission
+	db.Find(&allPerms)
+
+	ceoRole := models.Role{
+		Name:        "CEO / Owners",
+		Description: "Akses penuh ke seluruh sistem",
+		Permissions: allPerms,
+	}
+	db.FirstOrCreate(&ceoRole, models.Role{Name: "CEO / Owners"})
+
+	// Update CEO permissions anyway to ensure latest
+	db.Model(&ceoRole).Association("Permissions").Replace(allPerms)
+
+	csRole := models.Role{
+		Name:        "Customer Service",
+		Description: "Menangani keluhan dan pesanan pelanggan",
+	}
+	db.FirstOrCreate(&csRole, models.Role{Name: "Customer Service"})
+	
+	var csPermLines []models.Permission
+	db.Where("code IN ?", []string{"manage_orders", "manage_cms"}).Find(&csPermLines)
+	db.Model(&csRole).Association("Permissions").Replace(csPermLines)
 }

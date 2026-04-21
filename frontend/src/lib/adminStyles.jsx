@@ -176,6 +176,7 @@ export const statusBadge = (status) => {
     published:  { color: '#16a34a', bg: '#f0fdf4' },
     draft:      { color: '#64748b', bg: '#f1f5f9' },
     taken_down: { color: '#dc2626', bg: '#fff1f2' },
+    out_of_stock: { color: '#ef4444', bg: '#fef2f2' },
   };
   const s = map[status] || { color: '#64748b', bg: '#f1f5f9' };
   return {
@@ -314,7 +315,9 @@ export function Modal({ title, onClose, children, wide }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(8px)',
+      background: 'rgba(15,23,42,0.4)', 
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
     }} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={{

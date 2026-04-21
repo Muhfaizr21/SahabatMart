@@ -1,0 +1,26 @@
+# IDEs
+.DS_Store
+.vscode/
+.idea/
+
+# Backend
+backend/backend
+backend/*.db
+backend/*.exe
+backend/.env
+backend/scratch/
+backend/tmp/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/*.local
+frontend/npm-debug.log*
+
+# Static / Old (Cleanup)
+affiliate.html
+merchant.html
+shofy/
+template-admin/
+scratch/

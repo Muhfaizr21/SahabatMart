@@ -42,6 +42,8 @@ func ConnectDB() {
 		&models.Wishlist{}, &models.CategoryCommission{}, &models.MerchantCommission{},
 		&models.AuditLog{}, &models.PayoutRequest{}, &models.Notification{},
 		&models.Review{}, &models.ContactMessage{},
+		&models.Permission{}, &models.Role{},
+		&models.Wallet{}, &models.WalletTransaction{}, &models.WithdrawalRequest{}, &models.Refund{},
 		// Affiliate portal models
 		&models.AffiliateCommission{}, &models.AffiliateLink{},
 		&models.AffiliateClickLog{}, &models.AffiliateWithdrawal{},

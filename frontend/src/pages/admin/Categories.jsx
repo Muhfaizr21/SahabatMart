@@ -42,8 +42,9 @@ export default function AdminCategories() {
         </button>
       </PageHeader>
 
-      <TablePanel loading={loading}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+      <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+        <TablePanel loading={loading}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 650 }}>
           <thead>
             <tr>
               {['Identitas Kategori', 'URL Slug', 'Urutan', 'Opsi'].map((h, i) => (
@@ -91,6 +92,7 @@ export default function AdminCategories() {
           </tbody>
         </table>
       </TablePanel>
+      </div>
 
       {modal && (
         <Modal title={modal.id ? 'Edit Kategori' : 'Tambah Kategori'} onClose={() => setModal(null)}>

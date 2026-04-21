@@ -93,15 +93,16 @@ export default function AdminAffiliates() {
       ]} />
 
       {/* Tab Switch */}
-      <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 4, borderRadius: 12, border: '1px solid #f1f5f9', alignSelf: 'flex-start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, background: '#f8fafc', padding: 6, borderRadius: 14, border: '1px solid #f1f5f9' }}>
         {[
-          { val: 'members', label: 'Daftar Member' },
-          { val: 'tiers', label: 'Konfigurasi Tier' },
-          { val: 'withdrawals', label: `Pencairan${pendingWd > 0 ? ` (${pendingWd})` : ''}` },
+          { val: 'members', label: 'Members' },
+          { val: 'tiers', label: 'Tiers' },
+          { val: 'withdrawals', label: `Payouts${pendingWd > 0 ? ` (${pendingWd})` : ''}` },
         ].map(t => (
           <button key={t.val} style={{
-            padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            fontWeight: 700, fontSize: 13,
+            flex: '1 1 auto', textAlign: 'center',
+            padding: '8px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 12,
             background: tab === t.val ? '#fff' : 'transparent',
             color: tab === t.val ? (t.val === 'withdrawals' && pendingWd > 0 ? '#f59e0b' : '#0f172a') : '#94a3b8',
             boxShadow: tab === t.val ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
@@ -113,21 +114,22 @@ export default function AdminAffiliates() {
       {/* ── MEMBERS TAB ──────────────────────────────────────────── */}
       {tab === 'members' && (
         <>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: '1 1 300px' }}>
               <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
               <input style={{ ...A.select, paddingLeft: 42, width: '100%' }} placeholder="Cari email / nama / ref code..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
           </div>
-          <TablePanel loading={loading}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
-              <thead>
-                <tr>
-                  {['Member', 'Ref Code', 'Tier', 'Total Earned', 'Saldo', 'Konversi', 'Status', 'Bergabung'].map((h, i) => (
-                    <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 7 ? 24 : 14 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+          <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+            <TablePanel loading={loading}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+                <thead>
+                  <tr>
+                    {['Member', 'Ref Code', 'Tier', 'Total Earned', 'Saldo', 'Konversi', 'Status', 'Bergabung'].map((h, i) => (
+                      <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 7 ? 24 : 14 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr><td colSpan={8} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
@@ -176,6 +178,7 @@ export default function AdminAffiliates() {
               </tbody>
             </table>
           </TablePanel>
+          </div>
         </>
       )}
 
@@ -224,59 +227,61 @@ export default function AdminAffiliates() {
 
       {/* ── WITHDRAWALS TAB ────────────────────────────────────────── */}
       {tab === 'withdrawals' && (
-        <TablePanel loading={loading}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
-            <thead>
-              <tr>
-                {['Affiliate', 'Jumlah', 'Bank', 'Status', 'Tanggal', 'Aksi'].map((h, i) => (
-                  <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 5 ? 24 : 14, textAlign: i === 5 ? 'right' : 'left' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {withdrawals.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
-                  <i className="bx bxs-wallet" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
-                  Belum ada permintaan pencairan.
-                </td></tr>
-              ) : withdrawals.map((w, idx) => (
-                <tr key={w.id}
-                  style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
-                  onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
-                >
-                  <td style={{ ...A.td, paddingLeft: 24 }}>
-                    <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5 }}>{w.full_name || w.email}</div>
-                    <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{w.ref_code}</div>
-                  </td>
-                  <td style={A.td}><span style={{ fontWeight: 800, color: '#10b981', fontSize: 15 }}>{idr(w.amount)}</span></td>
-                  <td style={A.td}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{w.bank_name}</div>
-                    <div style={{ fontSize: 11.5, color: '#64748b' }}>{w.account_number} — {w.account_name}</div>
-                  </td>
-                  <td style={A.td}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...(STATUS_BADGE[w.status] || {}) }}>
-                      {w.status}
-                    </span>
-                  </td>
-                  <td style={{ ...A.td, fontSize: 12, color: '#94a3b8' }}>{fmtDate(w.created_at)}</td>
-                  <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                    {w.status === 'pending' ? (
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button style={{ ...A.iconBtn('#10b981', '#dcfce7'), padding: '6px 14px', fontSize: 12, fontWeight: 700, borderRadius: 8 }}
-                          onClick={() => setProcessWd({ ...w, note: '' })}>
-                          <i className="bx bx-check" /> Proses
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: 11.5, color: '#94a3b8' }}>{w.processed_at ? fmtDate(w.processed_at) : '—'}</span>
-                    )}
-                  </td>
+        <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+          <TablePanel loading={loading}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
+              <thead>
+                <tr>
+                  {['Affiliate', 'Jumlah', 'Bank', 'Status', 'Tanggal', 'Aksi'].map((h, i) => (
+                    <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 5 ? 24 : 14, textAlign: i === 5 ? 'right' : 'left' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </TablePanel>
+              </thead>
+              <tbody>
+                {withdrawals.length === 0 ? (
+                  <tr><td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                    <i className="bx bxs-wallet" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
+                    Belum ada permintaan pencairan.
+                  </td></tr>
+                ) : withdrawals.map((w, idx) => (
+                  <tr key={w.id}
+                    style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+                  >
+                    <td style={{ ...A.td, paddingLeft: 24 }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5 }}>{w.full_name || w.email}</div>
+                      <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{w.ref_code}</div>
+                    </td>
+                    <td style={A.td}><span style={{ fontWeight: 800, color: '#10b981', fontSize: 15 }}>{idr(w.amount)}</span></td>
+                    <td style={A.td}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{w.bank_name}</div>
+                      <div style={{ fontSize: 11.5, color: '#64748b' }}>{w.account_number} — {w.account_name}</div>
+                    </td>
+                    <td style={A.td}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...(STATUS_BADGE[w.status] || {}) }}>
+                        {w.status}
+                      </span>
+                    </td>
+                    <td style={{ ...A.td, fontSize: 12, color: '#94a3b8' }}>{fmtDate(w.created_at)}</td>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                      {w.status === 'pending' ? (
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button style={{ ...A.iconBtn('#10b981', '#dcfce7'), padding: '6px 14px', fontSize: 12, fontWeight: 700, borderRadius: 8 }}
+                            onClick={() => setProcessWd({ ...w, note: '' })}>
+                            <i className="bx bx-check" /> Proses
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 11.5, color: '#94a3b8' }}>{w.processed_at ? fmtDate(w.processed_at) : '—'}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TablePanel>
+        </div>
       )}
 
       {/* ── MODAL: Edit Tier ────────────────────────────────────────── */}

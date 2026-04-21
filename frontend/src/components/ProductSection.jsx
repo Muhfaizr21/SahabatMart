@@ -93,10 +93,18 @@ function ProductCard({ product }) {
     <div className="group bg-white rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full">
       <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-square">
         <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        
+        {/* Badge Stok Habis - Overlay */}
+        {product.stock <= 0 && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center z-10">
+            <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg uppercase tracking-widest">Stok Habis</span>
+          </div>
+        )}
+
         <button 
           onClick={toggleWishlist}
           disabled={wishlisting}
-          className={`absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center transition-all shadow-sm z-10 ${isSaved ? 'text-red-500 scale-110' : 'text-gray-400 hover:text-red-500 hover:scale-110'}`}
+          className={`absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center transition-all shadow-sm z-20 ${isSaved ? 'text-red-500 scale-110' : 'text-gray-400 hover:text-red-500 hover:scale-110'}`}
         >
           <i className={`bx ${wishlisting ? 'bx-loader-alt animate-spin' : (isSaved ? 'bxs-heart' : 'bx-heart')}`} style={{ fontSize: 18 }}></i>
         </button>
@@ -119,10 +127,10 @@ function ProductCard({ product }) {
           </div>
           <button 
             onClick={addToCart}
-            disabled={adding}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-[11px] font-bold px-3 py-2 rounded-xl transition-all flex-shrink-0"
+            disabled={adding || product.stock <= 0}
+            className={`text-[11px] font-bold px-3 py-2 rounded-xl transition-all flex-shrink-0 ${product.stock <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
-            {adding ? '...' : '+ Keranjang'}
+            {adding ? '...' : (product.stock <= 0 ? 'Habis' : '+ Keranjang')}
           </button>
         </div>
       </div>

@@ -57,30 +57,32 @@ export default function AdminUsers() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="User Management" subtitle="Kelola seluruh pengguna, role, dan akses keamanan platform.">
-        <div style={A.searchWrap}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input
-            style={A.searchInput}
-            placeholder="Cari nama / email..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && load()}
-          />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
+          <div style={{ ...A.searchWrap, minWidth: 250, flex: 1 }}>
+            <i className="bx bx-search" style={A.searchIcon} />
+            <input
+              style={A.searchInput}
+              placeholder="Cari nama / email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && load()}
+            />
+          </div>
+          <select style={{ ...A.select, flex: '1 1 140px' }} value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+            <option value="">Semua Role</option>
+            <option value="buyer">Buyer</option>
+            <option value="merchant">Merchant</option>
+            <option value="affiliate">Affiliate</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select style={{ ...A.select, flex: '1 1 140px' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">Semua Status</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="banned">Banned</option>
+          </select>
+          <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /></button>
         </div>
-        <select style={A.select} value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-          <option value="">Semua Role</option>
-          <option value="buyer">Buyer</option>
-          <option value="merchant">Merchant</option>
-          <option value="affiliate">Affiliate</option>
-          <option value="admin">Admin</option>
-        </select>
-        <select style={A.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">Semua Status</option>
-          <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
-          <option value="banned">Banned</option>
-        </select>
-        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /></button>
       </PageHeader>
 
       <StatRow stats={[
@@ -90,15 +92,16 @@ export default function AdminUsers() {
         { label: 'Affiliate', val: stats.affiliates || 0, icon: 'bxs-link', color: '#ea580c' },
       ]} />
 
-      <TablePanel loading={loading}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
-          <thead>
-            <tr>
-              {['Pengguna', 'Role', 'Status', 'Terdaftar', 'Aksi'].map((h, i) => (
-                <th key={h} style={{ ...A.th, textAlign: i === 4 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 4 ? 24 : 16 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
+      <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+        <TablePanel loading={loading}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            <thead>
+              <tr>
+                {['Pengguna', 'Role', 'Status', 'Terdaftar', 'Aksi'].map((h, i) => (
+                  <th key={h} style={{ ...A.th, textAlign: i === 4 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 4 ? 24 : 16 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
           <tbody>
             {users.length === 0 ? (
               <tr><td colSpan={5} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
@@ -140,22 +143,23 @@ export default function AdminUsers() {
           </tbody>
         </table>
       </TablePanel>
+      </div>
 
       {modal && (
         <Modal title="User Management Panel" onClose={() => setModal(null)}>
           {/* User Info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '16px', background: '#f8fafc', borderRadius: 12 }}>
             <div style={{
-              width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+              width: 48, height: 48, borderRadius: 12, flexShrink: 0,
               background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontWeight: 900, fontSize: 20,
+              color: '#fff', fontWeight: 900, fontSize: 18,
             }}>
               {(modal.profile?.full_name || modal.email || '?').charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 16 }}>{modal.profile?.full_name || '—'}</div>
-              <div style={{ fontSize: 12, color: '#94a3b8' }}>{modal.email}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{modal.profile?.full_name || '—'}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{modal.email}</div>
               <div style={{ marginTop: 4 }}><span style={roleBadge(modal.role)}>{modal.role}</span></div>
             </div>
           </div>
@@ -163,15 +167,16 @@ export default function AdminUsers() {
           {/* Role control */}
           <div style={{ marginBottom: 20 }}>
             <FieldLabel>Ubah Role</FieldLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 8 }}>
               {['buyer', 'merchant', 'affiliate'].map(r => (
                 <button key={r}
                   onClick={() => updateUser(modal.id, modal.status, r)}
                   style={{
-                    padding: '9px', borderRadius: 11, border: 'none', cursor: 'pointer',
-                    fontWeight: 700, fontSize: 12, textTransform: 'uppercase',
+                    padding: '10px 4px', borderRadius: 11, border: 'none', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 11, textTransform: 'uppercase',
                     background: modal.role === r ? '#6366f1' : '#f8fafc',
                     color: modal.role === r ? '#fff' : '#64748b',
+                    transition: 'all 0.2s'
                   }}
                 >{r}</button>
               ))}
@@ -181,7 +186,7 @@ export default function AdminUsers() {
           {/* Status control */}
           <div style={{ marginBottom: 20 }}>
             <FieldLabel>Status Akun</FieldLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 8 }}>
               {[
                 { val: 'active', color: '#10b981' },
                 { val: 'suspended', color: '#f59e0b' },
@@ -190,10 +195,11 @@ export default function AdminUsers() {
                 <button key={s.val}
                   onClick={() => updateUser(modal.id, s.val, modal.role, modal.admin_role)}
                   style={{
-                    padding: '9px', borderRadius: 11, border: 'none', cursor: 'pointer',
-                    fontWeight: 700, fontSize: 12, textTransform: 'uppercase',
+                    padding: '10px 4px', borderRadius: 11, border: 'none', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 11, textTransform: 'uppercase',
                     background: modal.status === s.val ? s.color : '#f8fafc',
                     color: modal.status === s.val ? '#fff' : '#64748b',
+                    transition: 'all 0.2s'
                   }}
                 >{s.val}</button>
               ))}

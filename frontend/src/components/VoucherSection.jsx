@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import toast from 'react-hot-toast';
 
 export default function VoucherSection() {
   const [vouchers, setVouchers] = useState([]);
@@ -15,6 +16,19 @@ export default function VoucherSection() {
       .catch(() => setVouchers([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleCopy = (code) => {
+    navigator.clipboard.writeText(code);
+    toast.success(`Kode ${code} disalin!`, {
+      style: {
+        borderRadius: '16px',
+        background: '#111827',
+        color: '#fff',
+        fontSize: '14px',
+        fontWeight: 'bold',
+      },
+    });
+  };
 
   if (loading && vouchers.length === 0) return null;
   if (!loading && vouchers.length === 0) return null;
@@ -62,7 +76,11 @@ export default function VoucherSection() {
                  </p>
 
                  <div className="mt-auto w-full">
-                    <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl px-4 py-4 font-mono font-black text-gray-900 tracking-[0.2em] text-lg mb-4 group-hover:border-blue-400 group-hover:text-blue-600 transition-colors">
+                    <div 
+                      onClick={() => handleCopy(v.code)}
+                      className="bg-white border-2 border-dashed border-gray-200 rounded-2xl px-4 py-4 font-mono font-black text-gray-900 tracking-[0.2em] text-lg mb-4 group-hover:border-blue-400 group-hover:text-blue-600 transition-colors cursor-pointer"
+                      title="Klik untuk menyalin"
+                    >
                         {v.code}
                     </div>
                     <Link to="/shop" className="block w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg hover:shadow-blue-200">

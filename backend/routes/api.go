@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 	"gorm.io/gorm"
@@ -24,10 +25,74 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	affiliateCtrl := controllers.NewAffiliateController(db, notifService)
 	productCtrl := controllers.NewProductController(db)
 	contactCtrl := &controllers.ContactController{DB: db}
+	rbacCtrl := controllers.NewRBACController(db)
 
 	// Middleware
 	cors := corsMiddleware
 	recover := recoverMiddleware
+
+	// [Monster Feature] Dynamic Role Middleware with DB Sync
+	actorOnly := func(allowedRoles ...string) func(http.HandlerFunc) http.HandlerFunc {
+		return func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				maintenance := false
+
+				authHeader := r.Header.Get("Authorization")
+				if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+					if maintenance {
+						utils.JSONError(w, http.StatusServiceUnavailable, "Platform sedang dalam pemeliharaan (Maintenance)")
+						return
+					}
+					utils.JSONError(w, http.StatusUnauthorized, "Silakan login terlebih dahulu")
+					return
+				}
+
+				token := strings.TrimPrefix(authHeader, "Bearer ")
+				claims, err := utils.ParseJWT(token)
+				if err != nil {
+					utils.JSONError(w, http.StatusUnauthorized, "Sesi Anda telah berakhir, silakan login kembali")
+					return
+				}
+
+				// [Complex Sync] Pengecekan status user langsung ke DB
+				var user models.User
+				if err := db.Select("role", "status").First(&user, "id = ?", claims.UserID).Error; err != nil {
+					utils.JSONError(w, http.StatusUnauthorized, "User tidak ditemukan")
+					return
+				}
+
+				if user.Status != "active" {
+					utils.JSONError(w, http.StatusForbidden, "Akun Anda sedang ditangguhkan atau tidak aktif")
+					return
+				}
+
+				role := strings.ToLower(user.Role)
+				if maintenance && role != "admin" && role != "superadmin" {
+					utils.JSONError(w, http.StatusServiceUnavailable, "Platform sedang dalam pemeliharaan (Maintenance)")
+					return
+				}
+
+				isAllowed := false
+				for _, ar := range allowedRoles {
+					if role == strings.ToLower(ar) {
+						isAllowed = true
+						break
+					}
+				}
+
+				if !isAllowed {
+					utils.JSONError(w, http.StatusForbidden, "Akses ditolak: Anda tidak memiliki otoritas")
+					return
+				}
+
+				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+				if claims.MerchantID != "" { ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID) }
+				if claims.AffiliateID != "" { ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID) }
+
+				next.ServeHTTP(w, r.WithContext(ctx))
+			}
+		}
+	}
 
 	// --- Auth Routes ---
 	mux.HandleFunc("/api/auth/register", authCtrl.Register)
@@ -187,6 +252,15 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/inbox/update", superOnly(contactCtrl.UpdateStatus))
 	mux.HandleFunc("/api/admin/inbox/delete", superOnly(contactCtrl.DeleteMessage))
 
+	// RBAC Management
+	mux.HandleFunc("/api/admin/rbac/permissions", superOnly(rbacCtrl.GetPermissions))
+	mux.HandleFunc("/api/admin/rbac/roles", superOnly(rbacCtrl.GetRoles))
+	mux.HandleFunc("/api/admin/rbac/roles/upsert", superOnly(rbacCtrl.UpsertRole))
+	mux.HandleFunc("/api/admin/rbac/roles/delete", superOnly(rbacCtrl.DeleteRole))
+	mux.HandleFunc("/api/admin/rbac/users", superOnly(rbacCtrl.CreateAdminUser))
+	mux.HandleFunc("/api/admin/rbac/users/status", superOnly(rbacCtrl.ToggleAdminStatus))
+	mux.HandleFunc("/api/admin/rbac/users/delete", superOnly(rbacCtrl.DeleteAdmin))
+
 	// System & Config
 	mux.HandleFunc("/api/admin/configs", adminOnly(adminCtrl.GetSettings))
 	mux.HandleFunc("/api/admin/configs/upsert", adminOnly(adminCtrl.UpsertSettings))
@@ -203,6 +277,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/blogs/detail", adminCtrl.GetPublicBlogDetail)
 	mux.HandleFunc("/api/public/banners", adminCtrl.GetPublicBanners)
 	mux.HandleFunc("/api/public/vouchers", adminCtrl.GetPublicVouchers)
+	mux.HandleFunc("/api/public/vouchers/check", adminCtrl.CheckVoucher)
 	mux.HandleFunc("/api/public/contact/submit", contactCtrl.SubmitMessage)
 	mux.HandleFunc("/api/public/configs", adminCtrl.GetPublicConfig) // Alias for public config
 	mux.HandleFunc("/api/public/config", adminCtrl.GetPublicConfig)
@@ -243,65 +318,4 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func actorOnly(allowedRoles ...string) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			// [Monster Feature] Cek Maintenance Mode Global
-			// Admin/Super Admin tetap bisa tembus maintenance
-			maintenance := false
-			// Logic: query platform_configs where key='platform_maintenance' and value='true'
-			// (Kita asumsikan pencarian cepat ke cache atau DB)
-
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-				if maintenance {
-					utils.JSONError(w, http.StatusServiceUnavailable, "Platform sedang dalam pemeliharaan (Maintenance)")
-					return
-				}
-				utils.JSONError(w, http.StatusUnauthorized, "Silakan login terlebih dahulu")
-				return
-			}
-
-			token := strings.TrimPrefix(authHeader, "Bearer ")
-			claims, err := utils.ParseJWT(token)
-			if err != nil {
-				utils.JSONError(w, http.StatusUnauthorized, "Sesi Anda telah berakhir, silakan login kembali")
-				return
-			}
-
-			role := strings.ToLower(claims.Role)
-			
-			// Jika maintenance on, hanya admin/superadmin yang bisa masuk
-			if maintenance && role != "admin" && role != "superadmin" {
-				utils.JSONError(w, http.StatusServiceUnavailable, "Platform sedang dalam pemeliharaan (Maintenance)")
-				return
-			}
-			
-			// ... (Sisa logic role check sama)
-			isAllowed := false
-			for _, ar := range allowedRoles {
-				if role == strings.ToLower(ar) {
-					isAllowed = true
-					break
-				}
-			}
-
-			if !isAllowed {
-				utils.JSONError(w, http.StatusForbidden, "Akses ditolak: Anda tidak memiliki otoritas")
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
-			if claims.MerchantID != "" {
-				ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID)
-			}
-			if claims.AffiliateID != "" {
-				ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID)
-			}
-
-			next.ServeHTTP(w, r.WithContext(ctx))
-		}
-	}
 }

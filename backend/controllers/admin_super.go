@@ -663,7 +663,11 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id")
 
 	if status != "" {
-		query = query.Where("p.status = ?", status)
+		if status == "out_of_stock" {
+			query = query.Where("p.stock <= 0")
+		} else {
+			query = query.Where("p.status = ?", status)
+		}
 	}
 	if merchantID != "" {
 		query = query.Where("p.merchant_id = ?", merchantID)
@@ -767,8 +771,9 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 
 	if p.Slug == "" {
 		p.Slug = strings.ToLower(strings.ReplaceAll(p.Name, " ", "-"))
-		// Tambahkan suffix timestamp agar slug unik
-		p.Slug = fmt.Sprintf("%s-%d", p.Slug, time.Now().Unix()%1000)
+		// [Complex Sync] Gunakan UnixNano % 1000000 agar probabilitas tabrakan slug hampir nol
+		// Terutama penting untuk sistem dengan banyak admin yang mengupload produk serentak
+		p.Slug = fmt.Sprintf("%s-%d", p.Slug, time.Now().UnixNano()%1000000)
 	}
 
 	if err := ac.DB.Create(&p).Error; err != nil {
@@ -934,6 +939,7 @@ func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Requ
 		       COUNT(*) AS orders
 		FROM order_merchant_groups
 		WHERE created_at >= NOW() - INTERVAL '12 months'
+		  AND status IN ('completed', 'delivered', 'paid')
 		GROUP BY month
 		ORDER BY month ASC
 	`).Scan(&rows)
@@ -1585,7 +1591,17 @@ func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Requ
 
 func (ac *AdminController) GetPublicCategories(w http.ResponseWriter, r *http.Request) {
 	var cats []models.Category
-	ac.DB.Order("categories.order ASC").Find(&cats)
+	// Hanya kembalikan kategori yang memiliki setidaknya satu produk aktif
+	ac.DB.Raw(`
+		SELECT DISTINCT c.* 
+		FROM categories c
+		JOIN products p ON p.category = c.name
+		JOIN merchants m ON m.id = p.merchant_id
+		WHERE p.status = 'active' AND m.status = 'active'
+		ORDER BY c.order ASC
+	`).Scan(&cats)
+	
+	if len(cats) == 0 { cats = []models.Category{} }
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": cats})
 }
 
@@ -1601,7 +1617,7 @@ func (ac *AdminController) GetPublicBanners(w http.ResponseWriter, r *http.Reque
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": banners})
 }
 
-// GetPublicVouchers returns active vouchers for storefront
+// GetPublicVouchers returns active and valid vouchers for storefront
 func (ac *AdminController) GetPublicVouchers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		utils.JSONResponse(w, http.StatusMethodNotAllowed, map[string]interface{}{"message": "Method not allowed"})
@@ -1609,13 +1625,51 @@ func (ac *AdminController) GetPublicVouchers(w http.ResponseWriter, r *http.Requ
 	}
 
 	var vouchers []models.Voucher
-	ac.DB.Where("status = ?", "active").Find(&vouchers)
+	now := time.Now()
+	// Hanya tampilkan voucher aktif yang belum kedaluwarsa dan masih memiliki kuota
+	ac.DB.Where("status = ? AND quota > used AND expiry_date > ?", "active", now).Find(&vouchers)
 
 	if vouchers == nil {
 		vouchers = []models.Voucher{}
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": vouchers})
+}
+
+// CheckVoucher validates a voucher code for a specific amount
+func (ac *AdminController) CheckVoucher(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	subtotalStr := r.URL.Query().Get("subtotal")
+	
+	if code == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Kode voucher wajib diisi")
+		return
+	}
+
+	var voucher models.Voucher
+	now := time.Now()
+	err := ac.DB.Where("code = ? AND status = ? AND expiry_date > ?", code, "active", now).First(&voucher).Error
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Voucher tidak ditemukan, tidak aktif, atau sudah kedaluwarsa")
+		return
+	}
+
+	if voucher.Quota <= voucher.Used {
+		utils.JSONError(w, http.StatusBadRequest, "Kuota voucher sudah habis")
+		return
+	}
+
+	var subtotal float64
+	fmt.Sscanf(subtotalStr, "%f", &subtotal)
+	if subtotal < voucher.MinOrder {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Minimal belanja Rp%.0f belum terpenuhi", voucher.MinOrder))
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   voucher,
+	})
 }
 
 func (ac *AdminController) GetPublicConfig(w http.ResponseWriter, r *http.Request) {
@@ -2016,7 +2070,22 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, oi := range orderItems {
-			tx.Create(&oi)
+			if err := tx.Create(&oi).Error; err != nil {
+				return err
+			}
+
+			// Decrement Stock - SYNC with inventory
+			if oi.ProductVariantID != nil {
+				if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *oi.ProductVariantID).
+					Update("stock", gorm.Expr("stock - ?", oi.Quantity)).Error; err != nil {
+					return err
+				}
+			}
+			// Penting: Update stok di tabel Product utama juga agar Homepage tersinkron
+			if err := tx.Model(&models.Product{}).Where("id = ?", oi.ProductID).
+				Update("stock", gorm.Expr("stock - ?", oi.Quantity)).Error; err != nil {
+				return err
+			}
 		}
 
 		// Update order with total fee

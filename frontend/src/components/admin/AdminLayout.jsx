@@ -64,6 +64,7 @@ const menu = [
   { name: 'Audit Log', icon: 'bxs-file-find', path: '/admin/audit' },
   { name: 'Security', icon: 'bxs-shield-alt-2', path: '/admin/security' },
   { name: 'Inbox', icon: 'bxs-inbox', path: '/admin/inbox' },
+  { name: 'RBAC Access', icon: 'bxs-key', path: '/admin/rbac' },
 ];
 
 // ─── SIDEBAR ITEM ──────────────────────────────────────
@@ -152,6 +153,12 @@ const AdminLayout = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [openNotif, setOpenNotif] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setCollapsed(true);
+    }
+  }, []);
+
   // Close notif when click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -192,19 +199,24 @@ const AdminLayout = () => {
     navigate('/login');
   };
 
-  const sideWidth = collapsed ? 70 : C.sideW;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  const sideWidth = collapsed ? (isMobile ? 0 : 70) : C.sideW;
+  const finalSideWidth = isMobile ? 0 : sideWidth;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: "'Inter', sans-serif" }}>
 
       {/* ─── SIDEBAR ─── */}
       <aside style={{
-        width: sideWidth, minHeight: '100vh', background: C.bg,
+        width: isMobile && collapsed ? 0 : sideWidth, minHeight: '100vh', background: C.bg,
         display: 'flex', flexDirection: 'column',
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-        position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50,
+        transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
+        position: 'fixed', top: 0, 
+        left: isMobile && collapsed ? -C.sideW : 0, 
+        bottom: 0, zIndex: 100,
         overflow: 'hidden',
         borderRight: `1px solid ${C.border}`,
+        boxShadow: isMobile && !collapsed ? '20px 0 50px rgba(0,0,0,0.3)' : 'none',
       }}>
 
         {/* Brand */}
@@ -250,6 +262,7 @@ const AdminLayout = () => {
               <NavItem item={menu[10]} />
               <NavItem item={menu[11]} />
               <NavItem item={menu[12]} />
+              <NavItem item={menu[13]} />
             </>
           ) : (
             menu.map(item => (
@@ -308,7 +321,22 @@ const AdminLayout = () => {
       </aside>
 
       {/* ─── MAIN CONTENT ─── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', marginLeft: sideWidth, transition: 'margin-left 0.25s cubic-bezier(0.4,0,0.2,1)', minHeight: '100vh' }}>
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        marginLeft: finalSideWidth, 
+        transition: 'margin-left 0.25s cubic-bezier(0.4,0,0.2,1)', 
+        minHeight: '100vh',
+        maxWidth: '100%' 
+      }}>
+        {/* Mobile Overlay */}
+        {isMobile && !collapsed && (
+          <div 
+            onClick={() => setCollapsed(true)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 90, backdropFilter: 'blur(2px)' }} 
+          />
+        )}
 
         {/* Topbar */}
         <header style={{

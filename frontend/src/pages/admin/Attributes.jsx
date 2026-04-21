@@ -88,7 +88,7 @@ const AdminAttributes = () => {
   return (
     <div style={{ padding: '0 20px 40px' }} className="fade-in">
       {/* Header Section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 }}>
+      <div style={{ display: 'flex', flexDirection: window.innerWidth < 640 ? 'column' : 'row', justifyContent: 'space-between', alignItems: window.innerWidth < 640 ? 'flex-start' : 'center', gap: 20, marginBottom: 25 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b', marginBottom: 6 }}>
             <Link to="/admin" style={{ color: 'inherit', textDecoration: 'none' }}>Dashboard</Link>
@@ -101,7 +101,7 @@ const AdminAttributes = () => {
         </div>
         <button 
           onClick={() => openForm()}
-          style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: '#4361ee', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(67, 97, 238, 0.25)', display: 'flex', alignItems: 'center', gap: 8 }}
+          style={{ width: window.innerWidth < 640 ? '100%' : 'auto', padding: '10px 24px', borderRadius: 10, border: 'none', background: '#4361ee', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(67, 97, 238, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
           <i className="bx bx-plus-circle fs-5" /> Define New Attribute
         </button>
@@ -113,7 +113,7 @@ const AdminAttributes = () => {
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
           {attrs.length === 0 ? (
              <div style={{ gridColumn: '1/-1', ...A.card, padding: '100px 20px', textAlign: 'center', color: '#94a3b8' }}>
                 <i className="bx bx-slider-alt" style={{ fontSize: 48, marginBottom: 15, opacity: 0.3 }} />

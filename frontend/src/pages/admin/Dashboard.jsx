@@ -200,13 +200,19 @@ export default function AdminDashboard() {
       </div>
 
       {/* ─── MAIN GRID ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+      <div style={{ 
+        display: 'flex', 
+        flexWrap: 'wrap',
+        gap: 20 
+      }}>
 
         {/* Chart */}
         <div style={{
+          flex: '1 1 500px',
           background: '#fff', borderRadius: 20, padding: 28,
           border: '1px solid #f1f5f9',
           boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          minWidth: 0 // Prevent overflow in flex
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
             <div>
@@ -223,15 +229,28 @@ export default function AdminDashboard() {
 
           {monthly.length > 0 ? (
             <>
-              <BarChart data={monthly} />
-              <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 24, paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 32 }}>
+              <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
+                <div style={{ minWidth: 400 }}>
+                  <BarChart data={monthly} />
+                </div>
+              </div>
+              <div style={{ 
+                borderTop: '1px solid #f1f5f9', 
+                marginTop: 24, 
+                paddingTop: 20, 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 20
+              }}>
+                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   {[
                     { label: 'Total GMV', value: idr(overview?.total_revenue), color: '#6366f1' },
                     { label: 'Platform Fee', value: idr(overview?.total_fee), color: '#10b981' },
                     { label: 'Orders', value: (overview?.total_orders || 0).toLocaleString('id-ID'), color: '#f59e0b' },
                   ].map(s => (
-                    <div key={s.label}>
+                    <div key={s.label} style={{ minWidth: 100 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</div>
                       <div style={{ fontSize: 16, fontWeight: 800, color: s.color, letterSpacing: '-0.03em' }}>{s.value}</div>
                     </div>
@@ -240,6 +259,7 @@ export default function AdminDashboard() {
                 <Link to="/admin/finance" style={{
                   fontSize: 12, fontWeight: 700, color: '#6366f1',
                   textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '8px 12px', background: '#f5f7ff', borderRadius: 8
                 }}>
                   View Ledger <i className="bx bx-right-arrow-alt" style={{ fontSize: 18 }} />
                 </Link>
@@ -254,7 +274,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Right Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ flex: '1 1 340px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* System Status */}
           <div style={{
