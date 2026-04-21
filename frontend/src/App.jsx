@@ -10,6 +10,7 @@ import VoucherSection from './components/VoucherSection';
 import Footer from './components/Footer';
 import { getStoredUser, isAdminUser } from './lib/auth';
 import { captureAffiliate } from './lib/api';
+import { Toaster } from 'react-hot-toast';
 
 // ── Protected Route Wrapper ─────────
 function ProtectedRoute({ children }) {
@@ -77,6 +78,10 @@ import AdminLogistics from './pages/admin/Logistics';
 import AdminSecurity from './pages/admin/Security';
 import AdminRegions from './pages/admin/Regions';
 import AdminBlogs from './pages/admin/Blogs';
+import AdminBanners from './pages/admin/Banners';
+import AdminInbox from './pages/admin/Inbox';
+import AdminPOS from './pages/admin/POS';
+import WishlistStats from './pages/admin/WishlistStats';
 
 // ── Penanganan Khusus Header/Footer ─────────
 function NavbarManager() {
@@ -166,6 +171,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <Toaster position="top-right" reverseOrder={false} />
       <div className="min-h-screen bg-white">
         <NavbarManager />
         <Routes>
@@ -190,6 +196,8 @@ export default function App() {
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
+            <Route path="pos" element={<AdminPOS />} />
+            <Route path="wishlist" element={<WishlistStats />} />
             <Route path="products" element={<AdminProductList />} />
             <Route path="products/add" element={<AdminAddProduct />} />
             <Route path="products/edit" element={<AdminEditProduct />} />
@@ -212,6 +220,8 @@ export default function App() {
             <Route path="security" element={<AdminSecurity />} />
             <Route path="audit" element={<AdminAuditLog />} />
             <Route path="blogs" element={<AdminBlogs />} />
+            <Route path="banners" element={<AdminBanners />} />
+            <Route path="inbox" element={<AdminInbox />} />
           </Route>
 
           {/* Merchant Routes */}

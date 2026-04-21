@@ -218,6 +218,7 @@ type Product struct {
 	MerchantID  string    `gorm:"type:uuid;not null" json:"merchant_id"`
 	Name        string    `gorm:"type:varchar(255);not null" json:"name"`
 	Slug        string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"slug"`
+	SKU         string    `gorm:"type:varchar(100);unique;index" json:"sku"`
 	Description string    `gorm:"type:text" json:"description"`
 	Price       float64   `gorm:"type:decimal(15,2);not null" json:"price"`
 	OldPrice    float64   `gorm:"type:decimal(15,2)" json:"old_price"`

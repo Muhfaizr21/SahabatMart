@@ -41,3 +41,9 @@ func JSONError(w http.ResponseWriter, statusCode int, message string) {
 		Message: message,
 	})
 }
+func ToStringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

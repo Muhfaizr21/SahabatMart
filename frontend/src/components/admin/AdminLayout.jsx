@@ -19,6 +19,8 @@ const C = {
 // ─── MENU STRUCTURE ────────────────────────────────────
 const menu = [
   { name: 'Dashboard', icon: 'bxs-dashboard', path: '/admin', end: true },
+  { name: 'Point of Sale', icon: 'bxs-calculator', path: '/admin/pos' },
+  { name: 'Wishlist Insights', icon: 'bxs-heart', path: '/admin/wishlist' },
   {
     name: 'Users', icon: 'bxs-user-account',
     children: [
@@ -52,8 +54,16 @@ const menu = [
       { name: 'Payouts', path: '/admin/payouts' },
     ]
   },
+  {
+    name: 'CMS & Layout', icon: 'bxs-layout',
+    children: [
+      { name: 'Blog Posts', path: '/admin/blogs' },
+      { name: 'Banner Hero', path: '/admin/banners' },
+    ]
+  },
   { name: 'Audit Log', icon: 'bxs-file-find', path: '/admin/audit' },
   { name: 'Security', icon: 'bxs-shield-alt-2', path: '/admin/security' },
+  { name: 'Inbox', icon: 'bxs-inbox', path: '/admin/inbox' },
 ];
 
 // ─── SIDEBAR ITEM ──────────────────────────────────────
@@ -224,17 +234,22 @@ const AdminLayout = () => {
             <>
               <NavItem item={menu[0]} />
               <Label text="People" />
-              <NavItem item={menu[1]} />
-              <NavItem item={menu[2]} />
-              <Label text="Commerce" />
               <NavItem item={menu[3]} />
               <NavItem item={menu[4]} />
+              <Label text="Commerce" />
+              <NavItem item={menu[1]} />
+              <NavItem item={menu[2]} />
               <NavItem item={menu[5]} />
-              <Label text="Finance" />
               <NavItem item={menu[6]} />
-              <Label text="System" />
               <NavItem item={menu[7]} />
+              <Label text="Finance" />
               <NavItem item={menu[8]} />
+              <Label text="Content & CMS" />
+              <NavItem item={menu[9]} />
+              <Label text="System" />
+              <NavItem item={menu[10]} />
+              <NavItem item={menu[11]} />
+              <NavItem item={menu[12]} />
             </>
           ) : (
             menu.map(item => (

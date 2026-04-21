@@ -41,7 +41,7 @@ func ConnectDB() {
 		&models.BlogPost{}, &models.Banner{},
 		&models.Wishlist{}, &models.CategoryCommission{}, &models.MerchantCommission{},
 		&models.AuditLog{}, &models.PayoutRequest{}, &models.Notification{},
-		&models.Review{},
+		&models.Review{}, &models.ContactMessage{},
 		// Affiliate portal models
 		&models.AffiliateCommission{}, &models.AffiliateLink{},
 		&models.AffiliateClickLog{}, &models.AffiliateWithdrawal{},
@@ -232,8 +232,8 @@ func autoUpdateLogistics(db *gorm.DB, notif *services.NotificationService) error
 				// Send notification to Buyer
 				var order models.Order
 				db.Select("buyer_id").First(&order, "id = ?", group.OrderID)
-				if order.BuyerID != "" {
-					notif.Push(order.BuyerID, "buyer", "order_completed", 
+				if order.BuyerID != nil && *order.BuyerID != "" {
+					notif.Push(*order.BuyerID, "buyer", "order_completed", 
 						"Pesanan Selesai! 🎁", "Seluruh item pesanan Anda telah diterima. Terima kasih sudah berbelanja!", "/orders")
 				}
 			}

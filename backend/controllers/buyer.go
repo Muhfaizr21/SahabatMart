@@ -136,7 +136,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		orderItems = append(orderItems, models.OrderItem{
 			MerchantID:       product.MerchantID,
 			ProductID:        ci.ProductID,
-			ProductVariantID: ci.ProductVariantID,
+			ProductVariantID: utils.ToStringPtr(ci.ProductVariantID),
 			ProductName:      product.Name,
 			VariantName:      variant.Name,
 			SKU:              variant.SKU,

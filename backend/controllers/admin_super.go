@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"regexp"
@@ -1804,4 +1805,285 @@ func (ac *AdminController) MarkNotificationRead(w http.ResponseWriter, r *http.R
 		ac.Notif.MarkAsRead(req.ID)
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POINT OF SALE (POS) SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/pos/products?q=...
+func (ac *AdminController) POSGetProducts(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("q")
+	var products []models.Product
+
+	db := ac.DB.Model(&models.Product{}).Preload("Variants")
+
+	if search != "" {
+		like := "%" + strings.ToLower(search) + "%"
+		db = db.Where(ac.DB.Where("name ILIKE ?", like).
+			Or("slug ILIKE ?", like).
+			Or("sku ILIKE ?", like).
+			Or("id IN (SELECT product_id FROM product_variants WHERE sku ILIKE ?)", like))
+		
+		// If search looks like a potential ID, add OR condition for it
+		if len(search) >= 8 {
+			db = db.Or("CAST(id AS TEXT) ILIKE ?", search+"%")
+		}
+	}
+
+	if err := db.Order("created_at DESC").Limit(40).Find(&products).Error; err != nil {
+		log.Printf("[POS] Fetch Error: %v", err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal sinkronisasi produk")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   products,
+	})
+}
+
+// POST /api/admin/pos/checkout
+func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Metode tidak diizinkan")
+		return
+	}
+
+	var req struct {
+		Items []struct {
+			ProductID        string  `json:"product_id"`
+			ProductVariantID *string `json:"product_variant_id"`
+			Quantity         int     `json:"quantity"`
+			Price           float64 `json:"price"`
+		} `json:"items"`
+		PaymentMethod string  `json:"payment_method"`
+		AmountPaid    float64 `json:"amount_paid"`
+		BuyerID       *string `json:"buyer_id"`
+		Notes         string  `json:"notes"`
+		Discount      float64 `json:"discount"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	adminID := r.Context().Value("user_id").(string)
+
+	var order models.Order
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		// Calculate Number first
+		shortCode := strings.ToUpper(utils.GenerateShortCode(6))
+		orderNumber := fmt.Sprintf("POS-%s-%d", shortCode, time.Now().Unix()%100000)
+
+		var subtotal float64
+		var totalPlatformFee float64
+		
+		// Temporary storage for items to be created after order
+		type itemData struct {
+			product models.Product
+			variant models.ProductVariant
+			qty     int
+			price   float64
+		}
+		var itemsToProcess []itemData
+
+		for _, item := range req.Items {
+			var product models.Product
+			if err := tx.First(&product, "id = ?", item.ProductID).Error; err != nil {
+				return fmt.Errorf("produk tidak ditemukan: %s", item.ProductID)
+			}
+
+			var variant models.ProductVariant
+			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+				if err := tx.First(&variant, "id = ?", *item.ProductVariantID).Error; err != nil {
+					return fmt.Errorf("varian tidak ditemukan: %s", *item.ProductVariantID)
+				}
+			}
+
+			unitPrice := product.Price
+			if variant.ID != "" {
+				unitPrice = variant.Price
+			}
+			if item.Price > 0 {
+				unitPrice = item.Price
+			}
+
+			subtotal += unitPrice * float64(item.Quantity)
+			itemsToProcess = append(itemsToProcess, itemData{product, variant, item.Quantity, unitPrice})
+
+			// Update Stock
+			if variant.ID != "" {
+				if variant.Stock < item.Quantity {
+					return fmt.Errorf("stok tidak mencukupi untuk %s", variant.Name)
+				}
+				tx.Model(&models.ProductVariant{}).Where("id = ?", variant.ID).Update("stock", gorm.Expr("stock - ?", item.Quantity))
+			} else {
+				if product.Stock < item.Quantity {
+					return fmt.Errorf("stok tidak mencukupi untuk %s", product.Name)
+				}
+				tx.Model(&models.Product{}).Where("id = ?", product.ID).Update("stock", gorm.Expr("stock - ?", item.Quantity))
+			}
+		}
+
+		grandTotal := subtotal - req.Discount
+
+		order = models.Order{
+			OrderNumber:      orderNumber,
+			BuyerID:          req.BuyerID,
+			CashierID:        &adminID,
+			OrderType:        "pos",
+			Subtotal:         subtotal,
+			TotalDiscount:    req.Discount,
+			GrandTotal:       grandTotal,
+			Status:           models.OrderCompleted,
+			PaidAt:           &[]time.Time{time.Now()}[0],
+			Notes:            req.Notes,
+		}
+
+		if err := tx.Create(&order).Error; err != nil {
+			return err
+		}
+
+		// Now we have order.ID
+		merchantGroups := make(map[string]*models.OrderMerchantGroup)
+		var orderItems []models.OrderItem
+
+		for _, it := range itemsToProcess {
+			// Calculate individual fee
+			var catComm models.CategoryCommission
+			tx.Where("LOWER(category_name) = LOWER(?)", it.product.Category).First(&catComm)
+			feeRate := catComm.FeePercent / 100
+			if feeRate == 0 { feeRate = 0.01 }
+			
+			itemSubtotal := it.price * float64(it.qty)
+			itemFee := itemSubtotal * feeRate
+			totalPlatformFee += itemFee
+
+			if _, ok := merchantGroups[it.product.MerchantID]; !ok {
+				merchantGroups[it.product.MerchantID] = &models.OrderMerchantGroup{
+					OrderID:    order.ID,
+					MerchantID: it.product.MerchantID,
+					Status:     models.MOrderCompleted,
+					CreatedAt:  time.Now(),
+				}
+				if err := tx.Create(merchantGroups[it.product.MerchantID]).Error; err != nil {
+					return err
+				}
+			}
+
+			mg := merchantGroups[it.product.MerchantID]
+			mg.Subtotal += itemSubtotal
+			mg.PlatformFee += itemFee
+			mg.MerchantPayout += (itemSubtotal - itemFee)
+
+			var variantID *string
+			sku := it.product.Slug
+			if it.variant.ID != "" { 
+				sku = it.variant.SKU 
+				vid := it.variant.ID
+				variantID = &vid
+			}
+
+			orderItems = append(orderItems, models.OrderItem{
+				OrderID:              order.ID,
+				OrderMerchantGroupID: mg.ID,
+				MerchantID:           it.product.MerchantID,
+				ProductID:            it.product.ID,
+				ProductVariantID:     variantID,
+				ProductName:          it.product.Name,
+				VariantName:          it.variant.Name,
+				SKU:                  sku,
+				Quantity:             it.qty,
+				UnitPrice:            it.price,
+				Subtotal:             itemSubtotal,
+				PlatformFeeAmount:    itemFee,
+				MerchantAmount:       itemSubtotal - itemFee,
+			})
+		}
+
+		// Update Merchant Groups and create OrderItems
+		for _, mg := range merchantGroups {
+			tx.Save(mg)
+			
+			// Add to Merchant Balance
+			tx.Model(&models.Merchant{}).Where("id = ?", mg.MerchantID).
+				Updates(map[string]interface{}{
+					"balance":      gorm.Expr("balance + ?", mg.MerchantPayout),
+					"total_sales":  gorm.Expr("total_sales + ?", mg.Subtotal),
+				})
+		}
+
+		for _, oi := range orderItems {
+			tx.Create(&oi)
+		}
+
+		// Update order with total fee
+		tx.Model(&order).Update("total_platform_fee", totalPlatformFee)
+
+		// Record Payment
+		payment := models.Payment{
+			OrderID:        order.ID,
+			PaymentMethod:  req.PaymentMethod,
+			Status:         models.PaymentPaid,
+			Amount:         grandTotal,
+			AmountReceived: req.AmountPaid,
+			Gateway:        "cashier",
+			PaidAt:         &[]time.Time{time.Now()}[0],
+		}
+		if err := tx.Create(&payment).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	ac.Audit.Log(adminID, "pos_checkout", "order", order.ID, fmt.Sprintf("Total: %v", order.GrandTotal), r.RemoteAddr)
+
+	// Preload items and payment for response to receipt
+	ac.DB.Preload("Items").Preload("Payment").First(&order, "id = ?", order.ID)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   order,
+	})
+}
+
+// GetWishlistStats returns aggregated wishlist counts per product
+func (ac *AdminController) GetWishlistStats(w http.ResponseWriter, r *http.Request) {
+	type Result struct {
+		ProductID   string  `json:"product_id"`
+		ProductName string  `json:"product_name"`
+		ProductSlug string  `json:"product_slug"`
+		Image       string  `json:"image"`
+		MerchantID  string  `json:"merchant_id"`
+		StoreName   string  `json:"store_name"`
+		Count       int64   `json:"count"`
+		Price       float64 `json:"price"`
+	}
+
+	var results []Result
+	err := ac.DB.Table("wishlists").
+		Select("products.id as product_id, products.name as product_name, products.slug as product_slug, products.image, products.price, merchants.id as merchant_id, merchants.store_name, count(wishlists.id) as count").
+		Joins("join products on products.id = wishlists.product_id").
+		Joins("join merchants on merchants.id = products.merchant_id").
+		Group("products.id, merchants.id, products.name, products.slug, products.image, products.price, merchants.store_name").
+		Order("count DESC").
+		Scan(&results).Error
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   results,
+	})
 }

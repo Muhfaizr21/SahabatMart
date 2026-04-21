@@ -47,7 +47,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 	}
 
 	order := &models.Order{
-		BuyerID:            buyerID,
+		BuyerID:            &buyerID,
 		OrderNumber:        fmt.Sprintf("ORD-%d-%s", time.Now().Unix(), buyerID[:8]),
 		Status:             models.OrderPendingPayment,
 		AffiliateID:        affiliateID,
@@ -228,9 +228,11 @@ func (s *OrderService) CompletePayment(orderID string) error {
 		}
 
 		// Notifikasi ke Buyer
-		_ = s.Notification.Push(order.BuyerID, "buyer", "payment_success", "Pembayaran Berhasil", 
-			fmt.Sprintf("Pembayaran untuk pesanan %s telah kami terima.", order.OrderNumber), 
-			fmt.Sprintf("/orders/%s", order.ID))
+		if order.BuyerID != nil {
+			_ = s.Notification.Push(*order.BuyerID, "buyer", "payment_success", "Pembayaran Berhasil", 
+				fmt.Sprintf("Pembayaran untuk pesanan %s telah kami terima.", order.OrderNumber), 
+				fmt.Sprintf("/orders/%s", order.ID))
+		}
 
 		// [NOTIF] Kirim ke Admin Topbar (Pembayaran Masuk)
 		adminID := "00000000-0000-0000-0000-000000000001"

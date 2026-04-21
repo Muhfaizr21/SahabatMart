@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
-import { PageHeader, StatRow, TablePanel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
+import { PageHeader, StatRow, TablePanel, statusBadge, idr, fmtDate, A, Modal } from '../../lib/adminStyles.jsx';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const API = ADMIN_API_BASE;
 
@@ -19,7 +20,7 @@ const STATUS_CFG = {
 };
 
 // Dropdown state per row
-function ActionDropdown({ product, onToggle, onDelete }) {
+function ActionDropdown({ product, onToggle, onDelete, onViewQR }) {
   const [open, setOpen] = useState(false);
   const cfg = STATUS_CFG[product.status] || { actionLabel: 'Ubah', icon: 'bx-transfer', next: 'active' };
 
@@ -53,6 +54,12 @@ function ActionDropdown({ product, onToggle, onDelete }) {
               <i className="bx bx-pencil" style={{ fontSize: 16, color: '#6366f1' }} /> Edit Detail
             </Link>
             <button
+              onClick={() => { onViewQR(product); setOpen(false); }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', border: 'none', background: 'none', cursor: 'pointer', color: '#334155', fontSize: 13.5, fontWeight: 500, textAlign: 'left' }}
+            >
+              <i className="bx bx-qr-scan" style={{ fontSize: 16, color: '#ec4899' }} /> Generate QR Code
+            </button>
+            <button
               onClick={() => { onToggle(product.id, product.status); setOpen(false); }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', border: 'none', background: 'none', cursor: 'pointer', color: '#334155', fontSize: 13.5, fontWeight: 500, textAlign: 'left' }}
             >
@@ -78,6 +85,7 @@ export default function AdminProductList() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('');
   const [search, setSearch] = useState('');
+  const [showQR, setShowQR] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -114,6 +122,78 @@ export default function AdminProductList() {
 
   return (
     <div style={A.page} className="fade-in">
+      {showQR && (
+        <Modal title="Digital Product ID" onClose={() => setShowQR(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, padding: '8px 0', textAlign: 'center' }}>
+            {/* The QR Stage */}
+            <div style={{ 
+              padding: 24, 
+              background: '#fff', 
+              borderRadius: 36, 
+              boxShadow: '0 25px 60px rgba(99,102,241,0.14), 0 8px 16px rgba(0,0,0,0.03)',
+              border: '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative'
+            }}>
+              <QRCodeCanvas 
+                value={showQR.id} 
+                size={230} 
+                level="H" 
+                marginSize={1}
+                fgColor="#0f172a"
+              />
+              <div style={{ 
+                position: 'absolute', top: -12, right: -12, 
+                width: 36, height: 36, borderRadius: '50%', background: '#6366f1',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 20px rgba(99,102,241,0.4)', fontSize: 18
+              }}>
+                <i className="bx bxs-badge-check" />
+              </div>
+            </div>
+
+            {/* Content Area */}
+            <div style={{ width: '100%' }}>
+              <h3 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1.2, margin: '0 0 12px 0' }}>{showQR.name}</h3>
+              <div style={{ 
+                display: 'inline-flex', alignItems: 'center', gap: 7, 
+                padding: '7px 14px', borderRadius: 12, background: '#f8fafc',
+                color: '#64748b', fontSize: 12, fontWeight: 800,
+                fontFamily: 'monospace', border: '1px solid #f1f5f9'
+              }}>
+                <i className="bx bx-barcode-reader" style={{ fontSize: 16, color: '#6366f1' }} />
+                #{String(showQR.id).toUpperCase()}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ width: '100%', height: 1, background: 'linear-gradient(90deg, transparent, #f1f5f9, transparent)' }} />
+
+            {/* Actions */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, width: '100%' }}>
+              <button 
+                style={{ ...A.btnPrimary, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
+                onClick={() => window.print()}
+              >
+                <i className="bx bx-printer" style={{ fontSize: 18 }} /> Print Label
+              </button>
+              <button 
+                style={{ ...A.btnGhost, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
+                onClick={() => setShowQR(null)}
+              >
+                Tutup
+              </button>
+            </div>
+            
+            <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+              Tempelkan label ini pada produk fisik untuk mempercepat checkout di POS.
+            </p>
+          </div>
+        </Modal>
+      )}
+
       <PageHeader title="Product Catalog" subtitle="Kelola dan moderasi seluruh listing produk platform SahabatMart.">
         <div style={A.searchWrap}>
           <i className="bx bx-search" style={A.searchIcon} />
@@ -186,7 +266,16 @@ export default function AdminProductList() {
                         />
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5, marginBottom: 2 }}>{p.name}</div>
-                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>SKU #{String(p.id).slice(0, 8).toUpperCase()}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            SKU #{String(p.id).slice(0, 8).toUpperCase()}
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setShowQR(p); }}
+                              style={{ color: '#ec4899', cursor: 'pointer', border: 'none', background: 'none', padding: 0, display: 'flex', alignItems: 'center' }}
+                              title="Generate QR Code"
+                            >
+                              <i className="bx bx-qr-scan" style={{ fontSize: 14 }} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -217,7 +306,7 @@ export default function AdminProductList() {
                     </td>
                     {/* Actions */}
                     <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                      <ActionDropdown product={p} onToggle={toggle} onDelete={del} />
+                      <ActionDropdown product={p} onToggle={toggle} onDelete={del} onViewQR={setShowQR} />
                     </td>
                   </tr>
                 );
@@ -234,6 +323,46 @@ export default function AdminProductList() {
           </div>
         )}
       </TablePanel>
+
+      <Modal 
+        show={!!showQR} 
+        onClose={() => setShowQR(null)} 
+        title="QR Label Produk"
+        width={380}
+      >
+        {showQR && (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ background: '#fff', padding: 25, borderRadius: 24, boxShadow: '0 8px 30px rgba(0,0,0,0.05)', display: 'inline-block', border: '1px solid #f1f5f9' }}>
+                  <QRCodeCanvas 
+                      value={showQR.sku || showQR.id} 
+                      size={220}
+                      level="H"
+                      includeMargin={true}
+                  />
+              </div>
+              <div style={{ marginTop: 25 }}>
+                 <h4 style={{ margin: '0 0 5px', fontSize: 18, color: '#0f172a' }}>{showQR.name}</h4>
+                 <p style={{ margin: 0, fontSize: 13, color: '#6366f1', fontWeight: 800, fontFamily: 'monospace' }}>
+                     CODE: {showQR.sku || showQR.id}
+                 </p>
+              </div>
+              <div style={{ marginTop: 30, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <button 
+                    onClick={() => window.print()}
+                    style={{ padding: '12px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    <i className="bx bx-printer" /> Cetak Label
+                  </button>
+                  <button 
+                    onClick={() => setShowQR(null)}
+                    style={{ padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Tutup
+                  </button>
+              </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

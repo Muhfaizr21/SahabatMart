@@ -10,7 +10,7 @@ export default function BlogDetailPage() {
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/blogs/detail?slug=${id}`)
       .then(d => {
-        if (d.data) setBlog(d.data);
+        if (d) setBlog(d);
       })
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

@@ -41,21 +41,23 @@ const (
 type Order struct {
 	ID                  string         `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	OrderNumber         string         `gorm:"type:varchar(30);unique;not null" json:"order_number"`
-	BuyerID             string         `gorm:"type:uuid;not null" json:"buyer_id"`
+	BuyerID             *string        `gorm:"type:uuid" json:"buyer_id"`
+	CashierID           *string        `gorm:"type:uuid" json:"cashier_id"`
+	OrderType           string         `gorm:"type:varchar(20);default:'online';not null" json:"order_type"` // online, pos
 	
 	// Affiliate attribution
 	AffiliateID         *string        `gorm:"type:uuid" json:"affiliate_id"`
 	AffiliateRefCode    *string        `gorm:"type:varchar(20)" json:"affiliate_ref_code"`
 	AffiliateClickID    *string        `gorm:"type:uuid" json:"affiliate_click_id"`
-
-	// Shipping Snapshot
-	ShippingName        string         `gorm:"type:varchar(150);not null" json:"shipping_name"`
-	ShippingPhone       string         `gorm:"type:varchar(20);not null" json:"shipping_phone"`
-	ShippingAddress     string         `gorm:"type:text;not null" json:"shipping_address"`
+	
+	// Shipping Snapshot (Nullable for POS)
+	ShippingName        string         `gorm:"type:varchar(150)" json:"shipping_name"`
+	ShippingPhone       string         `gorm:"type:varchar(20)" json:"shipping_phone"`
+	ShippingAddress     string         `gorm:"type:text" json:"shipping_address"`
 	ShippingDistrict    string         `gorm:"type:varchar(100)" json:"shipping_district"`
-	ShippingCity        string         `gorm:"type:varchar(100);not null" json:"shipping_city"`
-	ShippingProvince    string         `gorm:"type:varchar(100);not null" json:"shipping_province"`
-	ShippingPostalCode  string         `gorm:"type:varchar(10);not null" json:"shipping_postal_code"`
+	ShippingCity        string         `gorm:"type:varchar(100)" json:"shipping_city"`
+	ShippingProvince    string         `gorm:"type:varchar(100)" json:"shipping_province"`
+	ShippingPostalCode  string         `gorm:"type:varchar(10)" json:"shipping_postal_code"`
 	
 	// Financials
 	Subtotal            float64        `gorm:"type:decimal(15,2);not null" json:"subtotal"`
@@ -84,6 +86,7 @@ type Order struct {
 
 	MerchantGroups      []OrderMerchantGroup `gorm:"foreignKey:OrderID" json:"merchant_groups"`
 	Items               []OrderItem          `gorm:"foreignKey:OrderID" json:"items"`
+	Payment             *Payment             `gorm:"foreignKey:OrderID" json:"payment"`
 }
 
 type OrderMerchantGroup struct {
@@ -117,7 +120,7 @@ type OrderItem struct {
 	OrderMerchantGroupID  string  `gorm:"type:uuid;not null;index" json:"order_merchant_group_id"`
 	MerchantID           string  `gorm:"type:uuid;not null" json:"merchant_id"`
 	ProductID            string  `gorm:"type:uuid;not null" json:"product_id"`
-	ProductVariantID     string  `gorm:"type:uuid;not null" json:"product_variant_id"`
+	ProductVariantID     *string `gorm:"type:uuid" json:"product_variant_id"`
 
 	ProductName          string  `gorm:"type:varchar(255);not null" json:"product_name"`
 	VariantName          string  `gorm:"type:varchar(255)" json:"variant_name"`

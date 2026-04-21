@@ -2,6 +2,7 @@ package seeder
 
 import (
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/utils"
 	"fmt"
 	"log"
 
@@ -74,10 +75,11 @@ func seedOrders(db *gorm.DB) {
 	})
 
 	orderID := "00000000-0000-0000-0000-000000000001"
+	buyerIDVar := BuyerID
 	order := models.Order{
 		ID:          orderID,
 		OrderNumber: "ORD-2026-0001",
-		BuyerID:     BuyerID,
+		BuyerID:     &buyerIDVar,
 		GrandTotal:  45000000,
 		Subtotal:    45000000,
 		Status:      models.OrderCompleted,
@@ -106,7 +108,7 @@ func seedOrders(db *gorm.DB) {
 		OrderID:              orderID,
 		MerchantID:           merchant.ID,
 		ProductID:            "00000000-1111-0000-0000-000000000001",
-		ProductVariantID:     "00000000-2222-0000-0000-000000000001",
+		ProductVariantID:     utils.ToStringPtr("00000000-2222-0000-0000-000000000001"),
 		ProductName:          "MacBook Pro M3 Max - 14 Inch",
 		UnitPrice:            45000000,
 		Quantity:             1,
@@ -146,6 +148,21 @@ func seedMarketing(db *gorm.DB) {
 	}
 	for _, v := range vouchers {
 		db.Create(&v)
+	}
+
+	// Clicks for Security Audit (Fraud/Bot Detection)
+	affiliates := []models.AffiliateMember{}
+	db.Find(&affiliates)
+	if len(affiliates) > 0 {
+		clicks := []models.AffiliateClick{
+			{AffiliateID: affiliates[0].ID, IPAddress: "114.124.200.15", Referrer: "google.com", IsFraud: false, IsBot: false},
+			{AffiliateID: affiliates[0].ID, IPAddress: "114.124.200.15", Referrer: "google.com", IsFraud: false, IsBot: false},
+			{AffiliateID: affiliates[0].ID, IPAddress: "139.192.112.50", Referrer: "unknown", IsFraud: true, IsBot: false}, // High speed duplicate from different region
+			{AffiliateID: affiliates[0].ID, IPAddress: "23.45.67.89", Referrer: "facebook.com", IsFraud: false, IsBot: true}, // Data center IP
+		}
+		for _, c := range clicks {
+			db.Create(&c)
+		}
 	}
 }
 

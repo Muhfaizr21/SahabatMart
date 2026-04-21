@@ -23,6 +23,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	adminCtrl := controllers.NewAdminController(db)
 	affiliateCtrl := controllers.NewAffiliateController(db, notifService)
 	productCtrl := controllers.NewProductController(db)
+	contactCtrl := &controllers.ContactController{DB: db}
 
 	// Middleware
 	cors := corsMiddleware
@@ -100,6 +101,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// --- Admin Routes ---
 	adminOnly := actorOnly("admin", "superadmin")
+	superOnly := actorOnly("superadmin")
 	
 	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
@@ -145,6 +147,15 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/disputes", adminOnly(adminCtrl.GetDisputes))
 	mux.HandleFunc("/api/admin/disputes/arbitrate", adminOnly(adminCtrl.ArbitrateDispute))
 
+	// POS System
+	mux.HandleFunc("/api/admin/pos/products", adminOnly(adminCtrl.POSGetProducts))
+	mux.HandleFunc("/api/admin/pos/checkout", adminOnly(adminCtrl.POSCheckout))
+
+	// analysis section removed redundant blog lines handled below
+
+	// Analysis & Reports
+	mux.HandleFunc("/api/admin/wishlist/stats", adminOnly(adminCtrl.GetWishlistStats))
+
 	// Affiliate & Marketing
 	mux.HandleFunc("/api/admin/affiliates", adminOnly(adminCtrl.GetAffiliates))
 	mux.HandleFunc("/api/admin/affiliates/configs", adminOnly(adminCtrl.GetAffiliateConfigs))
@@ -169,7 +180,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/blogs/upsert", adminOnly(adminCtrl.UpsertBlog))
 	mux.HandleFunc("/api/admin/blogs/delete", adminOnly(adminCtrl.DeleteBlog))
 	mux.HandleFunc("/api/admin/banners", adminOnly(adminCtrl.ManageBanners))
-	mux.HandleFunc("/api/admin/banners/delete", adminOnly(adminCtrl.DeleteBanner))
+	mux.HandleFunc("/api/admin/banners/delete", superOnly(adminCtrl.DeleteBanner))
+
+	// CMS & Inbox
+	mux.HandleFunc("/api/admin/inbox", superOnly(contactCtrl.GetMessages))
+	mux.HandleFunc("/api/admin/inbox/update", superOnly(contactCtrl.UpdateStatus))
+	mux.HandleFunc("/api/admin/inbox/delete", superOnly(contactCtrl.DeleteMessage))
 
 	// System & Config
 	mux.HandleFunc("/api/admin/configs", adminOnly(adminCtrl.GetSettings))
@@ -187,6 +203,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/blogs/detail", adminCtrl.GetPublicBlogDetail)
 	mux.HandleFunc("/api/public/banners", adminCtrl.GetPublicBanners)
 	mux.HandleFunc("/api/public/vouchers", adminCtrl.GetPublicVouchers)
+	mux.HandleFunc("/api/public/contact/submit", contactCtrl.SubmitMessage)
 	mux.HandleFunc("/api/public/configs", adminCtrl.GetPublicConfig) // Alias for public config
 	mux.HandleFunc("/api/public/config", adminCtrl.GetPublicConfig)
 	mux.HandleFunc("/api/public/products/detail", adminCtrl.GetPublicProductDetail)

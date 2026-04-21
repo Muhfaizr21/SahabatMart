@@ -92,7 +92,14 @@ export default function AdminOrders() {
                 onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
               >
                 <td style={{ ...A.td, paddingLeft: 24 }}>
-                  <div style={{ fontFamily: 'monospace', fontWeight: 800, color: '#0f172a', fontSize: 14 }}>#{o.id?.slice(0,8).toUpperCase()}</div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 800, color: '#0f172a', fontSize: 14 }}>#{o.order_number || o.id?.slice(0,8).toUpperCase()}</div>
+                    {o.order_type === 'pos' && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: '#fef3c7', color: '#92400e', fontSize: 10, fontWeight: 800, marginLeft: 8 }}>
+                        <i className="bx bx-calculator" style={{ fontSize: 12 }} /> POS
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 11, color: '#94a3b8' }}>ID Pesanan</div>
                 </td>
                 <td style={A.td}>

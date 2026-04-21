@@ -18,7 +18,7 @@ export default function AdminEditProduct() {
   const [uploading, setUploading] = useState(false);
   
   const [p, setP] = useState({
-    id: '', name: '', description: '', price: 0, old_price: 0,
+    id: '', name: '', sku: '', description: '', price: 0, old_price: 0,
     category: '', brand: '', attributes: '{}', image: '',
     images: '[]', stock: 0, status: 'active'
   });
@@ -43,7 +43,7 @@ export default function AdminEditProduct() {
       const item = items.find(x => x.id === productId);
       if (item) {
         setP({
-            id: item.id, name: item.name, description: item.description || '',
+            id: item.id, name: item.name, sku: item.sku || '', description: item.description || '',
             price: item.price, old_price: item.old_price || 0,
             category: item.category, brand: item.brand || '',
             attributes: item.attributes || '{}', image: item.image,
@@ -170,6 +170,17 @@ export default function AdminEditProduct() {
                   value={p.name} 
                   onChange={e => setP({...p, name: e.target.value})}
                   placeholder="E.g. Professional Wireless Headset"
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none' }} 
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>SKU / Barcode</label>
+                <input 
+                  type="text" 
+                  value={p.sku} 
+                  onChange={e => setP({...p, sku: e.target.value})}
+                  placeholder="E.g. BC-12345678"
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none' }} 
                 />
               </div>

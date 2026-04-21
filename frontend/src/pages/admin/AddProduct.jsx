@@ -34,7 +34,7 @@ export default function AdminAddProduct() {
   const [uploading, setUploading] = useState(false);
 
   const [p, setP] = useState({
-    name: '', description: '', price: 0, old_price: 0,
+    name: '', sku: '', description: '', price: 0, old_price: 0,
     category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active'
   });
   const [gallery, setGallery] = useState([]);
@@ -180,6 +180,11 @@ export default function AdminAddProduct() {
                 <option value="">— Tanpa Brand —</option>
                 {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
+            </FormField>
+            <FormField label="SKU / Kode Barcode">
+              <input style={S.input} type="text" placeholder="Scan atau input SKU..."
+                value={p.sku} onChange={e => setP(prev => ({ ...prev, sku: e.target.value }))}
+                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
             <FormField label="Stok Tersedia">
               <input style={S.input} type="number" min={0} value={p.stock}
