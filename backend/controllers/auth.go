@@ -29,6 +29,7 @@ type RegisterRequest struct {
 	FullName string `json:"full_name"`
 	Phone    string `json:"phone"`
 	Role     string `json:"role"`
+	UplineID string `json:"upline_id"`
 }
 
 type LoginRequest struct {
@@ -48,7 +49,7 @@ func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, token, err := ac.Service.Register(req.Email, req.Password, req.FullName, req.Phone, req.Role)
+	user, token, err := ac.Service.Register(req.Email, req.Password, req.FullName, req.Phone, req.Role, req.UplineID)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "email sudah terdaftar" {

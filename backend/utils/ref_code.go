@@ -32,3 +32,9 @@ func GenerateShortCode(length int) string {
 	}
 	return string(b)
 }
+
+func Slugify(s string) string {
+	s = strings.ToLower(s)
+	reg, _ := regexp.Compile("[^a-z0-9]+")
+	return strings.Trim(reg.ReplaceAllString(s, "-"), "-")
+}

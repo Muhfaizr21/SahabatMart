@@ -12,7 +12,7 @@ export default function AboutPage() {
               Membangun Ekosistem Belanja Masa Depan.
             </h1>
             <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-lg">
-              Berawal dari mimpi sederhana di tahun 2018, SahabatMart hadir untuk menjembatani jarak antara produsen berkualitas dan konsumen yang mencari kemudahan serta transparansi bertransaksi.
+              Berawal dari mimpi sederhana di tahun 2018, AkuGrow hadir untuk menjembatani jarak antara produsen kecantikan berkualitas dan konsumen yang mencari kemudahan serta transparansi bertransaksi.
             </p>
             <div className="flex gap-4">
               <Link to="/contact" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-8 rounded-xl transition-colors shadow-lg shadow-blue-600/20">

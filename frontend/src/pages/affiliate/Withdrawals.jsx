@@ -40,7 +40,7 @@ export default function AffiliateWithdrawals() {
         fetchJson(`${AFFILIATE_API_BASE}/withdrawals`),
         fetchJson(`${AFFILIATE_API_BASE}/dashboard`),
       ]);
-      setWithdrawals(Array.isArray(wRes.data) ? wRes.data : []);
+      setWithdrawals(Array.isArray(wRes) ? wRes : []);
       setBalance(dRes?.stats?.balance || 0);
     } catch (err) {
       console.error(err);

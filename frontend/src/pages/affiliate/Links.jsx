@@ -29,7 +29,7 @@ export default function AffiliateLinks() {
     product_id: '',
   });
 
-  const refCode = user?.affiliate_ref_code || 'SM-REF';
+  const refCode = user?.affiliate_ref_code || 'AG-REF';
 
   const fetchLinks = useCallback(async () => {
     setLoading(true);
@@ -137,6 +137,51 @@ export default function AffiliateLinks() {
           <span className="material-symbols-outlined text-lg">add_link</span>
           Buat Link Baru
         </button>
+      </div>
+
+      {/* Quick Links per user request */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all group flex flex-col justify-between">
+              <div>
+                <span className="material-symbols-outlined text-purple-400 mb-2">home</span>
+                <h4 className="text-white font-bold text-sm">Link Utama Website</h4>
+                <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda AkuGrow.</p>
+              </div>
+              <button 
+                onClick={() => copyURL(`${window.location.origin}?ref=${refCode}`)}
+                className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-purple-600 transition-all"
+              >
+                Salin Link Utama
+              </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 transition-all group flex flex-col justify-between">
+              <div>
+                <span className="material-symbols-outlined text-blue-400 mb-2">shopping_bag</span>
+                <h4 className="text-white font-bold text-sm">Link Langsung Produk</h4>
+                <p className="text-slate-500 text-[10px] mt-1">Arahkan langsung ke halaman detail produk tertentu.</p>
+              </div>
+              <button 
+                 onClick={() => { setShowForm(true); setForm({ ...form, product_id: products[0]?.id || '' })}}
+                 className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-blue-600 transition-all"
+              >
+                Pilih Produk
+              </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-pink-500/50 transition-all group flex flex-col justify-between">
+              <div>
+                <span className="material-symbols-outlined text-pink-400 mb-2">campaign</span>
+                <h4 className="text-white font-bold text-sm">Link Promo Khusus</h4>
+                <p className="text-slate-500 text-[10px] mt-1">Link untuk kampanye marketing atau landing page event.</p>
+              </div>
+              <button 
+                onClick={() => copyURL(`${window.location.origin}/promo/special?ref=${refCode}`)}
+                className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-pink-600 transition-all"
+              >
+                Salin Link Promo
+              </button>
+          </div>
       </div>
 
       {/* Create Form */}

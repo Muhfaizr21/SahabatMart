@@ -28,7 +28,13 @@ const menu = [
       { name: 'Affiliates', path: '/admin/affiliates' },
     ]
   },
-  { name: 'Merchants', icon: 'bxs-store-alt', path: '/admin/merchants' },
+  {
+    name: 'Merchants', icon: 'bxs-store-alt',
+    children: [
+      { name: 'All Merchants', path: '/admin/merchants' },
+      { name: 'Restock Requests', path: '/admin/merchants/restock' },
+    ]
+  },
   {
     name: 'Catalog', icon: 'bxs-package',
     children: [
@@ -213,7 +219,7 @@ const AdminLayout = () => {
         transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
         position: 'fixed', top: 0, 
         left: isMobile && collapsed ? -C.sideW : 0, 
-        bottom: 0, zIndex: 100,
+        bottom: 0, zIndex: 10,
         overflow: 'hidden',
         borderRight: `1px solid ${C.border}`,
         boxShadow: isMobile && !collapsed ? '20px 0 50px rgba(0,0,0,0.3)' : 'none',
@@ -234,7 +240,7 @@ const AdminLayout = () => {
           </div>
           {!collapsed && (
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>SahabatMart</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>AkuGrow</div>
               <div style={{ fontSize: 9, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin Portal</div>
             </div>
           )}
@@ -328,7 +334,8 @@ const AdminLayout = () => {
         marginLeft: finalSideWidth, 
         transition: 'margin-left 0.25s cubic-bezier(0.4,0,0.2,1)', 
         minHeight: '100vh',
-        maxWidth: '100%' 
+        maxWidth: '100%',
+        position: 'relative'
       }}>
         {/* Mobile Overlay */}
         {isMobile && !collapsed && (
@@ -340,7 +347,7 @@ const AdminLayout = () => {
 
         {/* Topbar */}
         <header style={{
-          position: 'sticky', top: 0, zIndex: 40,
+          position: 'sticky', top: 0, zIndex: 1,
           height: 64,
           background: 'rgba(248,250,252,0.85)',
           backdropFilter: 'blur(20px)',
@@ -399,7 +406,7 @@ const AdminLayout = () => {
                   position: 'absolute', top: 48, right: 0, width: 320,
                   background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0',
                   boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
-                  zIndex: 100, overflow: 'hidden'
+                  zIndex: 20, overflow: 'hidden'
                 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Notifications</span>

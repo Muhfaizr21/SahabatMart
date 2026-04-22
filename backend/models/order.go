@@ -92,13 +92,18 @@ type Order struct {
 type OrderMerchantGroup struct {
 	ID              string              `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	OrderID         string              `gorm:"type:uuid;not null;index" json:"order_id"`
-	MerchantID      string              `gorm:"type:uuid;not null;index" json:"merchant_id"`
+	MerchantID      string              `gorm:"type:uuid;not null;index" json:"merchant_id"` // Sang Distributor
 	Status          MerchantOrderStatus `gorm:"type:varchar(50);default:'new';not null" json:"status"`
 
 	Subtotal        float64             `gorm:"type:decimal(15,2);not null" json:"subtotal"`
 	ShippingCost    float64             `gorm:"type:decimal(15,2);not null;default:0" json:"shipping_cost"`
 	PlatformFee     float64             `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee"`
-	Commission      float64             `gorm:"type:decimal(15,2);not null;default:0" json:"commission"`
+	
+	// Dual Commissions
+	DistributionCommission float64     `gorm:"type:decimal(15,2);not null;default:0" json:"distribution_commission"` // Jatah Merchant Distributor
+	AffiliateCommission    float64     `gorm:"type:decimal(15,2);not null;default:0" json:"affiliate_commission"`    // Jatah Pengajak (Affiliate)
+	
+	Commission      float64             `gorm:"type:decimal(15,2);not null;default:0" json:"commission"` // Legacy/Total
 	Discount        float64             `gorm:"type:decimal(15,2);not null;default:0" json:"discount"`
 	MerchantPayout  float64             `gorm:"type:decimal(15,2);not null;default:0" json:"merchant_payout"`
 
@@ -118,7 +123,7 @@ type OrderItem struct {
 	ID                    string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	OrderID               string  `gorm:"type:uuid;not null;index" json:"order_id"`
 	OrderMerchantGroupID  string  `gorm:"type:uuid;not null;index" json:"order_merchant_group_id"`
-	MerchantID           string  `gorm:"type:uuid;not null" json:"merchant_id"`
+	MerchantID           string  `gorm:"type:uuid;not null" json:"merchant_id"` // Sang Distributor
 	ProductID            string  `gorm:"type:uuid;not null" json:"product_id"`
 	ProductVariantID     *string `gorm:"type:uuid" json:"product_variant_id"`
 
@@ -132,10 +137,14 @@ type OrderItem struct {
 	Subtotal             float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
 	Metadata             string  `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
 	PlatformFeeAmount    float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee_amount"`
-	CommissionRate       float64 `gorm:"type:decimal(5,4);not null;default:0" json:"commission_rate"`
-	CommissionAmount     float64 `gorm:"type:decimal(15,2);not null;default:0" json:"commission_amount"`
+	
+	// Commissions
+	CommissionRate         float64 `gorm:"type:decimal(5,4);not null;default:0" json:"commission_rate"`           // Affiliate Rate
+	CommissionAmount       float64 `gorm:"type:decimal(15,2);not null;default:0" json:"commission_amount"`         // Affiliate Amount
+	DistributionFeeAmount  float64 `gorm:"type:decimal(15,2);not null;default:0" json:"distribution_fee_amount"`  // Distributor Amount
+	
 	DiscountAmount       float64 `gorm:"type:decimal(15,2);not null;default:0" json:"discount_amount"`
-	MerchantAmount       float64 `gorm:"type:decimal(15,2);not null" json:"merchant_amount"`
+	MerchantAmount       float64 `gorm:"type:decimal(15,2);not null" json:"merchant_amount"` // Net for Distributor
 
 	CreatedAt            time.Time `json:"created_at"`
 }

@@ -106,7 +106,7 @@ export default function ContactPage() {
             {[
               { label: 'Alamat', value: 'Jl. Sudirman No. 123, Jakarta Pusat, 10220', icon: 'bx-map', color: 'blue' },
               { label: 'Telepon', value: '+62 21 1234 5678', icon: 'bx-phone', color: 'indigo' },
-              { label: 'Email', value: 'support@sahabatmart.id', icon: 'bx-envelope', color: 'sky' },
+              { label: 'Email', value: 'support@akugrow.id', icon: 'bx-envelope', color: 'sky' },
               { label: 'Jam Operasional', value: 'Sen - Sab: 09.00 - 21.00 WIB', icon: 'bx-time-five', color: 'emerald' },
             ].map((item) => (
               <div key={item.label} className="bg-white rounded-3xl p-6 border border-gray-50 shadow-xl shadow-gray-200/20 flex gap-5 group hover:border-blue-100 transition-all">
@@ -124,10 +124,10 @@ export default function ContactPage() {
           <div className="bg-gradient-to-br from-gray-900 to-slate-800 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl">
              <div className="relative z-10">
                 <h3 className="text-2xl font-bold mb-3">Butuh bantuan cepat?</h3>
-                <p className="text-white/60 text-sm mb-8 leading-relaxed">Hubungi pusat bantuan SahabatMart Care untuk respon instan dari tim support kami.</p>
+                <p className="text-white/60 text-sm mb-8 leading-relaxed">Hubungi pusat bantuan AkuGrow Care untuk respon instan dari tim support kami.</p>
                 <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl font-bold cursor-pointer hover:bg-white hover:text-gray-900 transition-all">
                    <i className="bx bxl-whatsapp text-xl text-green-400"></i>
-                   SahabatMart Care
+                   AkuGrow Care
                 </div>
              </div>
              {/* Decorative */}

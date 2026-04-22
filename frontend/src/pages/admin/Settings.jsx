@@ -4,7 +4,7 @@ import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 const API = ADMIN_API_BASE;
 
 const DEFAULT_CONFIGS = [
-  { key: 'platform_name',           value: 'SahabatMart',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
+  { key: 'platform_name',           value: 'AkuGrow',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
   { key: 'platform_maintenance',    value: 'false',            description: 'Mode Pemeliharaan',           group: 'platform',  type: 'bool' },
   { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
   { key: 'platform_fee_default',    value: '0.05',             description: 'Fee Platform Default (%)',   group: 'platform',  type: 'number' },

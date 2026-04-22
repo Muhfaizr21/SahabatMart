@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-const ORDER_REFERENCE = '#SM-240001';
+const ORDER_REFERENCE = '#AG-240001';
 
 export default function OrderSuccessPage() {
   return (
@@ -23,7 +23,7 @@ export default function OrderSuccessPage() {
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2 relative z-10">Pesanan Berhasil!</h1>
         <p className="text-gray-500 mb-8 relative z-10">
-          Terima kasih telah berbelanja di SahabatMart. Pesanan kamu dengan nomor 
+          Terima kasih telah berbelanja di AkuGrow. Pesanan kamu dengan nomor 
           <span className="font-bold text-gray-800"> {ORDER_REFERENCE} </span> 
           sedang kami proses.
         </p>

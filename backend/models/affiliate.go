@@ -40,6 +40,11 @@ type AffiliateMember struct {
 	TotalEarned      float64 `gorm:"type:decimal(15,2);default:0" json:"total_earned"`
 	TotalWithdrawn   float64 `gorm:"type:decimal(15,2);default:0" json:"total_withdrawn"`
 	PostbackURL      string  `gorm:"type:text" json:"postback_url"`
+	
+	// Networking
+	UplineID         *string `gorm:"type:uuid" json:"upline_id"`
+	UplineCode       string  `gorm:"type:varchar(20)" json:"upline_code"`
+	
 	Flags            string  `gorm:"type:text" json:"flags"`
 
 	CreatedAt time.Time `json:"created_at"`

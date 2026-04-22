@@ -74,6 +74,7 @@ const MerchantLayout = () => {
     { name: 'Dashboard', icon: 'dashboard', path: '/merchant', end: true },
     { name: 'Analytics', icon: 'insights', path: '/merchant/analytics' },
     { name: 'Inventory', icon: 'inventory_2', path: '/merchant/products' },
+    { name: 'Restock', icon: 'rebase_edit', path: '/merchant/restock' },
     { name: 'Orders', icon: 'shopping_cart', path: '/merchant/orders' },
     { name: 'Wallet', icon: 'account_balance_wallet', path: '/merchant/wallet' },
     { name: 'Vouchers', icon: 'confirmation_number', path: '/merchant/vouchers' },
@@ -91,7 +92,7 @@ const MerchantLayout = () => {
                   <span className="material-symbols-outlined text-white">bolt</span>
                </div>
                <div>
-                  <span className="text-xl font-black bg-gradient-to-br from-violet-600 to-indigo-800 bg-clip-text text-transparent tracking-tight">SahabatMart</span>
+                  <span className="text-xl font-black bg-gradient-to-br from-violet-600 to-indigo-800 bg-clip-text text-transparent tracking-tight">AkuGrow</span>
                   <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mt-0.5">Partner Elite</p>
                </div>
             </div>
@@ -247,12 +248,11 @@ const MerchantLayout = () => {
         </main>
       </div>
 
-      {/* Persistent Add FAB */}
       <button 
-        onClick={() => navigate('/merchant/products/add')}
+        onClick={() => navigate('/merchant/restock')}
         className="fixed bottom-10 right-10 w-16 h-16 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group border-4 border-white/20"
       >
-          <span className="material-symbols-outlined text-3xl transition-transform group-hover:rotate-90">add</span>
+          <span className="material-symbols-outlined text-3xl transition-transform group-hover:rotate-90">rebase_edit</span>
       </button>
 
       <style>{`

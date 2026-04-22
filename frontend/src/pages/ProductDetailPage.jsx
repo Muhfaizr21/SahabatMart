@@ -32,6 +32,8 @@ export default function ProductDetailPage() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [sellers, setSellers] = useState([]);
+  const [selectedMerchant, setSelectedMerchant] = useState(null);
   const [selectedAttributes, setSelectedAttributes] = useState({}); // Track user selections
 
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -58,12 +60,19 @@ export default function ProductDetailPage() {
     const loadProduct = async () => {
       try {
         const d = await fetchJson(`${PUBLIC_API_BASE}/products/detail?id=${id}`);
-        // fetchJson unwrap means d is likely the object itself, but might be {data: {...}}
-        const productData = d.data || d;
+        // [Akuglow Update] Handle new response format { data: { product, sellers } }
+        const productData = d.data?.product || d.data || d;
+        const sellersData = d.data?.sellers || [];
         
         if (productData && productData.id) {
           if (cancelled) return;
           setProduct(productData);
+          setSellers(sellersData);
+          
+          // Default merchant selection (first one available)
+          if (sellersData.length > 0) {
+            setSelectedMerchant(sellersData[0]);
+          }
           
           // Initial Attribute Selection (Default to first value of each)
           try {
@@ -105,6 +114,11 @@ export default function ProductDetailPage() {
       return;
     }
 
+    if (!selectedMerchant) {
+      alert('Silakan pilih merchant/pengiriman terlebih dahulu.');
+      return;
+    }
+
     setAddedToCart(true);
     try {
       await fetchJson(`${BUYER_API_BASE}/cart/add`, {
@@ -112,6 +126,7 @@ export default function ProductDetailPage() {
         body: JSON.stringify({
           product_id: product.id,
           product_variant_id: selectedVariant ? selectedVariant.id : product.id,
+          merchant_id: selectedMerchant.merchant_id, // [Akuglow Update] Send selected merchant
           quantity: qty,
           metadata: JSON.stringify(selectedAttributes) // Send selected attributes as metadata
         })
@@ -308,24 +323,65 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl shadow-gray-200/20 mb-10 overflow-hidden relative group">
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-2xl shadow-lg">
-                        {product.store_name?.charAt(0) || "S"}
+            {/* [Akuglow] Merchant Source Selector */}
+            {sellers.length > 0 ? (
+              <div className="mb-10">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Pilih Pengiriman (Merchant)</h4>
+                <div className="flex flex-col gap-3">
+                  {sellers.map((s) => (
+                    <button
+                      key={s.merchant_id}
+                      onClick={() => setSelectedMerchant(s)}
+                      className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                        selectedMerchant?.merchant_id === s.merchant_id
+                          ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md'
+                          : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                          {s.store_name.charAt(0)}
+                        </div>
+                        <div className="text-left">
+                          <p className="font-black text-sm">{s.store_name}</p>
+                          <p className="text-[10px] uppercase tracking-tighter opacity-70">{s.city}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Stok</p>
+                        <p className="font-black text-xs">{s.stock} Unit</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+                <div className="mb-10 p-6 rounded-3xl bg-red-50 border border-red-100 flex items-center gap-4">
+                    <div className="text-2xl text-red-500">📵</div>
+                    <div>
+                        <h4 className="font-black text-red-600 text-sm">Stok Tidak Tersedia</h4>
+                        <p className="text-xs text-red-400">Maaf, produk ini sedang kosong di semua gudang merchant.</p>
                     </div>
-                    <div className="flex-1">
-                        <div className="text-xs font-black text-gray-400 uppercase tracking-tighter mb-0.5">Sold & Shipped By</div>
-                        <div className="flex items-center gap-2">
-                            <h4 className="font-black text-gray-900">{product.store_name || "SahabatMart Official"}</h4>
-                            {product.store_verified && (
-                                <svg width="14" height="14" fill="#3b82f6" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                            )}
+                </div>
+            )}
+
+            {selectedMerchant && (
+                <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl shadow-gray-200/20 mb-10 overflow-hidden relative group">
+                    <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-2xl shadow-lg">
+                            {selectedMerchant.store_name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-black text-gray-400 uppercase tracking-tighter mb-0.5">Sold & Shipped By</div>
+                            <div className="flex items-center gap-2">
+                                <h4 className="font-black text-gray-900">{selectedMerchant.store_name}</h4>
+                                <span className="bg-green-100 text-green-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Ready Stock</span>
+                            </div>
                         </div>
                     </div>
-                    <Link to={`/merchant/${product.store_slug}`} className="bg-gray-900 text-white text-[10px] font-black px-4 py-2 rounded-xl hover:bg-blue-600 transition-colors uppercase">Visit Shop</Link>
                 </div>
-            </div>
+            )}
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-6 sm:mt-10">
               <div className="flex items-center justify-between bg-white/50 backdrop-blur-sm border border-white rounded-[1.25rem] p-1.5 shadow-sm sm:w-fit">

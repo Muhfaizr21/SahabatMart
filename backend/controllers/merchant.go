@@ -41,63 +41,51 @@ func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request
 	utils.JSONResponse(w, http.StatusOK, products)
 }
 
-// POST /api/merchant/products/add
-func (mc *MerchantController) AddProduct(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
-
-	var req struct {
-		Product  models.Product        `json:"product"`
-		Variants []models.ProductVariant `json:"variants"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
-		return
-	}
-
-	req.Product.MerchantID = merchantID
-	req.Product.Status = "pending" // Requires admin approval
-	product, err := mc.Service.AddProductWithVariants(&req.Product, req.Variants)
+// GET /api/merchant/catalog
+func (mc *MerchantController) GetCatalog(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("search")
+	products, err := mc.Service.GetCatalog(search)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menambahkan produk: "+err.Error())
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil katalog")
 		return
 	}
-	utils.JSONResponse(w, http.StatusCreated, product)
+	utils.JSONResponse(w, http.StatusOK, products)
 }
 
-// POST /api/merchant/products/update
-func (mc *MerchantController) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+// GET /api/merchant/restock
+func (mc *MerchantController) GetRestockRequests(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
-
-	var req struct {
-		Product  models.Product        `json:"product"`
-		Variants []models.ProductVariant `json:"variants"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
-		return
-	}
-
-	product, err := mc.Service.UpdateProductWithVariants(merchantID, &req.Product, req.Variants)
+	requests, err := mc.Service.GetRestockRequests(merchantID)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal update produk: "+err.Error())
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data restock")
 		return
 	}
-	utils.JSONResponse(w, http.StatusOK, product)
+	utils.JSONResponse(w, http.StatusOK, requests)
 }
 
-// DELETE /api/merchant/products/delete?id=...
-func (mc *MerchantController) DeleteProduct(w http.ResponseWriter, r *http.Request) {
+// POST /api/merchant/restock/request
+func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
-	productID := r.URL.Query().Get("id")
-	if productID == "" {
-		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
+	
+	var req struct {
+		Items []models.RestockItem `json:"items"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
-	if err := mc.Service.DeleteProduct(merchantID, productID); err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus produk")
+
+	request, err := mc.Service.CreateRestockRequest(merchantID, req.Items)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat permintaan restock: "+err.Error())
 		return
 	}
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Produk berhasil dihapus"})
+
+	// Notify Admin
+	mc.Notif.Push(models.AdminID, "admin", "restock_new", "Permintaan Restock Baru", 
+		fmt.Sprintf("Merchant baru saja mengirimkan permintaan restock untuk %d item.", len(req.Items)), "/admin/merchants/restock")
+
+	utils.JSONResponse(w, http.StatusCreated, request)
 }
 
 // ─────────────────────────────────────────
@@ -184,7 +172,7 @@ func (mc *MerchantController) RequestPayout(w http.ResponseWriter, r *http.Reque
 	// Notify Super Admin
 	store, _ := mc.Service.GetStoreProfile(merchantID)
 	msg := fmt.Sprintf("Merchant '%s' mengajukan penarikan dana sebesar %.0f.", store.StoreName, req.Amount)
-	mc.Notif.Push("admin", "admin", "payout_request", "Pengajuan Payout Baru", msg, "/admin/payouts")
+	mc.Notif.Push(models.AdminID, "admin", "payout_request", "Pengajuan Payout Baru", msg, "/admin/payouts")
 
 	utils.JSONResponse(w, http.StatusCreated, payout)
 }
@@ -363,5 +351,25 @@ func (mc *MerchantController) MarkNotificationRead(w http.ResponseWriter, r *htt
 	} else {
 		mc.Notif.MarkAsRead(req.ID)
 	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// POST /api/merchant/restock/receive
+func (mc *MerchantController) ReceiveRestock(w http.ResponseWriter, r *http.Request) {
+	merchantID := r.Context().Value("merchant_id").(string)
+	var req struct {
+		RequestID string `json:"request_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	err := mc.Service.ReceiveRestock(merchantID, req.RequestID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal konfirmasi penerimaan: "+err.Error())
+		return
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

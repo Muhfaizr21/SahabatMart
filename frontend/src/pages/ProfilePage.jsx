@@ -108,7 +108,7 @@ export default function ProfilePage() {
               <div className="w-32 h-32 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-4xl font-black mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative group cursor-pointer">
                 <img src={profile.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop"} alt={profile.full_name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
               </div>
-              <h2 className="text-xl font-black text-gray-900 leading-tight mb-1">{profile.full_name || 'User SahabatMart'}</h2>
+              <h2 className="text-xl font-black text-gray-900 leading-tight mb-1">{profile.full_name || 'User AkuGrow'}</h2>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full mt-2 border border-yellow-200">
                  <i className="bx bxs-crown"></i> <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Member Aktif</span>
               </div>

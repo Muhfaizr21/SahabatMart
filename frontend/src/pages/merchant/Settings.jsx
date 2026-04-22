@@ -117,7 +117,7 @@ const MerchantSettings = () => {
                         <div>
                             <FieldLabel>Digital Storefront Slug (Permanent URL)</FieldLabel>
                             <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                                <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', height: '100%', display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>sahabatmart.com/shop/</span>
+                                <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', height: '100%', display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>akuglow.id/shop/</span>
                                 <input name="slug" value={store?.slug || ''} onChange={handleChange} style={{ ...A.input, border: 'none', background: 'transparent', flex: 1, padding: 14, fontFamily: 'monospace', color: '#6366f1', fontWeight: 800 }} required />
                             </div>
                             <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>* Changing your slug may affect existing indexed links and SEO rankings.</p>

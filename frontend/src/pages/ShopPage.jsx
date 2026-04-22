@@ -145,7 +145,7 @@ export default function ShopPage() {
       {/* Page Header */}
       <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-6">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Toko SahabatMart</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Toko AkuGrow</h1>
           <nav className="flex items-center gap-2 text-blue-200 text-sm mt-3">
             <Link to="/" className="hover:text-white">Beranda</Link>
             <span>/</span>
@@ -222,7 +222,7 @@ export default function ShopPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
               <h3 className="font-bold text-gray-900 mb-4">Brand</h3>
               <div className="space-y-2">
-                {['Samsung', 'Apple', 'Sony', 'Xiaomi', 'Logitech'].map(brand => (
+                {['Wardah', 'Somethinc', 'Avoskin', 'Scarlett', 'BIOAQUA'].map(brand => (
                   <label key={brand} className="flex items-center gap-3 cursor-pointer group">
                     <input type="checkbox" className="accent-blue-600 w-4 h-4" />
                     <span className="text-sm text-gray-600 group-hover:text-gray-900">{brand}</span>
@@ -335,7 +335,7 @@ export default function ShopPage() {
                         <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-[10px] text-white font-black shadow-inner">
                              {product.store_name?.charAt(0) || "S"}
                         </div>
-                        <span className="text-[11px] font-bold text-gray-500 truncate">{product.store_name || "SahabatMart Official"}</span>
+                        <span className="text-[11px] font-bold text-gray-500 truncate">{product.store_name || "AkuGrow Official"}</span>
                       </div>
 
                       {/* Footer */}

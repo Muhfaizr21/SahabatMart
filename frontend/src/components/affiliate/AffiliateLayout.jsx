@@ -2,13 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
 
+// Menu items sesuai spesifikasi Mitra Area Akuglow
+// Ref: Alur Mitra Affiliate Akuglow — section 2 "Mitra Masuk ke Mitra Area"
 const menuItems = [
-  { name: 'Insights', icon: 'insert_chart', path: '/affiliate', end: true },
-  { name: 'Generate Links', icon: 'link', path: '/affiliate/links' },
-  { name: 'Top Produk', icon: 'trending_up', path: '/affiliate/products' },
-  { name: 'Komisi', icon: 'payments', path: '/affiliate/commissions' },
-  { name: 'Penarikan', icon: 'account_balance_wallet', path: '/affiliate/withdrawals' },
-  { name: 'Pengaturan', icon: 'settings', path: '/affiliate/settings' },
+  { name: 'Dashboard', icon: 'grid_view', path: '/affiliate', end: true },
+  { name: 'Belanja Yuk', icon: 'shopping_basket', path: '/' },
+  { name: 'Profil Saya', icon: 'person', path: '/profile' },
+  { name: 'Pesanan Saya', icon: 'inventory_2', path: '/profile?tab=orders' }, // Orders tab in profile
+  { name: 'Status Mitra & Omset Tim', icon: 'stars', path: '/affiliate/stats' }, // Gabungan: status + omset tim
+  { name: 'Team', icon: 'group', path: '/affiliate/team' },
+  { name: 'Edukasi Bisnis', icon: 'school', path: '/affiliate/education' },
+  { name: 'Leaderboard', icon: 'emoji_events', path: '/affiliate/leaderboard' },
+  { name: 'Link Affiliate', icon: 'link', path: '/affiliate/links' },
+  { name: 'Event Terdekat', icon: 'event', path: '/affiliate/events' },
+  { name: 'Materi Promo', icon: 'campaign', path: '/affiliate/marketing' },
+  { name: 'Voucher', icon: 'confirmation_number', path: '/affiliate/vouchers' },
+  { name: 'Komisi & Penarikan', icon: 'payments', path: '/affiliate/withdrawals' },
+  { name: 'Pengaturan', icon: 'tune', path: '/affiliate/settings' },
 ];
 
 const SidebarLink = ({ item, collapsed }) => (
@@ -62,8 +72,19 @@ const AffiliateLayout = () => {
     if (isMobile) setMobileOpen(false);
   }, [location, isMobile]);
 
-  if (!user || user.role !== 'affiliate') {
+  if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Per spec: Merchant = Mitra + Merchant. Merchant role users get BOTH areas.
+  // Merchant Area link is inserted right after Dashboard for merchant role users.
+  const finalMenuItems = [...menuItems];
+  if (user.role === 'merchant') {
+    finalMenuItems.splice(1, 0, {
+      name: 'Merchant Area',
+      icon: 'storefront',
+      path: '/merchant',
+    });
   }
 
   const handleLogout = () => {
@@ -72,7 +93,7 @@ const AffiliateLayout = () => {
     navigate('/login');
   };
 
-  const affiliateRefCode = user.affiliate_ref_code || user.affiliate?.ref_code || 'SM-REF';
+  const affiliateRefCode = user.affiliate_ref_code || user.affiliate?.ref_code || 'AG-REF';
   const tierName = user.affiliate?.membership_tier?.name || 'Bronze';
   const displayName = user.profile?.full_name || user.email || 'Affiliate';
   const initial = displayName.charAt(0).toUpperCase();
@@ -83,7 +104,7 @@ const AffiliateLayout = () => {
       <div className="px-6 mb-10 flex items-center justify-between">
         <div>
           <span className="text-xl font-extrabold tracking-[0.15em] text-white font-['Plus_Jakarta_Sans']">
-            SAHABAT<span className="text-purple-400">MART</span>
+            AKU<span className="text-purple-400">GROW</span>
           </span>
           <p className="text-[9px] text-slate-500 font-bold tracking-[0.25em] uppercase mt-1">
             Affiliate Portal
@@ -103,7 +124,7 @@ const AffiliateLayout = () => {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-3">
-        {menuItems.map((item) => (
+        {finalMenuItems.map((item) => (
           <SidebarLink key={item.path} item={item} collapsed={!sidebarOpen && !isMobile} />
         ))}
       </nav>

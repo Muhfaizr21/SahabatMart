@@ -21,62 +21,73 @@ func NewMerchantService(db *gorm.DB) *MerchantService {
 	}
 }
 
+func (s *MerchantService) GetCatalog(search string) ([]models.Product, error) {
+	var products []models.Product
+	query := s.DB.Where("status = ?", "active")
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+	err := query.Find(&products).Error
+	return products, err
+}
+
 // ── PRODUCT MANAGEMENT ─────────────────────
 
-func (s *MerchantService) GetProducts(merchantID string) ([]models.Product, error) {
-	return s.Repo.GetByMerchant(merchantID)
+func (s *MerchantService) GetProducts(merchantID string) ([]interface{}, error) {
+	type ProductWithStock struct {
+		models.Product
+		Stock int `json:"stock"`
+	}
+	var results []ProductWithStock
+	err := s.DB.Table("products").
+		Select("products.*, inv.stock as stock").
+		Joins("JOIN inventories inv ON inv.product_id = products.id").
+		Where("inv.merchant_id = ?", merchantID).
+		Scan(&results).Error
+	
+	// Convert to interface slice for easy JSON response
+	final := make([]interface{}, len(results))
+	for i, v := range results { final[i] = v }
+	return final, err
 }
 
-func (s *MerchantService) AddProductWithVariants(product *models.Product, variants []models.ProductVariant) (*models.Product, error) {
+// [Akuglow Refactor] Merchants can no longer add/delete products directly.
+// They "add" products to their storefront by requesting restock or being assigned by admin.
+func (s *MerchantService) CreateRestockRequest(merchantID string, items []models.RestockItem) (*models.RestockRequest, error) {
+	if len(items) == 0 {
+		return nil, errors.New("daftar kulakan tidak boleh kosong")
+	}
+
+	totalQty := 0
+	for _, it := range items {
+		totalQty += it.Quantity
+	}
+
+	req := &models.RestockRequest{
+		MerchantID: merchantID,
+		Status:     "requested", // Match model default
+		TotalItems: totalQty,
+	}
+
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Save Product
-		if err := tx.Create(product).Error; err != nil {
+		if err := tx.Create(req).Error; err != nil {
 			return err
 		}
-
-		// 2. Save Variants
-		for i := range variants {
-			variants[i].ProductID = product.ID
-			if err := tx.Create(&variants[i]).Error; err != nil {
+		for i := range items {
+			items[i].RestockID = req.ID
+			if err := tx.Create(&items[i]).Error; err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-	return product, err
+	return req, err
 }
 
-func (s *MerchantService) UpdateProductWithVariants(merchantID string, product *models.Product, variants []models.ProductVariant) (*models.Product, error) {
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		// Verify ownership
-		var existing models.Product
-		if err := tx.Where("id = ? AND merchant_id = ?", product.ID, merchantID).First(&existing).Error; err != nil {
-			return errors.New("produk tidak ditemukan atau akses ditolak")
-		}
-
-		// 1. Update Product
-		if err := tx.Model(&existing).Updates(product).Error; err != nil {
-			return err
-		}
-
-		// 2. Update/Create Variants (Sync logic)
-		// Simpel: Delete all old variants and insert new ones
-		if err := tx.Where("product_id = ?", product.ID).Delete(&models.ProductVariant{}).Error; err != nil {
-			return err
-		}
-		for i := range variants {
-			variants[i].ProductID = product.ID
-			if err := tx.Create(&variants[i]).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return product, err
-}
-
-func (s *MerchantService) DeleteProduct(merchantID, productID string) error {
-	return s.DB.Where("id = ? AND merchant_id = ?", productID, merchantID).Delete(&models.Product{}).Error
+func (s *MerchantService) GetRestockRequests(merchantID string) ([]models.RestockRequest, error) {
+	var requests []models.RestockRequest
+	err := s.DB.Preload("Items.Product").Where("merchant_id = ?", merchantID).Order("created_at desc").Find(&requests).Error
+	return requests, err
 }
 
 // ── ORDER MANAGEMENT ───────────────────────
@@ -273,4 +284,20 @@ func (s *MerchantService) GetAffiliateStats(merchantID string) (map[string]inter
 		"affiliate_commissions": totalComm,
 		"affiliate_sales":       totalSales,
 	}, nil
+}
+
+func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var req models.RestockRequest
+		if err := tx.First(&req, "id = ? AND merchant_id = ?", requestID, merchantID).Error; err != nil {
+			return err
+		}
+
+		if req.Status != "shipped" {
+			return fmt.Errorf("hanya restock yang sudah dikirim yang dapat diterima (Status saat ini: %s)", req.Status)
+		}
+
+		req.Status = "received"
+		return tx.Save(&req).Error
+	})
 }

@@ -18,7 +18,7 @@ export default function BlogPage() {
       <div className="max-w-7xl mx-auto px-6">
         <header className="mb-14 text-center">
             <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Katalog <span className="text-blue-600">Artikel</span></h1>
-            <p className="text-gray-500 font-medium max-w-xl mx-auto">Dapatkan tips, trik, dan informasi terbaru seputar gadget dan gaya hidup dari tim SahabatMart.</p>
+            <p className="text-gray-500 font-medium max-w-xl mx-auto">Dapatkan tips kecantikan, informasi kesehatan, dan gaya hidup terbaru dari tim AkuGrow.</p>
             <div className="w-20 h-1.5 bg-blue-600 rounded-full mx-auto mt-6 shadow-lg shadow-blue-100" />
         </header>
 
@@ -54,7 +54,7 @@ export default function BlogPage() {
                     <h2 className="text-xl font-black text-gray-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">{post.title}</h2>
                   </Link>
                   <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 mb-6 flex-1">
-                    {post.summary || "Baca selengkapnya mengenai detail artikel ini di SahabatMart Blog."}
+                    {post.summary || "Baca selengkapnya mengenai detail artikel ini di AkuGrow Blog."}
                   </p>
                   <div className="pt-5 border-t border-gray-50 mt-auto flex items-center justify-between">
                     <div className="flex items-center gap-2">

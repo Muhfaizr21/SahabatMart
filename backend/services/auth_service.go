@@ -24,7 +24,7 @@ func NewAuthService(db *gorm.DB) *AuthService {
 	}
 }
 
-func (s *AuthService) Register(email, password, fullName, phone, role string) (*models.User, string, error) {
+func (s *AuthService) Register(email, password, fullName, phone, role, uplineID string) (*models.User, string, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	role = strings.ToLower(role)
 	if role == "" {
@@ -60,19 +60,32 @@ func (s *AuthService) Register(email, password, fullName, phone, role string) (*
 			return err
 		}
 
-		switch role {
-		case "merchant":
+		// [Akuglow Special] Every user is a partner/mitra
+		aff := &models.AffiliateMember{
+			UserID:           user.ID,
+			RefCode:          utils.GenerateRefCode(fullName),
+			MembershipTierID: 1, // Basic Tier
+			Status:           models.AffiliateActive,
+		}
+
+		if uplineID != "" {
+			aff.UplineID = &uplineID
+			// Get upline code for convenience
+			var upline models.AffiliateMember
+			if err := tx.Select("ref_code").First(&upline, "id = ?", uplineID).Error; err == nil {
+				aff.UplineCode = upline.RefCode
+			}
+		}
+
+		if err := tx.Create(aff).Error; err != nil {
+			return err
+		}
+
+		if role == "merchant" {
 			return tx.Create(&models.Merchant{
 				UserID:    user.ID,
 				StoreName: fullName + "'s Store",
 				Status:    "pending",
-			}).Error
-		case "affiliate":
-			return tx.Create(&models.AffiliateMember{
-				UserID:           user.ID,
-				RefCode:          utils.GenerateRefCode(fullName),
-				MembershipTierID: 1,
-				Status:           models.AffiliateActive,
 			}).Error
 		}
 		return nil
@@ -118,13 +131,16 @@ func (s *AuthService) Login(email, password, clientIP string) (*models.User, str
 
 func (s *AuthService) GetExtraIDs(userID, role string) (string, string) {
 	mID, aID := "", ""
+	
+	// Everyone has an affiliate record
+	if a, err := s.Repo.GetAffiliateByID(userID); err == nil {
+		aID = a.ID
+	}
+
+	// Only merchants have merchant records
 	if role == "merchant" {
 		if m, err := s.Repo.GetMerchantByID(userID); err == nil {
 			mID = m.ID
-		}
-	} else if role == "affiliate" {
-		if a, err := s.Repo.GetAffiliateByID(userID); err == nil {
-			aID = a.ID
 		}
 	}
 	return mID, aID

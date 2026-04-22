@@ -73,6 +73,10 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		var totalSubtotal, totalPlatformFee, totalCommission float64
 
 		for merchantID, gItems := range merchantItems {
+			// [Akuglow Refactor] Ambil info Merchant untuk hitung Distribution Fee
+			var merchant models.Merchant
+			tx.First(&merchant, "id = ?", merchantID)
+
 			group := models.OrderMerchantGroup{
 				OrderID:    order.ID,
 				MerchantID: merchantID,
@@ -83,83 +87,79 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				return err
 			}
 
-			var gSub, gPlat, gComm float64
+			var gSub, gPlat, gAffComm, gDistComm float64
 			for _, item := range gItems {
-				commRate, platRate, _ := s.CalculateCommission(tx, item, affiliateID)
+				affAmt, distAmt, platAmt, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
 
-				// Decrement Stock
-				var variant models.ProductVariant
-				if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&variant, "id = ?", item.ProductVariantID).Error; err != nil {
-					return fmt.Errorf("varian produk tidak ditemukan: %w", err)
-				}
-				if variant.Stock < item.Quantity {
-					return fmt.Errorf("stok produk '%s' tidak mencukupi (Tersisa: %d)", item.ProductName, variant.Stock)
-				}
-				if err := tx.Model(&variant).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-					return err
+				// [Akuglow Refactor] Decrement Stock from Inventory Table
+				var inventory models.Inventory
+				if err := tx.Set("gorm:query_option", "FOR UPDATE").
+					Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).
+					First(&inventory).Error; err != nil {
+					return fmt.Errorf("stok tidak ditemukan di merchant %s", merchant.StoreName)
 				}
 
-				// SYNC: Update stok di tabel Product utama juga agar Homepage tersinkron
-				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-					Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+				if inventory.Stock < item.Quantity {
+					return fmt.Errorf("stok produk '%s' di merchant %s tidak mencukupi (Tersisa: %d)", item.ProductName, merchant.StoreName, inventory.Stock)
+				}
+
+				if err := tx.Model(&inventory).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 					return err
 				}
 
 				item.OrderID = order.ID
 				item.OrderMerchantGroupID = group.ID
 				item.Subtotal = item.UnitPrice * float64(item.Quantity)
-				item.PlatformFeeAmount = item.Subtotal * platRate
-				item.CommissionRate = commRate
-				item.CommissionAmount = item.Subtotal * commRate
-				item.MerchantAmount = item.Subtotal - item.PlatformFeeAmount - item.CommissionAmount
+				item.PlatformFeeAmount = platAmt
+				
+				// Affiliate Commission
+				item.CommissionRate = affAmt / item.Subtotal
+				item.CommissionAmount = affAmt
+				
+				// Distribution Commission (Untuk Merchant)
+				item.DistributionFeeAmount = distAmt
+				
+				// Merchant Payout: Apa yang diterima merchant setelah dipotong platform & affiliate
+				item.MerchantAmount = item.Subtotal - platAmt - affAmt
 
 				if err := tx.Create(&item).Error; err != nil {
 					return err
 				}
 
 				if resolvedAffiliate != nil && item.CommissionAmount > 0 {
-					var lastClick models.AffiliateClick
-					err := tx.Where("affiliate_id = ? AND product_id = ?", resolvedAffiliate.ID, item.ProductID).
-						Order("created_at DESC").First(&lastClick).Error
-					
-					if err == nil && lastClick.IsFraud {
-						item.CommissionAmount = 0
-						item.CommissionRate = 0
+					holdDays := 7
+					if resolvedAffiliate.Tier != nil {
+						holdDays = resolvedAffiliate.Tier.CommissionHoldDays
 					}
-
-					if item.CommissionAmount > 0 {
-						holdDays := 7
-						if resolvedAffiliate.Tier != nil {
-							holdDays = resolvedAffiliate.Tier.CommissionHoldDays
-						}
-						holdUntil := time.Now().AddDate(0, 0, holdDays)
-						commission := models.AffiliateCommission{
-							AffiliateID: resolvedAffiliate.ID,
-							OrderID:     order.ID,
-							OrderItemID: item.ID,
-							ProductID:   item.ProductID,
-							MerchantID:  item.MerchantID,
-							GrossAmount: item.Subtotal,
-							RateApplied: commRate,
-							Amount:      item.CommissionAmount,
-							Status:      models.CommissionPending,
-							HoldUntil:   &holdUntil,
-						}
-						if err := tx.Create(&commission).Error; err != nil {
-							return err
-						}
+					holdUntil := time.Now().AddDate(0, 0, holdDays)
+					commission := models.AffiliateCommission{
+						AffiliateID: resolvedAffiliate.ID,
+						OrderID:     order.ID,
+						OrderItemID: item.ID,
+						ProductID:   item.ProductID,
+						MerchantID:  item.MerchantID,
+						GrossAmount: item.Subtotal,
+						RateApplied: item.CommissionRate,
+						Amount:      item.CommissionAmount,
+						Status:      models.CommissionPending,
+						HoldUntil:   &holdUntil,
+					}
+					if err := tx.Create(&commission).Error; err != nil {
+						return err
 					}
 				}
 
 				gSub += item.Subtotal
 				gPlat += item.PlatformFeeAmount
-				gComm += item.CommissionAmount
+				gAffComm += item.CommissionAmount
+				gDistComm += item.DistributionFeeAmount
 			}
 
 			group.Subtotal = gSub
 			group.PlatformFee = gPlat
-			group.Commission = gComm
-			group.MerchantPayout = gSub - gPlat - gComm
+			group.AffiliateCommission = gAffComm
+			group.DistributionCommission = gDistComm
+			group.MerchantPayout = gSub - gPlat - gAffComm
 
 			if err := tx.Save(&group).Error; err != nil {
 				return err
@@ -167,7 +167,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 			totalSubtotal += gSub
 			totalPlatformFee += gPlat
-			totalCommission += gComm
+			totalCommission += gAffComm
 		}
 
 		order.Subtotal = totalSubtotal
@@ -283,49 +283,48 @@ func (s *OrderService) CompletePayment(orderID string) error {
 	})
 }
 
-func (s *OrderService) CalculateCommission(db *gorm.DB, item models.OrderItem, affiliateID *string) (float64, float64, error) {
-	// Ambil fee default dari config db
-	defaultPlatFee := s.ConfigService.GetFloat("default_platform_fee", 0.05)
-	defaultCommRate := s.ConfigService.GetFloat("default_affiliate_commission", 0.03)
+func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, distAmt float64, platAmt float64, err error) {
+	subtotal := item.UnitPrice * float64(item.Quantity)
 
-	// 1. Check Product Specific Rules (Highest Priority)
-	var rule models.CommissionRule
-	if err := db.Where("product_id = ? AND is_active = ?", item.ProductID, true).Order("priority DESC").First(&rule).Error; err == nil {
-		return rule.CommissionRate, rule.PlatformFeeRate, nil
-	}
+	// 1. Platform Fee (Percentage only)
+	platRate := s.ConfigService.GetFloat("default_platform_fee", 0.05)
+	platAmt = subtotal * platRate
 
-	// 2. Check Merchant Specific Override
-	var merchComm models.MerchantCommission
-	platFee := defaultPlatFee
-	if err := db.Where("merchant_id = ?", item.MerchantID).First(&merchComm).Error; err == nil {
-		platFee = merchComm.FeePercent / 100.0
-	}
-
-	// 3. Check Category Specific Override
+	// 2. Load Data
 	var product models.Product
-	if err := db.Select("category").First(&product, "id = ?", item.ProductID).Error; err == nil {
-		var catComm models.CategoryCommission
-		if err := db.Where("category_name = ?", product.Category).First(&catComm).Error; err == nil {
-			// Category fee only applies if no merchant specific fee is set
-			if platFee == defaultPlatFee {
-				platFee = catComm.FeePercent / 100.0
-			}
-		}
+	db.Where("id = ?", item.ProductID).First(&product)
+
+	var merchant models.Merchant
+	db.Where("id = ?", merchantID).First(&merchant)
+
+	// 3. Distribution Fee (Merchant's cut)
+	// Rules: Merchant Tier % > Product % > Product Nominal
+	if merchant.DistributionFeePercent > 0 {
+		distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
+	} else if product.BaseDistributionFee > 0 {
+		distAmt = subtotal * (product.BaseDistributionFee / 100.0)
+	} else if product.BaseDistributionFeeNominal > 0 {
+		distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
 	}
 
-	// 4. Calculate Affiliate Commission
-	commRate := 0.0 // [FIX] Default harus 0 jika tidak lewat affiliate
+	// 4. Affiliate Fee (Referrer's cut)
+	// Rules: Tier % > Product % > Product Nominal
 	if affiliateID != nil && *affiliateID != "" {
-		commRate = defaultCommRate // Gunakan default jika lewat affiliate tapi tier tidak ditemukan
 		if aff, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
 			var tier models.MembershipTier
 			if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
-				commRate = tier.BaseCommissionRate
+				affAmt = subtotal * tier.BaseCommissionRate
+			} else if product.BaseAffiliateFee > 0 {
+				affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
+			} else if product.BaseAffiliateFeeNominal > 0 {
+				affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
+			} else {
+				affAmt = subtotal * 0.03 // global fallback 3%
 			}
 		}
 	}
 
-	return commRate, platFee, nil
+	return affAmt, distAmt, platAmt, nil
 }
 
 func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy string) error {
@@ -339,9 +338,10 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 			return fmt.Errorf("pesanan sudah dalam status akhir")
 		}
 
-		// Return Stock
+		// Return Stock to Merchant's Inventory
 		for _, item := range order.Items {
-			if err := tx.Model(&models.ProductVariant{}).Where("id = ?", item.ProductVariantID).
+			if err := tx.Model(&models.Inventory{}).
+				Where("merchant_id = ? AND product_id = ?", item.MerchantID, item.ProductID).
 				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
 				return err
 			}

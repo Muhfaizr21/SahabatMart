@@ -98,15 +98,22 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		Order("created_at DESC").Limit(5).
 		Find(&recentCommissions)
 
+	// Calculate available balance:
+	// approved commissions MINUS already-withdrawn MINUS in-flight withdrawals (pending/processed)
+	var inFlightWithdrawals float64
+	ac.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM affiliate_withdrawals WHERE affiliate_id = ? AND status IN ('pending','processed')`, affiliateID).Scan(&inFlightWithdrawals)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"affiliate": affiliate,
 		"stats": map[string]interface{}{
-			"total_clicks":       clicks,
-			"total_conversions":  totalConversions,
-			"total_commission":   totalCommission,
-			"pending_commission": pendingCommission,
-			"total_withdrawn":    totalWithdrawn,
-			"balance":            totalCommission - totalWithdrawn,
+			"total_clicks":         clicks,
+			"total_conversions":    totalConversions,
+			"total_commission":     totalCommission,
+			"pending_commission":   pendingCommission,
+			"total_withdrawn":      totalWithdrawn,
+			// balance = approved - already paid out - still in processing queue
+			"balance":              totalCommission - totalWithdrawn - inFlightWithdrawals,
+			"inflight_withdrawals": inFlightWithdrawals,
 		},
 		"monthly_data":        monthlyData,
 		"recent_commissions":  recentCommissions,
@@ -470,4 +477,198 @@ func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Requ
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// GET /api/affiliate/team-stats
+func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Request) {
+	affiliateID, ok := r.Context().Value("affiliate_id").(string)
+	if !ok || affiliateID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+		return
+	}
+
+	totalDownlines, teamTurnover, err := ac.Service.GetTeamStats(affiliateID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data tim")
+		return
+	}
+
+	// Get downlines list
+	type DownlineRow struct {
+		UserID    string    `json:"user_id"`
+		FullName  string    `json:"full_name"`
+		Status    string    `json:"status"`
+		JoinedAt  time.Time `json:"joined_at"`
+		Turnover  float64   `json:"turnover"`
+	}
+	var downlines []DownlineRow
+	ac.DB.Raw(`
+		SELECT am.user_id, up.full_name, am.status, am.created_at as joined_at,
+		       COALESCE(SUM(o.grand_total), 0) as turnover
+		FROM affiliate_members am
+		LEFT JOIN user_profiles up ON up.user_id = am.user_id
+		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid', 'shipped', 'completed')
+		WHERE am.upline_id = ?
+		GROUP BY am.user_id, up.full_name, am.status, am.created_at
+		ORDER BY am.created_at DESC
+	`, affiliateID).Scan(&downlines)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"total_downlines": totalDownlines,
+		"team_turnover":   teamTurnover,
+		"downlines":       downlines,
+	})
+}
+
+// GET /api/affiliate/merchant-eligibility
+func (ac *AffiliateController) CheckMerchantEligibility(w http.ResponseWriter, r *http.Request) {
+	affiliateID, ok := r.Context().Value("affiliate_id").(string)
+	if !ok || affiliateID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+		return
+	}
+
+	isEligible, activeMitra, monthlyTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"is_eligible":      isEligible,
+		"active_mitra":     activeMitra,
+		"monthly_turnover": monthlyTurnover,
+		"requirements": map[string]interface{}{
+			"min_mitra":    100,
+			"min_turnover": 10000000,
+		},
+	})
+}
+
+// GET /api/affiliate/leaderboard — sanitized, no bank data exposed
+func (ac *AffiliateController) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
+	type LeaderboardEntry struct {
+		Rank        int     `json:"rank"`
+		RefCode     string  `json:"ref_code"`
+		FullName    string  `json:"full_name"`
+		TierName    string  `json:"tier_name"`
+		TotalEarned float64 `json:"total_earned"`
+		TotalSales  int64   `json:"total_sales"`
+	}
+
+	var entries []LeaderboardEntry
+	ac.DB.Raw(`
+		SELECT
+			ROW_NUMBER() OVER (ORDER BY am.total_earned DESC) AS rank,
+			am.ref_code,
+			COALESCE(up.full_name, 'Mitra Akuglow') AS full_name,
+			COALESCE(mt.name, 'Bronze') AS tier_name,
+			am.total_earned,
+			COUNT(DISTINCT o.id) AS total_sales
+		FROM affiliate_members am
+		LEFT JOIN user_profiles up ON up.user_id = am.user_id
+		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
+		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid','shipped','completed')
+		WHERE am.status = 'active'
+		GROUP BY am.id, up.full_name, mt.name
+		ORDER BY am.total_earned DESC
+		LIMIT 10
+	`).Scan(&entries)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   entries,
+	})
+}
+
+// GET /api/affiliate/events
+func (ac *AffiliateController) GetEvents(w http.ResponseWriter, r *http.Request) {
+	// Mock events for now, can be moved to DB later
+	events := []map[string]interface{}{
+		{
+			"title": "Webinar: Strategi Closing 99%",
+			"date":  time.Now().AddDate(0, 0, 3),
+			"type":  "Online",
+			"url":   "https://zoom.us/j/akuglow",
+		},
+		{
+			"title": "Kopdar Mitra Jakarta - Akuglow",
+			"date":  time.Now().AddDate(0, 0, 7),
+			"type":  "Offline",
+			"location": "Kemang, Jakarta Selatan",
+		},
+	}
+	utils.JSONResponse(w, http.StatusOK, events)
+}
+
+// POST /api/affiliate/apply-merchant
+// Alur: Mitra eligible → submit aplikasi → Admin menerima notif → Admin approve/reject via /api/admin/merchants/verify
+func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.Request) {
+	affiliateID, ok := r.Context().Value("affiliate_id").(string)
+	if !ok || affiliateID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+		return
+	}
+	userID, _ := r.Context().Value("user_id").(string)
+
+	// 1. Cek apakah sudah jadi merchant
+	var existingMerchant models.Merchant
+	if err := ac.DB.Where("user_id = ?", userID).First(&existingMerchant).Error; err == nil {
+		if existingMerchant.Status == "active" {
+			utils.JSONError(w, http.StatusConflict, "Anda sudah menjadi Merchant aktif")
+			return
+		}
+		if existingMerchant.Status == "pending" {
+			utils.JSONError(w, http.StatusConflict, "Pengajuan Merchant Anda sedang dalam review")
+			return
+		}
+	}
+
+	// 2. Cek eligibility — harus 100 mitra aktif & omset tim >= 10jt/bulan
+	isEligible, activeMitra, monthlyTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+	if !isEligible {
+		utils.JSONError(w, http.StatusForbidden,
+			fmt.Sprintf("Belum memenuhi syarat. Mitra aktif: %d/100, Omset tim: Rp %.0f/10.000.000", activeMitra, monthlyTurnover))
+		return
+	}
+
+	// 3. Parse request body
+	var req struct {
+		StoreName string `json:"store_name"`
+		City      string `json:"city"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.StoreName == "" {
+		// Fallback: pakai nama mitra sebagai nama toko sementara
+		var profile struct{ FullName string }
+		ac.DB.Table("user_profiles").Select("full_name").Where("user_id = ?", userID).Scan(&profile)
+		req.StoreName = profile.FullName + " Store"
+	}
+
+	// 4. Buat merchant record dengan status pending
+	newMerchant := models.Merchant{
+		UserID:    userID,
+		StoreName: req.StoreName,
+		City:      req.City,
+		Status:    "pending",
+	}
+	if err := ac.DB.Create(&newMerchant).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengajukan permohonan Merchant")
+		return
+	}
+
+	// 5. Notifikasi ke admin
+	notifSvc := services.NewNotificationService(ac.DB)
+	var aff models.AffiliateMember
+	ac.DB.Select("user_id").Where("id = ?", affiliateID).First(&aff)
+	msg := fmt.Sprintf("Mitra mengajukan upgrade menjadi Merchant. Omset Tim: Rp %.0f | Mitra Aktif: %d. Toko: '%s'",
+		monthlyTurnover, activeMitra, req.StoreName)
+	notifSvc.Push("", "admin", "merchant_application", "Pengajuan Merchant Baru 🏪", msg, "/admin/merchants")
+
+	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"status":  "success",
+		"message": "Pengajuan Merchant berhasil dikirim! Tim kami akan meninjau dan menghubungi Anda dalam 3-5 hari kerja.",
+		"data": map[string]interface{}{
+			"merchant_id": newMerchant.ID,
+			"store_name":  newMerchant.StoreName,
+			"status":      "pending",
+		},
+	})
 }

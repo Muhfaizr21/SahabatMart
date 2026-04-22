@@ -127,7 +127,7 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ac.DB.Model(&models.User{}).Where("id = ?", req.UserID).Updates(updates)
-	ac.Audit.Log("admin", "update_user", "user", req.UserID,
+	ac.Audit.Log(models.AdminID, "update_user", "user", req.UserID,
 		fmt.Sprintf("status=%s role=%s admin_role=%s", req.Status, req.Role, req.AdminRole),
 		r.RemoteAddr)
 
@@ -145,7 +145,7 @@ func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus user")
 		return
 	}
-	ac.Audit.Log("admin", "delete_user", "user", id, "suspended", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_user", "user", id, "suspended", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -217,7 +217,7 @@ func (ac *AdminController) UpdateMerchantStatus(w http.ResponseWriter, r *http.R
 	}
 
 	ac.DB.Model(&models.Merchant{}).Where("id = ?", req.MerchantID).Updates(updates)
-	ac.Audit.Log("admin", "update_merchant_status", "merchant", req.MerchantID,
+	ac.Audit.Log(models.AdminID, "update_merchant_status", "merchant", req.MerchantID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.SuspendNote),
 		r.RemoteAddr)
 
@@ -236,7 +236,7 @@ func (ac *AdminController) VerifyMerchant(w http.ResponseWriter, r *http.Request
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Model(&models.Merchant{}).Where("id = ?", req.MerchantID).Update("is_verified", req.Verified)
-	ac.Audit.Log("admin", "verify_merchant", "merchant", req.MerchantID,
+	ac.Audit.Log(models.AdminID, "verify_merchant", "merchant", req.MerchantID,
 		fmt.Sprintf("verified=%v", req.Verified), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -311,7 +311,7 @@ func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
 
 	action := "create_category"
 	if cat.ID > 0 { action = "update_category" }
-	ac.Audit.Log("admin", action, "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, action, "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
 	
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -327,7 +327,7 @@ func (ac *AdminController) DeleteCategory(w http.ResponseWriter, r *http.Request
 	}
 	id := r.URL.Query().Get("id")
 	ac.DB.Where("id = ?", id).Delete(&models.Category{})
-	ac.Audit.Log("admin", "delete_category", "category", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_category", "category", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -502,7 +502,7 @@ func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.
 	} else {
 		ac.DB.Save(&tier)
 	}
-	ac.Audit.Log("admin", "upsert_membership_tier", "membership_tier",
+	ac.Audit.Log(models.AdminID, "upsert_membership_tier", "membership_tier",
 		fmt.Sprintf("%d", tier.ID), tier.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -624,7 +624,7 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 			"Update Penarikan Komisi", msg, "/affiliate/withdrawals")
 	}
 
-	ac.Audit.Log("admin", "process_affiliate_withdrawal", "affiliate_withdrawal",
+	ac.Audit.Log(models.AdminID, "process_affiliate_withdrawal", "affiliate_withdrawal",
 		req.ID, newStatus, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success", "result": newStatus})
 }
@@ -707,14 +707,21 @@ func (ac *AdminController) ModerateProduct(w http.ResponseWriter, r *http.Reques
 	ac.DB.First(&prod, "id = ?", req.ID)
 	ac.DB.Table("products").Where("id = ?", req.ID).Update("status", req.Status)
 	
-	// Notify Merchant
-	msg := fmt.Sprintf("Produk '%s' Anda telah %s oleh tim moderasi.", prod.Name, req.Status)
+	// Notify Merchants who have this in inventory
+	statusMsg := fmt.Sprintf("Produk '%s' Anda telah %s oleh tim moderasi.", prod.Name, req.Status)
 	if req.Status == "active" {
-		msg = fmt.Sprintf("Hore! Produk '%s' Anda telah disetujui dan kini live.", prod.Name)
+		statusMsg = fmt.Sprintf("Hore! Produk '%s' Anda telah disetujui dan kini live.", prod.Name)
 	}
-	ac.Notif.Push(prod.MerchantID, "merchant", "product_moderated", "Status Produk Update", msg, "/merchant/products")
 
-	ac.Audit.Log("admin", "moderate_product", "product", req.ID,
+	var invs []models.Inventory
+	ac.DB.Where("product_id = ?", prod.ID).Find(&invs)
+	for _, inv := range invs {
+		if inv.MerchantID != models.PusatID {
+			ac.Notif.Push(inv.MerchantID, "merchant", "product_moderated", "Status Produk Update", statusMsg, "/merchant/products")
+		}
+	}
+
+	ac.Audit.Log(models.AdminID, "moderate_product", "product", req.ID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.Note), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -732,7 +739,7 @@ func (ac *AdminController) DeleteProduct(w http.ResponseWriter, r *http.Request)
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus produk secara permanen")
 		return
 	}
-	ac.Audit.Log("admin", "delete_product_permanent", "product", id, "purged from database", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_product_permanent", "product", id, "purged from database", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -748,26 +755,8 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default to SahabatMart Official if no merchant selected (for super admin)
-	if p.MerchantID == "" {
-		var m models.Merchant
-		err := ac.DB.Where("store_name = ?", "SahabatMart Official").First(&m).Error
-		if err != nil {
-			// Find first admin to link the merchant
-			var admin models.User
-			ac.DB.Where("role IN ?", []string{"admin", "superadmin"}).First(&admin)
-			
-			// Benar-benar tidak ada merchant, buatkan satu official terkait admin
-			m = models.Merchant{
-				UserID:    admin.ID,
-				StoreName: "SahabatMart Official",
-				Slug:      "sahabatmart-official",
-				Status:    "active",
-			}
-			ac.DB.Create(&m)
-		}
-		p.MerchantID = m.ID
-	}
+	// [Akuglow Refactor] Product is now Master Product (PUSAT)
+	// Initial stock will be handled via Inventories table after creation.
 
 	if p.Slug == "" {
 		p.Slug = strings.ToLower(strings.ReplaceAll(p.Name, " ", "-"))
@@ -777,12 +766,19 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := ac.DB.Create(&p).Error; err != nil {
-		fmt.Printf("❌ Database Error: %v\n", err) // Log ke terminal backend untuk debug
+		fmt.Printf("❌ Database Error: %v\n", err) 
 		utils.JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Database Error: %v", err))
 		return
 	}
 
-	ac.Audit.Log("admin", "create_product", "product", p.ID, p.Name, r.RemoteAddr)
+	// [Akuglow] Auto-populate PUSAT inventory with 0 stock
+	ac.DB.Create(&models.Inventory{
+		ProductID:  p.ID,
+		MerchantID: models.PusatID,
+		Stock:      0,
+	})
+
+	ac.Audit.Log(models.AdminID, "create_product", "product", p.ID, p.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{"status": "success", "data": p})
 }
 
@@ -819,7 +815,6 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"category":    req.Category,
 		"brand":       req.Brand,
 		"attributes":  req.Attributes,
-		"stock":       req.Stock,
 		"image":       req.Image,
 		"images":      req.Images, // Ensuring gallery images are updated
 		"status":      req.Status,
@@ -830,7 +825,12 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ac.Audit.Log("admin", "update_product", "product", req.ID, req.Name, r.RemoteAddr)
+	// [Akuglow] Sync PUSAT stock
+	if req.Stock > 0 {
+		ac.DB.Table("inventories").Where("merchant_id = ? AND product_id = ?", models.PusatID, req.ID).Update("stock", req.Stock)
+	}
+
+	ac.Audit.Log(models.AdminID, "update_product", "product", req.ID, req.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1085,7 +1085,7 @@ func (ac *AdminController) FreezeOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	ac.Audit.Log("admin", "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
 		"status": "success", 
@@ -1113,7 +1113,7 @@ func (ac *AdminController) ManageCommissions(w http.ResponseWriter, r *http.Requ
 		var comm models.CategoryCommission
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
-		ac.Audit.Log("admin", "upsert_commission", "category_commission",
+		ac.Audit.Log(models.AdminID, "upsert_commission", "category_commission",
 			fmt.Sprintf("%d", comm.ID), fmt.Sprintf("cat=%s fee=%.4f", comm.CategoryName, comm.FeePercent),
 			r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -1144,7 +1144,7 @@ func (ac *AdminController) ManageMerchantCommissions(w http.ResponseWriter, r *h
 		var comm models.MerchantCommission
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
-		ac.Audit.Log("admin", "upsert_merchant_commission", "merchant_commission",
+		ac.Audit.Log(models.AdminID, "upsert_merchant_commission", "merchant_commission",
 			comm.MerchantID, fmt.Sprintf("fee=%.4f", comm.FeePercent), r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
@@ -1167,7 +1167,7 @@ func (ac *AdminController) BulkUpdateCommissions(w http.ResponseWriter, r *http.
 	for _, comm := range comms {
 		ac.DB.Save(&comm)
 	}
-	ac.Audit.Log("admin", "bulk_update_commissions", "category_commission", "", fmt.Sprintf("updated %d items", len(comms)), r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "bulk_update_commissions", "category_commission", "", fmt.Sprintf("updated %d items", len(comms)), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1277,14 +1277,14 @@ func (ac *AdminController) UpsertBrand(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ac.DB.Save(&brand)
 	}
-	ac.Audit.Log("admin", "upsert_brand", "brand", fmt.Sprintf("%d", brand.ID), brand.Name, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "upsert_brand", "brand", fmt.Sprintf("%d", brand.ID), brand.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, brand)
 }
 
 func (ac *AdminController) DeleteBrand(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Brand{}, id)
-	ac.Audit.Log("admin", "delete_brand", "brand", id, "", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_brand", "brand", id, "", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1306,14 +1306,14 @@ func (ac *AdminController) UpsertAttribute(w http.ResponseWriter, r *http.Reques
 	} else {
 		ac.DB.Save(&attr)
 	}
-	ac.Audit.Log("admin", "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, attr)
 }
 
 func (ac *AdminController) DeleteAttribute(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Attribute{}, id)
-	ac.Audit.Log("admin", "delete_attribute", "attribute", id, "", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_attribute", "attribute", id, "", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1334,7 +1334,7 @@ func (ac *AdminController) ToggleLogistic(w http.ResponseWriter, r *http.Request
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Model(&models.LogisticChannel{}).Where("id = ?", req.ID).Update("is_active", req.Active)
-	ac.Audit.Log("admin", "toggle_logistic", "logistic", fmt.Sprintf("%d", req.ID), fmt.Sprintf("active=%v", req.Active), r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "toggle_logistic", "logistic", fmt.Sprintf("%d", req.ID), fmt.Sprintf("active=%v", req.Active), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1427,7 +1427,7 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 	} else {
 		ac.DB.Save(&v)
 	}
-	ac.Audit.Log("admin", "upsert_voucher", "voucher", v.Code, v.Title, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "upsert_voucher", "voucher", v.Code, v.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, v)
 }
 
@@ -1438,7 +1438,7 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 func (ac *AdminController) GetAffiliateClicks(w http.ResponseWriter, r *http.Request) {
 	var clicks []models.AffiliateClick
 	ac.DB.Order("created_at DESC").Limit(1000).Find(&clicks)
-	ac.Audit.Log("admin", "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": clicks})
 }
 
@@ -1463,7 +1463,7 @@ func (ac *AdminController) UpsertRegion(w http.ResponseWriter, r *http.Request) 
 	var reg models.Region
 	json.NewDecoder(r.Body).Decode(&reg)
 	ac.DB.Save(&reg)
-	ac.Audit.Log("admin", "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, reg)
 }
 
@@ -1503,7 +1503,7 @@ func (ac *AdminController) UpsertSettings(w http.ResponseWriter, r *http.Request
 			Assign(models.PlatformConfig{Value: cfg.Value, Description: cfg.Description}).
 			FirstOrCreate(&models.PlatformConfig{})
 	}
-	ac.Audit.Log("admin", "upsert_settings", "platform_config", "",
+	ac.Audit.Log(models.AdminID, "upsert_settings", "platform_config", "",
 		fmt.Sprintf("updated %d keys", len(configs)), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -1572,21 +1572,36 @@ func (ac *AdminController) GetAuditLogs(w http.ResponseWriter, r *http.Request) 
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Request) {
-	type ProductInfo struct {
-		models.Product
-		StoreName string `json:"store_name"`
-	}
-	var products []ProductInfo
-	query := ac.DB.Table("products").
-		Select("products.*, m.store_name").
-		Joins("JOIN merchants m ON m.id = products.merchant_id").
-		Where("products.status = 'active' AND m.status = 'active'")
+	var products []models.Product
+	query := ac.DB.Model(&models.Product{}).
+		Where("status = 'active'")
 
 	if cat := r.URL.Query().Get("cat"); cat != "" {
 		query = query.Where("category = ?", cat)
 	}
-	query.Find(&products)
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": products})
+
+	// [Akuglow Refactor] Tampilkan total stok dari seluruh gudang
+	query.Preload("Inventories").Find(&products)
+	
+	// Tambahkan informasi stok agregat untuk ditampilkan di card
+	type ProductWithStock struct {
+		models.Product
+		TotalStock int `json:"total_stock"`
+	}
+	
+	result := make([]ProductWithStock, len(products))
+	for i, p := range products {
+		total := 0
+		for _, inv := range p.Inventories {
+			total += inv.Stock
+		}
+		result[i] = ProductWithStock{
+			Product:    p,
+			TotalStock: total,
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": result})
 }
 
 func (ac *AdminController) GetPublicCategories(w http.ResponseWriter, r *http.Request) {
@@ -1596,8 +1611,7 @@ func (ac *AdminController) GetPublicCategories(w http.ResponseWriter, r *http.Re
 		SELECT DISTINCT c.* 
 		FROM categories c
 		JOIN products p ON p.category = c.name
-		JOIN merchants m ON m.id = p.merchant_id
-		WHERE p.status = 'active' AND m.status = 'active'
+		WHERE p.status = 'active'
 		ORDER BY c.order ASC
 	`).Scan(&cats)
 	
@@ -1767,14 +1781,14 @@ func (ac *AdminController) UpsertBlog(w http.ResponseWriter, r *http.Request) {
 		post.Slug = strings.Trim(post.Slug, "-")
 	}
 	ac.DB.Save(&post)
-	ac.Audit.Log("admin", "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, post)
 }
 
 func (ac *AdminController) DeleteBlog(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.BlogPost{}, id)
-	ac.Audit.Log("admin", "delete_blog", "blog", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_blog", "blog", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1788,14 +1802,14 @@ func (ac *AdminController) ManageBanners(w http.ResponseWriter, r *http.Request)
 	var b models.Banner
 	json.NewDecoder(r.Body).Decode(&b)
 	ac.DB.Save(&b)
-	ac.Audit.Log("admin", "upsert_banner", "banner", fmt.Sprintf("%d", b.ID), b.Title, r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "upsert_banner", "banner", fmt.Sprintf("%d", b.ID), b.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, b)
 }
 
 func (ac *AdminController) DeleteBanner(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Banner{}, id)
-	ac.Audit.Log("admin", "delete_banner", "banner", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "delete_banner", "banner", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1815,26 +1829,35 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	type ProductInfo struct {
-		models.Product
-		StoreName    string `json:"store_name"`
-		StoreSlug    string `json:"store_slug"`
-		StoreVerified bool   `json:"store_verified"`
-	}
+	var product models.Product
+	err := ac.DB.Preload("Variants").Preload("Inventories").
+		Where("id = ?", id).First(&product).Error
 
-	var product ProductInfo
-	err := ac.DB.Table("products").
-		Select("products.*, m.store_name, m.slug as store_slug, m.is_verified as store_verified").
-		Joins("LEFT JOIN merchants m ON m.id = products.merchant_id").
-		Where("products.id = ?", id).
-		Scan(&product).Error
-
-	if err != nil || product.ID == "" {
+	if err != nil {
 		utils.JSONResponse(w, http.StatusNotFound, map[string]interface{}{"message": "Product not found"})
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": product})
+	// [Akuglow Refactor] Ambil daftar Merchant yang punya stok produk ini
+	type MerchantStock struct {
+		MerchantID string `json:"merchant_id"`
+		StoreName  string `json:"store_name"`
+		City       string `json:"city"`
+		Stock      int    `json:"stock"`
+	}
+	var sellers []MerchantStock
+	ac.DB.Table("inventories inv").
+		Select("inv.merchant_id, m.store_name, m.city, inv.stock").
+		Joins("JOIN merchants m ON m.id = inv.merchant_id").
+		Where("inv.product_id = ? AND inv.stock > 0", id).
+		Scan(&sellers)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"data": map[string]interface{}{
+			"product": product,
+			"sellers": sellers,
+		},
+	})
 }
 
 // GET /api/admin/notifications
@@ -1974,10 +1997,14 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 				}
 				tx.Model(&models.ProductVariant{}).Where("id = ?", variant.ID).Update("stock", gorm.Expr("stock - ?", item.Quantity))
 			} else {
-				if product.Stock < item.Quantity {
-					return fmt.Errorf("stok tidak mencukupi untuk %s", product.Name)
+				var inv models.Inventory
+				if err := tx.Where("merchant_id = ? AND product_id = ?", models.PusatID, product.ID).First(&inv).Error; err != nil {
+					return fmt.Errorf("stok pusat tidak ditemukan untuk %s", product.Name)
 				}
-				tx.Model(&models.Product{}).Where("id = ?", product.ID).Update("stock", gorm.Expr("stock - ?", item.Quantity))
+				if inv.Stock < item.Quantity {
+					return fmt.Errorf("stok pusat tidak mencukupi untuk %s (Tersedia: %d)", product.Name, inv.Stock)
+				}
+				tx.Model(&models.Inventory{}).Where("merchant_id = ? AND product_id = ?", models.PusatID, product.ID).Update("stock", gorm.Expr("stock - ?", item.Quantity))
 			}
 		}
 
@@ -2015,19 +2042,22 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 			itemFee := itemSubtotal * feeRate
 			totalPlatformFee += itemFee
 
-			if _, ok := merchantGroups[it.product.MerchantID]; !ok {
-				merchantGroups[it.product.MerchantID] = &models.OrderMerchantGroup{
+			// POS order from super admin uses models.PusatID as merchant
+			const targetMerchantID = models.PusatID
+
+			if _, ok := merchantGroups[targetMerchantID]; !ok {
+				merchantGroups[targetMerchantID] = &models.OrderMerchantGroup{
 					OrderID:    order.ID,
-					MerchantID: it.product.MerchantID,
+					MerchantID: targetMerchantID,
 					Status:     models.MOrderCompleted,
 					CreatedAt:  time.Now(),
 				}
-				if err := tx.Create(merchantGroups[it.product.MerchantID]).Error; err != nil {
+				if err := tx.Create(merchantGroups[targetMerchantID]).Error; err != nil {
 					return err
 				}
 			}
 
-			mg := merchantGroups[it.product.MerchantID]
+			mg := merchantGroups[targetMerchantID]
 			mg.Subtotal += itemSubtotal
 			mg.PlatformFee += itemFee
 			mg.MerchantPayout += (itemSubtotal - itemFee)
@@ -2043,7 +2073,7 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 			orderItems = append(orderItems, models.OrderItem{
 				OrderID:              order.ID,
 				OrderMerchantGroupID: mg.ID,
-				MerchantID:           it.product.MerchantID,
+				MerchantID:           models.PusatID,
 				ProductID:            it.product.ID,
 				ProductVariantID:     variantID,
 				ProductName:          it.product.Name,
@@ -2081,8 +2111,8 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 					return err
 				}
 			}
-			// Penting: Update stok di tabel Product utama juga agar Homepage tersinkron
-			if err := tx.Model(&models.Product{}).Where("id = ?", oi.ProductID).
+			// Sync stock in Pusat Inventory
+			if err := tx.Model(&models.Inventory{}).Where("merchant_id = ? AND product_id = ?", models.PusatID, oi.ProductID).
 				Update("stock", gorm.Expr("stock - ?", oi.Quantity)).Error; err != nil {
 				return err
 			}
@@ -2139,10 +2169,11 @@ func (ac *AdminController) GetWishlistStats(w http.ResponseWriter, r *http.Reque
 
 	var results []Result
 	err := ac.DB.Table("wishlists").
-		Select("products.id as product_id, products.name as product_name, products.slug as product_slug, products.image, products.price, merchants.id as merchant_id, merchants.store_name, count(wishlists.id) as count").
+		Select("products.id as product_id, products.name as product_name, products.slug as product_slug, products.image, products.price, inventories.merchant_id as merchant_id, merchants.store_name, count(wishlists.id) as count").
 		Joins("join products on products.id = wishlists.product_id").
-		Joins("join merchants on merchants.id = products.merchant_id").
-		Group("products.id, merchants.id, products.name, products.slug, products.image, products.price, merchants.store_name").
+		Joins("left join inventories on inventories.product_id = products.id AND inventories.merchant_id = '00000000-0000-0000-0000-000000000000'").
+		Joins("left join merchants on merchants.id = inventories.merchant_id").
+		Group("products.id, inventories.merchant_id, products.name, products.slug, products.image, products.price, merchants.store_name").
 		Order("count DESC").
 		Scan(&results).Error
 
@@ -2155,4 +2186,45 @@ func (ac *AdminController) GetWishlistStats(w http.ResponseWriter, r *http.Reque
 		"status": "success",
 		"data":   results,
 	})
+}
+
+// GET /api/admin/merchants/restock
+func (ac *AdminController) GetRestockRequests(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	var requests []models.RestockRequest
+	query := ac.DB.Preload("Merchant").Preload("Items.Product").Order("created_at desc")
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	query.Find(&requests)
+	utils.JSONResponse(w, http.StatusOK, requests)
+}
+
+// POST /api/admin/merchants/restock/moderate
+func (ac *AdminController) ModerateRestockRequest(w http.ResponseWriter, r *http.Request) {
+	adminID := r.Context().Value("user_id").(string)
+	
+	var req struct {
+		RequestID string `json:"request_id"`
+		Status    string `json:"status"` // "approved" or "rejected"
+		AdminNote string `json:"admin_note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	err := ac.Service.ModerateRestockRequest(adminID, req.RequestID, req.Status, req.AdminNote)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal moderasi: "+err.Error())
+		return
+	}
+
+	// Notify Merchant
+	var restock models.RestockRequest
+	ac.DB.First(&restock, "id = ?", req.RequestID)
+	ac.Notif.Push(restock.MerchantID, "merchant", "restock_update", "Status Restock Diperbarui", 
+		fmt.Sprintf("Permintaan restock Anda statusnya kini: %s.", req.Status), "/merchant/restock")
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

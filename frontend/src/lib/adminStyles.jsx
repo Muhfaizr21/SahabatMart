@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 // ─── SHARED ADMIN DESIGN SYSTEM ─────────────────────────
 // Use this across all admin pages for consistent, clean UI
 
@@ -312,38 +313,63 @@ export function TablePanel({ children, toolbar, tabs, loading }) {
 
 // ─── MODAL ───────────────────────────────────────────────
 export function Modal({ title, onClose, children, wide }) {
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(15,23,42,0.4)', 
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      position: 'fixed', inset: 0, zIndex: 1000000,
+      background: 'rgba(15, 23, 42, 0.7)', 
+      backdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
+      overflowY: 'auto',
     }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      
+      {/* Floating Close Button Outside (Premium Style) */}
+      <button 
+        onClick={onClose}
+        style={{
+          position: 'fixed', top: 30, right: 30,
+          width: 54, height: 54, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.1)', color: '#fff',
+          border: '1px solid rgba(255,255,255,0.2)',
+          cursor: 'pointer', fontSize: 32, 
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: '0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+          zIndex: 1000001
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)'; e.currentTarget.style.background = '#ef4444'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+      >
+        <i className='bx bx-x'></i>
+      </button>
+
       <div style={{
-        background: '#fff', borderRadius: 20,
-        width: '100%', maxWidth: wide ? 640 : 480,
-        overflow: 'hidden',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
-        maxHeight: '90vh', overflowY: 'auto',
-        animation: 'modalIn 0.2s ease',
+        background: '#fff', borderRadius: 32,
+        width: '100%', maxWidth: wide ? 900 : 550,
+        margin: 'auto',
+        boxShadow: '0 100px 150px -30px rgba(0,0,0,0.5)',
+        animation: 'modalEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+        overflow: 'hidden', position: 'relative'
       }}>
-        <div style={{
-          background: '#0f172a', padding: '18px 24px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: '#f1f5f9' }}>{title}</span>
-          <button onClick={onClose} style={{
-            width: 30, height: 30, borderRadius: 8, border: 'none',
-            background: 'rgba(255,255,255,0.08)', color: '#94a3b8',
-            cursor: 'pointer', fontSize: 18,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>×</button>
-        </div>
-        <div style={{ padding: 24 }}>{children}</div>
-        <style>{`@keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(10px); } to { opacity: 1; transform: none; }}`}</style>
+        {title && (
+          <div style={{ padding: '35px 45px 25px', display: 'flex', alignItems: 'center', gap: 15 }}>
+            <div style={{ width: 6, height: 24, background: '#4f46e5', borderRadius: 10 }}></div>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.7px' }}>{title}</h2>
+          </div>
+        )}
+        <div style={{ padding: '0 45px 45px' }}>{children}</div>
       </div>
-    </div>
+
+      <style>{`
+        @keyframes modalEntrance { 
+           from { opacity: 0; transform: translateY(50px) scale(0.9); } 
+           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+    </div>,
+    document.body
   );
 }
 

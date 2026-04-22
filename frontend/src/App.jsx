@@ -82,6 +82,7 @@ import AdminBanners from './pages/admin/Banners';
 import AdminInbox from './pages/admin/Inbox';
 import AdminPOS from './pages/admin/POS';
 import AdminRBAC from './pages/admin/RBAC';
+import AdminRestock from './pages/admin/RestockModeration';
 import WishlistStats from './pages/admin/WishlistStats';
 
 // ── Penanganan Khusus Header/Footer ─────────
@@ -135,7 +136,7 @@ function NotFoundPage() {
 import MerchantLayout from './components/merchant/MerchantLayout';
 import MerchantDashboard from './pages/merchant/Dashboard';
 import MerchantProducts from './pages/merchant/ProductList';
-import MerchantAddProduct from './pages/merchant/AddProduct';
+import MerchantRestock from './pages/merchant/RestockRequest';
 import MerchantOrders from './pages/merchant/OrderList';
 import MerchantWallet from './pages/merchant/Wallet';
 import MerchantSettings from './pages/merchant/Settings';
@@ -150,6 +151,13 @@ import AffiliateProducts from './pages/affiliate/Products';
 import AffiliateCommissions from './pages/affiliate/Commissions';
 import AffiliateWithdrawals from './pages/affiliate/Withdrawals';
 import AffiliateSettings from './pages/affiliate/Settings';
+import AffiliateEducation from './pages/affiliate/Education';
+import AffiliateTeam from './pages/affiliate/Team';
+import AffiliateMarketing from './pages/affiliate/Marketing';
+import AffiliateLeaderboard from './pages/affiliate/Leaderboard';
+import AffiliateVouchers from './pages/affiliate/Vouchers';
+import AffiliateEvents from './pages/affiliate/Events';
+import AffiliateStats from './pages/affiliate/Stats';
 
 // ── Scroll To Top on Route Change ─────────
 function ScrollToTop() {
@@ -180,7 +188,7 @@ export default function App() {
           <Route path="/shop" element={<ShopPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
-          <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:id" element={<BlogDetailPage />} />
@@ -208,6 +216,7 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="affiliates" element={<AdminAffiliates />} />
             <Route path="merchants" element={<AdminMerchants />} />
+            <Route path="merchants/restock" element={<AdminRestock />} />
             <Route path="moderation" element={<AdminModeration />} />
             <Route path="finance" element={<AdminFinance />} />
             <Route path="commissions" element={<AdminCommissions />} />
@@ -230,8 +239,7 @@ export default function App() {
           <Route path="/merchant" element={<MerchantLayout />}>
              <Route index element={<MerchantDashboard />} />
              <Route path="products" element={<MerchantProducts />} />
-             <Route path="products/add" element={<MerchantAddProduct />} />
-             <Route path="products/edit/:id" element={<MerchantAddProduct />} />
+             <Route path="restock" element={<MerchantRestock />} />
              <Route path="orders" element={<MerchantOrders />} />
              <Route path="wallet" element={<MerchantWallet />} />
              <Route path="settings" element={<MerchantSettings />} />
@@ -246,6 +254,13 @@ export default function App() {
              <Route path="products" element={<AffiliateProducts />} />
              <Route path="commissions" element={<AffiliateCommissions />} />
              <Route path="withdrawals" element={<AffiliateWithdrawals />} />
+             <Route path="education" element={<AffiliateEducation />} />
+             <Route path="team" element={<AffiliateTeam />} />
+             <Route path="marketing" element={<AffiliateMarketing />} />
+             <Route path="leaderboard" element={<AffiliateLeaderboard />} />
+             <Route path="vouchers" element={<AffiliateVouchers />} />
+             <Route path="events" element={<AffiliateEvents />} />
+             <Route path="stats" element={<AffiliateStats />} />
              <Route path="settings" element={<AffiliateSettings />} />
           </Route>
 

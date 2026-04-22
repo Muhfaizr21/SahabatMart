@@ -54,8 +54,8 @@ export default function BlogDetailPage() {
              <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(blog.author || 'Admin')}&background=f8fafc&color=4361ee`} className="w-full h-full" alt="" />
           </div>
           <div>
-            <div className="font-black text-gray-900 text-base">{blog.author || 'Tim SahabatMart'}</div>
-            <div className="text-xs font-bold text-blue-600 uppercase tracking-widest">SahabatMart Editor</div>
+            <div className="font-black text-gray-900 text-base">{blog.author || 'Tim AkuGrow'}</div>
+            <div className="text-xs font-bold text-blue-600 uppercase tracking-widest">AkuGrow Editor</div>
           </div>
         </div>
       </header>

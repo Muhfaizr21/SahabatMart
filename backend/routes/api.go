@@ -118,11 +118,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// --- Merchant Routes ---
 	merchantOnly := actorOnly("merchant", "admin", "superadmin")
-	// Products
+	// Products & Inventory
 	mux.HandleFunc("/api/merchant/products", merchantOnly(merchantCtrl.GetProducts))
-	mux.HandleFunc("/api/merchant/products/add", merchantOnly(merchantCtrl.AddProduct))
-	mux.HandleFunc("/api/merchant/products/update", merchantOnly(merchantCtrl.UpdateProduct))
-	mux.HandleFunc("/api/merchant/products/delete", merchantOnly(merchantCtrl.DeleteProduct))
+	mux.HandleFunc("/api/merchant/catalog", merchantOnly(merchantCtrl.GetCatalog))
+	mux.HandleFunc("/api/merchant/restock", merchantOnly(merchantCtrl.GetRestockRequests))
+	mux.HandleFunc("/api/merchant/restock/request", merchantOnly(merchantCtrl.RequestRestock))
+	mux.HandleFunc("/api/merchant/restock/receive", merchantOnly(merchantCtrl.ReceiveRestock))
 	
 	// Orders
 	mux.HandleFunc("/api/merchant/orders", merchantOnly(merchantCtrl.GetOrders))
@@ -151,7 +152,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/affiliate-stats", merchantOnly(merchantCtrl.GetAffiliateStats))
 
 	// --- Affiliate Routes ---
-	affiliateOnly := actorOnly("affiliate", "admin", "superadmin")
+	// Per spec: Merchant = Mitra + Merchant, so merchant role MUST also access Mitra Area routes
+	affiliateOnly := actorOnly("affiliate", "merchant", "admin", "superadmin")
 	mux.HandleFunc("/api/affiliate/dashboard", affiliateOnly(affiliateCtrl.GetDashboard))
 	mux.HandleFunc("/api/affiliate/commissions", affiliateOnly(affiliateCtrl.GetCommissions))
 	mux.HandleFunc("/api/affiliate/links", affiliateOnly(affiliateCtrl.GetLinks))
@@ -160,6 +162,11 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/affiliate/products", affiliateOnly(affiliateCtrl.GetTopProducts))
 	mux.HandleFunc("/api/affiliate/withdrawals", affiliateOnly(affiliateCtrl.GetWithdrawals))
 	mux.HandleFunc("/api/affiliate/withdrawals/request", affiliateOnly(affiliateCtrl.RequestWithdrawal))
+	mux.HandleFunc("/api/affiliate/team-stats", affiliateOnly(affiliateCtrl.GetTeamStats))
+	mux.HandleFunc("/api/affiliate/merchant-eligibility", affiliateOnly(affiliateCtrl.CheckMerchantEligibility))
+	mux.HandleFunc("/api/affiliate/apply-merchant", affiliateOnly(affiliateCtrl.ApplyForMerchant))
+	mux.HandleFunc("/api/affiliate/leaderboard", affiliateCtrl.GetLeaderboard) // Public leaderboard — no auth needed
+	mux.HandleFunc("/api/affiliate/events", affiliateOnly(affiliateCtrl.GetEvents))
 	mux.HandleFunc("/api/affiliate/profile", affiliateOnly(affiliateCtrl.GetProfile))
 	mux.HandleFunc("/api/affiliate/profile/update", affiliateOnly(affiliateCtrl.UpdateProfile))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
@@ -187,6 +194,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))
 	mux.HandleFunc("/api/admin/merchants/status", adminOnly(adminCtrl.UpdateMerchantStatus))
 	mux.HandleFunc("/api/admin/merchants/verify", adminOnly(adminCtrl.VerifyMerchant))
+	mux.HandleFunc("/api/admin/merchants/restock", adminOnly(adminCtrl.GetRestockRequests))
+	mux.HandleFunc("/api/admin/merchants/restock/moderate", adminOnly(adminCtrl.ModerateRestockRequest))
 
 	// Product Catalog
 	mux.HandleFunc("/api/admin/products", adminOnly(adminCtrl.GetProducts))
@@ -277,6 +286,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/blogs/detail", adminCtrl.GetPublicBlogDetail)
 	mux.HandleFunc("/api/public/banners", adminCtrl.GetPublicBanners)
 	mux.HandleFunc("/api/public/vouchers", adminCtrl.GetPublicVouchers)
+	mux.HandleFunc("/api/public/checkout", buyerCtrl.PublicCheckout)
 	mux.HandleFunc("/api/public/vouchers/check", adminCtrl.CheckVoucher)
 	mux.HandleFunc("/api/public/contact/submit", contactCtrl.SubmitMessage)
 	mux.HandleFunc("/api/public/configs", adminCtrl.GetPublicConfig) // Alias for public config

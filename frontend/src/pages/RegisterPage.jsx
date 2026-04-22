@@ -30,7 +30,8 @@ export default function RegisterPage() {
           full_name: formData.fullName,
           email: formData.email,
           phone: formData.phone,
-          password: formData.password
+          password: formData.password,
+          upline_id: localStorage.getItem('affiliate_id') || ''
         })
       });
 
@@ -53,7 +54,7 @@ export default function RegisterPage() {
         <div className="w-full md:w-1/2 p-10 md:p-14 flex flex-col justify-center">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Buat Akun Baru ✨</h1>
-            <p className="text-gray-500">Bergabunglah dengan ribuan pengguna SahabatMart lainnya.</p>
+            <p className="text-gray-500">Bergabunglah dengan ribuan pengguna AkuGrow lainnya.</p>
           </div>
           
           {error && (
@@ -122,7 +123,7 @@ export default function RegisterPage() {
             <div className="flex items-start gap-2 mt-1">
               <input type="checkbox" id="terms" required className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
               <label htmlFor="terms" className="text-xs text-gray-600 leading-relaxed cursor-pointer select-none">
-                Saya menyetujui <Link to="#" className="text-blue-600 font-medium hover:underline">Syarat & Ketentuan</Link> serta <Link to="#" className="text-blue-600 font-medium hover:underline">Kebijakan Privasi</Link> SahabatMart.
+                Saya menyetujui <Link to="#" className="text-blue-600 font-medium hover:underline">Syarat & Ketentuan</Link> serta <Link to="#" className="text-blue-600 font-medium hover:underline">Kebijakan Privasi</Link> AkuGrow.
               </label>
             </div>
             

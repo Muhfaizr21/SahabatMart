@@ -16,50 +16,36 @@ func NewBuyerService(db *gorm.DB) *BuyerService {
 }
 
 // AddToCart adds a product variant to user's cart with optional metadata attributes
-func (s *BuyerService) AddToCart(buyerID string, productID string, variantID string, quantity int, metadata string) error {
+func (s *BuyerService) AddToCart(buyerID string, productID string, variantID string, merchantID string, quantity int, metadata string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		var variant models.ProductVariant
-		// Try to find the exact variant first
-		err := tx.First(&variant, "id = ?", variantID).Error
-		
-		if err != nil {
-			// If not found or ID is invalid UUID, try falling back to the product's first variant
-			if err := tx.Where("product_id = ?", productID).First(&variant).Error; err != nil {
-				// If still not found, try to auto-create a default variant to prevent 400 errors
-				var product models.Product
-				if err := tx.First(&product, "id = ?", productID).Error; err != nil {
-					return errors.New("Produk tidak ditemukan di database")
-				}
-				variant = models.ProductVariant{
-					ProductID: product.ID,
-					Name:      "Default",
-					SKU:       "SKU-" + product.ID[:8],
-					Price:     product.Price,
-					Stock:     product.Stock,
-				}
-				if err := tx.Create(&variant).Error; err != nil {
-					return errors.New("Gagal sinkronisasi varian produk")
-				}
-			}
-			// Update variantID for the rest of the logic
-			variantID = variant.ID
-		}
-
-		if variant.ProductID != productID {
-			return errors.New("produk dan varian tidak sinkron")
-		}
-
+		// 1. Validate Product
 		var product models.Product
-		if err := tx.Select("merchant_id").First(&product, "id = ?", productID).Error; err != nil {
+		if err := tx.First(&product, "id = ?", productID).Error; err != nil {
 			return errors.New("produk tidak ditemukan")
 		}
 
-		// 2. Check Stock
-		if variant.Stock < quantity {
-			return errors.New("stok tidak mencukupi")
+		// 2. Validate Variant
+		var variant models.ProductVariant
+		err := tx.First(&variant, "id = ?", variantID).Error
+		if err != nil {
+			// Fallback to first variant if specific one not found
+			if err := tx.Where("product_id = ?", productID).First(&variant).Error; err != nil {
+				return errors.New("varian produk tidak tersedia")
+			}
+			variantID = variant.ID
 		}
 
-		// 3. Get or Create Cart
+		// 3. [Akuglow Refactor] Check Stock from Inventory instead of Product model
+		var inventory models.Inventory
+		if err := tx.Where("merchant_id = ? AND product_id = ?", merchantID, productID).First(&inventory).Error; err != nil {
+			return errors.New("produk tidak tersedia di merchant ini")
+		}
+
+		if inventory.Stock < quantity {
+			return errors.New("stok di merchant ini tidak mencukupi")
+		}
+
+		// 4. Get or Create Cart
 		var cart models.Cart
 		tx.Where("buyer_id = ?", buyerID).First(&cart)
 		if cart.ID == "" {
@@ -69,10 +55,10 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 			}
 		}
 
-		// 4. Update or Add Item
+		// 5. Update or Add Item
 		var item models.CartItem
-		// We use metadata as part of the unique key to separate different selections of the same variant
-		result := tx.Where("cart_id = ? AND product_variant_id = ? AND metadata = ?", cart.ID, variantID, metadata).First(&item)
+		// We include MerchantID in the search to allow buying same product from different merchants if needed
+		result := tx.Where("cart_id = ? AND product_variant_id = ? AND merchant_id = ? AND metadata = ?", cart.ID, variantID, merchantID, metadata).First(&item)
 		
 		if result.Error == nil {
 			// Update quantity if exists
@@ -84,8 +70,8 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 				}
 				return err
 			}
-			if item.Quantity > variant.Stock {
-				return errors.New("total pesanan melebihi stok yang tersedia")
+			if item.Quantity > inventory.Stock {
+				return errors.New("total pesanan melebihi stok merchant yang tersedia")
 			}
 			err := tx.Save(&item).Error
 			if err == nil {
@@ -96,16 +82,12 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 
 		// Create new item (only if quantity > 0)
 		if quantity <= 0 {
-			return nil // Nothing to add
+			return nil
 		}
 		
-		if quantity > variant.Stock {
-			return errors.New("stok tidak mencukupi")
-		}
-
 		newItem := models.CartItem{
 			CartID:           cart.ID,
-			MerchantID:       product.MerchantID,
+			MerchantID:       merchantID,
 			ProductID:        productID,
 			ProductVariantID: variantID,
 			Quantity:         quantity,
@@ -125,8 +107,15 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 // MoveFromWishlistToCart moves an item from wishlist to cart atomically
 func (s *BuyerService) MoveFromWishlistToCart(buyerID string, productID string, variantID string, quantity int) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Add to cart first (with empty metadata as default from wishlist)
-		if err := s.AddToCart(buyerID, productID, variantID, quantity, ""); err != nil {
+		// 1. Resolve a Merchant ID (Fallback to pusat if not specified/found)
+		var inv models.Inventory
+		merchantID := models.PusatID
+		if err := tx.Where("product_id = ?", productID).First(&inv).Error; err == nil {
+			merchantID = inv.MerchantID
+		}
+
+		// 2. Add to cart
+		if err := s.AddToCart(buyerID, productID, variantID, merchantID, quantity, ""); err != nil {
 			return err
 		}
 

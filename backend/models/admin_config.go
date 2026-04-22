@@ -6,6 +6,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	AdminID = "00000000-0000-0000-0000-000000000001"
+	PusatID = "00000000-0000-0000-0000-000000000000"
+)
+
 // PlatformConfig menyimpan pengaturan global platform
 type PlatformConfig struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
@@ -71,11 +76,52 @@ type Merchant struct {
 	IsVerified  bool       `gorm:"default:false" json:"is_verified"`
 	Balance     float64    `gorm:"type:decimal(15,2);default:0" json:"balance"`
 	TotalSales  float64    `gorm:"type:decimal(15,2);default:0" json:"total_sales"`
+	
+	// Akuglow Specifics
+	City              string  `gorm:"type:varchar(100)" json:"city"` // Untuk filtering merchant terdekat
+	ActiveMitraCount int     `gorm:"default:0" json:"active_mitra_count"`
+	TeamMonthlyTurnover float64 `gorm:"type:decimal(15,2);default:0" json:"team_monthly_turnover"`
+	DistributionFeePercent float64 `gorm:"type:decimal(5,2);default:0" json:"distribution_fee_percent"` // Komisi distribusi
+
 	JoinedAt    time.Time  `json:"joined_at"`
 	SuspendedAt *time.Time `json:"suspended_at"`
 	SuspendNote string     `gorm:"type:text" json:"suspend_note"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// Inventory menyimpan stok produk di berbagai gudang (Pusat/Merchant)
+type Inventory struct {
+	ID         string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ProductID  string    `gorm:"type:uuid;not null;index" json:"product_id"`
+	MerchantID string    `gorm:"type:uuid;not null;index" json:"merchant_id"` // ID Merchant atau ID "SYSTEM_PUSAT"
+	Stock      int       `gorm:"default:0" json:"stock"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// RestockRequest permintaan stok merchant ke pusat
+type RestockRequest struct {
+	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	MerchantID  string    `gorm:"type:uuid;not null;index" json:"merchant_id"`
+	Status      string    `gorm:"type:varchar(50);default:'requested'" json:"status"` // requested, approved, shipped, received, rejected
+	TotalItems  int       `json:"total_items"`
+	Note        string    `gorm:"type:text" json:"note"`
+	AdminNote   string    `gorm:"type:text" json:"admin_note"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	
+	Items       []RestockItem `gorm:"foreignKey:RestockID" json:"items"`
+	Merchant    Merchant      `gorm:"foreignKey:MerchantID;references:ID" json:"merchant"`
+}
+
+type RestockItem struct {
+	ID        string `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	RestockID string `gorm:"type:uuid;not null;index" json:"restock_id"`
+	ProductID string `gorm:"type:uuid;not null" json:"product_id"`
+	Quantity  int    `gorm:"not null" json:"quantity"`
+
+	Product   Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 // AffiliateConfig tier/setting afiliasi
@@ -212,22 +258,28 @@ type BlogPost struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Product utama platform
+// Product utama platform (Master Product Pusat)
 type Product struct {
 	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	MerchantID  string    `gorm:"type:uuid;not null" json:"merchant_id"`
 	Name        string    `gorm:"type:varchar(255);not null" json:"name"`
 	Slug        string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"slug"`
 	SKU         string    `gorm:"type:varchar(100);unique;index" json:"sku"`
 	Description string    `gorm:"type:text" json:"description"`
 	Price       float64   `gorm:"type:decimal(15,2);not null" json:"price"`
 	OldPrice    float64   `gorm:"type:decimal(15,2)" json:"old_price"`
-	Stock       int       `gorm:"default:0" json:"stock"`
+	
+	// Global Info
 	Category    string    `gorm:"type:varchar(100)" json:"category"`
 	Brand       string    `gorm:"type:varchar(100)" json:"brand"`
 	Attributes  string     `gorm:"type:text" json:"attributes"` // JSON: {color: "red", size: "XL"}
 	Image       string     `gorm:"type:text" json:"image"`
 	Images      string     `gorm:"type:text" json:"images"` // JSON Array: ["url1", "url2", "url3"]
+	
+	// Distribution Specs
+	BaseDistributionFee        float64 `gorm:"type:decimal(15,2);default:0" json:"base_distribution_fee"`
+	BaseDistributionFeeNominal float64 `gorm:"type:decimal(15,2);default:0" json:"base_distribution_fee_nominal"`
+	BaseAffiliateFee          float64 `gorm:"type:decimal(15,2);default:0" json:"base_affiliate_fee"`
+	BaseAffiliateFeeNominal   float64 `gorm:"type:decimal(15,2);default:0" json:"base_affiliate_fee_nominal"`	
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 	Rating      float64   `gorm:"type:decimal(2,1);default:0" json:"rating"`
 	AverageRating float64 `gorm:"type:decimal(2,1);default:0" json:"average_rating"` // Satisfy legacy triggers
@@ -240,6 +292,7 @@ type Product struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	Variants    []ProductVariant `gorm:"foreignKey:ProductID" json:"variants"`
+	Inventories []Inventory      `gorm:"foreignKey:ProductID" json:"inventories"`
 }
 
 // ProductVariant untuk variasi produk (warna, ukuran, dsb)
@@ -320,6 +373,9 @@ func (Cart) TableName() string                { return "carts" }
 func (CartItem) TableName() string            { return "cart_items" }
 func (Notification) TableName() string        { return "notifications" }
 func (BlogPost) TableName() string            { return "blog_posts" }
+func (Inventory) TableName() string        { return "inventories" }
+func (RestockRequest) TableName() string { return "restock_requests" }
+func (RestockItem) TableName() string    { return "restock_items" }
 func (Product) TableName() string             { return "products" }
 func (Banner) TableName() string              { return "banners" }
 func (Wishlist) TableName() string            { return "wishlists" }

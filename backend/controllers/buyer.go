@@ -16,6 +16,7 @@ type BuyerController struct {
 	DB           *gorm.DB
 	OrderService *services.OrderService
 	BuyerService *services.BuyerService
+	AuthService  *services.AuthService
 }
 
 func NewBuyerController(db *gorm.DB) *BuyerController {
@@ -23,6 +24,7 @@ func NewBuyerController(db *gorm.DB) *BuyerController {
 		DB:           db,
 		OrderService: services.NewOrderService(db),
 		BuyerService: services.NewBuyerService(db),
+		AuthService:  services.NewAuthService(db),
 	}
 }
 
@@ -57,6 +59,7 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ProductID        string `json:"product_id"`
 		ProductVariantID string `json:"product_variant_id"`
+		MerchantID       string `json:"merchant_id"`
 		Quantity         int    `json:"quantity"`
 		Metadata         string `json:"metadata"`
 	}
@@ -66,7 +69,7 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bc.BuyerService.AddToCart(buyerID, req.ProductID, req.ProductVariantID, req.Quantity, req.Metadata); err != nil {
+	if err := bc.BuyerService.AddToCart(buyerID, req.ProductID, req.ProductVariantID, req.MerchantID, req.Quantity, req.Metadata); err != nil {
 		log.Printf("Add to Cart error (BuyerID: %s, ProductID: %s): %v", buyerID, req.ProductID, err)
 		utils.JSONError(w, http.StatusBadRequest, "Gagal menambah ke keranjang: "+err.Error())
 		return
@@ -101,11 +104,11 @@ func (bc *BuyerController) MoveToCart(w http.ResponseWriter, r *http.Request) {
 // POST /api/buyer/checkout
 func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
-
 	var req struct {
-		ShippingInfo models.Order `json:"shipping_info"`
-		AffiliateID  *string      `json:"affiliate_id"`
-		VoucherCode  string       `json:"voucher_code"`
+		Items        []models.OrderItem `json:"items"`
+		ShippingInfo models.Order       `json:"shipping_info"`
+		VoucherCode  string             `json:"voucher_code"`
+		AffiliateID  *string            `json:"affiliate_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -113,51 +116,71 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cart models.Cart
-	if err := bc.DB.Preload("Items").Where("buyer_id = ?", buyerID).First(&cart).Error; err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Keranjang kosong")
-		return
-	}
-
-	if len(cart.Items) == 0 {
-		utils.JSONError(w, http.StatusBadRequest, "Keranjang kosong")
-		return
-	}
-
-	var orderItems []models.OrderItem
-	for _, ci := range cart.Items {
-		var variant models.ProductVariant
-		if err := bc.DB.First(&variant, "id = ?", ci.ProductVariantID).Error; err != nil {
-			continue
-		}
-		
-		var product models.Product
-		bc.DB.First(&product, "id = ?", ci.ProductID)
-
-		orderItems = append(orderItems, models.OrderItem{
-			MerchantID:       product.MerchantID,
-			ProductID:        ci.ProductID,
-			ProductVariantID: utils.ToStringPtr(ci.ProductVariantID),
-			ProductName:      product.Name,
-			VariantName:      variant.Name,
-			SKU:              variant.SKU,
-			UnitPrice:        variant.Price,
-			Quantity:         ci.Quantity,
-			Metadata:         ci.Metadata, // Propagate metadata from cart to order
-			ProductImageURL:  product.Image,
-		})
-	}
-
 	req.ShippingInfo.VoucherCode = req.VoucherCode
-	order, err := bc.OrderService.CreateOrder(buyerID, orderItems, req.AffiliateID, req.ShippingInfo)
+	order, err := bc.OrderService.CreateOrder(buyerID, req.Items, req.AffiliateID, req.ShippingInfo)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat pesanan: "+err.Error())
 		return
 	}
 
-	bc.DB.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{})
-
 	utils.JSONResponse(w, http.StatusCreated, order)
+}
+
+// POST /api/public/checkout
+func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email        string             `json:"email"`
+		Password     string             `json:"password"`
+		FullName     string             `json:"full_name"`
+		Phone        string             `json:"phone"`
+		Items        []models.OrderItem `json:"items"`
+		ShippingInfo models.Order       `json:"shipping_info"`
+		UplineID     string             `json:"upline_id"`
+		VoucherCode  string             `json:"voucher_code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	// 1. Find or Create User
+	var user *models.User
+	var token string
+	var err error
+
+	// Try to find user
+	err = bc.DB.Where("email = ?", req.Email).First(&user).Error
+	if err != nil {
+		// Create new user (Mitra)
+		user, token, err = bc.AuthService.Register(req.Email, req.Password, req.FullName, req.Phone, "buyer", req.UplineID)
+		if err != nil {
+			utils.JSONError(w, http.StatusBadRequest, "Gagal membuat akun: "+err.Error())
+			return
+		}
+	} else {
+		// Existing user: we should ideally validate password, but for simplicity in this flow 
+		// if they provide the right password it works.
+		// Actually, let's keep it simple: if email exists, return error "Silakan login" 
+		// OR just use the account if we are brave.
+		// User said "otomatis meminta pembuatan akun" - implying registration.
+		utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar. Silakan masuk terlebih dahulu.")
+		return
+	}
+
+	// 2. Process Order
+	req.ShippingInfo.VoucherCode = req.VoucherCode
+	order, err := bc.OrderService.CreateOrder(user.ID, req.Items, &req.UplineID, req.ShippingInfo)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat pesanan: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"order": order,
+		"token": token, // Return token so the frontend can auto-login
+		"user":  user,
+	})
 }
 
 // GET /api/buyer/wishlist

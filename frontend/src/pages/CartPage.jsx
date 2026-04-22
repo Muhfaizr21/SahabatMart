@@ -13,6 +13,14 @@ export default function CartPage() {
   const loadCart = useCallback(async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+          // For now, guest cart is empty on refresh, but in real apps we use localStorage.
+          // We return empty to avoid 401 errors.
+          setItems([]);
+          setLoading(false);
+          return;
+      }
       const resp = await fetchJson(`${BUYER_API_BASE}/cart`);
       console.log("DEBUG RESPONSE:", resp);
       

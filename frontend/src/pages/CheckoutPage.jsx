@@ -29,7 +29,8 @@ export default function CheckoutPage() {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
-          navigate('/login');
+          // Guest mode, nothing to fetch from profile
+          setLoading(false);
           return;
         }
 
@@ -98,7 +99,25 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      
+      const orderItems = cart.items.map(item => ({
+          merchant_id: item.product?.merchant_id || 'pusat',
+          product_id: item.product_id,
+          product_variant_id: item.product_variant_id,
+          product_name: item.product?.name,
+          variant_name: item.product_variant?.name,
+          sku: item.product_variant?.sku,
+          unit_price: item.product_variant?.price,
+          quantity: item.quantity,
+          product_image_url: item.product?.image
+      }));
+
       const payload = {
+        email: form.email,
+        password: form.password || '', // Only for guests
+        full_name: `${form.firstName} ${form.lastName}`,
+        phone: form.phone,
+        items: orderItems,
         shipping_info: {
           shipping_name: `${form.firstName} ${form.lastName}`,
           shipping_phone: form.phone,
@@ -108,18 +127,23 @@ export default function CheckoutPage() {
           shipping_postal_code: form.postalCode,
           notes: form.notes,
         },
-        affiliate_id: localStorage.getItem('affiliate_id') || null,
+        upline_id: localStorage.getItem('affiliate_id') || '',
         voucher_code: appliedVoucher?.code || '',
       };
 
-      await fetchJson(`${BUYER_API_BASE}/checkout`, {
+      const res = await fetchJson('/api/public/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(payload)
       });
+
+      if (res.token) {
+        localStorage.setItem('token', res.token);
+        localStorage.setItem('user', JSON.stringify(res.user));
+      }
 
       navigate('/order-success');
     } catch (err) {
@@ -159,7 +183,36 @@ export default function CheckoutPage() {
             <div className="flex-1 space-y-6">
               {/* Shipping Info */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 text-lg mb-5">Informasi Pengiriman</h2>
+                <div className="flex items-center justify-between mb-5">
+                   <h2 className="font-bold text-gray-900 text-lg">Informasi Pengiriman</h2>
+                   {!localStorage.getItem('token') && (
+                      <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-full uppercase tracking-tighter">Beli & Daftar Mitra</span>
+                   )}
+                </div>
+                
+                {/* Account setup for guests */}
+                {!localStorage.getItem('token') && (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 mb-6 group hover:border-purple-300 transition-all">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="material-symbols-outlined text-purple-600 text-sm">person_add</span>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Buat Akun Mitra (Wajib)</h4>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mb-4">Setiap pembeli di Akuglow otomatis menjadi mitra berlisensi.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-700 block mb-1">Email *</label>
+                        <input required type="email" placeholder="email@kamu.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-purple-400 transition-colors" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-700 block mb-1">Kata Sandi *</label>
+                        <input required type="password" placeholder="Min. 8 Karakter" value={form.password || ''} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:border-purple-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-700 block mb-1">Nama Depan *</label>
@@ -171,11 +224,14 @@ export default function CheckoutPage() {
                     <input required type="text" placeholder="Doe" value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors" />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Email *</label>
-                    <input required type="email" placeholder="email@kamu.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors" />
-                  </div>
+                  {/* Hide email if already shown in account setup above */}
+                  {localStorage.getItem('token') && (
+                    <div className="sm:col-span-2">
+                      <label className="text-sm font-medium text-gray-700 block mb-1">Email *</label>
+                      <input required type="email" placeholder="email@kamu.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors" />
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-700 block mb-1">Nomor HP *</label>
                     <input required type="tel" placeholder="08xxxxxxxxxx" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
