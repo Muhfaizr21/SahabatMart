@@ -26,15 +26,13 @@ export default function StatusMitra() {
     setApplying(true);
     setApplyResult(null);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/affiliate/apply-merchant', {
+      const res = await fetchJson(`${AFFILIATE_API_BASE}/apply-merchant`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ store_name: storeName }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Gagal mengajukan');
-      setApplyResult({ success: true, message: data.message });
+      
+      setApplyResult({ success: true, message: 'Pengajuan berhasil dikirim! Silakan tunggu konfirmasi admin.' });
       setShowForm(false);
     } catch (err) {
       setApplyResult({ success: false, message: err.message });

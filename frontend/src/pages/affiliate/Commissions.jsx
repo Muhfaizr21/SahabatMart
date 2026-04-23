@@ -37,7 +37,7 @@ export default function AffiliateCommissions() {
         ? `${AFFILIATE_API_BASE}/commissions`
         : `${AFFILIATE_API_BASE}/commissions?status=${filter}`;
       const res = await fetchJson(url);
-      const data = Array.isArray(res.data) ? res.data : [];
+      const data = Array.isArray(res) ? res : [];
       setCommissions(data);
 
       // Calculate summary

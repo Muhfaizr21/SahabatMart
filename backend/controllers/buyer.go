@@ -8,6 +8,8 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
+	"math"
+	"os"
 
 	"gorm.io/gorm"
 )
@@ -17,14 +19,15 @@ type BuyerController struct {
 	OrderService *services.OrderService
 	BuyerService *services.BuyerService
 	AuthService  *services.AuthService
+	TripayService *services.TripayService
 }
-
 func NewBuyerController(db *gorm.DB) *BuyerController {
 	return &BuyerController{
 		DB:           db,
 		OrderService: services.NewOrderService(db),
 		BuyerService: services.NewBuyerService(db),
 		AuthService:  services.NewAuthService(db),
+		TripayService: services.NewTripayService(),
 	}
 }
 
@@ -105,10 +108,11 @@ func (bc *BuyerController) MoveToCart(w http.ResponseWriter, r *http.Request) {
 func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 	var req struct {
-		Items        []models.OrderItem `json:"items"`
-		ShippingInfo models.Order       `json:"shipping_info"`
-		VoucherCode  string             `json:"voucher_code"`
-		AffiliateID  *string            `json:"affiliate_id"`
+		Items         []models.OrderItem `json:"items"`
+		ShippingInfo  models.Order       `json:"shipping_info"`
+		VoucherCode   string             `json:"voucher_code"`
+		AffiliateID   *string            `json:"affiliate_id"`
+		PaymentMethod string             `json:"payment_method"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -123,7 +127,138 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusCreated, order)
+	// Integrasi TriPay: Jika metode pembayaran dipilih, buat transaksi di TriPay
+	var paymentData map[string]interface{}
+	if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
+		// Ambil data item lengkap untuk TriPay
+		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
+		
+		tripayResult, err := bc.getTripayData(order, req.PaymentMethod)
+		if err != nil {
+			log.Printf("⚠️ TriPay Request Error: %v", err)
+			// Tetap lanjut, biarkan user melihat order tapi mungkin bayar manual nanti
+		} else {
+			paymentData = tripayResult["data"].(map[string]interface{})
+			
+			// Save Payment Record to Database
+			payment := models.Payment{
+				OrderID:              order.ID,
+				PaymentMethod:        req.PaymentMethod,
+				Status:               models.PaymentPending,
+				Gateway:              "tripay",
+				GatewayTransactionID: paymentData["reference"].(string),
+				GatewayOrderID:      paymentData["merchant_ref"].(string),
+				Amount:               order.GrandTotal,
+			}
+			
+			respJson, _ := json.Marshal(paymentData)
+			payment.GatewayResponse = string(respJson)
+			
+			if err := bc.DB.Create(&payment).Error; err != nil {
+				log.Printf("⚠️ Failed to save payment record: %v", err)
+			}
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
+		"order":   order,
+		"payment": paymentData,
+	})
+}
+
+// GET /api/buyer/orders/payment-instructions?order_id=...
+func (bc *BuyerController) GetPaymentInstructions(w http.ResponseWriter, r *http.Request) {
+	orderID := r.URL.Query().Get("order_id")
+	if orderID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Order ID is required")
+		return
+	}
+
+	var payment models.Payment
+	if err := bc.DB.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Payment record not found")
+		return
+	}
+
+	// Fetch fresh instructions from TriPay
+	result, err := bc.TripayService.GetInstructions(payment.PaymentMethod, payment.GatewayTransactionID, payment.Amount)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Failed to fetch instructions: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, result)
+}
+
+// Helper to get TriPay Instructions (Optional, but good for UX)
+func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod string) (map[string]interface{}, error) {
+	tripay := services.NewTripayService()
+	
+	// ⚠️ PENTING: TriPay mewajibkan (Sum of Items == Amount)
+	// Kita hitung total Amount langsung dari sum item yang sudah dibulatkan
+	var totalAmount int64 = 0
+
+	// Convert order items to TriPay format
+	var tripayItems []services.TripayItem
+	for _, item := range order.Items {
+		price := int64(math.Round(item.UnitPrice))
+		qty := item.Quantity
+		subtotal := price * int64(qty)
+		
+		tripayItems = append(tripayItems, services.TripayItem{
+			SKU:      item.SKU,
+			Name:     item.ProductName,
+			Price:    price,
+			Quantity: qty,
+			Subtotal: subtotal,
+		})
+		totalAmount += subtotal
+	}
+
+	if order.TotalShippingCost > 0 {
+		price := int64(math.Round(order.TotalShippingCost))
+		tripayItems = append(tripayItems, services.TripayItem{
+			SKU:      "SHIPPING",
+			Name:     "Ongkos Kirim",
+			Price:    price,
+			Quantity: 1,
+			Subtotal: price,
+		})
+		totalAmount += price
+	}
+	
+	if order.TotalDiscount > 0 {
+		price := -int64(math.Round(order.TotalDiscount))
+		tripayItems = append(tripayItems, services.TripayItem{
+			SKU:      "DISCOUNT",
+			Name:     "Potongan Voucher",
+			Price:    price,
+			Quantity: 1,
+			Subtotal: price,
+		})
+		totalAmount += price
+	}
+
+	// Get Customer Info
+	var buyer models.User
+	bc.DB.Preload("Profile").First(&buyer, "id = ?", *order.BuyerID)
+	
+	customerName := "Customer"
+	if buyer.Profile.FullName != "" { 
+		customerName = buyer.Profile.FullName 
+	}
+	
+	customerPhone := ""
+	if buyer.Phone != nil {
+		customerPhone = *buyer.Phone
+	}
+	
+	appURL := os.Getenv("APP_URL")
+	callbackUrl := appURL + "/api/callback/tripay"
+	returnUrl := appURL + "/order-success"
+
+	result, err := tripay.CreateTransaction(paymentMethod, order.OrderNumber, totalAmount, customerName, buyer.Email, customerPhone, tripayItems, callbackUrl, returnUrl)
+	return result, err
 }
 
 // POST /api/public/checkout

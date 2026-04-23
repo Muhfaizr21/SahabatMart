@@ -56,8 +56,8 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 			return gorm.ErrInvalidData
 		}
 
-		if status == "approved" {
-			// Transfer Stock from PUSAT to Merchant
+		if status == "approved" || status == "shipped" {
+			// Transfer Stock from PUSAT (Inventory in Transit)
 			for _, item := range req.Items {
 				// 1. Deduct from Pusat
 				var pusatInv models.Inventory
@@ -70,21 +70,6 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 				}
 				if err := tx.Model(&pusatInv).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 					return err
-				}
-
-				// 2. Add to Merchant Inventory
-				var merchInv models.Inventory
-				err = tx.Where("merchant_id = ? AND product_id = ?", req.MerchantID, item.ProductID).First(&merchInv).Error
-				if err != nil {
-					// Create if not exists
-					merchInv = models.Inventory{
-						MerchantID: req.MerchantID,
-						ProductID:  item.ProductID,
-						Stock:      item.Quantity,
-					}
-					if err := tx.Create(&merchInv).Error; err != nil { return err }
-				} else {
-					if err := tx.Model(&merchInv).Update("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil { return err }
 				}
 			}
 		}

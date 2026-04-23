@@ -59,29 +59,54 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 	}
 
 	totalQty := 0
-	for _, it := range items {
-		totalQty += it.Quantity
-	}
-
+	var totalAmount float64
+	
 	req := &models.RestockRequest{
 		MerchantID: merchantID,
-		Status:     "requested", // Match model default
-		TotalItems: totalQty,
+		Status:     "requested",
+		CreatedAt:  time.Now(),
 	}
 
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Create Request Header
 		if err := tx.Create(req).Error; err != nil {
 			return err
 		}
+
+		// 2. Process Items
 		for i := range items {
+			var prod models.Product
+			if err := tx.First(&prod, "id = ?", items[i].ProductID).Error; err != nil {
+				return fmt.Errorf("produk %s tidak ditemukan", items[i].ProductID)
+			}
+			
+			// Assume restock price is 80% of retail if not specified, 
+			// but for now let's use full price or a dedicated field if exists.
+			// Let's check if there's a wholesale price... (assuming Price for now)
 			items[i].RestockID = req.ID
+			items[i].UnitPrice = prod.Price 
+			items[i].Subtotal = items[i].UnitPrice * float64(items[i].Quantity)
+			
 			if err := tx.Create(&items[i]).Error; err != nil {
 				return err
 			}
+			
+			totalQty += items[i].Quantity
+			totalAmount += items[i].Subtotal
 		}
-		return nil
+
+		// 3. Update Header with Totals
+		return tx.Model(req).Updates(map[string]interface{}{
+			"total_items": totalQty,
+			"total_price": totalAmount,
+		}).Error
 	})
-	return req, err
+	
+	var finalReq models.RestockRequest
+	if err == nil {
+		s.DB.Preload("Items").First(&finalReq, "id = ?", req.ID)
+	}
+	return &finalReq, err
 }
 
 func (s *MerchantService) GetRestockRequests(merchantID string) ([]models.RestockRequest, error) {
@@ -289,12 +314,45 @@ func (s *MerchantService) GetAffiliateStats(merchantID string) (map[string]inter
 func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var req models.RestockRequest
-		if err := tx.First(&req, "id = ? AND merchant_id = ?", requestID, merchantID).Error; err != nil {
+		if err := tx.Preload("Items").First(&req, "id = ? AND merchant_id = ?", requestID, merchantID).Error; err != nil {
 			return err
 		}
 
 		if req.Status != "shipped" {
 			return fmt.Errorf("hanya restock yang sudah dikirim yang dapat diterima (Status saat ini: %s)", req.Status)
+		}
+
+		// 1. Update Inventory
+		for _, item := range req.Items {
+			var inv models.Inventory
+			err := tx.Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).First(&inv).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				inv = models.Inventory{
+					MerchantID: merchantID,
+					ProductID:  item.ProductID,
+					Stock:      item.Quantity,
+				}
+				if err := tx.Create(&inv).Error; err != nil { return err }
+			} else if err == nil {
+				if err := tx.Model(&inv).Update("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil { return err }
+			} else {
+				return err
+			}
+		}
+
+		// 2. Financial Transaction (Merchant pays HQ)
+		financeSvc := NewFinanceService(tx)
+		
+		// Debit Merchant
+		descPay := fmt.Sprintf("Pembayaran Kulakan: %s", req.ID)
+		if err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -req.TotalPrice, req.ID, "restock", descPay); err != nil {
+			return err
+		}
+
+		// Credit HQ
+		descRev := fmt.Sprintf("Pendapatan Kulakan Merchant: %s", req.ID)
+		if err := financeSvc.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxRestockRevenue, req.TotalPrice, req.ID, "restock", descRev); err != nil {
+			return err
 		}
 
 		req.Status = "received"

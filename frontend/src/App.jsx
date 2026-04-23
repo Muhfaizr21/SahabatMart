@@ -79,6 +79,9 @@ import AdminSecurity from './pages/admin/Security';
 import AdminRegions from './pages/admin/Regions';
 import AdminBlogs from './pages/admin/Blogs';
 import AdminBanners from './pages/admin/Banners';
+import AdminEducation from './pages/admin/Education';
+import AdminEvents from './pages/admin/Events';
+import AdminPromo from './pages/admin/Promo';
 import AdminInbox from './pages/admin/Inbox';
 import AdminPOS from './pages/admin/POS';
 import AdminRBAC from './pages/admin/RBAC';
@@ -174,7 +177,7 @@ function ScrollToTop() {
 export default function App() {
   useEffect(() => {
     // Jalankan pelacakan affiliate di setiap akses pertama
-    captureAffiliate();
+    // captureAffiliate(); 
   }, []);
 
   return (
@@ -231,6 +234,9 @@ export default function App() {
             <Route path="audit" element={<AdminAuditLog />} />
             <Route path="blogs" element={<AdminBlogs />} />
             <Route path="banners" element={<AdminBanners />} />
+            <Route path="education" element={<AdminEducation />} />
+            <Route path="events" element={<AdminEvents />} />
+            <Route path="promo" element={<AdminPromo />} />
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
           </Route>

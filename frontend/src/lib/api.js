@@ -25,9 +25,9 @@ export async function fetchJson(url, options = {}) {
     const response = await fetch(url, { ...options, headers });
 
     if (response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login'; // Force redirect to login
+      // localStorage.removeItem('token');
+      // localStorage.removeItem('user');
+      // window.location.href = '/login'; // Force redirect to login
     }
 
     if (!response.ok) {

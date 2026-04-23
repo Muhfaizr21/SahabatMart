@@ -5,15 +5,16 @@ import { BUYER_API_BASE, fetchJson } from '../lib/api';
 const steps = ['Keranjang', 'Checkout', 'Konfirmasi'];
 const provinces = ['DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Yogyakarta', 'Bali', 'Sumatera Utara', 'Sulawesi Selatan'];
 const paymentMethods = [
-  { id: 'transfer', label: 'Transfer Bank', icon: '🏦', desc: 'BCA, Mandiri, BNI, BRI' },
-  { id: 'ewallet', label: 'E-Wallet', icon: '📱', desc: 'GoPay, OVO, DANA, ShopeePay' },
-  { id: 'cod', label: 'Bayar di Tempat', icon: '💵', desc: 'Cash On Delivery' },
-  { id: 'cc', label: 'Kartu Kredit/Debit', icon: '💳', desc: 'Visa, MasterCard, JCB' },
+  { id: 'QRIS', label: 'QRIS (GOPAY/OVO/DANA)', icon: '📱', desc: 'Scan & Bayar Instan' },
+  { id: 'MANDIRIVA', label: 'Mandiri Virtual Account', icon: '🏦', desc: 'Transfer via Mandiri' },
+  { id: 'BRIVA', label: 'BRI Virtual Account', icon: '🏦', desc: 'Transfer via BRI' },
+  { id: 'BCAVA', label: 'BCA Virtual Account', icon: '🏦', desc: 'Transfer via BCA' },
+  { id: 'ALFAMART', label: 'Alfamart', icon: '🏪', desc: 'Bayar via Kasir Alfamart' },
 ];
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const [paymentMethod, setPaymentMethod] = useState('transfer');
+  const [paymentMethod, setPaymentMethod] = useState('QRIS');
   const [cart, setCart] = useState({ items: [] });
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
@@ -23,6 +24,9 @@ export default function CheckoutPage() {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [checkingVoucher, setCheckingVoucher] = useState(false);
+  const [shippingType, setShippingType] = useState('expedition');
+  const [shippingCost, setShippingCost] = useState(0);
+  const [selectedShipping, setSelectedShipping] = useState({ id: 'jne-reg', price: 0 });
 
   useEffect(() => {
     const fetchCheckoutData = async () => {
@@ -76,7 +80,7 @@ export default function CheckoutPage() {
     }
   }
 
-  const total = subtotal + shipping - discount;
+  const total = subtotal + (shippingType === 'expedition' ? shippingCost : 0) - discount;
 
   const handleApplyVoucher = async () => {
     if (!voucherCode) return;
@@ -129,6 +133,7 @@ export default function CheckoutPage() {
         },
         upline_id: localStorage.getItem('affiliate_id') || '',
         voucher_code: appliedVoucher?.code || '',
+        payment_method: paymentMethod,
       };
 
       const res = await fetchJson('/api/public/checkout', {
@@ -145,7 +150,12 @@ export default function CheckoutPage() {
         localStorage.setItem('user', JSON.stringify(res.user));
       }
 
-      navigate('/order-success');
+      navigate('/order-success', { 
+        state: { 
+          order: res.order, 
+          payment: res.payment 
+        } 
+      });
     } catch (err) {
       alert('Checkout gagal: ' + err.message);
     } finally {
@@ -270,23 +280,56 @@ export default function CheckoutPage() {
 
               {/* Shipping Method */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 text-lg mb-5">Metode Pengiriman</h2>
-                <div className="space-y-3">
-                  {[
-                    { id: 'jne-reg', label: 'JNE Reguler', days: '3-5 hari', price: 'GRATIS' },
-                    { id: 'jne-yes', label: 'JNE YES (Yakin Esok Sampai)', days: '1 hari', price: 'Rp25.000' },
-                    { id: 'sicepat', label: 'SiCepat BEST', days: '2-3 hari', price: 'Rp12.000' },
-                  ].map(method => (
-                    <label key={method.id} className="flex items-center gap-4 border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:border-blue-300 transition-all has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                      <input type="radio" name="shipping" defaultChecked={method.id === 'jne-reg'} className="accent-blue-600 w-4 h-4" />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-800 text-sm">{method.label}</div>
-                        <div className="text-xs text-gray-500">{method.days}</div>
-                      </div>
-                      <div className={`text-sm font-bold ${method.price === 'GRATIS' ? 'text-green-600' : 'text-gray-700'}`}>{method.price}</div>
-                    </label>
-                  ))}
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-bold text-gray-900 text-lg">Metode Pengiriman</h2>
+                  <div className="flex bg-gray-100 p-1 rounded-xl">
+                    <button 
+                      type="button"
+                      onClick={() => setShippingType('expedition')}
+                      className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${shippingType === 'expedition' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                    >Kirim Ekspedisi</button>
+                    <button 
+                      type="button"
+                      onClick={() => setShippingType('pickup')}
+                      className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${shippingType === 'pickup' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                    >Ambil di Toko</button>
+                  </div>
                 </div>
+
+                {shippingType === 'expedition' ? (
+                  <div className="space-y-3">
+                    {[
+                      { id: 'jne-reg', label: 'JNE Reguler', days: '3-5 hari', price: 0, priceLabel: 'GRATIS' },
+                      { id: 'jne-yes', label: 'JNE YES', days: '1 hari', price: 25000, priceLabel: 'Rp25.000' },
+                      { id: 'sicepat', label: 'SiCepat BEST', days: '2-3 hari', price: 12000, priceLabel: 'Rp12.000' },
+                    ].map(method => (
+                      <label key={method.id} className="flex items-center gap-4 border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:border-blue-300 transition-all has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                        <input 
+                          type="radio" 
+                          name="shipping" 
+                          checked={selectedShipping?.id === method.id}
+                          onChange={() => {
+                            setSelectedShipping(method);
+                            setShippingCost(method.price);
+                          }}
+                          className="accent-blue-600 w-4 h-4" 
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-800 text-sm">{method.label}</div>
+                          <div className="text-xs text-gray-500">{method.days}</div>
+                        </div>
+                        <div className={`text-sm font-bold ${method.price === 0 ? 'text-green-600' : 'text-gray-700'}`}>{method.priceLabel}</div>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 rounded-2xl border-2 border-blue-500 bg-blue-50 flex flex-col items-center text-center">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl mb-4 shadow-xl shadow-blue-200/50">🏪</div>
+                    <h4 className="font-black text-blue-900 mb-1">Pick-up di Merchant Terdekat</h4>
+                    <p className="text-xs text-blue-600 mb-4 px-6 leading-relaxed">Pesanan Anda akan disiapkan untuk diambil di lokasi merchant yang Anda pilih saat memasukkan produk ke keranjang.</p>
+                    <div className="bg-white px-4 py-2 rounded-full border border-blue-200 text-[10px] font-black text-blue-600 uppercase tracking-widest">Biaya Pengiriman: GRATIS</div>
+                  </div>
+                )}
               </div>
 
               {/* Payment Method */}
@@ -365,7 +408,9 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Pengiriman</span>
-                    <span className="text-green-600 font-medium text-xs">GRATIS (Promo)</span>
+                    <span className={shippingType === 'pickup' || shippingCost === 0 ? "text-green-600 font-bold" : "font-medium text-gray-900"}>
+                      {shippingType === 'pickup' || shippingCost === 0 ? 'GRATIS' : `Rp${shippingCost.toLocaleString('id-ID')}`}
+                    </span>
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between text-green-600">

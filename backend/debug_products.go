@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
+func RunDebugProducts() {
 	dsn := "host=localhost user=muhfaiizr dbname=sahabatmart port=5432 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {

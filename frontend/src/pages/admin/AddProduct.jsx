@@ -274,38 +274,32 @@ export default function AdminAddProduct() {
 
           <div style={S.divider} />
 
-          {/* Gallery Section */}
+          {/* Commission Configuration */}
           <div style={S.sectionTitle}>
-             <i className="bx bx-images" style={{ fontSize: 15 }} /> Gallery Foto Produk (Slide)
+            <i className="bx bx-trending-up" style={{ fontSize: 15 }} /> Struktur Komisi & Insentif
           </div>
-          <div style={{ background: '#f8fafc', padding: 20, borderRadius: 15, border: '1.5px dashed #cbd5e1' }}>
-             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 12 }}>
-                {gallery.map((img, idx) => (
-                   <div key={idx} style={{ position: 'relative', aspectSquare: 1, borderRadius: 12, overflow: 'hidden', border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                      <img src={formatImage(img)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                      <button type="button" onClick={() => removeGalleryImage(idx)} 
-                         style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.9)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12 }}>
-                         <i className="bx bx-x" />
-                      </button>
-                   </div>
-                ))}
-                <label style={{ 
-                   aspectSquare: 1, borderRadius: 12, border: '2px dashed #cbd5e1', background: '#fff', 
-                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
-                   cursor: 'pointer', color: '#94a3b8', transition: 'all 0.2s' 
-                }} onMouseEnter={e => e.currentTarget.style.borderColor = '#4361ee'} onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}>
-                   {uploading ? <div className="spinner-border spinner-border-sm" /> : (
-                      <>
-                        <i className="bx bx-plus-circle" style={{ fontSize: 24 }} />
-                        <span style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>Tambah Foto</span>
-                      </>
-                   )}
-                   <input type="file" className="d-none" accept="image/*" onChange={e => handleUpload(e, 'gallery')} />
-                </label>
-             </div>
-             <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 15, marginBottom: 0 }}>
-                <i className="bx bx-info-circle me-1" /> Maksimal 5 foto tambahan untuk mendapatkan tampilan slide terbaik di store.
+          <div style={{ background: '#f0f9ff', padding: 24, borderRadius: 16, border: '1.5px solid #bae6fd', marginBottom: 28 }}>
+             <p style={{ fontSize: 12, color: '#0369a1', fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="bx bx-info-circle" /> Atur komisi khusus untuk produk ini. Jika diisi, angka ini akan mengabaikan aturan komisi tier/global.
              </p>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18 }}>
+                <FormField label="Komisi Afiliasi (%)">
+                  <input style={S.input} type="number" step="0.01" placeholder="Contoh: 10" 
+                    value={p.base_affiliate_fee} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee: parseFloat(e.target.value) || 0 }))} />
+                </FormField>
+                <FormField label="Komisi Afiliasi (Nominal Rp)">
+                  <input style={S.input} type="number" placeholder="Contoh: Label 25000" 
+                    value={p.base_affiliate_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee_nominal: parseFloat(e.target.value) || 0 }))} />
+                </FormField>
+                <FormField label="Fee Distribusi Merchant (%)">
+                  <input style={S.input} type="number" step="0.01" placeholder="Contoh: 5" 
+                    value={p.base_distribution_fee} onChange={e => setP(prev => ({ ...prev, base_distribution_fee: parseFloat(e.target.value) || 0 }))} />
+                </FormField>
+                <FormField label="Fee Distribusi Merchant (Rp)">
+                  <input style={S.input} type="number" placeholder="Contoh: 15000" 
+                    value={p.base_distribution_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_distribution_fee_nominal: parseFloat(e.target.value) || 0 }))} />
+                </FormField>
+             </div>
           </div>
 
           <div style={S.divider} />

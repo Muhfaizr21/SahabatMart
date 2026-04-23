@@ -60,18 +60,24 @@ export default function ProductDetailPage() {
     const loadProduct = async () => {
       try {
         const d = await fetchJson(`${PUBLIC_API_BASE}/products/detail?id=${id}`);
-        // [Akuglow Update] Handle new response format { data: { product, sellers } }
-        const productData = d.data?.product || d.data || d;
-        const sellersData = d.data?.sellers || [];
+        // Because fetchJson in lib/api.js already unwraps the "data" layer:
+        // d is now { product: {...}, sellers: [...] }
+        const productData = d?.product || d;
+        const sellersData = d?.sellers || [];
         
         if (productData && productData.id) {
           if (cancelled) return;
           setProduct(productData);
           setSellers(sellersData);
           
-          // Default merchant selection (first one available)
+          // [Akuglow Update] Default merchant selection (Prefer local merchant)
           if (sellersData.length > 0) {
-            setSelectedMerchant(sellersData[0]);
+            const currentUser = isAuthenticated() ? JSON.parse(localStorage.getItem('user')) : null;
+            const nearMerchant = sellersData.find(s => 
+              currentUser?.profile?.city && s.city && 
+              s.city.toLowerCase() === currentUser.profile.city.toLowerCase()
+            );
+            setSelectedMerchant(nearMerchant || sellersData[0]);
           }
           
           // Initial Attribute Selection (Default to first value of each)
@@ -141,8 +147,11 @@ export default function ProductDetailPage() {
 
   const [copying, setCopying] = useState(false);
   const user = isAuthenticated() ? JSON.parse(localStorage.getItem('user')) : null;
-  const isAffiliate = user && user.role === 'affiliate';
-  const refCode = user?.affiliate_ref_code || null;
+  // [Akuglow Update] Both Affiliates AND Merchants can share affiliate links
+  const isAffiliateMode = user && (user.role === 'affiliate' || user.role === 'merchant');
+  
+  // Use ref_code from user profile OR fallback to affiliate tracking data
+  const refCode = user?.affiliate_ref_code || user?.ref_code || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -326,33 +335,53 @@ export default function ProductDetailPage() {
             {/* [Akuglow] Merchant Source Selector */}
             {sellers.length > 0 ? (
               <div className="mb-10">
-                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Pilih Pengiriman (Merchant)</h4>
+                <div className="flex items-center justify-between mb-4">
+                   <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Pilih Pengiriman (Merchant)</h4>
+                   {user?.profile?.city && (
+                     <div className="flex items-center gap-1 bg-blue-100 text-blue-600 px-2 py-1 rounded-lg">
+                        <span className="material-symbols-outlined text-[12px]">location_on</span>
+                        <span className="text-[10px] font-black uppercase">{user.profile.city}</span>
+                     </div>
+                   )}
+                </div>
                 <div className="flex flex-col gap-3">
-                  {sellers.map((s) => (
-                    <button
-                      key={s.merchant_id}
-                      onClick={() => setSelectedMerchant(s)}
-                      className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${
-                        selectedMerchant?.merchant_id === s.merchant_id
-                          ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md'
-                          : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                          {s.store_name.charAt(0)}
+                  {sellers.map((s) => {
+                    const isNear = user?.profile?.city && s.city && s.city.toLowerCase() === user.profile.city.toLowerCase();
+                    
+                    return (
+                      <button
+                        key={s.merchant_id}
+                        onClick={() => setSelectedMerchant(s)}
+                        className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between group relative overflow-hidden ${
+                          selectedMerchant?.merchant_id === s.merchant_id
+                            ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md'
+                            : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
+                        }`}
+                      >
+                        {isNear && (
+                          <div className="absolute top-0 right-0">
+                             <div className="bg-gradient-to-l from-orange-500 to-amber-400 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl shadow-sm uppercase tracking-tighter">Terdekat</div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white transition-colors ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                            {s.store_name.charAt(0)}
+                          </div>
+                          <div className="text-left">
+                            <div className="flex items-center gap-2">
+                                <p className="font-black text-sm">{s.store_name}</p>
+                                {isNear && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>}
+                            </div>
+                            <p className="text-[10px] uppercase tracking-tighter opacity-70 font-bold">{s.city || 'Pusat'}</p>
+                          </div>
                         </div>
-                        <div className="text-left">
-                          <p className="font-black text-sm">{s.store_name}</p>
-                          <p className="text-[10px] uppercase tracking-tighter opacity-70">{s.city}</p>
+                        <div className="text-right">
+                          <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Stok</p>
+                          <p className="font-black text-xs">{s.stock} Unit</p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Stok</p>
-                        <p className="font-black text-xs">{s.stock} Unit</p>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -421,7 +450,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Affiliate Share Section - Premium Magic UI */}
-            {isAffiliate && refCode && (
+            {isAffiliateMode && refCode && (
               <div className="mt-8 p-6 rounded-[2rem] bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 relative overflow-hidden group">
                 <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                 <div className="relative">

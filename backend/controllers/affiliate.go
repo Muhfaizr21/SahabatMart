@@ -103,6 +103,10 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 	var inFlightWithdrawals float64
 	ac.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM affiliate_withdrawals WHERE affiliate_id = ? AND status IN ('pending','processed')`, affiliateID).Scan(&inFlightWithdrawals)
 
+	// Total downline count
+	var totalDownline int64
+	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliate.UserID).Count(&totalDownline)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"affiliate": affiliate,
 		"stats": map[string]interface{}{
@@ -111,6 +115,7 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 			"total_commission":     totalCommission,
 			"pending_commission":   pendingCommission,
 			"total_withdrawn":      totalWithdrawn,
+			"total_downline":       totalDownline,
 			// balance = approved - already paid out - still in processing queue
 			"balance":              totalCommission - totalWithdrawn - inFlightWithdrawals,
 			"inflight_withdrawals": inFlightWithdrawals,
@@ -271,15 +276,15 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 
 	var rows []ProductRow
 	ac.DB.Raw(`
-		SELECT p.id, p.name, p.price, p.image, p.category, m.store_name,
+		SELECT p.id, p.name, p.price, p.image, p.category, 
+		       'Official Store' as store_name,
 		       COALESCE(cc.fee_percent, 0.05) AS comm_rate,
 		       COALESCE(SUM(oi.quantity), 0) AS total_sold
 		FROM products p
-		LEFT JOIN merchants m ON m.id = p.merchant_id
 		LEFT JOIN category_commissions cc ON LOWER(cc.category_name) = LOWER(p.category)
 		LEFT JOIN order_items oi ON oi.product_id = p.id
 		WHERE p.status = 'active'
-		GROUP BY p.id, p.name, p.price, p.image, p.category, m.store_name, cc.fee_percent
+		GROUP BY p.id, p.name, p.price, p.image, p.category, cc.fee_percent
 		ORDER BY total_sold DESC
 		LIMIT 50
 	`).Scan(&rows)
@@ -579,22 +584,43 @@ func (ac *AffiliateController) GetLeaderboard(w http.ResponseWriter, r *http.Req
 
 // GET /api/affiliate/events
 func (ac *AffiliateController) GetEvents(w http.ResponseWriter, r *http.Request) {
-	// Mock events for now, can be moved to DB later
-	events := []map[string]interface{}{
-		{
-			"title": "Webinar: Strategi Closing 99%",
-			"date":  time.Now().AddDate(0, 0, 3),
-			"type":  "Online",
-			"url":   "https://zoom.us/j/akuglow",
-		},
-		{
-			"title": "Kopdar Mitra Jakarta - Akuglow",
-			"date":  time.Now().AddDate(0, 0, 7),
-			"type":  "Offline",
-			"location": "Kemang, Jakarta Selatan",
-		},
+	var events []models.AffiliateEvent
+	ac.DB.Where("is_active = ? AND status != ?", true, "cancelled").
+		Order("start_time ASC").Find(&events)
+	
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   events,
+	})
+}
+
+// GET /api/affiliate/educations
+func (ac *AffiliateController) GetEducations(w http.ResponseWriter, r *http.Request) {
+	var educations []models.AffiliateEducation
+	ac.DB.Where("is_active = ?", true).Order("is_featured DESC, created_at DESC").Find(&educations)
+	
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   educations,
+	})
+}
+
+// GET /api/affiliate/promo-materials
+func (ac *AffiliateController) GetPromoMaterials(w http.ResponseWriter, r *http.Request) {
+	category := r.URL.Query().Get("category")
+	
+	var materials []models.PromoMaterial
+	query := ac.DB.Where("is_active = ?", true)
+	if category != "" {
+		query = query.Where("LOWER(category) = ?", category)
 	}
-	utils.JSONResponse(w, http.StatusOK, events)
+	
+	query.Order("created_at DESC").Find(&materials)
+	
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   materials,
+	})
 }
 
 // POST /api/affiliate/apply-merchant

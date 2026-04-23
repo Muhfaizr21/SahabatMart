@@ -72,6 +72,7 @@ const MerchantLayout = () => {
 
   const menuItems = [
     { name: 'Dashboard', icon: 'dashboard', path: '/merchant', end: true },
+    { name: 'Mitra Area', icon: 'stars', path: '/affiliate' },
     { name: 'Analytics', icon: 'insights', path: '/merchant/analytics' },
     { name: 'Inventory', icon: 'inventory_2', path: '/merchant/products' },
     { name: 'Restock', icon: 'rebase_edit', path: '/merchant/restock' },

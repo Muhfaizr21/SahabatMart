@@ -5,20 +5,17 @@ import { getStoredUser } from '../../lib/auth';
 // Menu items sesuai spesifikasi Mitra Area Akuglow
 // Ref: Alur Mitra Affiliate Akuglow — section 2 "Mitra Masuk ke Mitra Area"
 const menuItems = [
-  { name: 'Dashboard', icon: 'grid_view', path: '/affiliate', end: true },
-  { name: 'Belanja Yuk', icon: 'shopping_basket', path: '/' },
-  { name: 'Profil Saya', icon: 'person', path: '/profile' },
-  { name: 'Pesanan Saya', icon: 'inventory_2', path: '/profile?tab=orders' }, // Orders tab in profile
-  { name: 'Status Mitra & Omset Tim', icon: 'stars', path: '/affiliate/stats' }, // Gabungan: status + omset tim
-  { name: 'Team', icon: 'group', path: '/affiliate/team' },
-  { name: 'Edukasi Bisnis', icon: 'school', path: '/affiliate/education' },
+  { name: 'Dashboard', icon: 'dashboard', path: '/affiliate', end: true },
+  { name: 'Statistik & Omset', icon: 'monitoring', path: '/affiliate/stats' }, // Halaman Eligibility & Progres
+  { name: 'Team Saya', icon: 'groups', path: '/affiliate/team' },
   { name: 'Leaderboard', icon: 'emoji_events', path: '/affiliate/leaderboard' },
+  { name: 'Komisi', icon: 'account_balance_wallet', path: '/affiliate/commissions' },
+  { name: 'Penarikan', icon: 'payments', path: '/affiliate/withdrawals' },
   { name: 'Link Affiliate', icon: 'link', path: '/affiliate/links' },
-  { name: 'Event Terdekat', icon: 'event', path: '/affiliate/events' },
+  { name: 'Edukasi & Event', icon: 'school', path: '/affiliate/education' },
   { name: 'Materi Promo', icon: 'campaign', path: '/affiliate/marketing' },
-  { name: 'Voucher', icon: 'confirmation_number', path: '/affiliate/vouchers' },
-  { name: 'Komisi & Penarikan', icon: 'payments', path: '/affiliate/withdrawals' },
-  { name: 'Pengaturan', icon: 'tune', path: '/affiliate/settings' },
+  { name: 'Profil & Bank', icon: 'person_outline', path: '/affiliate/settings' },
+  { name: 'Belanja Yuk', icon: 'shopping_basket', path: '/' },
 ];
 
 const SidebarLink = ({ item, collapsed }) => (
@@ -26,10 +23,9 @@ const SidebarLink = ({ item, collapsed }) => (
     to={item.path}
     end={item.end}
     className={({ isActive }) =>
-      `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${
-        isActive
-          ? 'bg-gradient-to-r from-purple-500/20 to-transparent text-purple-300 border-l-4 border-purple-400'
-          : 'text-slate-400 hover:text-white hover:bg-white/5'
+      `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${isActive
+        ? 'active bg-gradient-to-r from-purple-500/20 to-transparent text-purple-300 border-l-4 border-purple-400'
+        : 'text-slate-400 hover:text-white hover:bg-white/5'
       }`
     }
     title={collapsed ? item.name : ''}
@@ -68,8 +64,18 @@ const AffiliateLayout = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const sidebarRef = React.useRef(null);
+
   useEffect(() => {
     if (isMobile) setMobileOpen(false);
+    
+    // Auto-scroll sidebar to active item (Sinkronisasi Scroll)
+    setTimeout(() => {
+      const activeLink = sidebarRef.current?.querySelector('.active');
+      if (activeLink) {
+        activeLink.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
   }, [location, isMobile]);
 
   if (!user) {
@@ -99,21 +105,27 @@ const AffiliateLayout = () => {
   const initial = displayName.charAt(0).toUpperCase();
 
   const sidebarContent = (
-    <div className="flex flex-col h-full py-8">
+    <div ref={sidebarRef} className="flex flex-col h-full overflow-y-auto custom-scrollbar">
       {/* Logo */}
-      <div className="px-6 mb-10 flex items-center justify-between">
-        <div>
-          <span className="text-xl font-extrabold tracking-[0.15em] text-white font-['Plus_Jakarta_Sans']">
-            AKU<span className="text-purple-400">GROW</span>
-          </span>
-          <p className="text-[9px] text-slate-500 font-bold tracking-[0.25em] uppercase mt-1">
-            Affiliate Portal
-          </p>
-        </div>
+      <div className={`px-6 py-8 flex items-center ${(!sidebarOpen && !isMobile) ? 'justify-center' : 'justify-between'} sticky top-0 bg-[#151b2d] z-10 whitespace-nowrap overflow-hidden transition-all duration-300`}>
+        {(sidebarOpen || isMobile) ? (
+          <div>
+            <span className="text-xl font-extrabold tracking-[0.15em] text-white font-['Plus_Jakarta_Sans']">
+              AKU<span className="text-purple-400">GROW</span>
+            </span>
+            <p className="text-[9px] text-slate-500 font-bold tracking-[0.25em] uppercase mt-1">
+              Affiliate Portal
+            </p>
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0">
+            <span className="text-white font-black text-xs">AG</span>
+          </div>
+        )}
         {!isMobile && (
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-slate-500 hover:text-white transition-colors p-1"
+            className={`text-slate-500 hover:text-white transition-colors p-1 ${(!sidebarOpen && !isMobile) ? 'hidden' : 'block'}`}
           >
             <span className="material-symbols-outlined text-lg">
               {sidebarOpen ? 'chevron_left' : 'chevron_right'}
@@ -122,27 +134,40 @@ const AffiliateLayout = () => {
         )}
       </div>
 
+      {!sidebarOpen && !isMobile && (
+        <div className="flex justify-center py-2 mb-4">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-slate-500 hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined">menu_open</span>
+          </button>
+        </div>
+      )}
+
       {/* Nav */}
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="flex-1 space-y-1 px-3 mb-8">
         {finalMenuItems.map((item) => (
           <SidebarLink key={item.path} item={item} collapsed={!sidebarOpen && !isMobile} />
         ))}
       </nav>
 
       {/* Affiliate ID card */}
-      <div className="px-4 mt-6">
-        <div className="bg-gradient-to-br from-purple-600/30 to-blue-900/30 backdrop-blur-sm border border-purple-500/20 p-5 rounded-2xl relative overflow-hidden">
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl" />
-          <p className="text-[9px] font-bold text-purple-400 tracking-[0.2em] uppercase mb-1">
-            Kode Referral
-          </p>
-          <p className="text-base font-black text-white tracking-wider">{affiliateRefCode}</p>
-          <p className="text-[10px] text-slate-400 mt-1 capitalize">{tierName} Partner</p>
+      {(sidebarOpen || isMobile) && (
+        <div className="px-4 mt-auto mb-6">
+          <div className="bg-gradient-to-br from-purple-600/30 to-blue-900/30 backdrop-blur-sm border border-purple-500/20 p-5 rounded-2xl relative overflow-hidden">
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl" />
+            <p className="text-[9px] font-bold text-purple-400 tracking-[0.2em] uppercase mb-1">
+              Kode Referral
+            </p>
+            <p className="text-base font-black text-white tracking-wider">{affiliateRefCode}</p>
+            <p className="text-[10px] text-slate-400 mt-1 capitalize">{tierName} Partner</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Bottom actions */}
-      <div className="px-3 mt-6 space-y-1">
+      <div className="px-3 pb-8 space-y-1">
         <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-left">
           <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'wght' 300" }}>help</span>
           {(sidebarOpen || isMobile) && <span className="text-[12px] font-semibold uppercase tracking-wider">Bantuan</span>}
@@ -179,14 +204,14 @@ const AffiliateLayout = () => {
       {!isMobile && (
         <aside
           style={{
-            width: sidebarOpen ? '260px' : '72px',
+            width: sidebarOpen ? '260px' : '74px',
             background: 'rgba(21, 27, 45, 0.95)',
             borderRight: '1px solid rgba(77, 67, 84, 0.15)',
             backdropFilter: 'blur(20px)',
-            transition: 'width 0.3s ease',
+            transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             flexShrink: 0,
           }}
-          className="fixed left-0 top-0 h-screen z-30 overflow-hidden"
+          className="fixed left-0 top-0 h-screen z-30"
         >
           {sidebarContent}
         </aside>
@@ -197,13 +222,13 @@ const AffiliateLayout = () => {
         <aside
           style={{
             width: '280px',
-            background: 'rgba(21, 27, 45, 0.98)',
+            background: 'rgba(21, 27, 45, 1)',
             borderRight: '1px solid rgba(77, 67, 84, 0.2)',
             backdropFilter: 'blur(20px)',
             transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
-            transition: 'transform 0.3s ease',
+            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
-          className="fixed left-0 top-0 h-screen z-50 overflow-y-auto"
+          className="fixed left-0 top-0 h-screen z-50 shadow-2xl"
         >
           {sidebarContent}
         </aside>

@@ -116,11 +116,18 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				item.CommissionRate = affAmt / item.Subtotal
 				item.CommissionAmount = affAmt
 				
-				// Distribution Commission (Untuk Merchant)
+				// Distribution Commission (Jatah Pasti Merchant sebagai Distributor)
 				item.DistributionFeeAmount = distAmt
 				
-				// Merchant Payout: Apa yang diterima merchant setelah dipotong platform & affiliate
-				item.MerchantAmount = item.Subtotal - platAmt - affAmt
+				// Merchant Payout: Sekarang Merchant menerima jatah distribusi (Fixed Margin)
+				// Jika Anda ingin Merchant menerima SEMUA sisa, gunakan: item.Subtotal - platAmt - affAmt
+				// Tapi demi akurasi finansial yang Anda minta, kita pisahkan HQ Cut.
+				item.MerchantAmount = distAmt 
+
+				// HQ Cut: Sisa uang yang menjadi hak Pemilik Brand (Headquarters)
+				// Formula: Subtotal - PlatformFee - AffiliateFee - DistributionFee
+				hqCut := item.Subtotal - platAmt - affAmt - distAmt
+				if hqCut < 0 { hqCut = 0 } // Safety check
 
 				if err := tx.Create(&item).Error; err != nil {
 					return err
@@ -159,7 +166,11 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			group.PlatformFee = gPlat
 			group.AffiliateCommission = gAffComm
 			group.DistributionCommission = gDistComm
-			group.MerchantPayout = gSub - gPlat - gAffComm
+			group.MerchantPayout = gDistComm // Merchant hanya dapat jatah distribusi
+			
+			// Hitung HQ Cut untuk group ini (Pusat profit)
+			groupRevenue := gSub - gPlat - gAffComm - gDistComm
+			if groupRevenue < 0 { groupRevenue = 0 }
 
 			if err := tx.Save(&group).Error; err != nil {
 				return err
@@ -176,16 +187,15 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		order.GrandTotal = totalSubtotal
 		order.VoucherCode = shippingInfo.VoucherCode
 
+		// 4. Calculate and Distribute Discount (Voucher)
 		if order.VoucherCode != "" {
 			var voucher models.Voucher
-			// Validate voucher: active, not expired, min_order met
 			err := tx.Set("gorm:query_option", "FOR UPDATE").
 				Where("code = ? AND status = ? AND min_order <= ? AND expiry_date > ?", order.VoucherCode, "active", order.Subtotal, time.Now()).
 				First(&voucher).Error
 
 			if err == nil {
 				if voucher.Quota > voucher.Used {
-					// Calculate Discount
 					var discount float64
 					if voucher.DiscountType == "percent" {
 						discount = order.Subtotal * (voucher.DiscountValue / 100.0)
@@ -193,7 +203,6 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 						discount = voucher.DiscountValue
 					}
 
-					// Cap discount to subtotal
 					if discount > order.Subtotal {
 						discount = order.Subtotal
 					}
@@ -202,7 +211,23 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					order.TotalDiscount = discount
 					order.GrandTotal = order.Subtotal - discount
 					
-					// Increment used count
+					// Distribute discount proportionally to merchant groups
+					remainingDiscount := discount
+					var groups []models.OrderMerchantGroup
+					tx.Where("order_id = ?", order.ID).Find(&groups)
+
+					for i, group := range groups {
+						var groupDiscount float64
+						if i == len(groups)-1 {
+							groupDiscount = remainingDiscount
+						} else {
+							groupDiscount = (group.Subtotal / order.Subtotal) * discount
+							remainingDiscount -= groupDiscount
+						}
+						group.Discount = groupDiscount
+						tx.Save(&group)
+					}
+
 					if err := tx.Model(&voucher).Update("used", gorm.Expr("used + 1")).Error; err != nil {
 						return err
 					}
@@ -212,6 +237,8 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			} else {
 				return fmt.Errorf("voucher '%s' tidak valid atau minimal belanja tidak terpenuhi", order.VoucherCode)
 			}
+		} else {
+			order.GrandTotal = order.Subtotal
 		}
 
 		if err := tx.Save(order).Error; err != nil {
@@ -249,6 +276,11 @@ func (s *OrderService) CompletePayment(orderID string) error {
 		order.PaidAt = &now
 
 		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+
+		// [Akuglow Sync] Update Payment Record status to PAID
+		if err := tx.Model(&models.Payment{}).Where("order_id = ?", order.ID).Update("status", "PAID").Error; err != nil {
 			return err
 		}
 
@@ -298,28 +330,34 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	db.Where("id = ?", merchantID).First(&merchant)
 
 	// 3. Distribution Fee (Merchant's cut)
-	// Rules: Merchant Tier % > Product % > Product Nominal
-	if merchant.DistributionFeePercent > 0 {
-		distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
-	} else if product.BaseDistributionFee > 0 {
+	// Rules: Product Specific % > Product Nominal > Merchant Tier %
+	if product.BaseDistributionFee > 0 {
 		distAmt = subtotal * (product.BaseDistributionFee / 100.0)
 	} else if product.BaseDistributionFeeNominal > 0 {
 		distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
+	} else if merchant.DistributionFeePercent > 0 {
+		distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
 	}
 
 	// 4. Affiliate Fee (Referrer's cut)
-	// Rules: Tier % > Product % > Product Nominal
+	// Rules Priority: Product Specific % > Product Nominal > Tier % > Global Fallback
 	if affiliateID != nil && *affiliateID != "" {
 		if aff, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
-			var tier models.MembershipTier
-			if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
-				affAmt = subtotal * tier.BaseCommissionRate
-			} else if product.BaseAffiliateFee > 0 {
+			if product.BaseAffiliateFee > 0 {
+				// 1. Prioritas Utama: Komisi Persentase Produk
 				affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
 			} else if product.BaseAffiliateFeeNominal > 0 {
+				// 2. Prioritas Kedua: Komisi Nominal Produk
 				affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
 			} else {
-				affAmt = subtotal * 0.03 // global fallback 3%
+				// 3. Prioritas Ketiga: Berdasarkan Tier Affiliate
+				var tier models.MembershipTier
+				if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
+					affAmt = subtotal * tier.BaseCommissionRate
+				} else {
+					// 4. Fallback Terakhir: Global 3%
+					affAmt = subtotal * 0.03
+				}
 			}
 		}
 	}

@@ -65,6 +65,9 @@ const menu = [
     children: [
       { name: 'Blog Posts', path: '/admin/blogs' },
       { name: 'Banner Hero', path: '/admin/banners' },
+      { name: 'Affiliate Education', path: '/admin/education' },
+      { name: 'Affiliate Events', path: '/admin/events' },
+      { name: 'Promo Materials', path: '/admin/promo' },
     ]
   },
   { name: 'Audit Log', icon: 'bxs-file-find', path: '/admin/audit' },
@@ -247,7 +250,7 @@ const AdminLayout = () => {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px', scrollbarWidth: 'none' }}>
+        <nav className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
           {!collapsed ? (
             <>
               <NavItem item={menu[0]} />
@@ -495,7 +498,10 @@ const AdminLayout = () => {
       </div>
 
       <style>{`
-        nav::-webkit-scrollbar { display: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
         * { box-sizing: border-box; }
         .fade-in { animation: fadeIn 0.35s ease forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

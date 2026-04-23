@@ -32,12 +32,12 @@ func (r *UserRepository) Update(user *models.User, updates interface{}) error {
 
 func (r *UserRepository) GetMerchantByID(userID string) (*models.Merchant, error) {
 	var m models.Merchant
-	err := r.DB.Select("id").Where("user_id = ?", userID).First(&m).Error
+	err := r.DB.Where("user_id = ?", userID).First(&m).Error
 	return &m, err
 }
 
 func (r *UserRepository) GetAffiliateByID(userID string) (*models.AffiliateMember, error) {
 	var a models.AffiliateMember
-	err := r.DB.Select("id").Where("user_id = ?", userID).First(&a).Error
+	err := r.DB.Where("user_id = ?", userID).First(&a).Error
 	return &a, err
 }

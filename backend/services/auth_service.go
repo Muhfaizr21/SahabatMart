@@ -24,11 +24,23 @@ func NewAuthService(db *gorm.DB) *AuthService {
 	}
 }
 
-func (s *AuthService) Register(email, password, fullName, phone, role, uplineID string) (*models.User, string, error) {
+func (s *AuthService) Register(email, password, fullName, phone, role, referralCode string) (*models.User, string, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	role = strings.ToLower(role)
 	if role == "" {
 		role = "buyer"
+	}
+
+	// Resolve Upline ID from Referral Code if provided
+	var uplineID *string
+	var resolvedUplineCode string
+	if referralCode != "" {
+		var upline models.AffiliateMember
+		if err := s.DB.Where("ref_code = ?", referralCode).First(&upline).Error; err == nil {
+			uID := upline.ID
+			uplineID = &uID
+			resolvedUplineCode = upline.RefCode
+		}
 	}
 
 	// Check existing
@@ -66,15 +78,8 @@ func (s *AuthService) Register(email, password, fullName, phone, role, uplineID 
 			RefCode:          utils.GenerateRefCode(fullName),
 			MembershipTierID: 1, // Basic Tier
 			Status:           models.AffiliateActive,
-		}
-
-		if uplineID != "" {
-			aff.UplineID = &uplineID
-			// Get upline code for convenience
-			var upline models.AffiliateMember
-			if err := tx.Select("ref_code").First(&upline, "id = ?", uplineID).Error; err == nil {
-				aff.UplineCode = upline.RefCode
-			}
+			UplineID:         uplineID,
+			UplineCode:       resolvedUplineCode,
 		}
 
 		if err := tx.Create(aff).Error; err != nil {

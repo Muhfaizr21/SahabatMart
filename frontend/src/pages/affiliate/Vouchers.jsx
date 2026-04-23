@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react';
-import { fetchJson } from '../../lib/api';
+import { fetchJson, PUBLIC_API_BASE } from '../../lib/api';
 
 export default function AffiliateVouchers() {
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [copied, setCopied] = useState(null);
 
   useEffect(() => {
-    fetchJson('/api/public/vouchers').then(res => {
-      setVouchers(res);
-      setLoading(false);
-    });
+    setLoading(true);
+    fetchJson(`${PUBLIC_API_BASE}/vouchers`)
+      .then(res => {
+        setVouchers(res || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch vouchers:', err);
+        setError(err.message);
+        setLoading(false);
+      });
   }, []);
 
   const handleCopy = (code) => {
@@ -18,6 +26,24 @@ export default function AffiliateVouchers() {
     setCopied(code);
     setTimeout(() => setCopied(null), 2000);
   }
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
+      <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center">
+        <span className="material-symbols-outlined text-3xl">error</span>
+      </div>
+      <div>
+        <h3 className="text-lg font-bold text-gray-900">Gagal memuat voucher</h3>
+        <p className="text-gray-500 max-w-xs mx-auto">{error}</p>
+      </div>
+      <button 
+        onClick={() => window.location.reload()}
+        className="px-6 py-2 bg-blue-600 text-white rounded-2xl font-bold text-sm"
+      >
+        Coba Lagi
+      </button>
+    </div>
+  );
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">

@@ -13,6 +13,10 @@ const TX_TYPES = {
   withdrawal_completed:  { label: 'Penarikan Selesai',  icon: 'bxs-check-circle',  color: '#6366f1' },
   platform_fee:          { label: 'Fee Platform',       icon: 'bxs-building-house',color: '#2563eb' },
   refund_deduction:      { label: 'Potongan Refund',    icon: 'bx-undo',           color: '#dc2626' },
+  restock_payment:       { label: 'Pembayaran Kulakan', icon: 'bxs-package',       color: '#f59e0b' },
+  restock_revenue:       { label: 'Pendapatan Kulakan', icon: 'bxs-chevrons-up',    color: '#10b981' },
+  bonus:                 { label: 'Bonus / Reward',     icon: 'bxs-award',         color: '#8b5cf6' },
+  adjustment:            { label: 'Penyesuaian Saldo',  icon: 'bx-git-commit',     color: '#64748b' },
 };
 
 const TAB_LIST = [

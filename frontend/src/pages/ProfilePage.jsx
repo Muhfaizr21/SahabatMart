@@ -4,10 +4,17 @@ import { BUYER_API_BASE, fetchJson } from '../lib/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile');
+  const query = new URLSearchParams(window.location.search);
+  const tabParam = query.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam || 'profile');
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [orders, setOrders] = useState([]);
+
+  // Sync tab with URL parameter if it changes
+  useEffect(() => {
+    if (tabParam) setActiveTab(tabParam);
+  }, [tabParam]);
 
   const [formData, setFormData] = useState({
     full_name: '',

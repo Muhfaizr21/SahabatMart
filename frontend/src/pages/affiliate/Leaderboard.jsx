@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchJson } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
@@ -11,10 +11,9 @@ export default function Leaderboard() {
 
   useEffect(() => {
     // Leaderboard sekarang public — tidak perlu auth
-    fetchJson('/api/affiliate/leaderboard')
+    fetchJson(`${AFFILIATE_API_BASE}/leaderboard`)
       .then(res => {
-        // Response: { status, data: [...] }
-        setData(Array.isArray(res.data) ? res.data : []);
+        setData(Array.isArray(res) ? res : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));

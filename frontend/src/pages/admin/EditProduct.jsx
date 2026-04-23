@@ -42,14 +42,18 @@ export default function AdminEditProduct() {
       const items = Array.isArray(prod) ? prod : (prod.data || []);
       const item = items.find(x => x.id === productId);
       if (item) {
-        setP({
-            id: item.id, name: item.name, sku: item.sku || '', description: item.description || '',
-            price: item.price, old_price: item.old_price || 0,
-            category: item.category, brand: item.brand || '',
-            attributes: item.attributes || '{}', image: item.image,
-            images: item.images || '[]', stock: item.stock || 100,
-            status: item.status
-        });
+            setP({
+                id: item.id, name: item.name, sku: item.sku || '', description: item.description || '',
+                price: item.price, old_price: item.old_price || 0,
+                category: item.category, brand: item.brand || '',
+                attributes: item.attributes || '{}', image: item.image,
+                images: item.images || '[]', stock: item.stock || 100,
+                status: item.status,
+                base_affiliate_fee: item.base_affiliate_fee || 0,
+                base_affiliate_fee_nominal: item.base_affiliate_fee_nominal || 0,
+                base_distribution_fee: item.base_distribution_fee || 0,
+                base_distribution_fee_nominal: item.base_distribution_fee_nominal || 0
+            });
         try {
            setSelectedAttrs(JSON.parse(item.attributes || '{}'));
            setGallery(JSON.parse(item.images || '[]'));
@@ -265,9 +269,9 @@ export default function AdminEditProduct() {
              </div>
           </div>
 
-          {/* Pricing */}
+          {/* Pricing & Commissions */}
           <div style={{ ...A.card, padding: 20, background: '#f5f7ff' }}>
-             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Financials</h5>
+             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Financials & Commissions</h5>
              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Main Price (IDR)</label>
@@ -275,8 +279,33 @@ export default function AdminEditProduct() {
                 </div>
                 <div>
                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Strike Price (Discount)</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#64748b' }} value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
+                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#64748b' }} value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
                 </div>
+
+                <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
+                
+                <div>
+                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Affiliate Fee (%)</label>
+                   <input type="number" step="0.01" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_affiliate_fee} onChange={e => setP({...p, base_affiliate_fee: parseFloat(e.target.value) || 0})} />
+                </div>
+                <div>
+                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Affiliate Fee (Rp)</label>
+                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_affiliate_fee_nominal} onChange={e => setP({...p, base_affiliate_fee_nominal: parseFloat(e.target.value) || 0})} />
+                </div>
+
+                <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
+
+                <div>
+                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Distribution Fee (%)</label>
+                   <input type="number" step="0.01" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_distribution_fee} onChange={e => setP({...p, base_distribution_fee: parseFloat(e.target.value) || 0})} />
+                </div>
+                <div>
+                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Distribution Fee (Rp)</label>
+                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_distribution_fee_nominal} onChange={e => setP({...p, base_distribution_fee_nominal: parseFloat(e.target.value) || 0})} />
+                </div>
+
+                <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
+
                 <div>
                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Stock Count</label>
                    <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 700 }} value={p.stock} onChange={e => setP({...p, stock: parseInt(e.target.value)})} />

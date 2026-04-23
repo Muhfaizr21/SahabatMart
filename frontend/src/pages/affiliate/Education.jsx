@@ -1,66 +1,152 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
 
-const EducationItem = ({ title, description, icon, duration }) => (
-  <div className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 p-6 rounded-2xl hover:border-purple-500/50 transition-all group cursor-pointer">
-    <div className="flex items-start justify-between mb-4">
-      <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-        <span className="material-symbols-outlined text-2xl">{icon}</span>
+const EducationModal = ({ item, onClose }) => {
+  if (!item) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-white/10 transition-all"
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
+
+        <div className="flex flex-col lg:flex-row">
+          {/* Media Section */}
+          <div className="lg:w-3/5 bg-black flex items-center justify-center aspect-video lg:aspect-auto min-h-[300px]">
+             {item.video_url ? (
+               <iframe 
+                 src={item.video_url.replace('watch?v=', 'embed/')}
+                 className="w-full h-full border-none"
+                 allowFullScreen
+               />
+             ) : item.image_url ? (
+               <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
+             ) : (
+               <div className="text-slate-700 flex flex-col items-center">
+                  <span className="material-symbols-outlined text-6xl">school</span>
+                  <p className="text-xs font-bold uppercase tracking-wider mt-2">Preview Tidak Tersedia</p>
+               </div>
+             )}
+          </div>
+
+          {/* Content Section */}
+          <div className="lg:w-2/5 p-8 flex flex-col">
+            <span className="text-[10px] font-black text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full uppercase tracking-widest w-fit mb-4">
+              {item.category || 'Materi'}
+            </span>
+            <h2 className="text-2xl font-black text-white mb-4 leading-tight">{item.title}</h2>
+            <div className="flex-1 overflow-y-auto max-h-[200px] text-slate-400 text-sm leading-relaxed mb-6 scrollbar-hide">
+              {item.content}
+            </div>
+            
+            <div className="space-y-3">
+              {item.video_url && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 text-xs text-slate-300">
+                   <span className="material-symbols-outlined text-purple-400">play_circle</span>
+                   Materi Video Tersedia
+                </div>
+              )}
+              {item.file_url ? (
+                 <a 
+                   href={item.file_url} 
+                   target="_blank" 
+                   rel="noreferrer"
+                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-500 transition-all"
+                 >
+                   <span className="material-symbols-outlined">description</span>
+                   Download PDF Panduan
+                 </a>
+              ) : (
+                 <button 
+                   disabled
+                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 text-slate-500 font-bold text-sm cursor-not-allowed"
+                 >
+                   <span className="material-symbols-outlined">file_download_off</span>
+                   PDF Tidak Tersedia
+                 </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-      <span className="text-[10px] font-bold text-slate-500 bg-slate-900/50 px-2 py-1 rounded-md uppercase tracking-wider">
-        {duration}
-      </span>
     </div>
-    <h3 className="text-white font-bold text-lg mb-2 group-hover:text-purple-300 transition-colors">{title}</h3>
-    <p className="text-slate-400 text-sm leading-relaxed">{description}</p>
-    <div className="mt-6 flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-      Mulai Belajar
-      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+  );
+};
+
+const EducationItem = ({ item, onClick }) => {
+  const getIcon = (cat) => {
+    switch(cat?.toLowerCase()) {
+      case 'marketing': return 'campaign';
+      case 'product': return 'inventory_2';
+      case 'sales': return 'payments';
+      default: return 'school';
+    }
+  };
+
+  return (
+    <div 
+      onClick={() => onClick(item)}
+      className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 p-6 rounded-2xl hover:border-purple-500/50 transition-all group cursor-pointer"
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+          <span className="material-symbols-outlined text-2xl">{getIcon(item.category)}</span>
+        </div>
+        <div className="flex flex-col items-end">
+           <span className="text-[10px] font-bold text-slate-500 bg-slate-900/50 px-2 py-1 rounded-md uppercase tracking-wider mb-1">
+             {item.category || 'Materi'}
+           </span>
+           {item.video_url && (
+             <span className="material-symbols-outlined text-xs text-red-500">videocam</span>
+           )}
+        </div>
+      </div>
+      <h3 className="text-white font-bold text-lg mb-2 group-hover:text-purple-300 transition-colors uppercase tracking-tight">{item.title}</h3>
+      <p className="text-slate-400 text-sm leading-relaxed line-clamp-2">{item.content}</p>
+      <div className="mt-6 flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+        {item.video_url ? 'Tonton Video' : 'Mulai Belajar'}
+        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default function BusinessEducation() {
-  const courses = [
-    {
-      title: 'Cara Kerja Bisnis AkuGrow',
-      description: 'Pelajari konsep hybrid marketplace dan bagaimana sistem komisi kami bekerja untuk Anda.',
-      icon: 'architecture',
-      duration: '10 Menit'
-    },
-    {
-      title: 'Strategi Promosi Digital',
-      description: 'Tingkatkan jangkauan affiliate Anda dengan teknik promosi di Social Media dan materi konten.',
-      icon: 'campaign',
-      duration: '15 Menit'
-    },
-    {
-      title: 'Optimalisasi Komisi',
-      description: 'Tips dan trik mendapatkan penghasilan maksimal dari setiap transaksi dan tim Anda.',
-      icon: 'payments',
-      duration: '12 Menit'
-    },
-    {
-      title: 'Membangun Tim Solid',
-      description: 'Panduan merekrut mitra baru dan mengelola jaringan untuk passive income jangka panjang.',
-      icon: 'group_add',
-      duration: '20 Menit'
-    },
-    {
-      title: 'Karir & Jenjang Pro',
-      description: 'Langkah demi langkah menjadi Merchant Leader dan mendapatkan jatah distribusi nasional.',
-      icon: 'trending_up',
-      duration: '8 Menit'
-    },
-    {
-      title: 'Public Speaking & Closing',
-      description: 'Teknik berkomunikasi dan mempresentasikan AkuGrow agar calon mitra langsung bergabung.',
-      icon: 'record_voice_over',
-      duration: '25 Menit'
-    }
-  ];
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  useEffect(() => {
+    fetchJson(`${AFFILIATE_API_BASE}/educations`)
+      .then(res => {
+        setCourses(res || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Gagal memuat edukasi", err);
+        setLoading(false);
+      });
+  }, []);
+
+  // Hitung jumlah tipe materi secara dinamis
+  const videoCount = courses.filter(c => c.video_url).length;
+  const pdfCount = courses.filter(c => c.file_url).length;
+
+  if (loading) return (
+    <div className="min-h-[400px] flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
 
   return (
     <div className="space-y-10">
+      <EducationModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+
       {/* Hero Section */}
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-900 to-purple-900 p-8 md:p-12">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
@@ -77,21 +163,29 @@ export default function BusinessEducation() {
           </p>
           <div className="flex flex-wrap gap-4">
              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-4 py-2 rounded-xl text-white text-sm font-bold border border-white/5">
-                <span className="text-purple-400">12</span> Materi Video
+                <span className="text-purple-400">{videoCount}</span> Materi Video
              </div>
              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-4 py-2 rounded-xl text-white text-sm font-bold border border-white/5">
-                <span className="text-purple-400">8</span> PDF Panduan
+                <span className="text-purple-400">{pdfCount}</span> PDF Panduan
              </div>
           </div>
         </div>
       </div>
 
       {/* Course Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {courses.map((course, i) => (
-          <EducationItem key={i} {...course} />
-        ))}
-      </div>
+      {courses.length === 0 ? (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-20 text-center">
+          <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">school</span>
+          <h3 className="text-xl font-bold text-slate-400">Belum Ada Materi</h3>
+          <p className="text-slate-500 text-sm">Nantikan update materi terbaru dari tim AkuGrow.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course, i) => (
+            <EducationItem key={i} item={course} onClick={setSelectedItem} />
+          ))}
+        </div>
+      )}
 
       {/* Webinar/Event Section */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8">

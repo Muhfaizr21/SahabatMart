@@ -12,6 +12,8 @@ export default function AdminUsers() {
   const [filterStatus, setFilterStatus] = useState('');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [newUserData, setNewUserData] = useState({ email: '', password: '', fullName: '', role: 'buyer' });
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -35,6 +37,19 @@ export default function AdminUsers() {
       method: 'PUT',
       body: JSON.stringify({ user_id: userId, status, role, admin_role: adminRole }),
     }).then(() => { load(); setModal(null); }).catch(e => alert(e.message));
+  };
+
+  const createUser = (e) => {
+    e.preventDefault();
+    setSaving(true);
+    fetchJson(`${API}/users/create`, {
+      method: 'POST',
+      body: JSON.stringify(newUserData),
+    }).then(() => {
+      load();
+      setModal(null);
+      setNewUserData({ email: '', password: '', fullName: '', role: 'buyer' });
+    }).catch(e => alert(e.message)).finally(() => setSaving(false));
   };
 
   const deleteUser = (userId) => {
@@ -82,6 +97,9 @@ export default function AdminUsers() {
             <option value="banned">Banned</option>
           </select>
           <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /></button>
+          <button style={A.btnPrimary} onClick={() => setModal('create')}>
+            <i className="bx bx-user-plus" /> Tambah User
+          </button>
         </div>
       </PageHeader>
 
@@ -145,7 +163,38 @@ export default function AdminUsers() {
       </TablePanel>
       </div>
 
-      {modal && (
+      {modal && modal === 'create' && (
+        <Modal title="Tambah User Baru" onClose={() => setModal(null)}>
+          <form onSubmit={createUser} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <FieldLabel>Email</FieldLabel>
+              <input style={A.input} type="email" required value={newUserData.email} onChange={e => setNewUserData({...newUserData, email: e.target.value})} placeholder="email@example.com" />
+            </div>
+            <div>
+              <FieldLabel>Full Name</FieldLabel>
+              <input style={A.input} required value={newUserData.fullName} onChange={e => setNewUserData({...newUserData, fullName: e.target.value})} placeholder="John Doe" />
+            </div>
+            <div>
+              <FieldLabel>Password</FieldLabel>
+              <input style={A.input} type="password" required value={newUserData.password} onChange={e => setNewUserData({...newUserData, password: e.target.value})} />
+            </div>
+            <div>
+              <FieldLabel>Role</FieldLabel>
+              <select style={A.select} value={newUserData.role} onChange={e => setNewUserData({...newUserData, role: e.target.value})}>
+                <option value="buyer">Buyer</option>
+                <option value="merchant">Merchant</option>
+                <option value="affiliate">Affiliate</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <button type="submit" disabled={saving} style={{ ...A.btnPrimary, marginTop: 10, justifyContent: 'center' }}>
+              {saving ? 'Saving...' : 'Buat Akun'}
+            </button>
+          </form>
+        </Modal>
+      )}
+
+      {modal && modal !== 'create' && (
         <Modal title="User Management Panel" onClose={() => setModal(null)}>
           {/* User Info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '16px', background: '#f8fafc', borderRadius: 12 }}>

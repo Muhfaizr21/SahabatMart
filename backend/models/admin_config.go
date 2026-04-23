@@ -106,6 +106,7 @@ type RestockRequest struct {
 	MerchantID  string    `gorm:"type:uuid;not null;index" json:"merchant_id"`
 	Status      string    `gorm:"type:varchar(50);default:'requested'" json:"status"` // requested, approved, shipped, received, rejected
 	TotalItems  int       `json:"total_items"`
+	TotalPrice  float64   `gorm:"type:decimal(15,2);default:0" json:"total_price"`
 	Note        string    `gorm:"type:text" json:"note"`
 	AdminNote   string    `gorm:"type:text" json:"admin_note"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -120,6 +121,8 @@ type RestockItem struct {
 	RestockID string `gorm:"type:uuid;not null;index" json:"restock_id"`
 	ProductID string `gorm:"type:uuid;not null" json:"product_id"`
 	Quantity  int    `gorm:"not null" json:"quantity"`
+	UnitPrice float64 `gorm:"type:decimal(15,2);not null;default:0" json:"unit_price"`
+	Subtotal  float64 `gorm:"type:decimal(15,2);not null;default:0" json:"subtotal"`
 
 	Product   Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
@@ -280,6 +283,10 @@ type Product struct {
 	BaseDistributionFeeNominal float64 `gorm:"type:decimal(15,2);default:0" json:"base_distribution_fee_nominal"`
 	BaseAffiliateFee          float64 `gorm:"type:decimal(15,2);default:0" json:"base_affiliate_fee"`
 	BaseAffiliateFeeNominal   float64 `gorm:"type:decimal(15,2);default:0" json:"base_affiliate_fee_nominal"`	
+	
+	MerchantID  string    `gorm:"type:uuid;index" json:"merchant_id"`
+	Stock       int       `gorm:"default:0" json:"stock"`
+
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 	Rating      float64   `gorm:"type:decimal(2,1);default:0" json:"rating"`
 	AverageRating float64 `gorm:"type:decimal(2,1);default:0" json:"average_rating"` // Satisfy legacy triggers

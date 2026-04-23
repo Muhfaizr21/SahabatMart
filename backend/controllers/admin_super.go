@@ -16,6 +16,7 @@ import (
 	"SahabatMart/backend/utils"
 
 	"gorm.io/gorm"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminController struct {
@@ -198,25 +199,53 @@ func (ac *AdminController) GetMerchants(w http.ResponseWriter, r *http.Request) 
 
 // PUT /api/admin/merchants/status
 func (ac *AdminController) UpdateMerchantStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
 	var req struct {
 		MerchantID  string `json:"merchant_id"`
-		Status      string `json:"status"` // active, suspended, banned, pending
+		Status      string `json:"status"`
 		SuspendNote string `json:"suspend_note"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
-
-	updates := map[string]interface{}{"status": req.Status}
-	if req.Status == "suspended" {
-		now := time.Now()
-		updates["suspended_at"] = &now
-		updates["suspend_note"] = req.SuspendNote
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request payload")
+		return
 	}
 
-	ac.DB.Model(&models.Merchant{}).Where("id = ?", req.MerchantID).Updates(updates)
+	updates := map[string]interface{}{
+		"status":       req.Status,
+		"suspend_note": req.SuspendNote,
+	}
+
+	// Monster Role Sync: Jika status aktif, pastikan role user berubah jadi merchant
+	// agar bisa mengakses dashboard merchant di frontend
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		var merchant models.Merchant
+		if err := tx.First(&merchant, "id = ?", req.MerchantID).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&merchant).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		if req.Status == "active" {
+			if err := tx.Model(&models.User{}).Where("id = ?", merchant.UserID).Update("role", "merchant").Error; err != nil {
+				return err
+			}
+			// Notifikasi ke user
+			msg := fmt.Sprintf("Selamat! Permohonan Merchant Anda untuk '%s' telah disetujui. Anda kini adalah Mitra + Merchant SahabatMart. 🎉", merchant.StoreName)
+			ac.Notif.Push(merchant.UserID, "merchant", "merchant_approved", "Merchant Anda Aktif! 🏪", msg, "/merchant")
+		} else if req.Status == "suspended" {
+			msg := fmt.Sprintf("Maaf, status Merchant '%s' Anda ditangguhkan sementara. Alasan: %s", merchant.StoreName, req.SuspendNote)
+			ac.Notif.Push(merchant.UserID, "merchant", "merchant_suspended", "Merchant Ditangguhkan", msg, "/merchant")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate status merchant")
+		return
+	}
+
 	ac.Audit.Log(models.AdminID, "update_merchant_status", "merchant", req.MerchantID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.SuspendNote),
 		r.RemoteAddr)
@@ -801,6 +830,10 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		Image       string  `json:"image"`
 		Images      string  `json:"images"` // Added missing images field
 		Status      string  `json:"status"`
+		BaseAffiliateFee          float64 `json:"base_affiliate_fee"`
+		BaseAffiliateFeeNominal   float64 `json:"base_affiliate_fee_nominal"`
+		BaseDistributionFee        float64 `json:"base_distribution_fee"`
+		BaseDistributionFeeNominal float64 `json:"base_distribution_fee_nominal"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
@@ -808,16 +841,20 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 	}
 
 	updates := map[string]interface{}{
-		"name":        req.Name,
-		"description": req.Description,
-		"price":       req.Price,
-		"old_price":   req.OldPrice,
-		"category":    req.Category,
-		"brand":       req.Brand,
-		"attributes":  req.Attributes,
-		"image":       req.Image,
-		"images":      req.Images, // Ensuring gallery images are updated
-		"status":      req.Status,
+		"name":                          req.Name,
+		"description":                   req.Description,
+		"price":                         req.Price,
+		"old_price":                     req.OldPrice,
+		"category":                      req.Category,
+		"brand":                         req.Brand,
+		"attributes":                    req.Attributes,
+		"image":                         req.Image,
+		"images":                        req.Images, // Ensuring gallery images are updated
+		"status":                        req.Status,
+		"base_affiliate_fee":            req.BaseAffiliateFee,
+		"base_affiliate_fee_nominal":    req.BaseAffiliateFeeNominal,
+		"base_distribution_fee":         req.BaseDistributionFee,
+		"base_distribution_fee_nominal": req.BaseDistributionFeeNominal,
 	}
 
 	if err := ac.DB.Table("products").Where("id = ?", req.ID).Updates(updates).Error; err != nil {
@@ -1050,8 +1087,26 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 	utils.LogAudit(ac.DB, adminID, "update_order_status", "order", order.ID, fmt.Sprintf("Changed status from %s to %s. Note: %s", oldStatus, req.Status, req.Note), string(oldStatus), string(req.Status), ip, r.UserAgent())
 
 	// If status is PAID, trigger background work (Commissions, etc - Req 13)
-	if req.Status == models.OrderPaid {
-		// Mock triggering commission approval/processing
+	if req.Status == models.OrderPaid || req.Status == models.OrderCompleted {
+		// Real commission processing
+		var commissions []models.AffiliateCommission
+		if err := ac.DB.Where("order_id = ? AND status = ?", order.ID, "pending").Find(&commissions).Error; err == nil {
+			for _, comm := range commissions {
+				// 1. Approve the commission
+				ac.DB.Model(&comm).Update("status", "approved")
+
+				// 2. Update Affiliate Member's TotalEarned
+				var affiliate models.AffiliateMember
+				if err := ac.DB.Where("id = ?", comm.AffiliateID).First(&affiliate).Error; err == nil {
+					newTotal := affiliate.TotalEarned + comm.Amount
+					ac.DB.Model(&affiliate).Update("total_earned", newTotal)
+
+					// 3. Trigger Tier Upgrade Tracking
+					affSvc := services.NewAffiliateService(ac.DB, ac.Notif)
+					affSvc.TriggerTierUpgrade(affiliate.ID)
+				}
+			}
+		}
 	}
 
 	// [NOTIF] Kirim Notifikasi ke Admin Topbar
@@ -1831,7 +1886,7 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 
 	var product models.Product
 	err := ac.DB.Preload("Variants").Preload("Inventories").
-		Where("id = ?", id).First(&product).Error
+		Where("id = ? OR slug = ?", id, id).First(&product).Error
 
 	if err != nil {
 		utils.JSONResponse(w, http.StatusNotFound, map[string]interface{}{"message": "Product not found"})
@@ -2227,4 +2282,214 @@ func (ac *AdminController) ModerateRestockRequest(w http.ResponseWriter, r *http
 		fmt.Sprintf("Permintaan restock Anda statusnya kini: %s.", req.Status), "/merchant/restock")
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AFFILIATE RESOURCES MANAGEMENT (EDUCATION, EVENTS, PROMO)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/education
+func (ac *AdminController) GetEducation(w http.ResponseWriter, r *http.Request) {
+	var edus []models.AffiliateEducation
+	ac.DB.Order("created_at DESC").Find(&edus)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   edus,
+	})
+}
+
+// POST /api/admin/education/upsert
+func (ac *AdminController) UpsertEducation(w http.ResponseWriter, r *http.Request) {
+	var req models.AffiliateEducation
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if req.Slug == "" {
+		req.Slug = utils.Slugify(req.Title)
+		// Check for uniqueness
+		var count int64
+		ac.DB.Model(&models.AffiliateEducation{}).Where("slug = ? AND id <> ?", req.Slug, req.ID).Count(&count)
+		if count > 0 {
+			req.Slug = fmt.Sprintf("%s-%d", req.Slug, time.Now().Unix()%1000)
+		}
+	}
+
+	if req.ID != 0 {
+		if err := ac.DB.Save(&req).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate edukasi")
+			return
+		}
+	} else {
+		if err := ac.DB.Create(&req).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat edukasi")
+			return
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, req)
+}
+
+// DELETE /api/admin/education?id=xxx
+func (ac *AdminController) DeleteEducation(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if err := ac.DB.Delete(&models.AffiliateEducation{}, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus edukasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// GET /api/admin/events
+func (ac *AdminController) GetEvents(w http.ResponseWriter, r *http.Request) {
+	var events []models.AffiliateEvent
+	ac.DB.Order("start_time DESC").Find(&events)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   events,
+	})
+}
+
+// POST /api/admin/events/upsert
+func (ac *AdminController) UpsertEvent(w http.ResponseWriter, r *http.Request) {
+	var req models.AffiliateEvent
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if req.ID != 0 {
+		if err := ac.DB.Save(&req).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate event")
+			return
+		}
+	} else {
+		if err := ac.DB.Create(&req).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat event")
+			return
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, req)
+}
+
+// DELETE /api/admin/events?id=xxx
+func (ac *AdminController) DeleteEvent(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if err := ac.DB.Delete(&models.AffiliateEvent{}, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus event")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// GET /api/admin/promo
+func (ac *AdminController) GetPromoMaterials(w http.ResponseWriter, r *http.Request) {
+	var promos []models.PromoMaterial
+	ac.DB.Order("created_at DESC").Find(&promos)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   promos,
+	})
+}
+
+// POST /api/admin/promo/upsert
+func (ac *AdminController) UpsertPromoMaterial(w http.ResponseWriter, r *http.Request) {
+	var req models.PromoMaterial
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if req.ID != 0 {
+		if err := ac.DB.Save(&req).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate materi promo")
+			return
+		}
+	} else {
+		if err := ac.DB.Create(&req).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat materi promo")
+			return
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, req)
+}
+
+// DELETE /api/admin/promo?id=xxx
+func (ac *AdminController) DeletePromoMaterial(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if err := ac.DB.Delete(&models.PromoMaterial{}, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus materi promo")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// POST /api/admin/users/create
+func (ac *AdminController) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		FullName string `json:"full_name"`
+		Role     string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if req.Email == "" || req.Password == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Email and Password are required")
+		return
+	}
+
+	// Check if user exists
+	var count int64
+	ac.DB.Model(&models.User{}).Where("email = ?", req.Email).Count(&count)
+	if count > 0 {
+		utils.JSONError(w, http.StatusConflict, "Email already registered")
+		return
+	}
+
+	// Hash password
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengenkripsi password")
+		return
+	}
+
+	user := models.User{
+		Email:        req.Email,
+		PasswordHash: string(hash),
+		Role:         req.Role,
+		Status:       "active",
+	}
+
+	if user.Role == "" {
+		user.Role = "buyer"
+	}
+
+	if err := ac.DB.Create(&user).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat user")
+		return
+	}
+
+	// Create profile
+	profile := models.UserProfile{
+		UserID:   user.ID,
+		FullName: req.FullName,
+	}
+	ac.DB.Create(&profile)
+
+	// Create wallet
+	wallet := models.Wallet{
+		OwnerID:   user.ID,
+		OwnerType: models.WalletBuyer,
+		Balance:   0,
+	}
+	ac.DB.Create(&wallet)
+
+	utils.JSONResponse(w, http.StatusCreated, user)
 }

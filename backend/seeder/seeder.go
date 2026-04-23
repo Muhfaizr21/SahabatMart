@@ -4,6 +4,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/utils"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ func SeedAll(db *gorm.DB) {
 	// [IMPORTANT] Ensure the extensions and tables are ready
 	db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
 	
-	// Re-run migration to ensure all tables exist
+	// Re-run migration to ensure all tables exist with new schema
 	db.AutoMigrate(
 		&models.User{}, &models.UserProfile{},
 		&models.Merchant{}, &models.AffiliateMember{}, &models.MembershipTier{},
@@ -33,10 +34,6 @@ func SeedAll(db *gorm.DB) {
 		&models.Voucher{}, &models.Banner{},
 		&models.Permission{}, &models.Role{},
 	)
-
-	// Clean legacy columns that break the new Master Product architecture
-	db.Exec("ALTER TABLE products DROP COLUMN IF EXISTS merchant_id")
-	db.Exec("ALTER TABLE products DROP COLUMN IF EXISTS stock")
 
 	// DROP TRIGGER if exists
 	db.Exec("DROP TRIGGER IF EXISTS update_average_rating ON reviews")
@@ -74,6 +71,9 @@ func SeedAll(db *gorm.DB) {
 	// 5. Seed Marketing & RBAC
 	seedMarketing(db)
 	seedRBAC(db)
+
+	// 6. Seed Network (Merchant & Affiliate relationship)
+	SeedNetwork(db)
 
 	fmt.Println("✅ Seeding Completed! 40 Products created with full ecosystem.")
 }
@@ -123,6 +123,26 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	}
 	db.Create(&admin)
 	db.Create(&models.UserProfile{UserID: admin.ID, FullName: "CEO AkuGrow"})
+	
+	// Buyers (Test Location Tracking)
+	buyerSby := models.User{Email: "buyer@akuglow.com", PasswordHash: pwHash, Role: "buyer", Status: "active"}
+	db.Create(&buyerSby)
+	db.Create(&models.UserProfile{UserID: buyerSby.ID, FullName: "Buyer Surabaya", City: "Surabaya", Province: "Jawa Timur"})
+
+	buyerJkt := models.User{Email: "buyer_jkt@akuglow.com", PasswordHash: pwHash, Role: "buyer", Status: "active"}
+	db.Create(&buyerJkt)
+	db.Create(&models.UserProfile{UserID: buyerJkt.ID, FullName: "Buyer Jakarta", City: "Jakarta Pusat", Province: "DKI Jakarta"})
+
+	// Mitra (Test Affiliate Sharing)
+	mitra := models.User{Email: "mitra@akuglow.com", PasswordHash: pwHash, Role: "affiliate", Status: "active"}
+	db.Create(&mitra)
+	db.Create(&models.UserProfile{UserID: mitra.ID, FullName: "Mitra Akuglow Utama", City: "Bandung"})
+	db.Create(&models.AffiliateMember{
+		UserID:           mitra.ID,
+		RefCode:          "MITRA-BAIK",
+		MembershipTierID: 1,
+		Status:           "active",
+	})
 
 	// Pusat (Master Inventory)
 	pusatUser := models.User{ID: PusatID, Email: "pusat@akugrow.com", PasswordHash: pwHash, Role: "merchant", Status: "active"}
@@ -132,20 +152,41 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	pusatMerch := models.Merchant{ID: PusatID, UserID: pusatUser.ID, StoreName: "Gudang Pusat", Slug: "pusat", Status: "active", IsVerified: true}
 	db.Create(&pusatMerch)
 
+	// [Akuglow] Pusat is also an affiliate
+	db.Create(&models.AffiliateMember{
+		UserID:           pusatUser.ID,
+		RefCode:          "PUSAT-SM",
+		MembershipTierID: 4, // Platinum
+		Status:           "active",
+	})
+
 	// Merchants (Distributors)
-	merchantLocs := []struct{ name, email, slug string }{
-		{"AkuGrow Jakarta Distro", "jakarta@akugrow.com", "jakarta-distro"},
-		{"Surabaya Beauty Hub", "surabaya@akugrow.com", "surabaya-beauty"},
-		{"Medan Glow Center", "medan@akugrow.com", "medan-glow"},
+	merchantLocs := []struct{ name, email, slug, city string }{
+		{"AkuGrow Jakarta Distro", "jakarta@akugrow.com", "jakarta-distro", "Jakarta Pusat"},
+		{"Surabaya Beauty Hub", "surabaya@akugrow.com", "surabaya-beauty", "Surabaya"},
+		{"Medan Glow Center", "medan@akugrow.com", "medan-glow", "Medan"},
 	}
 
 	var mList []models.Merchant
 	for _, m := range merchantLocs {
 		u := models.User{Email: m.email, PasswordHash: pwHash, Role: "merchant", Status: "active"}
 		db.Create(&u)
-		db.Create(&models.UserProfile{UserID: u.ID, FullName: m.name})
-		merch := models.Merchant{UserID: u.ID, StoreName: m.name, Slug: m.slug, Status: "active", IsVerified: true}
+		db.Create(&models.UserProfile{UserID: u.ID, FullName: m.name, City: m.city})
+		merch := models.Merchant{UserID: u.ID, StoreName: m.name, Slug: m.slug, Status: "active", IsVerified: true, City: m.city}
 		db.Create(&merch)
+
+		// [Akuglow] Every distributor is also a top-tier affiliate
+		refCode := "MTR-" + strings.ToUpper(m.slug)
+		if len(refCode) > 20 {
+			refCode = refCode[:20]
+		}
+		db.Create(&models.AffiliateMember{
+			UserID:           u.ID,
+			RefCode:          refCode,
+			MembershipTierID: 3, // Gold Tier
+			Status:           "active",
+		})
+
 		mList = append(mList, merch)
 	}
 
@@ -217,6 +258,8 @@ func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Me
 			Brand:       t.brand,
 			Image:       t.img,
 			Status:      "active",
+			MerchantID:  PusatID, // Set Pusat as the official owner of Master Products
+			Stock:       100,     // Initial master stock
 			Rating:      4.5 + (0.1 * float64(i%5)),
 			Reviews:     int(10 + i*2),
 		}
@@ -267,6 +310,30 @@ func seedMarketing(db *gorm.DB) {
 	for _, v := range vouchers {
 		db.Create(&v)
 	}
+
+	// [Akuglow] Seed Affiliate Materials
+	fmt.Println("  -> Seeding Affiliate Resources (Edu, Events, Promo)...")
+	
+	edus := []models.AffiliateEducation{
+		{Title: "Cara Mencapai 100 Mitra Pertama", Slug: "sukses-100-mitra", Category: "Marketing", Content: "Panduan...", VideoURL: "https://www.youtube.com/embed/dQw4w9WgXcQ", IsActive: true},
+		{Title: "Strategi Duplicate Leader", Slug: "duplicate-leader", Category: "Leadership", Content: "Panduan...", VideoURL: "https://www.youtube.com/embed/dQw4w9WgXcQ", IsActive: true},
+		{Title: "E-Book: 10 Teknik Closing WhatsApp", Slug: "ebook-closing-wa", Category: "Marketing", Content: "Panduan...", FileURL: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", IsActive: true},
+	}
+	for _, e := range edus {
+		db.Create(&e)
+	}
+
+	events := []models.AffiliateEvent{
+		{Title: "Webinar: Rahasia Omset 10 JT/Bulan", Description: "Live coaching bersama CEO AkuGrow.", Type: "online", Location: "Zoom Meeting", StartTime: time.Now().Add(48 * time.Hour), EndTime: time.Now().Add(50 * time.Hour), Status: "upcoming", IsActive: true},
+		{Title: "Kopdar Akbar Jakarta", Description: "Temu kangen dan sharing session offline.", Type: "offline", Location: "Kuningan City, Jakarta", StartTime: time.Now().Add(168 * time.Hour), EndTime: time.Now().Add(172 * time.Hour), Status: "upcoming", IsActive: true},
+	}
+	for _, ev := range events { db.Create(&ev) }
+
+	promos := []models.PromoMaterial{
+		{Title: "Story Instagram: Brightening Series", Type: "image", Category: "Instagram", FileURL: "https://images.unsplash.com/photo-1590156221122-c746e753e50b?w=800", Caption: "Glow up bareng AkuGrow! 💎", IsActive: true},
+		{Title: "Banner Facebook: Open Mitra", Type: "image", Category: "Facebook", FileURL: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800", Caption: "Join komunitas kecantikan terbesar!", IsActive: true},
+	}
+	for _, p := range promos { db.Create(&p) }
 }
 
 func seedRBAC(db *gorm.DB) {

@@ -26,6 +26,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	productCtrl := controllers.NewProductController(db)
 	contactCtrl := &controllers.ContactController{DB: db}
 	rbacCtrl := controllers.NewRBACController(db)
+	paymentCtrl := controllers.NewPaymentController(db)
 
 	// Middleware
 	cors := corsMiddleware
@@ -97,6 +98,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	// --- Auth Routes ---
 	mux.HandleFunc("/api/auth/register", authCtrl.Register)
 	mux.HandleFunc("/api/auth/login", authCtrl.Login)
+	mux.HandleFunc("/api/callback/tripay", paymentCtrl.TriPayCallback)
 
 
 	// --- Buyer Routes ---
@@ -107,6 +109,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/cart/move-from-wishlist", buyerOnly(buyerCtrl.MoveToCart))
 	mux.HandleFunc("/api/buyer/checkout", buyerOnly(buyerCtrl.Checkout))
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
+	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
 	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
 	mux.HandleFunc("/api/buyer/profile/update", buyerOnly(buyerCtrl.UpdateProfile))
 	mux.HandleFunc("/api/buyer/wishlist", buyerOnly(buyerCtrl.GetWishlist))
@@ -167,6 +170,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/affiliate/apply-merchant", affiliateOnly(affiliateCtrl.ApplyForMerchant))
 	mux.HandleFunc("/api/affiliate/leaderboard", affiliateCtrl.GetLeaderboard) // Public leaderboard — no auth needed
 	mux.HandleFunc("/api/affiliate/events", affiliateOnly(affiliateCtrl.GetEvents))
+	mux.HandleFunc("/api/affiliate/educations", affiliateOnly(affiliateCtrl.GetEducations))
+	mux.HandleFunc("/api/affiliate/promo-materials", affiliateOnly(affiliateCtrl.GetPromoMaterials))
 	mux.HandleFunc("/api/affiliate/profile", affiliateOnly(affiliateCtrl.GetProfile))
 	mux.HandleFunc("/api/affiliate/profile/update", affiliateOnly(affiliateCtrl.UpdateProfile))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
@@ -187,6 +192,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// User Management
 	mux.HandleFunc("/api/admin/users", adminOnly(adminCtrl.GetUsers))
+	mux.HandleFunc("/api/admin/users/create", adminOnly(adminCtrl.CreateUser))
 	mux.HandleFunc("/api/admin/users/update", adminOnly(adminCtrl.UpdateUser))
 	mux.HandleFunc("/api/admin/users/delete", adminOnly(adminCtrl.DeleteUser))
 
@@ -255,6 +261,17 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/blogs/delete", adminOnly(adminCtrl.DeleteBlog))
 	mux.HandleFunc("/api/admin/banners", adminOnly(adminCtrl.ManageBanners))
 	mux.HandleFunc("/api/admin/banners/delete", superOnly(adminCtrl.DeleteBanner))
+
+	// Affiliate Resource Management
+	mux.HandleFunc("/api/admin/education", adminOnly(adminCtrl.GetEducation))
+	mux.HandleFunc("/api/admin/education/upsert", adminOnly(adminCtrl.UpsertEducation))
+	mux.HandleFunc("/api/admin/education/delete", adminOnly(adminCtrl.DeleteEducation))
+	mux.HandleFunc("/api/admin/events", adminOnly(adminCtrl.GetEvents))
+	mux.HandleFunc("/api/admin/events/upsert", adminOnly(adminCtrl.UpsertEvent))
+	mux.HandleFunc("/api/admin/events/delete", adminOnly(adminCtrl.DeleteEvent))
+	mux.HandleFunc("/api/admin/promo", adminOnly(adminCtrl.GetPromoMaterials))
+	mux.HandleFunc("/api/admin/promo/upsert", adminOnly(adminCtrl.UpsertPromoMaterial))
+	mux.HandleFunc("/api/admin/promo/delete", adminOnly(adminCtrl.DeletePromoMaterial))
 
 	// CMS & Inbox
 	mux.HandleFunc("/api/admin/inbox", superOnly(contactCtrl.GetMessages))

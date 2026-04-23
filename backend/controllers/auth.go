@@ -24,12 +24,12 @@ func NewAuthController(db *gorm.DB) *AuthController {
 }
 
 type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	FullName string `json:"full_name"`
-	Phone    string `json:"phone"`
-	Role     string `json:"role"`
-	UplineID string `json:"upline_id"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	FullName     string `json:"full_name"`
+	Phone        string `json:"phone"`
+	Role         string `json:"role"`
+	ReferralCode string `json:"referral_code"`
 }
 
 type LoginRequest struct {
@@ -49,7 +49,7 @@ func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, token, err := ac.Service.Register(req.Email, req.Password, req.FullName, req.Phone, req.Role, req.UplineID)
+	user, token, err := ac.Service.Register(req.Email, req.Password, req.FullName, req.Phone, req.Role, req.ReferralCode)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "email sudah terdaftar" {

@@ -48,6 +48,7 @@ func ConnectDB() {
 		// Affiliate portal models
 		&models.AffiliateCommission{}, &models.AffiliateLink{},
 		&models.AffiliateClickLog{}, &models.AffiliateWithdrawal{},
+		&models.AffiliateEducation{}, &models.AffiliateEvent{}, &models.PromoMaterial{},
 	)
 }
 
@@ -112,6 +113,9 @@ func autoSeedCriticalData(db *gorm.DB) {
 		}
 		log.Println("✅ Membership Tiers auto-seeded successfully!")
 	}
+
+	// [Auto-Fix] Pastikan admin@akugrow.com selalu ACTIVE
+	db.Model(&models.User{}).Where("email = ?", "admin@akugrow.com").Update("status", "active")
 }
 
 

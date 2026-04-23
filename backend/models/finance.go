@@ -26,6 +26,8 @@ const (
 	TxRefundDeduction     WalletTransactionType = "refund_deduction"
 	TxBonus               WalletTransactionType = "bonus"
 	TxAdjustment          WalletTransactionType = "adjustment"
+	TxRestockPayment      WalletTransactionType = "restock_payment" // Merchant pays HQ
+	TxRestockRevenue      WalletTransactionType = "restock_revenue" // HQ receives money
 )
 
 type Wallet struct {

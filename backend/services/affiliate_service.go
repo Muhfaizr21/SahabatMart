@@ -104,22 +104,32 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 	return nil
 }
 
-// GetTeamStats: Menghitung total downline dan omset tim (total sales dari semua order yang direferensikan downlines)
+// GetTeamStats: Menghitung total downline (langsung) dan omset tim (seluruh keturunan/infinite depth)
 func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int64, teamTurnover float64, err error) {
-	// 1. Hitung Total Downlines (Langsung)
+	// 1. Hitung Total Downlines (Direct saja untuk statistik cepat)
 	if err := s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownlines).Error; err != nil {
 		return 0, 0, err
 	}
 
-	// 2. Hitung Omset Tim:
-	// Ambil semua ID downlines, lalu sum grand_total order yang affiliate_id-nya adalah salah satu dari downline
-	var downlineIDs []string
-	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Pluck("id", &downlineIDs)
+	// 2. Hitung Omset Tim (Recursive Depth):
+	// Menggunakan Recursive CTE untuk mendapatkan semua ID downlines di semua level
+	// Ini memastikan omset mencakup Cucu, Cicit, dst.
+	var allDescendantIDs []string
+	query := `
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a
+			INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT id FROM subordinates
+	`
+	s.DB.Raw(query, affiliateID).Scan(&allDescendantIDs)
 
-	if len(downlineIDs) > 0 {
+	if len(allDescendantIDs) > 0 {
 		var turnover float64
 		s.DB.Model(&models.Order{}).
-			Where("affiliate_id IN ? AND status IN ?", downlineIDs, completedOrderStatuses).
+			Where("affiliate_id IN ? AND status IN ?", allDescendantIDs, completedOrderStatuses).
 			Select("COALESCE(SUM(grand_total), 0)").
 			Scan(&turnover)
 		teamTurnover = turnover
@@ -128,21 +138,29 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 	return totalDownlines, teamTurnover, nil
 }
 
-// CheckMerchantEligibility: Cek apakah mitra memenuhi syarat upgrade jadi Merchant
-// Syarat per spek Akuglow: 100 mitra aktif (direct downline) & omset tim Rp10jt/bulan
+// CheckMerchantEligibility: Cek kelayakan upgrade ke Merchant
 func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64) {
-	// Hitung mitra aktif (langsung / direct downline)
+	// Hitung mitra aktif (langsung)
 	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ? AND status = 'active'", affiliateID).Count(&activeMitra)
 
-	// Hitung omset tim 30 hari terakhir dari semua order yang direferensikan downlines
+	// Hitung omset tim 30 hari terakhir (Recursive Depth)
 	startTime := time.Now().AddDate(0, -1, 0)
+	
+	var allDescendantIDs []string
+	query := `
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a
+			INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT id FROM subordinates
+	`
+	s.DB.Raw(query, affiliateID).Scan(&allDescendantIDs)
 
-	var downlineIDs []string
-	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Pluck("id", &downlineIDs)
-
-	if len(downlineIDs) > 0 {
+	if len(allDescendantIDs) > 0 {
 		s.DB.Model(&models.Order{}).
-			Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", downlineIDs, completedOrderStatuses, startTime).
+			Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", allDescendantIDs, completedOrderStatuses, startTime).
 			Select("COALESCE(SUM(grand_total), 0)").
 			Scan(&monthlyTurnover)
 	}

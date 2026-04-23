@@ -28,6 +28,8 @@ export default function AffiliateLinks() {
     title: '',
     product_id: '',
   });
+  const [showProductSearch, setShowProductSearch] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
 
   const refCode = user?.affiliate_ref_code || 'AG-REF';
 
@@ -35,7 +37,7 @@ export default function AffiliateLinks() {
     setLoading(true);
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/links`);
-      setLinks(Array.isArray(res.data) ? res.data : []);
+      setLinks(Array.isArray(res) ? res : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -46,7 +48,7 @@ export default function AffiliateLinks() {
   const fetchProducts = useCallback(async () => {
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/products`);
-      setProducts(Array.isArray(res.data) ? res.data.slice(0, 50) : []);
+      setProducts(Array.isArray(res) ? res.slice(0, 50) : []);
     } catch (err) {
       console.error(err);
     }
@@ -140,18 +142,35 @@ export default function AffiliateLinks() {
       </div>
 
       {/* Quick Links per user request */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all group flex flex-col justify-between">
               <div>
                 <span className="material-symbols-outlined text-purple-400 mb-2">home</span>
                 <h4 className="text-white font-bold text-sm">Link Utama Website</h4>
-                <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda AkuGrow.</p>
+                <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda SahabatMart.</p>
               </div>
               <button 
                 onClick={() => copyURL(`${window.location.origin}?ref=${refCode}`)}
                 className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-purple-600 transition-all"
               >
                 Salin Link Utama
+              </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-green-500/50 transition-all group flex flex-col justify-between shadow-lg shadow-green-500/5 border-green-500/20">
+              <div>
+                <span className="material-symbols-outlined text-green-400 mb-2">group_add</span>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-white font-bold text-sm">Link Rekrutmen</h4>
+                  <span className="text-[8px] bg-green-500 text-white px-1 rounded-sm animate-pulse">NEW</span>
+                </div>
+                <p className="text-slate-500 text-[10px] mt-1">Link khusus pendaftaran mitra baru (Otomatis isi Referral).</p>
+              </div>
+              <button 
+                onClick={() => copyURL(`${window.location.origin}/register?ref=${refCode}`)}
+                className="mt-4 w-full py-2 rounded-lg bg-green-600/20 text-green-400 text-[10px] font-bold uppercase tracking-wider group-hover:bg-green-600 group-hover:text-white transition-all border border-green-500/30"
+              >
+                Salin Link Daftar
               </button>
           </div>
 
@@ -186,7 +205,7 @@ export default function AffiliateLinks() {
 
       {/* Create Form */}
       {showForm && (
-        <div className="rounded-2xl p-6" style={baseStyle}>
+        <div className="rounded-2xl p-6 relative z-50" style={baseStyle}>
           <h3 className="text-white font-bold mb-5 font-['Plus_Jakarta_Sans']">Buat Link Afiliasi Baru</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
@@ -207,26 +226,94 @@ export default function AffiliateLinks() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Pilih Produk (Opsional)
+                  Pilih Produk (Searchable)
                 </label>
-                <select
-                  value={form.product_id}
-                  onChange={(e) => setForm({ ...form, product_id: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl text-sm text-white border outline-none transition-all focus:border-purple-500"
-                  style={{
-                    background: 'rgba(12, 19, 36, 0.6)',
-                    border: '1px solid rgba(77, 67, 84, 0.3)',
-                  }}
-                >
-                  <option value="">-- Pilih Produk --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                
+                {/* Custom Searchable Dropdown */}
+                <div className="relative group">
+                  <div 
+                    onClick={() => setShowProductSearch(!showProductSearch)}
+                    className="w-full px-4 py-3 rounded-xl text-sm text-white border cursor-pointer flex items-center justify-between transition-all hover:bg-white/5"
+                    style={{
+                      background: 'rgba(12, 19, 36, 0.6)',
+                      border: '1px solid rgba(77, 67, 84, 0.3)',
+                    }}
+                  >
+                    <span className={form.product_id ? "text-white font-semibold" : "text-slate-500"}>
+                      {form.product_id ? products.find(p => p.id === form.product_id)?.name : "-- Pilih Produk --"}
+                    </span>
+                    <span className="material-symbols-outlined text-slate-500 transition-transform" style={{ transform: showProductSearch ? 'rotate(180deg)' : 'none' }}>
+                      expand_more
+                    </span>
+                  </div>
+
+                  {showProductSearch && (
+                    <div 
+                      className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl overflow-hidden border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
+                      style={{
+                        background: '#1a1f2e',
+                        border: '1px solid rgba(124, 58, 237, 0.3)',
+                        maxHeight: '300px',
+                      }}
+                    >
+                      <div className="p-2 border-b border-white/5 sticky top-0 bg-[#1a1f2e] z-10">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
+                          <span className="material-symbols-outlined text-sm text-slate-500">search</span>
+                          <input 
+                            autoFocus
+                            type="text"
+                            value={productSearchQuery}
+                            onChange={(e) => setProductSearchQuery(e.target.value)}
+                            placeholder="Cari nama produk..."
+                            className="w-full bg-transparent border-none outline-none text-xs text-white placeholder-slate-600"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="overflow-y-auto" style={{ maxHeight: '240px' }}>
+                        <div 
+                          onClick={() => { setForm({ ...form, product_id: '' }); setShowProductSearch(false); }}
+                          className="px-4 py-3 text-xs text-slate-400 hover:bg-white/5 cursor-pointer font-bold"
+                        >
+                          -- Kosongkan Pilihan --
+                        </div>
+                        {products
+                          .filter(p => !productSearchQuery || p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                          .map((p) => (
+                            <div 
+                              key={p.id}
+                              onClick={() => {
+                                setForm({ ...form, product_id: p.id });
+                                setShowProductSearch(false);
+                                setProductSearchQuery('');
+                              }}
+                              className="px-4 py-3 hover:bg-purple-600/20 cursor-pointer border-b border-white/5 last:border-none flex items-center justify-between group/item"
+                            >
+                              <div className="min-w-0 pr-4">
+                                <p className="text-white text-[13px] font-bold truncate group-hover/item:text-purple-300">
+                                  {p.name}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500 group-hover/item:text-purple-400">
+                                    {p.category}
+                                  </span>
+                                  <span className="text-[10px] text-amber-500 font-bold">
+                                    Rp {Number(p.price).toLocaleString('id-ID')}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="material-symbols-outlined text-sm text-purple-500 opacity-0 group-hover/item:opacity-100">
+                                check_circle
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

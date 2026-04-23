@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, idr, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
@@ -68,7 +68,11 @@ export default function AdminCommissions() {
 
       {/* Tab Switch */}
       <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 4, borderRadius: 12, border: '1px solid #f1f5f9', alignSelf: 'flex-start' }}>
-        {[{ val: 'category', icon: 'bxs-category', label: 'Category Defaults' }, { val: 'merchant', icon: 'bxs-store-alt', label: 'Merchant Overrides' }].map(t => (
+        {[
+          { val: 'category', icon: 'bxs-category', label: 'Category Defaults' }, 
+          { val: 'merchant', icon: 'bxs-store-alt', label: 'Merchant Overrides' },
+          { val: 'product', icon: 'bxs-package', label: 'Product Specifics' }
+        ].map(t => (
           <button key={t.val} style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '9px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
@@ -89,63 +93,107 @@ export default function AdminCommissions() {
         <span style={{ fontSize: 13, color: '#4338ca', fontWeight: 500 }}>
           {tab === 'category' 
             ? 'Aturan default berdasarkan kategori produk.' 
-            : 'Aturan khusus per merchant yang akan menimpa (override) aturan kategori.'}
+            : tab === 'merchant'
+              ? 'Aturan khusus per merchant yang akan menimpa (override) aturan kategori.'
+              : 'Daftar produk dengan pengaturan komisi manual (Custom Commission).'}
         </span>
       </div>
 
       <TablePanel loading={loading}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-          <thead>
-            <tr>
-              {['Subject', 'Fee Rate', 'Notes', 'Created At', 'Aksi'].map((h, i) => (
-                <th key={h} style={{ ...A.th, textAlign: i === 4 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 4 ? 24 : 16 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-                <i className="bx bx-percentage" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
-                Belum ada konfigurasi. Klik "New Protocol" untuk mulai.
-              </td></tr>
-            ) : rows.map((r, idx) => {
-              const name = tab === 'category'
-                ? r.category_name
-                : merchants.find(m => m.id === r.merchant_id)?.store_name || r.merchant_id;
-              
-              return (
-                <tr key={r.id}
-                  style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
-                  onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
-                >
-                  <td style={{ ...A.td, paddingLeft: 24 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <i className={`bx ${tab === 'category' ? 'bxs-category' : 'bxs-store-alt'}`} style={{ color: '#6366f1', fontSize: 17 }} />
+        {tab === 'product' ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+            <thead>
+              <tr>
+                {['Produk', 'Komisi Afiliasi', 'Fee Distribusi', 'Profitability', 'Aksi'].map((h, i) => (
+                  <th key={h} style={{ ...A.th, textAlign: i === 4 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {products.filter(p => p.base_affiliate_fee > 0 || p.base_affiliate_fee_nominal > 0).length === 0 ? (
+                <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                  Belum ada produk dengan komisi khusus. Klik Kelola di katalog produk untuk mengatur.
+                </td></tr>
+              ) : products.filter(p => p.base_affiliate_fee > 0 || p.base_affiliate_fee_nominal > 0).map((r, idx) => (
+                  <tr key={r.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                    <td style={{ ...A.td, paddingLeft: 24 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <img src={r.image} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{r.name}</span>
                       </div>
-                      <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{name}</span>
-                    </div>
-                  </td>
-                  <td style={A.td}>
-                    <span style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 20, background: '#eef2ff', color: '#6366f1', fontWeight: 800, fontSize: 14 }}>
-                      {(r.fee_percent * 100).toFixed(1)}%
-                    </span>
-                  </td>
-                  <td style={A.td}><span style={{ color: '#64748b', fontSize: 13 }}>{r.note || '-'}</span></td>
-                  <td style={A.td}>
-                     <span style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(r.created_at).toLocaleDateString()}</span>
-                  </td>
-                  <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                    <button style={A.iconBtn('#6366f1', '#eef2ff')} onClick={() => openModal(tab, r)} title="Edit">
-                      <i className="bx bx-pencil" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td style={A.td}>
+                       {r.base_affiliate_fee > 0 ? `${r.base_affiliate_fee}%` : idr(r.base_affiliate_fee_nominal)}
+                    </td>
+                    <td style={A.td}>
+                       {r.base_distribution_fee > 0 ? `${r.base_distribution_fee}%` : idr(r.base_distribution_fee_nominal)}
+                    </td>
+                    <td style={A.td}>
+                       <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>Custom Active</span>
+                    </td>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                       <button style={A.iconBtn('#4361ee', '#eef2ff')} onClick={() => window.location.href=`/admin/products/edit?id=${r.id}`}>
+                         <i className="bx bx-pencil" />
+                       </button>
+                    </td>
+                  </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+            <thead>
+              <tr>
+                {['Subject', 'Fee Rate', 'Notes', 'Created At', 'Aksi'].map((h, i) => (
+                  <th key={h} style={{ ...A.th, textAlign: i === 4 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 4 ? 24 : 16 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                  <i className="bx bx-percentage" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
+                  Belum ada konfigurasi. Klik "New Protocol" untuk mulai.
+                </td></tr>
+              ) : rows.map((r, idx) => {
+                const name = tab === 'category'
+                  ? r.category_name
+                  : merchants.find(m => m.id === r.merchant_id)?.store_name || r.merchant_id;
+                
+                return (
+                  <tr key={r.id}
+                    style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+                  >
+                    <td style={{ ...A.td, paddingLeft: 24 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <i className={`bx ${tab === 'category' ? 'bxs-category' : 'bxs-store-alt'}`} style={{ color: '#6366f1', fontSize: 17 }} />
+                        </div>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{name}</span>
+                      </div>
+                    </td>
+                    <td style={A.td}>
+                      <span style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 20, background: '#eef2ff', color: '#6366f1', fontWeight: 800, fontSize: 14 }}>
+                        {(r.fee_percent * 100).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td style={A.td}><span style={{ color: '#64748b', fontSize: 13 }}>{r.note || '-'}</span></td>
+                    <td style={A.td}>
+                       <span style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(r.created_at).toLocaleDateString()}</span>
+                    </td>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                      <button style={A.iconBtn('#6366f1', '#eef2ff')} onClick={() => openModal(tab, r)} title="Edit">
+                        <i className="bx bx-pencil" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </TablePanel>
 
       {modal && (

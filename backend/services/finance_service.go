@@ -83,18 +83,31 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		return err
 	}
 
-	// 1. Distribute ke Merchant Portions
+	// 1. Distribute ke Merchant Portions (Distributor Cut)
 	for _, group := range order.MerchantGroups {
-		desc := fmt.Sprintf("Hasil Penjualan: %s", order.OrderNumber)
-		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, group.MerchantPayout, order.ID, "order", desc); err != nil {
+		desc := fmt.Sprintf("Jatah Distribusi: %s", order.OrderNumber)
+		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, group.DistributionCommission, order.ID, "order", desc); err != nil {
 			return err
 		}
 
-		// 2. Record Platform Fee
+		// 2. Record Platform Fee & HQ Cut (Keuntungan Pusat)
 		if group.PlatformFee > 0 {
 			pfDesc := fmt.Sprintf("Biaya Layanan Platform: %s", order.OrderNumber)
-			// Kita catat sebagai earning untuk SYSTEM (ID: system-platform)
 			if err := s.ProcessTransaction(tx, "system-platform", models.WalletBuyer, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc); err != nil {
+				return err
+			}
+		}
+
+		// HQ Cut: Sisa pendapatan yang masuk ke Pusat/Brand Owner
+		// Formula: Subtotal - PlatformFee - AffiliateCommission - DistributionCommission - GroupDiscount
+		hqCut := group.Subtotal - group.PlatformFee - group.AffiliateCommission - group.DistributionCommission - group.Discount
+
+		if hqCut != 0 {
+			hqDesc := fmt.Sprintf("Pendapatan Bersih Pusat: %s", order.OrderNumber)
+			if group.Discount > 0 {
+				hqDesc = fmt.Sprintf("Pendapatan Bersih Pusat (Setelah Diskon Rp%.0f): %s", group.Discount, order.OrderNumber)
+			}
+			if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqCut, order.ID, "order", hqDesc); err != nil {
 				return err
 			}
 		}
