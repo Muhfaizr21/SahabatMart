@@ -4,6 +4,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/utils"
 	"errors"
+	"fmt"
 	"gorm.io/gorm"
 )
 
@@ -37,7 +38,9 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 
 		// 3. [Akuglow Refactor] Check Stock from Inventory instead of Product model
 		var inventory models.Inventory
+		fmt.Printf("[DEBUG] AddToCart: Checking stock for Merchant: %s, Product: %s\n", merchantID, productID)
 		if err := tx.Where("merchant_id = ? AND product_id = ?", merchantID, productID).First(&inventory).Error; err != nil {
+			fmt.Printf("[ERROR] AddToCart: Stock NOT FOUND for Merchant: %s, Product: %s\n", merchantID, productID)
 			return errors.New("produk tidak tersedia di merchant ini")
 		}
 

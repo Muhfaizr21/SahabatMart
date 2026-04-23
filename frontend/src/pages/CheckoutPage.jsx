@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson } from '../lib/api';
+import { BUYER_API_BASE, PUBLIC_API_BASE, fetchJson } from '../lib/api';
 
 const steps = ['Keranjang', 'Checkout', 'Konfirmasi'];
 const provinces = ['DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Yogyakarta', 'Bali', 'Sumatera Utara', 'Sulawesi Selatan'];
@@ -86,7 +86,7 @@ export default function CheckoutPage() {
     if (!voucherCode) return;
     setCheckingVoucher(true);
     try {
-      const res = await fetchJson(`/api/public/vouchers/check?code=${voucherCode}&subtotal=${subtotal}`);
+      const res = await fetchJson(`${PUBLIC_API_BASE}/vouchers/check?code=${voucherCode}&subtotal=${subtotal}`);
       if (res.status === 'success' && res.data) {
         setAppliedVoucher(res.data);
       }
@@ -105,7 +105,7 @@ export default function CheckoutPage() {
       const token = localStorage.getItem('token');
       
       const orderItems = cart.items.map(item => ({
-          merchant_id: item.product?.merchant_id || 'pusat',
+          merchant_id: (item.product?.merchant_id && item.product?.merchant_id !== 'pusat') ? item.product.merchant_id : '00000000-0000-0000-0000-000000000000',
           product_id: item.product_id,
           product_variant_id: item.product_variant_id,
           product_name: item.product?.name,
@@ -136,7 +136,7 @@ export default function CheckoutPage() {
         payment_method: paymentMethod,
       };
 
-      const res = await fetchJson('/api/public/checkout', {
+      const res = await fetchJson(`${PUBLIC_API_BASE}/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

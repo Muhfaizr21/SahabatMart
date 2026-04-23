@@ -46,10 +46,11 @@ type TripayRequest struct {
 	Items       []TripayItem `json:"order_items"`
 	CallbackURL string       `json:"callback_url"`
 	ReturnURL   string       `json:"return_url"`
+	ExpiredTime int64        `json:"expired_time"`
 	Signature   string       `json:"signature"`
 }
 
-func (s *TripayService) CreateTransaction(method string, merchantRef string, amount int64, customerName, email, phone string, items []TripayItem, callbackUrl, returnUrl string) (map[string]interface{}, error) {
+func (s *TripayService) CreateTransaction(method string, merchantRef string, amount int64, customerName, email, phone string, items []TripayItem, callbackUrl, returnUrl string, expiredTime int64) (map[string]interface{}, error) {
 	// 1. Generate Signature
 	payload := s.MerchantCode + merchantRef + fmt.Sprintf("%d", amount)
 	h := hmac.New(sha256.New, []byte(s.PrivateKey))
@@ -67,6 +68,7 @@ func (s *TripayService) CreateTransaction(method string, merchantRef string, amo
 		Items:       items,
 		CallbackURL: callbackUrl,
 		ReturnURL:   returnUrl,
+		ExpiredTime: expiredTime,
 		Signature:   signature,
 	}
 

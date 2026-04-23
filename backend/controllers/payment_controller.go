@@ -80,11 +80,14 @@ func (c *PaymentController) TriPayCallback(w http.ResponseWriter, r *http.Reques
 			return nil // Don't error, just acknowledge (TriPay expects 200 OK)
 		}
 
-		// Find order by merchant_ref (which is our OrderNumber or OrderID)
+		// Find order by merchant_ref
 		var order models.Order
-		// We try OrderNumber first, then ID
-		if err := tx.Where("order_number = ? OR id = ?", payload.MerchantRef, payload.MerchantRef).First(&order).Error; err != nil {
-			return fmt.Errorf("order not found: %s", payload.MerchantRef)
+		// Kita gunakan pengecekan spesifik agar tidak memicu error tipe UUID di PostgreSQL
+		if err := tx.Where("order_number = ?", payload.MerchantRef).First(&order).Error; err != nil {
+			// Jika tidak ketemu lewat order_number, coba lewat ID (tapi pastikan formatnya UUID agar tidak error)
+			if err := tx.Where("CAST(id AS TEXT) = ?", payload.MerchantRef).First(&order).Error; err != nil {
+				return fmt.Errorf("order not found: %s", payload.MerchantRef)
+			}
 		}
 
 		// Check if already paid

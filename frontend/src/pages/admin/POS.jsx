@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchJson, ADMIN_API_BASE, formatImage } from '../../lib/api';
 import toast from 'react-hot-toast';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const POS = () => {
   const [search, setSearch] = useState('');
@@ -136,8 +137,7 @@ const POS = () => {
   useEffect(() => {
     let scanner = null;
     if (isScannerOpen) {
-      /* global Html5Qrcode */
-      scanner = new window.Html5Qrcode("reader");
+      scanner = new Html5Qrcode("reader");
       const config = { fps: 15, qrbox: { width: 250, height: 250 } };
       
       scanner.start(

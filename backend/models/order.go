@@ -78,6 +78,7 @@ type Order struct {
 	CancelledAt         *time.Time     `json:"cancelled_at"`
 
 	PaidAt              *time.Time     `json:"paid_at"`
+	ExpiredAt           *time.Time     `json:"expired_at"`
 	CompletedAt         *time.Time     `json:"completed_at"`
 	AutoCompleteAt      *time.Time     `json:"auto_complete_at"`
 
@@ -112,7 +113,8 @@ type OrderMerchantGroup struct {
 	TrackingNumber  string              `gorm:"type:varchar(100)" json:"tracking_number"`
 	ShippedAt       *time.Time          `json:"shipped_at"`
 	DeliveredAt     *time.Time          `json:"delivered_at"`
-
+	
+	Merchant        *Merchant           `gorm:"foreignKey:MerchantID" json:"merchant"`
 	CreatedAt       time.Time           `json:"created_at"`
 	UpdatedAt       time.Time           `json:"updated_at"`
 

@@ -377,37 +377,42 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type OrderRow struct {
-		ID             string    `json:"id"`
-		OrderID        string    `json:"order_id"`
-		MerchantID     string    `json:"merchant_id"`
-		StoreName      string    `json:"store_name"`
-		BuyerName      string    `json:"buyer_name"`
-		BuyerEmail     string    `json:"buyer_email"`
-		Status         string    `json:"status"`
-		Subtotal       float64   `json:"subtotal"`
-		TotalAmount    float64   `json:"total_amount"`
-		TrackingNumber string    `json:"tracking_number"`
-		CourierCode    string    `json:"courier_code"`
-		CreatedAt      time.Time `json:"created_at"`
+		ID             string    `gorm:"column:id" json:"id"`
+		OrderID        string    `gorm:"column:order_id" json:"order_id"`
+		MerchantID     string    `gorm:"column:merchant_id" json:"merchant_id"`
+		StoreName      string    `gorm:"column:store_name" json:"store_name"`
+		BuyerName      string    `gorm:"column:buyer_name" json:"buyer_name"`
+		BuyerEmail     string    `gorm:"column:buyer_email" json:"buyer_email"`
+		PaymentStatus  string    `gorm:"column:payment_status" json:"payment_status"`
+		ShippingStatus string    `gorm:"column:shipping_status" json:"shipping_status"`
+		Subtotal       float64   `gorm:"column:subtotal" json:"subtotal"`
+		TotalAmount    float64   `gorm:"column:total_amount" json:"total_amount"`
+		TrackingNumber string    `gorm:"column:tracking_number" json:"tracking_number"`
+		CourierCode    string    `gorm:"column:courier_code" json:"courier_code"`
+		CreatedAt      time.Time `gorm:"column:created_at" json:"created_at"`
 	}
 
 	// [FIX] Mengambil o.id agar detail pesanan bisa ditemukan di tabel orders
 	query := ac.DB.Table("order_merchant_groups omg").
-		Select("o.id, o.id as order_id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, omg.status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
+		Select("o.id, o.id as order_id, omg.merchant_id, m.store_name, up.full_name as buyer_name, u.email as buyer_email, o.status as payment_status, omg.status as shipping_status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
 		Joins("JOIN merchants m ON m.id = omg.merchant_id").
 		Joins("JOIN orders o ON o.id = omg.order_id").
 		Joins("JOIN users u ON u.id = o.buyer_id").
 		Joins("JOIN user_profiles up ON up.user_id = u.id")
 
 	if status != "" {
-		query = query.Where("omg.status = ?", status)
+		// Filter berdasarkan status pengiriman (Shipping) atau pembayaran (Payment)
+		query = query.Where("omg.status = ? OR o.status = ?", status, status)
 	}
 
 	var orders []OrderRow
 	query.Order("omg.created_at DESC").Scan(&orders)
 
-	fmt.Printf("[DEBUG] GetAllOrders returning %d rows. Sample ID[0]: %s\n", len(orders), "")
-	if len(orders) > 0 { fmt.Printf("[DEBUG] Top Order ID: %s\n", orders[0].ID) }
+	// [DEBUG] Log data to verify fields are populated
+	if len(orders) > 0 {
+		fmt.Printf("[DEBUG] Order[0]: ID=%s, PayStatus=%s, ShipStatus=%s, Store=%s\n", 
+			orders[0].ID, orders[0].PaymentStatus, orders[0].ShippingStatus, orders[0].StoreName)
+	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -1904,7 +1909,7 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 	ac.DB.Table("inventories inv").
 		Select("inv.merchant_id, m.store_name, m.city, inv.stock").
 		Joins("JOIN merchants m ON m.id = inv.merchant_id").
-		Where("inv.product_id = ? AND inv.stock > 0", id).
+		Where("inv.product_id = ? AND inv.stock > 0", product.ID).
 		Scan(&sellers)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{

@@ -42,6 +42,7 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
+import OrderDetailPage from './pages/OrderDetailPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import BlogPage from './pages/BlogPage';
@@ -53,6 +54,7 @@ import WishlistPage from './pages/WishlistPage';
 import ComparePage from './pages/ComparePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import CouponPage from './pages/CouponPage';
+import InvoicePage from './pages/InvoicePage';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminProductList from './pages/admin/ProductList';
@@ -192,7 +194,8 @@ export default function App() {
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
+           <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
+           <Route path="/order/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:id" element={<BlogDetailPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -204,6 +207,7 @@ export default function App() {
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
+          <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

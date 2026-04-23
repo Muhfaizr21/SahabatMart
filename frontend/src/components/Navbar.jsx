@@ -9,7 +9,6 @@ const HeartIcon = () => <svg width="20" height="20" fill="none" stroke="currentC
 const UserIcon = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const MenuIcon = () => <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
 const CloseIcon = () => <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-const ChevronDown = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>;
 const CompareIcon = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="16 3 21 8 16 13"/><line x1="21" y1="8" x2="9" y2="8"/><polyline points="8 21 3 16 8 11"/><line x1="3" y1="16" x2="15" y2="16"/></svg>;
 
 const navLinks = [
@@ -27,12 +26,10 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [catOpen, setCatOpen] = useState(false);
   const [userDropdown, setUserDropdown] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [wishCount, setWishCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dynamicCats, setDynamicCats] = useState([]);
 
   const loggedIn = isAuthenticated();
   const user = getStoredUser();
@@ -58,8 +55,6 @@ export default function Navbar() {
   };
 
   useEffect(() => {
-    // Sync Categories via Public API
-    fetchJson(`${PUBLIC_API_BASE}/categories`).then(res => setDynamicCats(res.data || [])).catch(() => {});
     
     fetchCounts();
     
@@ -212,27 +207,6 @@ export default function Navbar() {
       {/* Navigation Bottom */}
       <div className="hidden lg:block border-t border-gray-100 bg-gray-50/50">
         <div className="max-w-7xl mx-auto px-6 flex items-center gap-10 h-12">
-          {/* Departments - Dynamicized */}
-          <div className="relative h-full">
-            <button 
-              className="flex items-center gap-3 h-full px-4 bg-blue-600 text-white text-sm font-bold rounded-t-lg shadow-sm"
-              onClick={() => setCatOpen(!catOpen)}
-              onBlur={() => setTimeout(() => setCatOpen(false), 200)}
-            >
-              <MenuIcon />
-              Semua Departemen
-              <ChevronDown />
-            </button>
-            {catOpen && (
-              <div className="absolute top-full left-0 w-64 bg-white border border-gray-100 shadow-2xl py-3 rounded-b-2xl z-50">
-                {dynamicCats.length > 0 ? dynamicCats.map(cat => (
-                  <Link key={cat.id} to={`/shop?cat=${cat.name}`} className="block px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-blue-50 hover:text-blue-600" onClick={() => setCatOpen(false)}>{cat.name}</Link>
-                )) : (
-                  <div className="px-6 py-3 text-xs text-gray-400 italic">Memuat kategori...</div>
-                )}
-              </div>
-            )}
-          </div>
 
           <nav className="flex items-center gap-8">
             {navLinks.map(link => (

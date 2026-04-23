@@ -98,6 +98,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	// --- Auth Routes ---
 	mux.HandleFunc("/api/auth/register", authCtrl.Register)
 	mux.HandleFunc("/api/auth/login", authCtrl.Login)
+	mux.HandleFunc("/api/tripay/webhook", paymentCtrl.TriPayCallback)
 	mux.HandleFunc("/api/callback/tripay", paymentCtrl.TriPayCallback)
 
 
@@ -109,6 +110,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/cart/move-from-wishlist", buyerOnly(buyerCtrl.MoveToCart))
 	mux.HandleFunc("/api/buyer/checkout", buyerOnly(buyerCtrl.Checkout))
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
+	mux.HandleFunc("/api/buyer/orders/detail", buyerOnly(buyerCtrl.GetOrderDetail))
 	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
 	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
 	mux.HandleFunc("/api/buyer/profile/update", buyerOnly(buyerCtrl.UpdateProfile))

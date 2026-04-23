@@ -10,6 +10,7 @@ import (
 	"SahabatMart/backend/utils"
 	"math"
 	"os"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -70,6 +71,13 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
 		return
+	}
+
+	if req.MerchantID == "" || req.MerchantID == "pusat" {
+		req.MerchantID = "00000000-0000-0000-0000-000000000000"
+	}
+	if req.ProductVariantID == "" {
+		req.ProductVariantID = req.ProductID // Fallback if no variant provided
 	}
 
 	if err := bc.BuyerService.AddToCart(buyerID, req.ProductID, req.ProductVariantID, req.MerchantID, req.Quantity, req.Metadata); err != nil {
@@ -254,10 +262,10 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 	}
 	
 	appURL := os.Getenv("APP_URL")
-	callbackUrl := appURL + "/api/callback/tripay"
+	callbackUrl := appURL + "/api/tripay/webhook"
 	returnUrl := appURL + "/order-success"
 
-	result, err := tripay.CreateTransaction(paymentMethod, order.OrderNumber, totalAmount, customerName, buyer.Email, customerPhone, tripayItems, callbackUrl, returnUrl)
+	result, err := tripay.CreateTransaction(paymentMethod, order.OrderNumber, totalAmount, customerName, buyer.Email, customerPhone, tripayItems, callbackUrl, returnUrl, order.ExpiredAt.Unix())
 	return result, err
 }
 
@@ -272,6 +280,7 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 		ShippingInfo models.Order       `json:"shipping_info"`
 		UplineID     string             `json:"upline_id"`
 		VoucherCode  string             `json:"voucher_code"`
+		PaymentMethod string             `json:"payment_method"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -284,23 +293,37 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 	var token string
 	var err error
 
-	// Try to find user
-	err = bc.DB.Where("email = ?", req.Email).First(&user).Error
-	if err != nil {
+	// A. Check if already logged in via Token
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := utils.ParseJWT(tokenStr)
+		if err == nil {
+			var loggedInUser models.User
+			if err := bc.DB.First(&loggedInUser, "id = ?", claims.UserID).Error; err == nil {
+				user = &loggedInUser
+				log.Printf("[PublicCheckout] Using logged-in user: %s", user.Email)
+			}
+		}
+	}
+
+	// B. If not logged in, handle Guest/Registration
+	if user == nil {
+		var existingUser models.User
+		err = bc.DB.Where("email = ?", req.Email).First(&existingUser).Error
+		if err == nil {
+			// User exists but not logged in as them
+			utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar. Silakan masuk terlebih dahulu.")
+			return
+		}
+
 		// Create new user (Mitra)
+		log.Printf("[PublicCheckout] Creating new user for: %s", req.Email)
 		user, token, err = bc.AuthService.Register(req.Email, req.Password, req.FullName, req.Phone, "buyer", req.UplineID)
 		if err != nil {
 			utils.JSONError(w, http.StatusBadRequest, "Gagal membuat akun: "+err.Error())
 			return
 		}
-	} else {
-		// Existing user: we should ideally validate password, but for simplicity in this flow 
-		// if they provide the right password it works.
-		// Actually, let's keep it simple: if email exists, return error "Silakan login" 
-		// OR just use the account if we are brave.
-		// User said "otomatis meminta pembuatan akun" - implying registration.
-		utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar. Silakan masuk terlebih dahulu.")
-		return
 	}
 
 	// 2. Process Order
@@ -311,10 +334,42 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// 3. Integrasi TriPay (Copy-paste logic from standard Checkout)
+	var paymentData map[string]interface{}
+	if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
+		// Ambil data item lengkap untuk TriPay
+		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
+		
+		tripayResult, err := bc.getTripayData(order, req.PaymentMethod)
+		if err != nil {
+			log.Printf("⚠️ TriPay Request Error: %v", err)
+		} else {
+			paymentData = tripayResult["data"].(map[string]interface{})
+			
+			// Save Payment Record
+			payment := models.Payment{
+				OrderID:              order.ID,
+				PaymentMethod:        req.PaymentMethod,
+				Status:               models.PaymentPending,
+				Gateway:              "tripay",
+				GatewayTransactionID: paymentData["reference"].(string),
+				GatewayOrderID:       paymentData["merchant_ref"].(string),
+				Amount:               order.GrandTotal,
+			}
+			respJson, _ := json.Marshal(paymentData)
+			payment.GatewayResponse = string(respJson)
+			
+			if err := bc.DB.Create(&payment).Error; err != nil {
+				log.Printf("⚠️ Failed to save payment record: %v", err)
+			}
+		}
+	}
+
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
-		"order": order,
-		"token": token, // Return token so the frontend can auto-login
-		"user":  user,
+		"order":   order,
+		"token":   token, // Return token so the frontend can auto-login
+		"user":    user,
+		"payment": paymentData,
 	})
 }
 
@@ -515,7 +570,11 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		}
 
 		profile.FullName = req.FullName
-		profile.Gender = &req.Gender
+		if req.Gender != "" {
+			profile.Gender = &req.Gender
+		} else {
+			profile.Gender = nil
+		}
 		profile.Address = req.Address
 		profile.City = req.City
 		profile.Province = req.Province
@@ -539,5 +598,59 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Profil berhasil diperbarui",
+	})
+}
+
+// GET /api/buyer/orders/detail?id=...
+func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+	orderID := r.URL.Query().Get("id")
+
+	log.Printf("[OrderDetail] Request ID: %s for BuyerID: %s", orderID, buyerID)
+
+	if orderID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Order ID dibutuhkan")
+		return
+	}
+
+	var order models.Order
+	// Gunakan CAST agar Postgres tidak bingung dengan tipe data UUID
+	err := bc.DB.Preload("MerchantGroups.Items").
+		Preload("MerchantGroups.Merchant").
+		Where("id = CAST(? AS UUID) AND buyer_id = CAST(? AS UUID)", orderID, buyerID).
+		First(&order).Error
+
+	if err != nil {
+		log.Printf("[OrderDetail] ERROR FINDING ORDER: %v (OrderID: %s, BuyerID: %s)", err, orderID, buyerID)
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan")
+		return
+	}
+
+	// Fetch payment data if exists
+	var payment models.Payment
+	bc.DB.Where("order_id = ?", order.ID).First(&payment)
+
+	// Ekstrak checkout_url dari GatewayResponse (TriPay) jika ada
+	var paymentMap map[string]interface{}
+	if payment.ID != "" {
+		paymentData, _ := json.Marshal(payment)
+		json.Unmarshal(paymentData, &paymentMap)
+		
+		if payment.GatewayResponse != "" {
+			var gresp map[string]interface{}
+			if err := json.Unmarshal([]byte(payment.GatewayResponse), &gresp); err == nil {
+				if curl, ok := gresp["checkout_url"].(string); ok {
+					paymentMap["checkout_url"] = curl
+				}
+				// Juga ambil qr_url atau pay_url jika ada
+				if qurl, ok := gresp["qr_url"].(string); ok { paymentMap["qr_url"] = qurl }
+				if purl, ok := gresp["pay_url"].(string); ok { paymentMap["pay_url"] = purl }
+			}
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"order":   order,
+		"payment": paymentMap,
 	})
 }

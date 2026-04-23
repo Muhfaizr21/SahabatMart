@@ -46,11 +46,27 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		}
 	}
 
+	// Sanitize AffiliateID (Convert empty string to nil)
+	if affiliateID != nil && *affiliateID == "" {
+		affiliateID = nil
+	}
+
+	for i := range items {
+		if items[i].ProductVariantID != nil && *items[i].ProductVariantID == "" {
+			items[i].ProductVariantID = nil
+		}
+		if items[i].MerchantID == "" || items[i].MerchantID == "pusat" {
+			items[i].MerchantID = "00000000-0000-0000-0000-000000000000"
+		}
+	}
+
+	expiry := time.Now().Add(30 * time.Minute)
 	order := &models.Order{
 		BuyerID:            &buyerID,
 		OrderNumber:        fmt.Sprintf("ORD-%d-%s", time.Now().Unix(), buyerID[:8]),
 		Status:             models.OrderPendingPayment,
 		AffiliateID:        affiliateID,
+		ExpiredAt:          &expiry,
 		ShippingName:       shippingInfo.ShippingName,
 		ShippingPhone:      shippingInfo.ShippingPhone,
 		ShippingAddress:    shippingInfo.ShippingAddress,
@@ -279,6 +295,11 @@ func (s *OrderService) CompletePayment(orderID string) error {
 			return err
 		}
 
+		// [Akuglow Sync] Update all merchant groups to 'confirmed' status
+		if err := tx.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", order.ID).Update("status", "confirmed").Error; err != nil {
+			return err
+		}
+
 		// [Akuglow Sync] Update Payment Record status to PAID
 		if err := tx.Model(&models.Payment{}).Where("order_id = ?", order.ID).Update("status", "PAID").Error; err != nil {
 			return err
@@ -409,10 +430,10 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 }
 
 func (s *OrderService) ExpireOrders() error {
-	// Find orders pending_payment older than 24 hours
-	expiryTime := time.Now().Add(-24 * time.Hour)
+	// Find orders pending_payment that have passed their ExpiredAt time
+	now := time.Now()
 	var orders []models.Order
-	if err := s.DB.Where("status = ? AND created_at < ?", models.OrderPendingPayment, expiryTime).Find(&orders).Error; err != nil {
+	if err := s.DB.Where("status = ? AND expired_at <= ?", models.OrderPendingPayment, now).Find(&orders).Error; err != nil {
 		return err
 	}
 

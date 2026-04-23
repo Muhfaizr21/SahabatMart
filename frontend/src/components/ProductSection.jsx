@@ -77,6 +77,7 @@ function ProductCard({ product }) {
         body: JSON.stringify({
           product_id: product.id,
           product_variant_id: product.variants?.[0]?.id || product.id,
+          merchant_id: product.merchant_id || '00000000-0000-0000-0000-000000000000',
           quantity: 1
         })
       });

@@ -126,7 +126,7 @@ func startHousekeeping(db *gorm.DB) {
 	affiliateService := services.NewAffiliateService(db, notifService)
 	orderService := services.NewOrderService(db)
 
-	ticker := time.NewTicker(30 * time.Minute) // More frequent check
+	ticker := time.NewTicker(5 * time.Minute) // Check every 5 minutes for expiry
 	for range ticker.C {
 		log.Println("🔄 Running Platform Housekeeping...")
 
