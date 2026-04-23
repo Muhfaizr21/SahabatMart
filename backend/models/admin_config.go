@@ -96,6 +96,8 @@ type Inventory struct {
 	ProductID  string    `gorm:"type:uuid;not null;index" json:"product_id"`
 	MerchantID string    `gorm:"type:uuid;not null;index" json:"merchant_id"` // ID Merchant atau ID "SYSTEM_PUSAT"
 	Stock      int       `gorm:"default:0" json:"stock"`
+	BasePrice  float64   `gorm:"type:decimal(15,2);default:0" json:"base_price"` // Harga beli/dasar saat sync terakhir
+	LastSyncPrice time.Time `json:"last_sync_price"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

@@ -125,7 +125,7 @@ export default function AdminDashboard() {
       fetchJson(API + '/finance/monthly'),
     ]).then(([ov, mo]) => {
       setOverview(ov);
-      const data = Array.isArray(mo) ? mo : (mo.data || []);
+      const data = Array.isArray(mo) ? mo : (mo?.data || []);
       setMonthly(data);
     }).catch(console.error).finally(() => setLoading(false));
   };

@@ -123,3 +123,33 @@ func (s *ProductService) CanUserReview(userID string, productID string) (bool, s
 
 	return true, order.ID, nil
 }
+
+// SyncInventoryMetadata sinkronisasi info dasar produk (harga/nama) ke seluruh inventory merchant
+func (s *ProductService) SyncInventoryMetadata(productID string) error {
+	var product models.Product
+	if err := s.DB.First(&product, "id = ?", productID).Error; err != nil {
+		return err
+	}
+
+	// Update seluruh inventory yang merujuk ke produk ini
+	return s.DB.Model(&models.Inventory{}).
+		Where("product_id = ?", productID).
+		Updates(map[string]interface{}{
+			"base_price":      product.Price,
+			"last_sync_price": gorm.Expr("NOW()"),
+		}).Error
+}
+
+// SyncAllInventories melakukan sinkronisasi harga massal untuk seluruh produk yang aktif
+func (s *ProductService) SyncAllInventories() (int64, error) {
+	var products []models.Product
+	s.DB.Where("status = ?", "active").Find(&products)
+	
+	var count int64
+	for _, p := range products {
+		if err := s.SyncInventoryMetadata(p.ID); err == nil {
+			count++
+		}
+	}
+	return count, nil
+}

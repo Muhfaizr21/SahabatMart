@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AUTH_API_BASE, fetchJson } from '../lib/api';
 
 export default function LoginPage() {
@@ -8,6 +8,43 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    
+    if (token) {
+      setLoading(true);
+      localStorage.setItem('token', token);
+      
+      // Ambil profil user lengkap menggunakan token baru
+      fetchJson(`${AUTH_API_BASE}/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+      }).then(user => {
+          localStorage.setItem('user', JSON.stringify(user));
+          
+          // Redirect berdasarkan role
+          if (user.role === 'admin' || user.role === 'superadmin') {
+            navigate('/admin');
+          } else if (user.role === 'merchant') {
+            navigate('/merchant');
+          } else if (user.role === 'affiliate') {
+            navigate('/affiliate');
+          } else {
+            navigate('/');
+          }
+          window.location.reload();
+      }).catch(err => {
+          setError("Gagal sinkronisasi data Google: " + err.message);
+          setLoading(false);
+      });
+    }
+  }, [location, navigate]);
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${AUTH_API_BASE}/google/login`;
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -140,7 +177,11 @@ export default function LoginPage() {
               <div className="flex-grow border-t border-gray-100"></div>
             </div>
             
-            <button type="button" className="flex items-center justify-center gap-3 border border-gray-200 hover:bg-gray-50 bg-white rounded-2xl py-3.5 transition-all text-sm font-bold text-gray-700">
+            <button 
+              type="button" 
+              onClick={handleGoogleLogin}
+              className="flex items-center justify-center gap-3 border border-gray-200 hover:bg-gray-50 bg-white rounded-2xl py-3.5 transition-all text-sm font-bold text-gray-700"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12.0003 12.0001V15.6806H18.7846C18.4908 17.0658 17.5147 18.2325 16.2731 18.917L20.3541 22.0717C22.7317 19.8824 24.1843 16.4806 24.1843 12.0001C24.1843 11.1718 24.1166 10.5186 23.9723 9.87329H12.0003V12.0001Z"/><path fill="#34A853" d="M12.0003 24.0004C15.4262 24.0004 18.2974 22.8631 20.3541 22.0717L16.2731 18.917C15.1106 19.6975 13.6848 20.1781 12.0003 20.1781C8.80789 20.1781 6.10398 18.0163 5.12198 15.143L0.902344 18.4116C2.94977 22.4842 7.15197 24.0004 12.0003 24.0004Z"/><path fill="#FBBC05" d="M5.122 15.143C4.8703 14.3941 4.72145 13.6063 4.72145 12.8001C4.72145 11.9939 4.8703 11.2061 5.122 10.4572L0.902359 7.18854C0.0620868 8.86877 -0.00020108 10.8715 -0.00020108 12.8001C-0.00020108 14.7288 0.0620868 16.7315 0.902359 18.4117L5.122 15.143Z"/><path fill="#4285F4" d="M12.0003 5.42226C13.8447 5.42226 15.518 6.06213 16.8209 7.20015L20.4435 3.5776C18.2718 1.54512 15.3995 0 12.0003 0C7.15197 0 2.94977 1.51624 0.902344 5.58882L5.12198 8.85746C6.10398 5.98418 8.80789 5.42226 12.0003 5.42226Z"/></svg>
               Google
             </button>

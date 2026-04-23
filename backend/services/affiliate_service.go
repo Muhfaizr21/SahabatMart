@@ -2,6 +2,8 @@ package services
 
 import (
 	"SahabatMart/backend/models"
+	"fmt"
+	"strconv"
 	"time"
 	"gorm.io/gorm"
 )
@@ -104,16 +106,9 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 	return nil
 }
 
-// GetTeamStats: Menghitung total downline (langsung) dan omset tim (seluruh keturunan/infinite depth)
+// GetTeamStats: Menghitung total downline dan omset tim (seluruh keturunan/infinite depth)
 func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int64, teamTurnover float64, err error) {
-	// 1. Hitung Total Downlines (Direct saja untuk statistik cepat)
-	if err := s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownlines).Error; err != nil {
-		return 0, 0, err
-	}
-
-	// 2. Hitung Omset Tim (Recursive Depth):
-	// Menggunakan Recursive CTE untuk mendapatkan semua ID downlines di semua level
-	// Ini memastikan omset mencakup Cucu, Cicit, dst.
+	// 1. Ambil Semua ID Downlines (Semua Level) menggunakan Recursive CTE
 	var allDescendantIDs []string
 	query := `
 		WITH RECURSIVE subordinates AS (
@@ -126,11 +121,14 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 	`
 	s.DB.Raw(query, affiliateID).Scan(&allDescendantIDs)
 
-	if len(allDescendantIDs) > 0 {
+	totalDownlines = int64(len(allDescendantIDs))
+
+	// 2. Hitung Omset Tim dari semua ID tersebut
+	if totalDownlines > 0 {
 		var turnover float64
 		s.DB.Model(&models.Order{}).
 			Where("affiliate_id IN ? AND status IN ?", allDescendantIDs, completedOrderStatuses).
-			Select("COALESCE(SUM(grand_total), 0)").
+			Select("COALESCE(SUM(subtotal), 0)").
 			Scan(&turnover)
 		teamTurnover = turnover
 	}
@@ -139,7 +137,7 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 }
 
 // CheckMerchantEligibility: Cek kelayakan upgrade ke Merchant
-func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64) {
+func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64) {
 	// Hitung mitra aktif (langsung)
 	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ? AND status = 'active'", affiliateID).Count(&activeMitra)
 
@@ -161,12 +159,30 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 	if len(allDescendantIDs) > 0 {
 		s.DB.Model(&models.Order{}).
 			Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", allDescendantIDs, completedOrderStatuses, startTime).
-			Select("COALESCE(SUM(grand_total), 0)").
+			Select("COALESCE(SUM(subtotal), 0)").
 			Scan(&monthlyTurnover)
 	}
 
-	isEligible = activeMitra >= 100 && monthlyTurnover >= 10000000
-	return isEligible, activeMitra, monthlyTurnover
+	// 3. Ambil syarat dari PlatformConfig (Dynamic)
+	minActiveMitra := 100
+	minTurnover := 10000000.0
+
+	var configActive models.PlatformConfig
+	if err := s.DB.Where("key = ?", "merchant_min_active_mitra").First(&configActive).Error; err == nil {
+		if val, err := strconv.Atoi(configActive.Value); err == nil {
+			minActiveMitra = val
+		}
+	}
+
+	var configTurnover models.PlatformConfig
+	if err := s.DB.Where("key = ?", "merchant_min_team_turnover").First(&configTurnover).Error; err == nil {
+		if val, err := strconv.ParseFloat(configTurnover.Value, 64); err == nil {
+			minTurnover = val
+		}
+	}
+
+	isEligible = activeMitra >= int64(minActiveMitra) && monthlyTurnover >= minTurnover
+	return isEligible, activeMitra, monthlyTurnover, minActiveMitra, minTurnover
 }
 
 // CancelCommission: Membatalkan komisi pending jika pesanan di-refund atau dispute dimenangkan buyer
@@ -184,4 +200,122 @@ func (s *AffiliateService) GetLeaderboard(limit int) ([]models.AffiliateMember, 
 		Limit(limit).
 		Find(&leaders).Error
 	return leaders, err
+}
+
+// UpdateTurnoverSnapshot memperbarui cache omset tim untuk dashboard yang cepat
+func (s *AffiliateService) UpdateTurnoverSnapshot(affiliateID string) error {
+	totalDownlines, teamTurnover, err := s.GetTeamStats(affiliateID)
+	if err != nil {
+		return err
+	}
+
+	_, _, monthlyTurnover, _, _ := s.CheckMerchantEligibility(affiliateID)
+
+	var directMitra int64
+	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&directMitra)
+
+	snapshot := models.AffiliateTurnoverSnapshot{
+		AffiliateID:     affiliateID,
+		TeamDownlines:   totalDownlines,
+		TeamTurnover:    teamTurnover,
+		MonthlyTurnover: monthlyTurnover,
+		DirectMitra:     directMitra,
+		LastUpdated:     time.Now(),
+	}
+
+	return s.DB.Where("affiliate_id = ?", affiliateID).
+		Assign(snapshot).
+		FirstOrCreate(&models.AffiliateTurnoverSnapshot{}).Error
+}
+// SyncLeaderboard menghitung ulang peringkat affiliate dan menyimpan ke cache
+func (s *AffiliateService) SyncLeaderboard() error {
+	var results []struct {
+		AffiliateID string
+		FullName    string
+		AvatarUrl   string
+		TotalEarned float64
+	}
+
+	// Ambil top 50 penghasilan tertinggi
+	query := `
+		SELECT am.id as affiliate_id, up.full_name, up.avatar_url, am.total_earned
+		FROM affiliate_members am
+		JOIN user_profiles up ON am.user_id = up.user_id
+		WHERE am.status = 'active'
+		ORDER BY am.total_earned DESC
+		LIMIT 50
+	`
+	s.DB.Raw(query).Scan(&results)
+
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		// Bersihkan cache lama
+		tx.Exec("DELETE FROM leaderboard_cache")
+
+		for i, res := range results {
+			cache := models.LeaderboardCache{
+				AffiliateID: res.AffiliateID,
+				Name:        res.FullName,
+				Avatar:      res.AvatarUrl,
+				Rank:        i + 1,
+				TotalEarned: res.TotalEarned,
+				LastSynced:  time.Now(),
+			}
+			if err := tx.Create(&cache).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// UpdateUplineSnapshotsRecursive memperbarui snapshot omset untuk seluruh silsilah upline
+func (s *AffiliateService) UpdateUplineSnapshotsRecursive(affiliateID string) {
+	// 1. Update diri sendiri dulu
+	s.UpdateTurnoverSnapshot(affiliateID)
+
+	// 2. Cari upline
+	var member models.AffiliateMember
+	if err := s.DB.Select("upline_id").Where("id = ?", affiliateID).First(&member).Error; err == nil {
+		if member.UplineID != nil && *member.UplineID != "" {
+			// Rekursif ke atas
+			s.UpdateUplineSnapshotsRecursive(*member.UplineID)
+		}
+	}
+}
+
+// LinkUpline menghubungkan user ke upline baru secara manual lewat kode referral
+func (s *AffiliateService) LinkUpline(userID, refCode string) error {
+	var userAff models.AffiliateMember
+	if err := s.DB.Where("user_id = ?", userID).First(&userAff).Error; err != nil {
+		return fmt.Errorf("data affiliate Anda tidak ditemukan")
+	}
+
+	if userAff.UplineID != nil && *userAff.UplineID != "" {
+		return fmt.Errorf("Anda sudah tergabung dalam jaringan")
+	}
+
+	var upline models.AffiliateMember
+	if err := s.DB.Where("ref_code = ?", refCode).First(&upline).Error; err != nil {
+		return fmt.Errorf("kode referral tidak valid")
+	}
+
+	// Cegah self-referral
+	if upline.UserID == userID {
+		return fmt.Errorf("tidak bisa menggunakan kode referral sendiri")
+	}
+
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		uID := upline.ID
+		updates := map[string]interface{}{
+			"upline_id":   &uID,
+			"upline_code": upline.RefCode,
+		}
+		if err := tx.Model(&userAff).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		// Sync stats ke atas
+		go s.UpdateUplineSnapshotsRecursive(uID)
+		return nil
+	})
 }

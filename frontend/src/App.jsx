@@ -243,6 +243,7 @@ export default function App() {
             <Route path="promo" element={<AdminPromo />} />
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           {/* Merchant Routes */}

@@ -10,6 +10,8 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_fee_default',    value: '0.05',             description: 'Fee Platform Default (%)',   group: 'platform',  type: 'number' },
   { key: 'platform_currency',       value: 'IDR',              description: 'Mata Uang',                  group: 'platform',  type: 'text' },
   { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
+  { key: 'merchant_min_active_mitra',  value: '100',          description: 'Min. Mitra Aktif (Merchant)', group: 'platform',  type: 'number' },
+  { key: 'merchant_min_team_turnover', value: '10000000',     description: 'Min. Omset Tim (Merchant)',  group: 'platform',  type: 'number' },
   { key: 'payout_min_amount',       value: '50000',            description: 'Minimum Payout (Rp)',        group: 'payout',    type: 'number' },
   { key: 'payout_schedule',         value: 'weekly',           description: 'Jadwal Payout',              group: 'payout',    type: 'select', options: ['daily', 'weekly', 'monthly'] },
   { key: 'payout_day',              value: 'friday',           description: 'Hari Payout (jika weekly)',  group: 'payout',    type: 'select', options: ['monday','tuesday','wednesday','thursday','friday'] },
@@ -50,7 +52,7 @@ export default function AdminSettings() {
   const [activeGroup, setActiveGroup] = useState('platform');
 
   useEffect(() => {
-    fetchJson(API + '/settings')
+    fetchJson(API + '/configs')
       .then(d => {
         const saved = d.data || [];
         const merged = DEFAULT_CONFIGS.map(def => {
@@ -79,7 +81,7 @@ export default function AdminSettings() {
       const found = configs.find(c => c.key === key);
       return { key, value: editing[key], description: found?.description || '' };
     });
-    fetchJson(API + '/settings/save', {
+    fetchJson(API + '/configs/upsert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

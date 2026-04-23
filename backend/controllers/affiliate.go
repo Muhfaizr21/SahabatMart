@@ -533,15 +533,15 @@ func (ac *AffiliateController) CheckMerchantEligibility(w http.ResponseWriter, r
 		return
 	}
 
-	isEligible, activeMitra, monthlyTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"is_eligible":      isEligible,
 		"active_mitra":     activeMitra,
 		"monthly_turnover": monthlyTurnover,
 		"requirements": map[string]interface{}{
-			"min_mitra":    100,
-			"min_turnover": 10000000,
+			"min_mitra":    reqMitra,
+			"min_turnover": reqTurnover,
 		},
 	})
 }
@@ -646,11 +646,12 @@ func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	// 2. Cek eligibility — harus 100 mitra aktif & omset tim >= 10jt/bulan
-	isEligible, activeMitra, monthlyTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+	// 2. Cek eligibility
+	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
 	if !isEligible {
 		utils.JSONError(w, http.StatusForbidden,
-			fmt.Sprintf("Belum memenuhi syarat. Mitra aktif: %d/100, Omset tim: Rp %.0f/10.000.000", activeMitra, monthlyTurnover))
+			fmt.Sprintf("Belum memenuhi syarat. Mitra aktif: %d/%d, Omset tim: Rp %.0f/%.0f", 
+				activeMitra, reqMitra, monthlyTurnover, reqTurnover))
 		return
 	}
 
@@ -696,5 +697,32 @@ func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.R
 			"store_name":  newMerchant.StoreName,
 			"status":      "pending",
 		},
+	})
+}
+
+// POST /api/affiliate/link-upline
+func (ac *AffiliateController) LinkUpline(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok || userID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+		return
+	}
+
+	var req struct {
+		RefCode string `json:"ref_code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if err := ac.Service.LinkUpline(userID, req.RefCode); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{
+		"status":  "success",
+		"message": "Berhasil bergabung ke jaringan!",
 	})
 }

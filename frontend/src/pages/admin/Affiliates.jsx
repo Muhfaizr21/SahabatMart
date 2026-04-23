@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
 
@@ -23,6 +23,7 @@ const STATUS_BADGE = {
 
 export default function AdminAffiliates() {
   const [affiliates, setAffiliates] = useState([]);
+  const [total, setTotal]           = useState(0);
   const [tiers, setTiers]           = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [tab, setTab]               = useState('members');
@@ -31,21 +32,32 @@ export default function AdminAffiliates() {
   const [processWd, setProcessWd]   = useState(null);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState('');
+  const [page, setPage]             = useState(1);
+  const [limit, setLimit]           = useState(20);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
+    const p = new URLSearchParams();
+    if (search) p.append('search', search);
+    p.append('page', page);
+    p.append('limit', limit);
+
     Promise.all([
-      fetchJson(`${API}/affiliates`),
+      fetchJson(`${API}/affiliates?${p}`),
       fetchJson(`${API}/affiliates/configs`),
       fetchJson(`${API}/affiliates/withdrawals`),
     ]).then(([af, cfg, wd]) => {
       setAffiliates(af.data || []);
+      setTotal(af.total || 0);
       setTiers(cfg.data || []);
       setWithdrawals(wd.data || []);
     }).catch(console.error).finally(() => setLoading(false));
-  };
+  }, [search, page, limit]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // Reset page on search
+  useEffect(() => { setPage(1); }, [search, limit]);
 
   const saveTier = () => {
     if (!editTier) return;
@@ -67,13 +79,8 @@ export default function AdminAffiliates() {
       .catch(console.error).finally(() => setSaving(false));
   };
 
-  const filtered = affiliates.filter(a =>
-    !search || (a.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (a.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (a.ref_code || '').toLowerCase().includes(search.toLowerCase())
-  );
-
   const pendingWd = withdrawals.filter(w => w.status === 'pending').length;
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div style={A.page} className="fade-in">
@@ -86,7 +93,7 @@ export default function AdminAffiliates() {
       </PageHeader>
 
       <StatRow stats={[
-        { label: 'Total Affiliate', val: affiliates.length, icon: 'bxs-group', color: '#6366f1' },
+        { label: 'Total Affiliate', val: total, icon: 'bxs-group', color: '#6366f1' },
         { label: 'Aktif', val: affiliates.filter(a => a.affiliate_status === 'active').length, icon: 'bxs-check-circle', color: '#10b981' },
         { label: 'Pencairan Pending', val: pendingWd, icon: 'bxs-wallet', color: '#f59e0b' },
         { label: 'Konfigurasi Tier', val: tiers.length, icon: 'bxs-layer', color: '#8b5cf6' },
@@ -115,28 +122,37 @@ export default function AdminAffiliates() {
       {tab === 'members' && (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-            <div style={{ position: 'relative', flex: '1 1 300px' }}>
-              <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-              <input style={{ ...A.select, paddingLeft: 42, width: '100%' }} placeholder="Cari email / nama / ref code..." value={search} onChange={e => setSearch(e.target.value)} />
+            <div style={{ ...A.searchWrap, minWidth: 300, flex: 1, position: 'relative' }}>
+              <i className="bx bx-search" style={A.searchIcon} />
+              <input style={{ ...A.searchInput, width: '100%', paddingLeft: 40, height: 42 }} placeholder="Cari Nama, Email, atau Ref Code..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select style={{ ...A.select, height: 42, minWidth: 100 }} value={limit} onChange={e => setLimit(parseInt(e.target.value))}>
+                <option value="20">20 / Hal</option>
+                <option value="50">50 / Hal</option>
+                <option value="100">100 / Hal</option>
+              </select>
             </div>
           </div>
+
           <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
             <TablePanel loading={loading}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
                 <thead>
                   <tr>
-                    {['Member', 'Ref Code', 'Tier', 'Total Earned', 'Saldo', 'Konversi', 'Status', 'Bergabung'].map((h, i) => (
+                    {['Member', 'Ref Code', 'Tier', 'Komisi', 'Saldo', 'Omzet Tim', 'Omzet Bulan', 'Aksi'].map((h, i) => (
                       <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 7 ? 24 : 14 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {affiliates.length === 0 ? (
                   <tr><td colSpan={8} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
                     <i className="bx bxs-group" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
-                    Belum ada member affiliate.
+                    Belum ada member affiliate yang sesuai filter.
                   </td></tr>
-                ) : filtered.map((a, idx) => {
+                ) : affiliates.map((a, idx) => {
                   const tc = TIER_COLORS[a.tier_name] || '#94a3b8';
                   return (
                     <tr key={a.id}
@@ -151,7 +167,7 @@ export default function AdminAffiliates() {
                           </div>
                           <div>
                             <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5 }}>{a.full_name || '—'}</div>
-                            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{a.email}</div>
+                            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{a.email} <span style={{ fontSize: 10, color: '#6366f1', textTransform: 'uppercase', background: '#eef2ff', padding: '1px 4px', borderRadius: 4 }}>{a.role}</span></div>
                           </div>
                         </div>
                       </td>
@@ -160,23 +176,42 @@ export default function AdminAffiliates() {
                       </td>
                       <td style={A.td}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 800, background: `${tc}18`, color: tc }}>
-                          {a.tier_name || 'Bronze'} {a.comm_rate ? `(${(a.comm_rate * 100).toFixed(1)}%)` : ''}
+                          {a.tier_name || 'Bronze'}
                         </span>
                       </td>
                       <td style={A.td}><span style={{ fontWeight: 700, color: '#10b981' }}>{idr(a.total_earned || 0)}</span></td>
                       <td style={A.td}><span style={{ fontWeight: 700, color: '#6366f1' }}>{idr(a.balance || 0)}</span></td>
-                      <td style={A.td}><span style={{ fontWeight: 700, color: '#0f172a' }}>{a.total_conversions || 0}x</span></td>
                       <td style={A.td}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{idr(a.team_turnover || 0)}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8' }}>{a.team_downlines || 0} downlines</div>
+                      </td>
+                      <td style={A.td}><span style={{ fontWeight: 700, color: '#f59e0b' }}>{idr(a.monthly_turnover || 0)}</span></td>
+                      <td style={{ ...A.td, paddingRight: 24 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...(STATUS_BADGE[a.affiliate_status] || STATUS_BADGE['pending_verification']) }}>
                           {a.affiliate_status || 'pending'}
                         </span>
                       </td>
-                      <td style={{ ...A.td, paddingRight: 24, fontSize: 12, color: '#94a3b8' }}>{fmtDate(a.joined_at)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+
+            {/* Pagination */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fcfcfd' }}>
+              <div style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>
+                Menampilkan <span style={{ color: '#475569' }}>{affiliates.length}</span> dari <span style={{ color: '#475569' }}>{total}</span> member
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ ...A.btnGhost, padding: '8px 12px', opacity: page === 1 ? 0.5 : 1 }}>
+                  <i className="bx bx-chevron-left" />
+                </button>
+                <div style={{ padding: '0 12px', fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{page} / {totalPages || 1}</div>
+                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ ...A.btnGhost, padding: '8px 12px', opacity: page >= totalPages ? 0.5 : 1 }}>
+                  <i className="bx bx-chevron-right" />
+                </button>
+              </div>
+            </div>
           </TablePanel>
           </div>
         </>

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"strconv"
 	"time"
 
 	"SahabatMart/backend/models"
@@ -76,24 +77,56 @@ func (ac *AdminController) GetUsers(w http.ResponseWriter, r *http.Request) {
 	role := r.URL.Query().Get("role")
 	status := r.URL.Query().Get("status")
 	search := r.URL.Query().Get("search")
+	sort := r.URL.Query().Get("sort")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page <= 0 { page = 1 }
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 { limit = 20 }
+	offset := (page - 1) * limit
 
-	query := ac.DB.Preload("Profile")
+	baseQuery := ac.DB.Model(&models.User{}).Joins("JOIN user_profiles ON user_profiles.user_id = users.id")
 	if role != "" {
-		query = query.Where("role = ?", role)
+		baseQuery = baseQuery.Where("users.role::text = ?", role)
 	}
 	if status != "" {
-		query = query.Where("status = ?", status)
+		baseQuery = baseQuery.Where("users.status::text = ?", status)
 	}
 	if search != "" {
-		// Kita tambahkan pencarian berdasarkan ID juga agar fitur Edit bisa memanggil data lewat ID
-		query = query.Where("email ILIKE ? OR phone ILIKE ? OR CAST(id AS TEXT) = ?", "%"+search+"%", "%"+search+"%", search)
+		baseQuery = baseQuery.Where("users.email ILIKE ? OR users.phone ILIKE ? OR CAST(users.id AS TEXT) = ? OR user_profiles.full_name ILIKE ?", "%"+search+"%", "%"+search+"%", search, "%"+search+"%")
 	}
 
+	var totalFiltered int64
+	baseQuery.Session(&gorm.Session{}).Count(&totalFiltered)
+
+	if sort == "" {
+		sort = "name"
+	}
+
+	query := baseQuery.Preload("Profile")
+	order := "users.created_at DESC"
+	if sort == "oldest" {
+		order = "users.created_at ASC"
+	} else if sort == "last_login" {
+		order = "users.last_login_at DESC"
+	} else if sort == "name" {
+		order = "user_profiles.full_name ASC"
+	}
+ 
+	if order != "" {
+		query = query.Order(order)
+	}
+	
 	var users []models.User
-	query.Find(&users)
+	err := query.Limit(limit).Offset(offset).Find(&users).Error
+	if err != nil {
+		log.Printf("GetUsers Error: %v", err)
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
-		"total":  len(users),
+		"total":  totalFiltered,
+		"page":   page,
+		"limit":  limit,
 		"data":   users,
 	})
 }
@@ -152,11 +185,10 @@ func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/admin/users/stats
 func (ac *AdminController) GetUserStats(w http.ResponseWriter, r *http.Request) {
-	var total, active, suspended, buyers, affiliates, merchants int64
+	var total, active, suspended, affiliates, merchants int64
 	ac.DB.Model(&models.User{}).Count(&total)
 	ac.DB.Model(&models.User{}).Where("status = 'active'").Count(&active)
 	ac.DB.Model(&models.User{}).Where("status = 'suspended'").Count(&suspended)
-	ac.DB.Model(&models.User{}).Where("role = 'buyer'").Count(&buyers)
 	ac.DB.Model(&models.User{}).Where("role = 'affiliate'").Count(&affiliates)
 	ac.DB.Model(&models.User{}).Where("role = 'merchant'").Count(&merchants)
 
@@ -164,7 +196,6 @@ func (ac *AdminController) GetUserStats(w http.ResponseWriter, r *http.Request) 
 		"total":      total,
 		"active":     active,
 		"suspended":  suspended,
-		"buyers":     buyers,
 		"affiliates": affiliates,
 		"merchants":  merchants,
 	})
@@ -432,6 +463,11 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request) {
 	search := r.URL.Query().Get("search")
 	status := r.URL.Query().Get("status")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page <= 0 { page = 1 }
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 { limit = 20 }
+	offset := (page - 1) * limit
 
 	type AffRow struct {
 		ID               string    `json:"id"`
@@ -450,41 +486,63 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 		AffStatus        string    `json:"affiliate_status"`
 		JoinedAt         time.Time `json:"joined_at"`
 		Balance          float64   `json:"balance"`
+		TeamTurnover     float64   `json:"team_turnover"`
+		MonthlyTurnover  float64   `json:"monthly_turnover"`
+		TeamDownlines    int64     `json:"team_downlines"`
+		Role             string    `json:"role"`
 	}
 
-	q := `
-		SELECT u.id, u.email, u.status, up.full_name,
-		       am.ref_code, mt.name AS tier_name, mt.level AS tier_level,
-		       mt.base_commission_rate AS comm_rate,
-		       am.total_earned, am.total_withdrawn, am.total_clicks, am.total_conversions,
-		       am.bank_name, am.status AS aff_status, am.created_at AS joined_at,
-		       GREATEST(am.total_earned - am.total_withdrawn, 0) AS balance
-		FROM users u
-		LEFT JOIN user_profiles up ON up.user_id = u.id
-		LEFT JOIN affiliate_members am ON am.user_id = u.id
-		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
-		WHERE u.role = 'affiliate'
-	`
+	whereClause := "u.role IN ('affiliate', 'merchant') AND am.id IS NOT NULL"
 	args := []interface{}{}
 	if search != "" {
-		q += " AND (u.email ILIKE ? OR up.full_name ILIKE ? OR am.ref_code ILIKE ?)"
+		whereClause += " AND (u.email ILIKE ? OR up.full_name ILIKE ? OR am.ref_code ILIKE ?)"
 		like := "%" + search + "%"
 		args = append(args, like, like, like)
 	}
 	if status != "" {
-		q += " AND am.status = ?"
+		whereClause += " AND am.status = ?"
 		args = append(args, status)
 	}
-	q += " ORDER BY am.total_earned DESC"
+
+	var totalFiltered int64
+	ac.DB.Table("users u").
+		Joins("LEFT JOIN affiliate_members am ON am.user_id = u.id").
+		Joins("LEFT JOIN user_profiles up ON up.user_id = u.id").
+		Where(whereClause, args...).
+		Count(&totalFiltered)
+
+	q := `
+		SELECT u.id, u.email, u.status, up.full_name, u.role,
+		       am.ref_code, mt.name AS tier_name, mt.level AS tier_level,
+		       mt.base_commission_rate AS comm_rate,
+		       am.total_earned, am.total_withdrawn, am.total_clicks, am.total_conversions,
+		       am.bank_name, am.status AS aff_status, am.created_at AS joined_at,
+		       GREATEST(am.total_earned - am.total_withdrawn, 0) AS balance,
+		       COALESCE(ats.team_turnover, 0) AS team_turnover,
+		       COALESCE(ats.monthly_turnover, 0) AS monthly_turnover,
+		       COALESCE(ats.team_downlines, 0) AS team_downlines
+		FROM users u
+		LEFT JOIN user_profiles up ON up.user_id = u.id
+		INNER JOIN affiliate_members am ON am.user_id = u.id
+		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
+		LEFT JOIN affiliate_turnover_snapshots ats ON ats.affiliate_id = am.id
+		WHERE ` + whereClause + `
+		ORDER BY am.total_earned DESC
+		LIMIT ? OFFSET ?
+	`
+	args = append(args, limit, offset)
 
 	var rows []AffRow
 	ac.DB.Raw(q, args...).Scan(&rows)
 	if rows == nil {
 		rows = []AffRow{}
 	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
-		"total":  len(rows),
+		"total":  totalFiltered,
+		"page":   page,
+		"limit":  limit,
 		"data":   rows,
 	})
 }
@@ -2465,15 +2523,16 @@ func (ac *AdminController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hashStr := string(hash)
 	user := models.User{
 		Email:        req.Email,
-		PasswordHash: string(hash),
+		PasswordHash: &hashStr,
 		Role:         req.Role,
 		Status:       "active",
 	}
 
 	if user.Role == "" {
-		user.Role = "buyer"
+		user.Role = "affiliate"
 	}
 
 	if err := ac.DB.Create(&user).Error; err != nil {

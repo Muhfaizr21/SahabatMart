@@ -86,6 +86,8 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			return err
 		}
 
+		adminID := "00000000-0000-0000-0000-000000000001"
+
 		var totalSubtotal, totalPlatformFee, totalCommission float64
 
 		for merchantID, gItems := range merchantItems {
@@ -121,6 +123,12 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 				if err := tx.Model(&inventory).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 					return err
+				}
+
+				// [Akuglow Sync] Low Stock Alert (Threshold: 5)
+				if inventory.Stock-item.Quantity <= 5 {
+					_ = s.Notification.Push(merchantID, "merchant", "low_stock_alert", "⚠️ Stok Menipis!", 
+						fmt.Sprintf("Produk '%s' sisa %d pcs. Segera lakukan restock!", item.ProductName, inventory.Stock-item.Quantity), "")
 				}
 
 				item.OrderID = order.ID
@@ -167,6 +175,15 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 						Status:      models.CommissionPending,
 						HoldUntil:   &holdUntil,
 					}
+
+					// [Akuglow Sync] Fraud Detection: Self-Referral Check
+					if resolvedAffiliate.UserID == buyerID {
+						commission.Status = models.CommissionFlagged
+						commission.Amount = 0 // Batalkan komisi otomatis
+						_ = s.Notification.Push(adminID, "admin", "fraud_detected", "Potensi Fraud Terdeteksi", 
+							fmt.Sprintf("User %s mencoba beli pakai link sendiri di pesanan %s.", resolvedAffiliate.UserID, order.OrderNumber), "")
+					}
+
 					if err := tx.Create(&commission).Error; err != nil {
 						return err
 					}
@@ -323,6 +340,15 @@ func (s *OrderService) CompletePayment(orderID string) error {
 			fmt.Sprintf("Pembayaran untuk pesanan %s telah divalidasi.", order.OrderNumber), 
 			fmt.Sprintf("/admin/orders/%s", order.ID))
 
+		// [NOTIF] Kirim ke Merchant: SIAP KIRIM
+		var groups []models.OrderMerchantGroup
+		tx.Where("order_id = ?", order.ID).Find(&groups)
+		for _, g := range groups {
+			_ = s.Notification.Push(g.MerchantID, "merchant", "order_ready_to_ship", "📦 Pesanan Siap Kirim!", 
+				fmt.Sprintf("Pesanan %s telah dibayar. Silakan segera packing dan kirim item pembeli.", order.OrderNumber), 
+				fmt.Sprintf("/merchant/orders/%s", order.ID))
+		}
+
 		// Cek Upgrade Tier Affiliate jika ada
 		if order.AffiliateID != nil {
 			// Increment Conversion Count
@@ -443,5 +469,98 @@ func (s *OrderService) ExpireOrders() error {
 		}
 	}
 	return nil
+}
+
+// [Akuglow Sync] UpdateMerchantOrderStatus memperbarui status group dan melakukan agregasi ke status induk
+func (s *OrderService) UpdateMerchantOrderStatus(groupID string, status models.MerchantOrderStatus) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var group models.OrderMerchantGroup
+		if err := tx.First(&group, "id = ?", groupID).Error; err != nil {
+			return err
+		}
+
+		group.Status = status
+		if status == models.MOrderShipped {
+			now := time.Now()
+			group.ShippedAt = &now
+		} else if status == models.MOrderDelivered {
+			now := time.Now()
+			group.DeliveredAt = &now
+		}
+
+		if err := tx.Save(&group).Error; err != nil {
+			return err
+		}
+
+		// Sync ke Status Induk
+		return s.SyncOrderStatusFromGroups(tx, group.OrderID)
+	})
+}
+
+// [Akuglow Sync] SyncOrderStatusFromGroups mengagregasi status dari seluruh distributor ke status pesanan utama
+func (s *OrderService) SyncOrderStatusFromGroups(tx *gorm.DB, orderID string) error {
+	var groups []models.OrderMerchantGroup
+	if err := tx.Where("order_id = ?", orderID).Find(&groups).Error; err != nil {
+		return err
+	}
+
+	total := len(groups)
+	shippedCount := 0
+	deliveredCount := 0
+	completedCount := 0
+	cancelledCount := 0
+
+	for _, g := range groups {
+		switch g.Status {
+		case models.MOrderShipped:
+			shippedCount++
+		case models.MOrderDelivered:
+			deliveredCount++
+		case models.MOrderCompleted:
+			completedCount++
+		case models.MOrderCancelled:
+			cancelledCount++
+		}
+	}
+
+	var newStatus models.OrderStatus
+	if cancelledCount == total {
+		newStatus = models.OrderCancelled
+	} else if completedCount == total {
+		newStatus = models.OrderCompleted
+	} else if (deliveredCount + completedCount) == total {
+		newStatus = models.OrderDelivered
+	} else if (shippedCount + deliveredCount + completedCount) == total {
+		newStatus = models.OrderShipped
+	} else {
+		// Tetap di status sebelumnya (Processing/Paid)
+		return nil
+	}
+
+	// Jika status berubah menjadi COMPLETED, trigger turnover update & Reward Points
+	if newStatus == models.OrderCompleted {
+		var order models.Order
+		tx.First(&order, "id = ?", orderID)
+		if order.Status != models.OrderCompleted {
+			// 1. Tambahkan Reward Points (Contoh: 1 poin per Rp 1.000)
+			if order.BuyerID != nil {
+				points := int64(order.GrandTotal / 1000)
+				if points > 0 {
+					tx.Model(&models.UserProfile{}).Where("user_id = ?", *order.BuyerID).
+						UpdateColumn("reward_points", gorm.Expr("reward_points + ?", points))
+					
+					_ = s.Notification.Push(*order.BuyerID, "buyer", "reward_earned", "🎁 Poin SahabatMart!", 
+						fmt.Sprintf("Selamat! Anda mendapatkan %d poin dari pesanan %s.", points, order.OrderNumber), "/profile?tab=points")
+				}
+			}
+
+			// 2. Trigger Turnover Snapshot Update untuk Affiliate secara Rekursif
+			if order.AffiliateID != nil {
+				go s.Affiliate.UpdateUplineSnapshotsRecursive(*order.AffiliateID)
+			}
+		}
+	}
+
+	return tx.Model(&models.Order{}).Where("id = ?", orderID).Update("status", newStatus).Error
 }
 

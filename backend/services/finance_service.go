@@ -85,8 +85,15 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 
 	// 1. Distribute ke Merchant Portions (Distributor Cut)
 	for _, group := range order.MerchantGroups {
-		desc := fmt.Sprintf("Jatah Distribusi: %s", order.OrderNumber)
-		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, group.DistributionCommission, order.ID, "order", desc); err != nil {
+		// [Akuglow Sync] Bagi beban diskon 50/50 antara Pusat & Merchant
+		merchantShare := group.Discount * 0.5
+		hqShare := group.Discount * 0.5
+
+		actualDistroCut := group.DistributionCommission - merchantShare
+		if actualDistroCut < 0 { actualDistroCut = 0 }
+
+		desc := fmt.Sprintf("Jatah Distribusi: %s (Potong Diskon 50%%: Rp%.0f)", order.OrderNumber, merchantShare)
+		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, actualDistroCut, order.ID, "order", desc); err != nil {
 			return err
 		}
 
@@ -99,14 +106,11 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		}
 
 		// HQ Cut: Sisa pendapatan yang masuk ke Pusat/Brand Owner
-		// Formula: Subtotal - PlatformFee - AffiliateCommission - DistributionCommission - GroupDiscount
-		hqCut := group.Subtotal - group.PlatformFee - group.AffiliateCommission - group.DistributionCommission - group.Discount
+		// Formula: (Subtotal - PlatformFee - AffiliateCommission - DistributionCommission) - hqShare
+		hqCut := (group.Subtotal - group.PlatformFee - group.AffiliateCommission - group.DistributionCommission) - hqShare
 
 		if hqCut != 0 {
-			hqDesc := fmt.Sprintf("Pendapatan Bersih Pusat: %s", order.OrderNumber)
-			if group.Discount > 0 {
-				hqDesc = fmt.Sprintf("Pendapatan Bersih Pusat (Setelah Diskon Rp%.0f): %s", group.Discount, order.OrderNumber)
-			}
+			hqDesc := fmt.Sprintf("Pendapatan Bersih Pusat: %s (Potong Diskon 50%%: Rp%.0f)", order.OrderNumber, hqShare)
 			if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqCut, order.ID, "order", hqDesc); err != nil {
 				return err
 			}
@@ -147,8 +151,9 @@ func (s *FinanceService) ManualAdjustment(adminID string, targetID string, owner
 }
 
 // MovePendingToAvailable... (previous code)
-func (s *FinanceService) ProcessSettlements() error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+func (s *FinanceService) ProcessSettlements() (int64, error) {
+	var settledCount int64
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		limitDate := time.Now().AddDate(0, 0, -7) // Settlement delay 7 hari
 		
 		var txs []models.WalletTransaction
@@ -208,9 +213,11 @@ func (s *FinanceService) ProcessSettlements() error {
 				_ = s.Notification.Push(wallet.OwnerID, "merchant", "payout_settled", "Saldo Cair", 
 					fmt.Sprintf("Dana Rp%.2f dari pesanan %s sudah masuk ke saldo utama.", amount, txn.ReferenceID), "/merchant/wallet")
 			}
+			settledCount++
 		}
 		return nil
 	})
+	return settledCount, err
 }
 
 // ReleaseEscrow secara langsung menarik dana dari Pending ke Available Balance
@@ -273,4 +280,3 @@ func (s *FinanceService) SyncPlatformLedger() (map[string]interface{}, error) {
 		"checked_at":               time.Now(),
 	}, nil
 }
-

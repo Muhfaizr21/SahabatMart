@@ -1,15 +1,22 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	googleoauth "google.golang.org/api/oauth2/v2"
+	"google.golang.org/api/option"
 	"gorm.io/gorm"
 )
 
@@ -139,4 +146,82 @@ func (ac *AuthController) Impersonate(w http.ResponseWriter, r *http.Request) {
 		"user":    user,
 		"is_ghost": true,
 	})
+}
+
+// GetMe mengambil profil user yang sedang login
+func (ac *AuthController) GetMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+		return
+	}
+
+	var user models.User
+	if err := ac.Service.DB.Preload("Profile").Preload("Merchant").Preload("Affiliate").First(&user, "id = ?", userID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, user)
+}
+
+func (ac *AuthController) getGoogleConfig() *oauth2.Config {
+	return &oauth2.Config{
+		RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
+		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		Endpoint:     google.Endpoint,
+	}
+}
+
+func (ac *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
+	ref := r.URL.Query().Get("ref")
+	if ref == "" {
+		ref = "direct"
+	}
+	url := ac.getGoogleConfig().AuthCodeURL(ref)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.FormValue("code")
+	config := ac.getGoogleConfig()
+	
+	token, err := config.Exchange(context.Background(), code)
+	if err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Gagal menukar token Google")
+		return
+	}
+
+	oauth2Service, err := googleoauth.NewService(context.Background(), option.WithTokenSource(config.TokenSource(context.Background(), token)))
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memuat layanan Google")
+		return
+	}
+
+	userInfo, err := oauth2Service.Userinfo.Get().Do()
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data user Google")
+		return
+	}
+
+	state := r.FormValue("state")
+	if state == "direct" || state == "state-token" {
+		state = ""
+	}
+
+	user, jwtToken, err := ac.Service.HandleGoogleUser(userInfo.Email, userInfo.Name, userInfo.Id, userInfo.Picture, state)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+	
+	// Redirect balik ke frontend dengan token di URL
+	http.Redirect(w, r, fmt.Sprintf("%s/login?token=%s&user_id=%s", frontendURL, jwtToken, user.ID), http.StatusTemporaryRedirect)
 }

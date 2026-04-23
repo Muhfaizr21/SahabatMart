@@ -21,6 +21,7 @@ const (
 	CommissionPaid      CommissionStatus = "paid"
 	CommissionRejected  CommissionStatus = "rejected"
 	CommissionCancelled CommissionStatus = "cancelled"
+	CommissionFlagged   CommissionStatus = "flagged"
 )
 
 type AffiliateMember struct {
@@ -145,4 +146,28 @@ func (AffiliateCommission) TableName() string  { return "affiliate_commissions" 
 func (AffiliateLink) TableName() string        { return "affiliate_links" }
 func (AffiliateClickLog) TableName() string    { return "affiliate_click_logs" }
 func (AffiliateWithdrawal) TableName() string  { return "affiliate_withdrawals" }
+
+type AffiliateTurnoverSnapshot struct {
+	ID              string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	AffiliateID     string    `gorm:"type:uuid;uniqueIndex;not null" json:"affiliate_id"`
+	TeamDownlines   int64     `gorm:"default:0" json:"team_downlines"`
+	TeamTurnover    float64   `gorm:"type:decimal(15,2);default:0" json:"team_turnover"`
+	MonthlyTurnover float64   `gorm:"type:decimal(15,2);default:0" json:"monthly_turnover"`
+	DirectMitra     int64     `gorm:"default:0" json:"direct_mitra"`
+	LastUpdated     time.Time `json:"last_updated"`
+}
+
+func (AffiliateTurnoverSnapshot) TableName() string { return "affiliate_turnover_snapshots" }
+
+type LeaderboardCache struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	AffiliateID string    `gorm:"type:uuid;not null;index" json:"affiliate_id"`
+	Name        string    `json:"name"`
+	Avatar      string    `json:"avatar"`
+	Rank        int       `json:"rank"`
+	TotalEarned float64   `json:"total_earned"`
+	LastSynced  time.Time `json:"last_synced"`
+}
+
+func (LeaderboardCache) TableName() string { return "leaderboard_cache" }
 

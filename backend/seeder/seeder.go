@@ -71,6 +71,7 @@ func SeedAll(db *gorm.DB) {
 	// 5. Seed Marketing & RBAC
 	seedMarketing(db)
 	seedRBAC(db)
+	seedConfigs(db)
 
 	// 6. Seed Network (Merchant & Affiliate relationship)
 	SeedNetwork(db)
@@ -119,22 +120,22 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 
 	// Super Admin
 	admin := models.User{
-		ID: AdminID, Email: "admin@akugrow.com", PasswordHash: pwHash, Role: "superadmin", Status: "active",
+		ID: AdminID, Email: "admin@akugrow.com", PasswordHash: &pwHash, Role: "superadmin", Status: "active",
 	}
 	db.Create(&admin)
 	db.Create(&models.UserProfile{UserID: admin.ID, FullName: "CEO AkuGrow"})
 	
 	// Buyers (Test Location Tracking)
-	buyerSby := models.User{Email: "buyer@akuglow.com", PasswordHash: pwHash, Role: "buyer", Status: "active"}
+	buyerSby := models.User{Email: "buyer@akuglow.com", PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 	db.Create(&buyerSby)
 	db.Create(&models.UserProfile{UserID: buyerSby.ID, FullName: "Buyer Surabaya", City: "Surabaya", Province: "Jawa Timur"})
 
-	buyerJkt := models.User{Email: "buyer_jkt@akuglow.com", PasswordHash: pwHash, Role: "buyer", Status: "active"}
+	buyerJkt := models.User{Email: "buyer_jkt@akuglow.com", PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 	db.Create(&buyerJkt)
 	db.Create(&models.UserProfile{UserID: buyerJkt.ID, FullName: "Buyer Jakarta", City: "Jakarta Pusat", Province: "DKI Jakarta"})
 
 	// Mitra (Test Affiliate Sharing)
-	mitra := models.User{Email: "mitra@akuglow.com", PasswordHash: pwHash, Role: "affiliate", Status: "active"}
+	mitra := models.User{Email: "mitra@akuglow.com", PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 	db.Create(&mitra)
 	db.Create(&models.UserProfile{UserID: mitra.ID, FullName: "Mitra Akuglow Utama", City: "Bandung"})
 	db.Create(&models.AffiliateMember{
@@ -145,7 +146,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	})
 
 	// Pusat (Master Inventory)
-	pusatUser := models.User{ID: PusatID, Email: "pusat@akugrow.com", PasswordHash: pwHash, Role: "merchant", Status: "active"}
+	pusatUser := models.User{ID: PusatID, Email: "pusat@akugrow.com", PasswordHash: &pwHash, Role: "merchant", Status: "active"}
 	db.Create(&pusatUser)
 	db.Create(&models.UserProfile{UserID: pusatUser.ID, FullName: "Gudang Pusat SahabatMart"})
 	
@@ -169,7 +170,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 
 	var mList []models.Merchant
 	for _, m := range merchantLocs {
-		u := models.User{Email: m.email, PasswordHash: pwHash, Role: "merchant", Status: "active"}
+		u := models.User{Email: m.email, PasswordHash: &pwHash, Role: "merchant", Status: "active"}
 		db.Create(&u)
 		db.Create(&models.UserProfile{UserID: u.ID, FullName: m.name, City: m.city})
 		merch := models.Merchant{UserID: u.ID, StoreName: m.name, Slug: m.slug, Status: "active", IsVerified: true, City: m.city}
@@ -349,5 +350,17 @@ func seedRBAC(db *gorm.DB) {
 	}
 	for _, p := range perms {
 		db.FirstOrCreate(&p, models.Permission{Code: p.Code})
+	}
+}
+
+func seedConfigs(db *gorm.DB) {
+	fmt.Println("  -> Seeding Platform Configs...")
+	configs := []models.PlatformConfig{
+		{Key: "merchant_min_active_mitra", Value: "100", Description: "Minimal affiliate aktif untuk menjadi merchant"},
+		{Key: "merchant_min_team_turnover", Value: "10000000", Description: "Minimal omset tim (Rp) per bulan untuk menjadi merchant"},
+	}
+
+	for _, c := range configs {
+		db.Where("key = ?", c.Key).FirstOrCreate(&c)
 	}
 }

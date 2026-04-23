@@ -47,8 +47,9 @@ func ConnectDB() {
 		&models.Inventory{}, &models.RestockRequest{}, &models.RestockItem{},
 		// Affiliate portal models
 		&models.AffiliateCommission{}, &models.AffiliateLink{},
-		&models.AffiliateClickLog{}, &models.AffiliateWithdrawal{},
+		&models.AffiliateWithdrawal{},
 		&models.AffiliateEducation{}, &models.AffiliateEvent{}, &models.PromoMaterial{},
+		&models.AffiliateTurnoverSnapshot{}, &models.LeaderboardCache{},
 	)
 }
 
@@ -131,8 +132,11 @@ func startHousekeeping(db *gorm.DB) {
 		log.Println("🔄 Running Platform Housekeeping...")
 
 		// 1. Process Merchant Settlements
-		if err := financeService.ProcessSettlements(); err != nil {
+		settled, err := financeService.ProcessSettlements()
+		if err != nil {
 			log.Printf("❌ Housekeeping Error (Settlement): %v", err)
+		} else if settled > 0 {
+			log.Printf("💰 Financial Sync: %d transactions settled to available balance", settled)
 		}
 
 		// 2. Auto-update Logistics & Order Completion
@@ -157,12 +161,42 @@ func startHousekeeping(db *gorm.DB) {
 			affiliateService.TriggerTierUpgrade(aff.ID)
 		}
 
-		// 6. Sync Platform Ledger
+		// 6. Auto-cancel Merchant orders if not shipped within 48h
+		if err := autoCancelOverdueMerchantOrders(db, orderService, notifService); err != nil {
+			log.Printf("❌ Housekeeping Error (Merchant Overdue): %v", err)
+		}
+
+		// 7. Sync Leaderboard Cache (Hourly or every 5 mins for now)
+		if err := affiliateService.SyncLeaderboard(); err != nil {
+			log.Printf("❌ Housekeeping Error (Leaderboard): %v", err)
+		}
+
+		// 8. Cleanup Expired Vouchers
+		if err := cleanupVouchers(db); err != nil {
+			log.Printf("❌ Housekeeping Error (Voucher Cleanup): %v", err)
+		}
+
+		// 9. Sync Platform Ledger
 		ledger, err := financeService.SyncPlatformLedger()
 		if err == nil {
 			log.Printf("📊 Platform Ledger Sync: %+v", ledger)
 		}
+
 	}
+}
+
+// cleanupVouchers: Menonaktifkan voucher yang expired atau habis kuota
+func cleanupVouchers(db *gorm.DB) error {
+	now := time.Now()
+	// Nonaktifkan yang expired
+	if err := db.Model(&models.Voucher{}).Where("status = 'active' AND expiry_date <= ?", now).Update("status", "expired").Error; err != nil {
+		return err
+	}
+	// Nonaktifkan yang kuota habis
+	if err := db.Model(&models.Voucher{}).Where("status = 'active' AND quota <= used").Update("status", "exhausted").Error; err != nil {
+		return err
+	}
+	return nil
 }
 
 // releaseAffiliateCommissions: pending → approved after hold_until passes
@@ -212,6 +246,7 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *services.NotificationServic
 
 
 func autoUpdateLogistics(db *gorm.DB, notif *services.NotificationService) error {
+	orderService := services.NewOrderService(db)
 	var groups []models.OrderMerchantGroup
 	// Find merchant groups that are SHIPPED but not yet DELIVERED
 	db.Where("status = ? AND tracking_number IS NOT NULL AND tracking_number <> ''", models.MOrderShipped).Find(&groups)
@@ -219,31 +254,36 @@ func autoUpdateLogistics(db *gorm.DB, notif *services.NotificationService) error
 	for _, group := range groups {
 		// Simulation: Every order with "99" at end of tracking number is marked as Delivered
 		if strings.HasSuffix(group.TrackingNumber, "99") {
-			now := time.Now()
-			group.Status = models.MOrderDelivered
-			group.DeliveredAt = &now
-			db.Save(&group)
-			log.Printf("📦 Merchant Order %s: Automated delivery sync completed", group.ID)
-
-			// SYNC: Check if all groups in this order are now Delivered/Completed
-			var totalGroups int64
-			var deliveredGroups int64
-			db.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", group.OrderID).Count(&totalGroups)
-			db.Model(&models.OrderMerchantGroup{}).Where("order_id = ? AND status IN ?", group.OrderID, []string{string(models.MOrderDelivered), string(models.MOrderCompleted)}).Count(&deliveredGroups)
-
-			if totalGroups > 0 && totalGroups == deliveredGroups {
-				// All items delivered, update parent Order status
-				db.Model(&models.Order{}).Where("id = ?", group.OrderID).Update("status", models.OrderCompleted)
-				log.Printf("🎉 Parent Order %s marked as COMPLETED automatically", group.OrderID)
-				
-				// Send notification to Buyer
-				var order models.Order
-				db.Select("buyer_id").First(&order, "id = ?", group.OrderID)
-				if order.BuyerID != nil && *order.BuyerID != "" {
-					notif.Push(*order.BuyerID, "buyer", "order_completed", 
-						"Pesanan Selesai! 🎁", "Seluruh item pesanan Anda telah diterima. Terima kasih sudah berbelanja!", "/orders")
-				}
+			log.Printf("📦 Logistics Sync: Auto-delivering group %s", group.ID)
+			if err := orderService.UpdateMerchantOrderStatus(group.ID, models.MOrderDelivered); err != nil {
+				log.Printf("❌ Logistics Sync Error: %v", err)
 			}
+		}
+	}
+	return nil
+}
+// autoCancelOverdueMerchantOrders: Membatalkan pesanan jika merchant tidak kirim dalam 48 jam
+func autoCancelOverdueMerchantOrders(db *gorm.DB, orderService *services.OrderService, notif *services.NotificationService) error {
+	deadline := time.Now().Add(-48 * time.Hour)
+
+	var overdueGroups []models.OrderMerchantGroup
+	// Mencari pesanan yang sudah dibayar (confirmed) tapi belum diproses/kirim lebih dari 48 jam
+	err := db.Where("status = ? AND updated_at <= ?", models.MOrderConfirmed, deadline).Find(&overdueGroups).Error
+	if err != nil {
+		return err
+	}
+
+	for _, group := range overdueGroups {
+		reason := "Sistem: Merchant tidak mengirim pesanan dalam waktu 48 jam"
+		
+		// Batalkan seluruh Order Induk jika ini satu-satunya group, atau cukup batalkan group ini saja?
+		// Sesuai permintaan, kita batalkan order tersebut untuk keamanan pembeli
+		if err := orderService.CancelOrder(group.OrderID, reason, "system"); err == nil {
+			log.Printf("⚠️ Auto-Cancelled Order %s due to Merchant %s delay", group.OrderID, group.MerchantID)
+			
+			// Notifikasi ke Merchant (Penalti Teguran)
+			_ = notif.Push(group.MerchantID, "merchant", "order_penalty", "Pesanan Dibatalkan Otomatis", 
+				fmt.Sprintf("Pesanan %s dibatalkan karena Anda tidak memproses pengiriman dalam 48 jam.", group.OrderID), "")
 		}
 	}
 	return nil

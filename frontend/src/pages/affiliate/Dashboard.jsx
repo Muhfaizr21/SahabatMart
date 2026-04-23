@@ -114,6 +114,27 @@ export default function AffiliateDashboard() {
     }
   }, []);
 
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [uplineCode, setUplineCode] = useState('');
+
+  const handleLinkUpline = async (e) => {
+    e.preventDefault();
+    if (!uplineCode) return;
+    setLinkLoading(true);
+    try {
+      await fetchJson(`${AFFILIATE_API_BASE}/link-upline`, {
+        method: 'POST',
+        body: JSON.stringify({ ref_code: uplineCode })
+      });
+      alert('Berhasil bergabung ke jaringan!');
+      fetchDashboard();
+    } catch (err) {
+      alert(err.message || 'Gagal bergabung ke jaringan');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchDashboard();
     const interval = setInterval(fetchDashboard, 60000);
@@ -210,6 +231,65 @@ export default function AffiliateDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Manual Join Network - Only if no upline */}
+      {!data?.affiliate?.upline_id && (
+        <div
+          className="p-6 rounded-2xl relative overflow-hidden"
+          style={{
+            background: 'rgba(35, 41, 60, 0.6)',
+            border: '1px solid rgba(124, 58, 237, 0.3)',
+            boxShadow: '0 0 40px rgba(124, 58, 237, 0.1)',
+          }}
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+            <span className="material-symbols-outlined text-8xl">hub</span>
+          </div>
+          
+          <div className="relative z-10">
+            <h3 className="text-xl font-black text-white font-['Plus_Jakarta_Sans'] mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-purple-400">link</span>
+              Gabung ke Jaringan Affiliate
+            </h3>
+            <p className="text-slate-400 text-sm mb-6 max-w-2xl leading-relaxed">
+              Anda belum terhubung ke jaringan manapun. Masukkan kode referral upline Anda 
+              untuk mulai membangun tim dan mendapatkan bimbingan dari senior mitra Anda.
+            </p>
+            
+            <form onSubmit={handleLinkUpline} className="flex flex-col sm:flex-row gap-3 max-w-lg">
+              <div className="flex-1 relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500 text-lg">
+                  alternate_email
+                </span>
+                <input
+                  type="text"
+                  value={uplineCode}
+                  onChange={(e) => setUplineCode(e.target.value.toUpperCase())}
+                  placeholder="KODE REFERRAL UPLINE"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl text-sm font-bold text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500"
+                  style={{
+                    background: 'rgba(12, 19, 36, 0.6)',
+                    border: '1px solid rgba(77, 67, 84, 0.3)',
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={linkLoading || !uplineCode}
+                className="px-8 py-3 rounded-xl text-sm font-black text-white transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
+              >
+                {linkLoading ? (
+                   <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                ) : (
+                  <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                )}
+                HUBUNGKAN SEKARANG
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

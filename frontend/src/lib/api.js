@@ -52,9 +52,9 @@ export async function fetchJson(url, options = {}) {
       throw new Error("Format respons server tidak valid");
     }
     
-    // Pelindung Rekursif: Mengupas lapisan 'success' sampai ketemu data inti
-    // Ini menangani kasus double-wrapping jika backend belum direstart
-    while (result && result.status === 'success' && result.data !== undefined) {
+    // Pelindung Rekursif: Mengupas lapisan 'success' hanya jika itu double-wrapping murni
+    // Jangan mengupas jika ada metadata penting seperti 'total', 'page', atau 'limit'
+    while (result && result.status === 'success' && result.data !== undefined && !result.total && !result.page) {
       result = result.data;
     }
     

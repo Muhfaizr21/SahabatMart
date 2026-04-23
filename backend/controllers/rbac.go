@@ -110,9 +110,10 @@ func (rc *RBACController) CreateAdminUser(w http.ResponseWriter, r *http.Request
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 
+	hashStr := string(hash)
 	user := models.User{
 		Email:        input.Email,
-		PasswordHash: string(hash),
+		PasswordHash: &hashStr,
 		Role:         input.Role,
 		AdminRole:    input.AdminRole,
 		Department:   input.Department,

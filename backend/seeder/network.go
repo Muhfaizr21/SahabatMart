@@ -44,7 +44,7 @@ func SeedNetwork(db *gorm.DB) {
 		u := models.User{
 			ID: uuid.New().String(),
 			Email: email,
-			PasswordHash: pwHash,
+			PasswordHash: &pwHash,
 			Role: "affiliate",
 			Status: "active",
 		}
@@ -85,7 +85,7 @@ func SeedNetwork(db *gorm.DB) {
 		u := models.User{
 			ID: uuid.New().String(),
 			Email: email,
-			PasswordHash: pwHash,
+			PasswordHash: &pwHash,
 			Role: "merchant", // IMPORTANT: Already upgraded to merchant
 			Status: "active",
 		}
@@ -129,7 +129,7 @@ func SeedNetwork(db *gorm.DB) {
 		u := models.User{
 			ID: uuid.New().String(),
 			Email: email,
-			PasswordHash: pwHash,
+			PasswordHash: &pwHash,
 			Role: "affiliate", // Still affiliate
 			Status: "active",
 		}
@@ -163,7 +163,7 @@ func SeedNetwork(db *gorm.DB) {
 
 	for i := 1; i <= 50; i++ {
 		email := fmt.Sprintf("mitra_reguler%d@akugrow.com", i)
-		u := models.User{ID: uuid.New().String(), Email: email, PasswordHash: pwHash, Role: "affiliate", Status: "active"}
+		u := models.User{ID: uuid.New().String(), Email: email, PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 		db.Create(&u)
 		db.Create(&models.UserProfile{UserID: u.ID, FullName: fmt.Sprintf("Mitra Reguler %d", i)})
 		

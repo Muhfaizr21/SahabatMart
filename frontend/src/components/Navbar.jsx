@@ -186,17 +186,21 @@ export default function Navbar() {
             )}
           </div>
 
-          <Link to="/wishlist" className="hidden sm:flex relative p-2.5 text-gray-700 hover:text-red-500 transition-colors">
-            <HeartIcon />
-            {loggedIn && wishCount > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{wishCount}</span>}
-          </Link>
+          {loggedIn && (
+            <Link to="/wishlist" className="hidden sm:flex relative p-2.5 text-gray-700 hover:text-red-500 transition-colors">
+              <HeartIcon />
+              {wishCount > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{wishCount}</span>}
+            </Link>
+          )}
 
-          <Link to="/cart" className="relative p-2.5 text-gray-700 hover:text-blue-600 transition-colors">
-            <CartIcon />
-            {loggedIn && cartCount > 0 && (
-              <span className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{cartCount}</span>
-            )}
-          </Link>
+          {loggedIn && (
+            <Link to="/cart" className="relative p-2.5 text-gray-700 hover:text-blue-600 transition-colors">
+              <CartIcon />
+              {cartCount > 0 && (
+                <span className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{cartCount}</span>
+              )}
+            </Link>
+          )}
 
           <button className="lg:hidden p-2 text-gray-700" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <CloseIcon /> : <MenuIcon />}

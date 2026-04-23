@@ -324,17 +324,26 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 
 		// 1. Update Inventory
 		for _, item := range req.Items {
+			var prod models.Product
+			tx.First(&prod, "id = ?", item.ProductID)
+
 			var inv models.Inventory
 			err := tx.Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).First(&inv).Error
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				inv = models.Inventory{
-					MerchantID: merchantID,
-					ProductID:  item.ProductID,
-					Stock:      item.Quantity,
+					MerchantID:    merchantID,
+					ProductID:     item.ProductID,
+					Stock:         item.Quantity,
+					BasePrice:     prod.Price,
+					LastSyncPrice: time.Now(),
 				}
 				if err := tx.Create(&inv).Error; err != nil { return err }
 			} else if err == nil {
-				if err := tx.Model(&inv).Update("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil { return err }
+				if err := tx.Model(&inv).Updates(map[string]interface{}{
+					"stock":           gorm.Expr("stock + ?", item.Quantity),
+					"base_price":      prod.Price,
+					"last_sync_price": time.Now(),
+				}).Error; err != nil { return err }
 			} else {
 				return err
 			}

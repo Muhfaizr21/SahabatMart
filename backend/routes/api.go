@@ -95,15 +95,65 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 		}
 	}
 
+	// [Akuglow Sync] Permission-based Middleware (RBAC Phase 2)
+	can := func(permissionCode string) func(http.HandlerFunc) http.HandlerFunc {
+		return func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				authHeader := r.Header.Get("Authorization")
+				if authHeader == "" {
+					utils.JSONError(w, http.StatusUnauthorized, "Login diperlukan")
+					return
+				}
+
+				token := strings.TrimPrefix(authHeader, "Bearer ")
+				claims, err := utils.ParseJWT(token)
+				if err != nil {
+					utils.JSONError(w, http.StatusUnauthorized, "Sesi berakhir")
+					return
+				}
+
+				// Check Permission in DB via Role
+				var count int64
+				err = db.Table("role_permissions").
+					Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
+					Joins("JOIN users ON users.role::text = (SELECT name::text FROM roles WHERE id = role_permissions.role_id)").
+					Where("users.id = ? AND permissions.code = ?", claims.UserID, permissionCode).
+					Count(&count).Error
+
+				if err != nil || count == 0 {
+					// Fallback: Superadmin always has access
+					var user models.User
+					db.Select("role").First(&user, "id = ?", claims.UserID)
+					if strings.ToLower(user.Role) != "superadmin" {
+						utils.JSONError(w, http.StatusForbidden, "Akses ditolak: Anda tidak memiliki izin "+permissionCode)
+						return
+					}
+				}
+
+				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+			}
+		}
+	}
+
 	// --- Auth Routes ---
 	mux.HandleFunc("/api/auth/register", authCtrl.Register)
 	mux.HandleFunc("/api/auth/login", authCtrl.Login)
+	mux.HandleFunc("/api/auth/google/login", authCtrl.GoogleLogin)
+	mux.HandleFunc("/api/auth/google/callback", authCtrl.GoogleCallback)
+	
+	// Middleware actor check
+	anyUser := actorOnly("merchant", "affiliate", "admin", "superadmin")
+	adminOnly := actorOnly("admin", "superadmin")
+	superAdminOnly := actorOnly("superadmin")
+	mux.HandleFunc("/api/auth/me", anyUser(authCtrl.GetMe))
+
 	mux.HandleFunc("/api/tripay/webhook", paymentCtrl.TriPayCallback)
 	mux.HandleFunc("/api/callback/tripay", paymentCtrl.TriPayCallback)
 
 
-	// --- Buyer Routes ---
-	buyerOnly := actorOnly("buyer", "admin", "superadmin", "merchant", "affiliate")
+	// --- Buyer Routes (Now mapped to all authenticated users) ---
+	buyerOnly := actorOnly("affiliate", "merchant", "admin", "superadmin")
 	mux.HandleFunc("/api/buyer/cart", buyerOnly(buyerCtrl.GetCart))
 	mux.HandleFunc("/api/buyer/cart/add", buyerOnly(buyerCtrl.AddToCart))
 	mux.HandleFunc("/api/buyer/cart/item", buyerOnly(buyerCtrl.RemoveFromCart))
@@ -176,11 +226,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/affiliate/promo-materials", affiliateOnly(affiliateCtrl.GetPromoMaterials))
 	mux.HandleFunc("/api/affiliate/profile", affiliateOnly(affiliateCtrl.GetProfile))
 	mux.HandleFunc("/api/affiliate/profile/update", affiliateOnly(affiliateCtrl.UpdateProfile))
+	mux.HandleFunc("/api/affiliate/link-upline", affiliateOnly(affiliateCtrl.LinkUpline))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
 
 	// --- Admin Routes ---
-	adminOnly := actorOnly("admin", "superadmin")
-	superOnly := actorOnly("superadmin")
+	adminOnly = actorOnly("admin", "superadmin")
+	superAdminOnly = actorOnly("superadmin")
 	
 	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
@@ -193,10 +244,10 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/notifications/read", adminOnly(adminCtrl.MarkNotificationRead))
 
 	// User Management
-	mux.HandleFunc("/api/admin/users", adminOnly(adminCtrl.GetUsers))
-	mux.HandleFunc("/api/admin/users/create", adminOnly(adminCtrl.CreateUser))
-	mux.HandleFunc("/api/admin/users/update", adminOnly(adminCtrl.UpdateUser))
-	mux.HandleFunc("/api/admin/users/delete", adminOnly(adminCtrl.DeleteUser))
+	mux.HandleFunc("/api/admin/users", can("manage_users")(adminCtrl.GetUsers))
+	mux.HandleFunc("/api/admin/users/create", can("manage_users")(adminCtrl.CreateUser))
+	mux.HandleFunc("/api/admin/users/update", can("manage_users")(adminCtrl.UpdateUser))
+	mux.HandleFunc("/api/admin/users/delete", can("manage_users")(adminCtrl.DeleteUser))
 
 	// Merchant Management
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))
@@ -206,11 +257,11 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/merchants/restock/moderate", adminOnly(adminCtrl.ModerateRestockRequest))
 
 	// Product Catalog
-	mux.HandleFunc("/api/admin/products", adminOnly(adminCtrl.GetProducts))
-	mux.HandleFunc("/api/admin/products/moderate", adminOnly(adminCtrl.ModerateProduct))
-	mux.HandleFunc("/api/admin/products/delete", adminOnly(adminCtrl.DeleteProduct))
-	mux.HandleFunc("/api/admin/products/add", adminOnly(adminCtrl.AddProduct))
-	mux.HandleFunc("/api/admin/products/update", adminOnly(adminCtrl.UpdateProduct))
+	mux.HandleFunc("/api/admin/products", can("manage_products")(adminCtrl.GetProducts))
+	mux.HandleFunc("/api/admin/products/moderate", can("manage_products")(adminCtrl.ModerateProduct))
+	mux.HandleFunc("/api/admin/products/delete", can("manage_products")(adminCtrl.DeleteProduct))
+	mux.HandleFunc("/api/admin/products/add", can("manage_products")(adminCtrl.AddProduct))
+	mux.HandleFunc("/api/admin/products/update", can("manage_products")(adminCtrl.UpdateProduct))
 	mux.HandleFunc("/api/admin/categories", adminOnly(adminCtrl.GetCategories))
 	mux.HandleFunc("/api/admin/categories/add", adminOnly(adminCtrl.AddCategory))
 	mux.HandleFunc("/api/admin/categories/delete", adminOnly(adminCtrl.DeleteCategory))
@@ -262,7 +313,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/blogs/upsert", adminOnly(adminCtrl.UpsertBlog))
 	mux.HandleFunc("/api/admin/blogs/delete", adminOnly(adminCtrl.DeleteBlog))
 	mux.HandleFunc("/api/admin/banners", adminOnly(adminCtrl.ManageBanners))
-	mux.HandleFunc("/api/admin/banners/delete", superOnly(adminCtrl.DeleteBanner))
+	mux.HandleFunc("/api/admin/banners/delete", superAdminOnly(adminCtrl.DeleteBanner))
 
 	// Affiliate Resource Management
 	mux.HandleFunc("/api/admin/education", adminOnly(adminCtrl.GetEducation))
@@ -276,18 +327,18 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/promo/delete", adminOnly(adminCtrl.DeletePromoMaterial))
 
 	// CMS & Inbox
-	mux.HandleFunc("/api/admin/inbox", superOnly(contactCtrl.GetMessages))
-	mux.HandleFunc("/api/admin/inbox/update", superOnly(contactCtrl.UpdateStatus))
-	mux.HandleFunc("/api/admin/inbox/delete", superOnly(contactCtrl.DeleteMessage))
+	mux.HandleFunc("/api/admin/inbox", superAdminOnly(contactCtrl.GetMessages))
+	mux.HandleFunc("/api/admin/inbox/update", superAdminOnly(contactCtrl.UpdateStatus))
+	mux.HandleFunc("/api/admin/inbox/delete", superAdminOnly(contactCtrl.DeleteMessage))
 
 	// RBAC Management
-	mux.HandleFunc("/api/admin/rbac/permissions", superOnly(rbacCtrl.GetPermissions))
-	mux.HandleFunc("/api/admin/rbac/roles", superOnly(rbacCtrl.GetRoles))
-	mux.HandleFunc("/api/admin/rbac/roles/upsert", superOnly(rbacCtrl.UpsertRole))
-	mux.HandleFunc("/api/admin/rbac/roles/delete", superOnly(rbacCtrl.DeleteRole))
-	mux.HandleFunc("/api/admin/rbac/users", superOnly(rbacCtrl.CreateAdminUser))
-	mux.HandleFunc("/api/admin/rbac/users/status", superOnly(rbacCtrl.ToggleAdminStatus))
-	mux.HandleFunc("/api/admin/rbac/users/delete", superOnly(rbacCtrl.DeleteAdmin))
+	mux.HandleFunc("/api/admin/rbac/permissions", superAdminOnly(rbacCtrl.GetPermissions))
+	mux.HandleFunc("/api/admin/rbac/roles", superAdminOnly(rbacCtrl.GetRoles))
+	mux.HandleFunc("/api/admin/rbac/roles/upsert", superAdminOnly(rbacCtrl.UpsertRole))
+	mux.HandleFunc("/api/admin/rbac/roles/delete", superAdminOnly(rbacCtrl.DeleteRole))
+	mux.HandleFunc("/api/admin/rbac/users", superAdminOnly(rbacCtrl.CreateAdminUser))
+	mux.HandleFunc("/api/admin/rbac/users/status", superAdminOnly(rbacCtrl.ToggleAdminStatus))
+	mux.HandleFunc("/api/admin/rbac/users/delete", superAdminOnly(rbacCtrl.DeleteAdmin))
 
 	// System & Config
 	mux.HandleFunc("/api/admin/configs", adminOnly(adminCtrl.GetSettings))

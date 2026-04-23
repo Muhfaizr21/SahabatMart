@@ -47,8 +47,11 @@ export default function StatusMitra() {
     </div>
   );
 
-  const mitraProgress = Math.min(100, ((eligibility?.active_mitra || 0) / 100) * 100);
-  const turnoverProgress = Math.min(100, ((eligibility?.monthly_turnover || 0) / 10000000) * 100);
+  const minMitra = eligibility?.requirements?.min_mitra || 100;
+  const minTurnover = eligibility?.requirements?.min_turnover || 10000000;
+
+  const mitraProgress = Math.min(100, ((eligibility?.active_mitra || 0) / minMitra) * 100);
+  const turnoverProgress = Math.min(100, ((eligibility?.monthly_turnover || 0) / minTurnover) * 100);
   const isEligible = eligibility?.is_eligible;
 
   return (
@@ -114,7 +117,7 @@ export default function StatusMitra() {
             <div className="flex justify-between items-center mb-3">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Mitra Aktif (Downline)</span>
               <span className="text-sm font-black" style={{ color: mitraProgress >= 100 ? '#4ade80' : '#b76dff' }}>
-                {eligibility?.active_mitra || 0} / 100
+                {eligibility?.active_mitra || 0} / {minMitra}
               </span>
             </div>
             <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -128,7 +131,7 @@ export default function StatusMitra() {
                 }}
               />
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">Minimal 100 mitra aktif di tim Anda.</p>
+            <p className="text-[11px] text-slate-500 mt-2">Minimal {minMitra} mitra aktif di tim Anda.</p>
           </div>
 
           {/* Omset tim */}
@@ -136,7 +139,7 @@ export default function StatusMitra() {
             <div className="flex justify-between items-center mb-3">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Omset Tim (30 Hari)</span>
               <span className="text-sm font-black" style={{ color: turnoverProgress >= 100 ? '#4ade80' : '#fabc4e' }}>
-                {formatRp(eligibility?.monthly_turnover)} / 10jt
+                {formatRp(eligibility?.monthly_turnover)} / {minTurnover >= 1000000 ? (minTurnover / 1000000) + 'jt' : formatRp(minTurnover)}
               </span>
             </div>
             <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -150,7 +153,7 @@ export default function StatusMitra() {
                 }}
               />
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">Capai Rp10.000.000 omset tim per bulan.</p>
+            <p className="text-[11px] text-slate-500 mt-2">Capai {formatRp(minTurnover)} omset tim per bulan.</p>
           </div>
         </div>
 

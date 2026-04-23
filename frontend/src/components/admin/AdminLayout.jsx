@@ -74,6 +74,7 @@ const menu = [
   { name: 'Security', icon: 'bxs-shield-alt-2', path: '/admin/security' },
   { name: 'Inbox', icon: 'bxs-inbox', path: '/admin/inbox' },
   { name: 'RBAC Access', icon: 'bxs-key', path: '/admin/rbac' },
+  { name: 'Platform Settings', icon: 'bxs-cog', path: '/admin/settings' },
 ];
 
 // ─── SIDEBAR ITEM ──────────────────────────────────────
@@ -272,6 +273,7 @@ const AdminLayout = () => {
               <NavItem item={menu[11]} />
               <NavItem item={menu[12]} />
               <NavItem item={menu[13]} />
+              <NavItem item={menu[14]} />
             </>
           ) : (
             menu.map(item => (
