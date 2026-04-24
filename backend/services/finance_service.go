@@ -85,33 +85,56 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 
 	// 1. Distribute ke Merchant Portions (Distributor Cut)
 	for _, group := range order.MerchantGroups {
-		// [Akuglow Sync] Bagi beban diskon 50/50 antara Pusat & Merchant
-		merchantShare := group.Discount * 0.5
-		hqShare := group.Discount * 0.5
+		// [Financial Audit Fix] Distribution Logic based on Reseller Model
+		pusatID := "00000000-0000-0000-0000-000000000000"
+		
+		if group.MerchantID != pusatID {
+			// [Audit Fix] Intelligent Discount Burden Distribution
+			merchantDiscShare := group.Discount * 0.5 // Default: bagi dua untuk Voucher Platform
+			hqDiscShare := group.Discount * 0.5
 
-		actualDistroCut := group.DistributionCommission - merchantShare
-		if actualDistroCut < 0 { actualDistroCut = 0 }
+			// Jika voucher dimiliki spesifik oleh merchant ini, merchant tanggung 100%
+			if order.VoucherID != nil {
+				var v models.Voucher
+				if err := tx.First(&v, *order.VoucherID).Error; err == nil {
+					if v.MerchantID != nil && *v.MerchantID == group.MerchantID {
+						merchantDiscShare = group.Discount
+						hqDiscShare = 0
+					}
+				}
+			}
 
-		desc := fmt.Sprintf("Jatah Distribusi: %s (Potong Diskon 50%%: Rp%.0f)", order.OrderNumber, merchantShare)
-		if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, actualDistroCut, order.ID, "order", desc); err != nil {
-			return err
-		}
+			// Hitung Payout Merchant: Subtotal - PlatformFee - KomisiAffiliate - BebanDiskon
+			merchantPayout := (group.Subtotal - group.PlatformFee - group.AffiliateCommission) - merchantDiscShare
+			
+			// 1. Bayar Merchant (Pendapatan Penjualan)
+			if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, merchantPayout, order.ID, "order", fmt.Sprintf("Penjualan order %s", order.OrderNumber)); err != nil {
+				return err
+			}
 
-		// 2. Record Platform Fee & HQ Cut (Keuntungan Pusat)
-		if group.PlatformFee > 0 {
-			pfDesc := fmt.Sprintf("Biaya Layanan Platform: %s", order.OrderNumber)
-			if err := s.ProcessTransaction(tx, "system-platform", models.WalletBuyer, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc); err != nil {
+			// 2. HQ berhak atas profit kotor (Subtotal - COGS) - Subsidi Diskon - Affiliate Commission
+			// Namun dalam model reseller, HQ menerima uang di awal (Restock). 
+			// Di sini HQ hanya perlu mencatat "Subsidi Diskon" jika ada.
+			if hqDiscShare > 0 {
+				if err := s.ProcessTransaction(tx, models.PusatID, models.WalletBuyer, models.TxPlatformFee, -hqDiscShare, order.ID, "order", fmt.Sprintf("Subsidi Diskon order %s", order.OrderNumber)); err != nil {
+					return err
+				}
+			}
+		} else {
+			// [MODEL PUSAT] HQ menanggung 100% diskon karena mereka pemilik stok
+			hqPayout := (group.Subtotal - group.PlatformFee - group.AffiliateCommission) - group.Discount
+			if hqPayout < 0 { hqPayout = 0 }
+
+			desc := fmt.Sprintf("Penjualan Langsung Pusat: %s (Potong diskon 100%%)", order.OrderNumber)
+			if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqPayout, order.ID, "order", desc); err != nil {
 				return err
 			}
 		}
 
-		// HQ Cut: Sisa pendapatan yang masuk ke Pusat/Brand Owner
-		// Formula: (Subtotal - PlatformFee - AffiliateCommission - DistributionCommission) - hqShare
-		hqCut := (group.Subtotal - group.PlatformFee - group.AffiliateCommission - group.DistributionCommission) - hqShare
-
-		if hqCut != 0 {
-			hqDesc := fmt.Sprintf("Pendapatan Bersih Pusat: %s (Potong Diskon 50%%: Rp%.0f)", order.OrderNumber, hqShare)
-			if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqCut, order.ID, "order", hqDesc); err != nil {
+		// Platform Fee tetap ditarik ke wallet platform
+		if group.PlatformFee > 0 {
+			pfDesc := fmt.Sprintf("Platform Fee: %s", order.OrderNumber)
+			if err := s.ProcessTransaction(tx, "system-platform", models.WalletBuyer, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc); err != nil {
 				return err
 			}
 		}

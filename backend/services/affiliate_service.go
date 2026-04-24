@@ -99,7 +99,8 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		// Push Notification
 		if s.Notif != nil {
 			msg := "Selamat! Tier Anda naik dari " + oldTierName + " ke " + nextTier.Name + ". Nikmati komisi yang lebih besar! 🚀"
-			s.Notif.Push(affiliate.UserID, "affiliate", "tier_upgrade", "Tier Naik! 🎉", msg, "/affiliate")
+			// [Audit Fix] Always use AffiliateMember.ID for Affiliate Area notifications
+			s.Notif.Push(affiliate.ID, "affiliate", "tier_upgrade", "Tier Naik! 🎉", msg, "/affiliate")
 		}
 	}
 

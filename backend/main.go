@@ -203,9 +203,15 @@ func cleanupVouchers(db *gorm.DB) error {
 func releaseAffiliateCommissions(db *gorm.DB, notif *services.NotificationService) error {
 	now := time.Now()
 
-	// Find commissions where hold period has expired
+	// [Audit Fix] Double-Check Order Status: Hanya cairkan komisi jika order 'completed'
+	// Ini mencegah komisi cair jika order dibatalkan/refund tanpa melalui service.
 	var commissions []models.AffiliateCommission
-	db.Where("status = 'pending' AND hold_until <= ?", now).Find(&commissions)
+	db.Table("affiliate_commissions").
+		Joins("JOIN orders ON orders.id = affiliate_commissions.order_id").
+		Where("affiliate_commissions.status = 'pending' AND affiliate_commissions.hold_until <= ?", now).
+		Where("orders.status = ?", models.OrderCompleted).
+		Select("affiliate_commissions.*").
+		Find(&commissions)
 
 	if len(commissions) == 0 {
 		return nil
@@ -229,14 +235,11 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *services.NotificationServic
 				"total_earned": gorm.Expr("total_earned + ?", earned),
 			})
 
-		// Get affiliate user_id for notification
-		var aff models.AffiliateMember
-		db.Select("user_id").First(&aff, "id = ?", affiliateID)
-		if aff.UserID != "" {
-			msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair dan siap untuk dicairkan!", earned)
-			notif.Push(aff.UserID, "affiliate", "commission_released",
-				"Komisi Siap Dicairkan! 🎉", msg, "/affiliate/commissions")
-		}
+		// [Audit Fix] Always use AffiliateID (Member ID) for Affiliate Area Notifications
+		msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair dan siap untuk ditarik!", earned)
+		notif.Push(affiliateID, "affiliate", "commission_released",
+			"Komisi Siap Cair! 🎉", msg, "/affiliate/commissions")
+		
 		log.Printf("✅ Affiliate %s: Released Rp %.0f in commissions", affiliateID, earned)
 	}
 	return nil

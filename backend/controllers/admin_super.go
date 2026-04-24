@@ -671,7 +671,6 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 	now := time.Now()
 	newStatus := map[string]string{"approve": "completed", "reject": "rejected"}[req.Action]
 
-	var affUserID string
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
 		var wd models.AffiliateWithdrawal
 		if err := tx.First(&wd, "id = ?", req.ID).Error; err != nil {
@@ -693,10 +692,6 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 					"total_withdrawn": gorm.Expr("total_withdrawn + ?", wd.Amount),
 				})
 		}
-		// Get affiliate user_id for notification
-		var aff models.AffiliateMember
-		tx.Select("user_id").First(&aff, "id = ?", wd.AffiliateID)
-		affUserID = aff.UserID
 		return nil
 	})
 
@@ -706,13 +701,17 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 	}
 
 	// Push notification to affiliate
-	if affUserID != "" {
+	if wdID := req.ID; wdID != "" {
+		// Re-fetch withdrawal to get AffiliateID (or use from closure if safe)
+		var wd models.AffiliateWithdrawal
+		ac.DB.First(&wd, "id = ?", req.ID)
+
 		msgMap := map[string]string{
 			"completed": "disetujui dan sedang diproses ke rekening Anda",
 			"rejected":  "ditolak oleh Admin",
 		}
 		msg := fmt.Sprintf("Permintaan penarikan komisi Anda telah %s. %s", msgMap[newStatus], req.Note)
-		ac.Notif.Push(affUserID, "affiliate", "withdrawal_"+newStatus,
+		ac.Notif.Push(wd.AffiliateID, "affiliate", "withdrawal_"+newStatus,
 			"Update Penarikan Komisi", msg, "/affiliate/withdrawals")
 	}
 
@@ -886,6 +885,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		Description string  `json:"description"`
 		Price       float64 `json:"price"`
 		OldPrice    float64 `json:"old_price"`
+		COGS        float64 `json:"cogs"` // Modal Awal
 		Category    string  `json:"category"`
 		Brand       string  `json:"brand"`
 		Attributes  string  `json:"attributes"`
@@ -908,6 +908,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"description":                   req.Description,
 		"price":                         req.Price,
 		"old_price":                     req.OldPrice,
+		"cogs":                          req.COGS,
 		"category":                      req.Category,
 		"brand":                         req.Brand,
 		"attributes":                    req.Attributes,
@@ -940,18 +941,42 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 
 // GET /api/admin/finance  → overview revenue platform
 func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
-	var totalRevenue, totalPlatformFee, pendingPayout, totalInsurance float64
+	var totalRevenue, totalPlatformFee, pendingPayout float64
+	var totalCOGS, totalNetProfit float64
 	var totalOrders, completedOrders int64
 
-	if ac.hasTable("wallets") {
-		ac.DB.Table("wallets").Select("COALESCE(SUM(balance), 0)").Scan(&totalRevenue)
-		ac.DB.Table("wallets").Select("COALESCE(SUM(pending_balance), 0)").Scan(&pendingPayout)
+	// [Financial Audit Fix] Calculate Historical Profit (Cumulative)
+	// We sum all revenue transactions to system wallets, ignoring withdrawals.
+	// This ensures "Total Profit" doesn't drop when you withdraw money to your bank.
+	ac.DB.Model(&models.WalletTransaction{}).
+		Joins("JOIN wallets ON wallets.id = wallet_transactions.wallet_id").
+		Where("wallets.owner_id IN ('system-hq', 'system-platform')").
+		Where("wallet_transactions.type IN (?, ?)", models.TxSaleRevenue, models.TxPlatformFee).
+		Select("COALESCE(SUM(wallet_transactions.amount), 0)").Scan(&totalRevenue)
+
+	// Platform Fee separately
+	ac.DB.Model(&models.WalletTransaction{}).
+		Joins("JOIN wallets ON wallets.id = wallet_transactions.wallet_id").
+		Where("wallets.owner_id = ?", "system-platform").
+		Where("wallet_transactions.type = ?", models.TxPlatformFee).
+		Select("COALESCE(SUM(wallet_transactions.amount), 0)").Scan(&totalPlatformFee)
+
+	if ac.hasTable("order_items") {
+		// Calculate total COGS from completed/paid sales
+		ac.DB.Model(&models.OrderItem{}).
+			Joins("JOIN orders ON orders.id = order_items.order_id").
+			Where("orders.status IN ('paid', 'shipped', 'delivered', 'completed')").
+			Select("COALESCE(SUM(order_items.cogs * order_items.quantity), 0)").Scan(&totalCOGS)
+		
+		// Net Profit = Historical Revenue - Historical COGS
+		totalNetProfit = totalRevenue - totalCOGS
 	}
 
-	if ac.hasTable("wallet_transactions") {
-		ac.DB.Table("wallet_transactions").
-			Where("type = ?", models.TxPlatformFee).
-			Select("COALESCE(SUM(amount), 0)").Scan(&totalPlatformFee)
+	if ac.hasTable("wallets") {
+		// Other wallets' pending balance represents obligations to merchants/affiliates
+		ac.DB.Table("wallets").
+			Where("owner_id NOT LIKE 'system-%'").
+			Select("COALESCE(SUM(pending_balance), 0)").Scan(&pendingPayout)
 	}
 
 	if ac.hasTable("orders") {
@@ -962,7 +987,8 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_revenue":      totalRevenue,
 		"total_platform_fee": totalPlatformFee,
-		"total_insurance":    totalInsurance,
+		"total_cogs":         totalCOGS,
+		"net_profit":         totalNetProfit,
 		"pending_payout":     pendingPayout,
 		"total_orders":       totalOrders,
 		"completed_orders":   completedOrders,
@@ -1027,20 +1053,29 @@ func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Requ
 	type MonthRow struct {
 		Month   string  `json:"month"`
 		Revenue float64 `json:"revenue"`
+		Profit  float64 `json:"profit"`
 		Fee     float64 `json:"fee"`
 		Orders  int     `json:"orders"`
 	}
 
 	var rows []MonthRow
+	// Profit formula: (subtotal - affiliate_commission - distribution_commission) - (sum of items COGS)
 	ac.DB.Raw(`
-		SELECT TO_CHAR(created_at, 'YYYY-MM') AS month,
-		       COALESCE(SUM(subtotal), 0) AS revenue,
-		       COALESCE(SUM(platform_fee), 0) AS fee,
-		       COUNT(*) AS orders
-		FROM order_merchant_groups
-		WHERE created_at >= NOW() - INTERVAL '12 months'
-		  AND status IN ('completed', 'delivered', 'paid')
-		GROUP BY month
+		WITH monthly_stats AS (
+			SELECT TO_CHAR(omg.created_at, 'YYYY-MM') AS month,
+			       SUM(omg.subtotal) AS revenue,
+			       SUM(omg.platform_fee) AS fee,
+			       SUM(omg.subtotal - omg.affiliate_commission - omg.distribution_commission) AS gross_take,
+			       COUNT(DISTINCT omg.id) AS orders,
+			       SUM(oi.cogs * oi.quantity) AS total_cogs
+			FROM order_merchant_groups omg
+			LEFT JOIN order_items oi ON oi.order_merchant_group_id = omg.id
+			WHERE omg.created_at >= NOW() - INTERVAL '12 months'
+			  AND omg.status IN ('completed', 'delivered', 'paid')
+			GROUP BY month
+		)
+		SELECT month, revenue, (gross_take - total_cogs) AS profit, fee, orders
+		FROM monthly_stats
 		ORDER BY month ASC
 	`).Scan(&rows)
 
@@ -1503,6 +1538,13 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 				return err
 			}
 			
+			// [Audit Fix] Batalkan Komisi Affiliate agar tidak terjadi kebocoran dana
+			affiliateService := services.NewAffiliateService(ac.DB, ac.Notif)
+			if err := affiliateService.CancelCommission(dispute.OrderID); err != nil {
+				log.Printf("⚠️ Gagal membatalkan komisi affiliate: %v", err)
+				// Tetap lanjut, jangan batalkan refund hanya karena notif/log gagal
+			}
+
 			// Update Order status to Refunded
 			tx.Table("orders").Where("id = ?", dispute.OrderID).Update("status", "refunded")
 		} else if req.Status == "rejected" {

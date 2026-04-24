@@ -272,6 +272,7 @@ type Product struct {
 	Description string    `gorm:"type:text" json:"description"`
 	Price       float64   `gorm:"type:decimal(15,2);not null" json:"price"`
 	OldPrice    float64   `gorm:"type:decimal(15,2)" json:"old_price"`
+	COGS        float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
 	
 	// Global Info
 	Category    string    `gorm:"type:varchar(100)" json:"category"`
@@ -311,6 +312,7 @@ type ProductVariant struct {
 	Name      string    `gorm:"type:varchar(255);not null" json:"name"` // e.g., "Red, XL"
 	SKU       string    `gorm:"type:varchar(100);unique;not null" json:"sku"`
 	Price     float64   `gorm:"type:decimal(15,2);not null" json:"price"`
+	COGS      float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
 	Stock     int       `gorm:"default:0" json:"stock"`
 	Image     string    `gorm:"type:text" json:"image"`
 	CreatedAt time.Time `json:"created_at"`

@@ -36,8 +36,8 @@ func (r *UserRepository) GetMerchantByID(userID string) (*models.Merchant, error
 	return &m, err
 }
 
-func (r *UserRepository) GetAffiliateByID(userID string) (*models.AffiliateMember, error) {
+func (r *UserRepository) GetAffiliateByID(identifier string) (*models.AffiliateMember, error) {
 	var a models.AffiliateMember
-	err := r.DB.Where("user_id = ?", userID).First(&a).Error
+	err := r.DB.Where("id = ? OR user_id = ? OR ref_code = ?", identifier, identifier, identifier).First(&a).Error
 	return &a, err
 }

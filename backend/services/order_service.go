@@ -77,6 +77,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		Notes:              shippingInfo.Notes,
 	}
 	if resolvedAffiliate != nil {
+		order.AffiliateID = &resolvedAffiliate.ID
 		refCode := resolvedAffiliate.RefCode
 		order.AffiliateRefCode = &refCode
 	}
@@ -107,7 +108,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 			var gSub, gPlat, gAffComm, gDistComm float64
 			for _, item := range gItems {
-				affAmt, distAmt, platAmt, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
+				affAmt, distAmt, platAmt, itemCogs, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
 
 				// [Akuglow Refactor] Decrement Stock from Inventory Table
 				var inventory models.Inventory
@@ -135,6 +136,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				item.OrderMerchantGroupID = group.ID
 				item.Subtotal = item.UnitPrice * float64(item.Quantity)
 				item.PlatformFeeAmount = platAmt
+				item.COGS = itemCogs
 				
 				// Affiliate Commission
 				item.CommissionRate = affAmt / item.Subtotal
@@ -143,10 +145,15 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				// Distribution Commission (Jatah Pasti Merchant sebagai Distributor)
 				item.DistributionFeeAmount = distAmt
 				
-				// Merchant Payout: Sekarang Merchant menerima jatah distribusi (Fixed Margin)
-				// Jika Anda ingin Merchant menerima SEMUA sisa, gunakan: item.Subtotal - platAmt - affAmt
-				// Tapi demi akurasi finansial yang Anda minta, kita pisahkan HQ Cut.
-				item.MerchantAmount = distAmt 
+				// [Financial Audit Fix] Merchant Payout Logic
+				// If Merchant is NOT HQ, they receive the full amount minus fees (Reseller model)
+				// If Merchant IS HQ, they receive the hqCut anyway.
+				pusatID := "00000000-0000-0000-0000-000000000000"
+				if merchantID != pusatID {
+					item.MerchantAmount = item.Subtotal - platAmt - affAmt
+				} else {
+					item.MerchantAmount = distAmt // Fixed fee for HQ-as-distributor (internal)
+				}
 
 				// HQ Cut: Sisa uang yang menjadi hak Pemilik Brand (Headquarters)
 				// Formula: Subtotal - PlatformFee - AffiliateFee - DistributionFee
@@ -362,7 +369,7 @@ func (s *OrderService) CompletePayment(orderID string) error {
 	})
 }
 
-func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, distAmt float64, platAmt float64, err error) {
+func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, distAmt float64, platAmt float64, cogs float64, err error) {
 	subtotal := item.UnitPrice * float64(item.Quantity)
 
 	// 1. Platform Fee (Percentage only)
@@ -372,6 +379,17 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	// 2. Load Data
 	var product models.Product
 	db.Where("id = ?", item.ProductID).First(&product)
+	cogs = product.COGS // Default to product COGS
+
+	// If variant, use variant COGS if set
+	if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+		var variant models.ProductVariant
+		if err := db.Where("id = ?", *item.ProductVariantID).First(&variant).Error; err == nil {
+			if variant.COGS > 0 {
+				cogs = variant.COGS
+			}
+		}
+	}
 
 	var merchant models.Merchant
 	db.Where("id = ?", merchantID).First(&merchant)
@@ -409,7 +427,7 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 		}
 	}
 
-	return affAmt, distAmt, platAmt, nil
+	return affAmt, distAmt, platAmt, cogs, nil
 }
 
 func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy string) error {
@@ -446,6 +464,12 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 		if err := tx.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", order.ID).
 			Update("status", models.MOrderCancelled).Error; err != nil {
 			return err
+		}
+
+		// [Audit Fix] Batalkan Komisi Affiliate jika ada
+		affiliateService := NewAffiliateService(tx, nil)
+		if err := affiliateService.CancelCommission(order.ID); err != nil {
+			log.Printf("⚠️ Gagal membatalkan komisi affiliate pada pembatalan order: %v", err)
 		}
 
 		// Refund/Reversal logic if paid (simplified for now as only pending_payment can be cancelled by user)

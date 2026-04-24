@@ -80,11 +80,13 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 				return fmt.Errorf("produk %s tidak ditemukan", items[i].ProductID)
 			}
 			
-			// Assume restock price is 80% of retail if not specified, 
-			// but for now let's use full price or a dedicated field if exists.
-			// Let's check if there's a wholesale price... (assuming Price for now)
+			// [Financial Audit Fix] Restock price should be the COGS (Modal Awal)
+			// not the Retail Price, so merchants have a margin to earn.
 			items[i].RestockID = req.ID
-			items[i].UnitPrice = prod.Price 
+			items[i].UnitPrice = prod.COGS 
+			if items[i].UnitPrice <= 0 {
+				items[i].UnitPrice = prod.Price * 0.8 // Fallback 80% if COGS not set
+			}
 			items[i].Subtotal = items[i].UnitPrice * float64(items[i].Quantity)
 			
 			if err := tx.Create(&items[i]).Error; err != nil {

@@ -18,7 +18,7 @@ export default function AdminEditProduct() {
   const [uploading, setUploading] = useState(false);
   
   const [p, setP] = useState({
-    id: '', name: '', sku: '', description: '', price: 0, old_price: 0,
+    id: '', name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0,
     category: '', brand: '', attributes: '{}', image: '',
     images: '[]', stock: 0, status: 'active'
   });
@@ -45,6 +45,7 @@ export default function AdminEditProduct() {
             setP({
                 id: item.id, name: item.name, sku: item.sku || '', description: item.description || '',
                 price: item.price, old_price: item.old_price || 0,
+                cogs: item.cogs || 0,
                 category: item.category, brand: item.brand || '',
                 attributes: item.attributes || '{}', image: item.image,
                 images: item.images || '[]', stock: item.stock || 100,
@@ -280,6 +281,10 @@ export default function AdminEditProduct() {
                 <div>
                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Strike Price (Discount)</label>
                    <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#64748b' }} value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
+                </div>
+                <div>
+                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Modal Awal / COGS (IDR)</label>
+                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#ef4444' }} value={p.cogs} onChange={e => setP({...p, cogs: parseFloat(e.target.value)})} />
                 </div>
 
                 <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />

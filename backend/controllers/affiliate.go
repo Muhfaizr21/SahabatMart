@@ -15,12 +15,14 @@ import (
 
 type AffiliateController struct {
 	Service *services.AffiliateService
+	Notif   *services.NotificationService
 	DB      *gorm.DB
 }
 
 func NewAffiliateController(db *gorm.DB, notif *services.NotificationService) *AffiliateController {
 	return &AffiliateController{
 		Service: services.NewAffiliateService(db, notif),
+		Notif:   notif,
 		DB:      db,
 	}
 }
@@ -509,7 +511,7 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 	var downlines []DownlineRow
 	ac.DB.Raw(`
 		SELECT am.user_id, up.full_name, am.status, am.created_at as joined_at,
-		       COALESCE(SUM(o.grand_total), 0) as turnover
+		       COALESCE(SUM(o.subtotal), 0) as turnover
 		FROM affiliate_members am
 		LEFT JOIN user_profiles up ON up.user_id = am.user_id
 		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid', 'shipped', 'completed')
@@ -721,8 +723,80 @@ func (ac *AffiliateController) LinkUpline(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Notify Upline
+	var upline models.AffiliateMember
+	if err := ac.DB.Select("id, user_id").Where("ref_code = ?", req.RefCode).First(&upline).Error; err == nil {
+		var memberName struct{ FullName string }
+		ac.DB.Table("user_profiles").Select("full_name").Where("user_id = ?", userID).Scan(&memberName)
+		
+		msg := fmt.Sprintf("%s baru saja bergabung ke tim Anda menggunakan kode referral Anda! 🚀", memberName.FullName)
+		ac.Notif.Push(upline.ID, "affiliate", "new_downline", "Mitra Tim Baru", msg, "/affiliate/team")
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Berhasil bergabung ke jaringan!",
 	})
+}
+func (ac *AffiliateController) GetNotifications(w http.ResponseWriter, r *http.Request) {
+	affiliateID, ok := r.Context().Value("affiliate_id").(string)
+	if !ok || affiliateID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "ID Affiliate tidak ditemukan")
+		return
+	}
+
+	// [Audit Fix] Get associated UserID to fetch BOTH personal and business notifications
+	var affiliate models.AffiliateMember
+	if err := ac.DB.Select("user_id").First(&affiliate, "id = ?", affiliateID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Data affiliate tidak ditemukan")
+		return
+	}
+
+	var notifs []models.Notification
+	// Fetch Combined Notifications: (AffiliateID as 'affiliate') OR (UserID as 'user')
+	err := ac.DB.Where("(receiver_id = ? AND receiver_type = ?) OR (receiver_id = ? AND receiver_type = ?)", 
+		affiliateID, "affiliate", affiliate.UserID, "user").
+		Order("created_at desc").
+		Limit(30).
+		Find(&notifs).Error
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, notifs)
+}
+
+func (ac *AffiliateController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+	notifIDStr := r.URL.Query().Get("id")
+	if notifIDStr == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ID notifikasi diperlukan")
+		return
+	}
+
+	var notifID uint
+	fmt.Sscanf(notifIDStr, "%d", &notifID)
+
+	if err := ac.Notif.MarkAsRead(notifID); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui status notifikasi")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Notifikasi ditandai telah dibaca"})
+}
+
+func (ac *AffiliateController) MarkAllNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	affiliateID, ok := r.Context().Value("affiliate_id").(string)
+	if !ok || affiliateID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "ID Affiliate tidak ditemukan")
+		return
+	}
+
+	if err := ac.Notif.MarkAllAsRead(affiliateID, "affiliate"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menandai semua notifikasi")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Semua notifikasi ditandai telah dibaca"})
 }

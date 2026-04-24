@@ -305,6 +305,9 @@ export default function AdminProductList() {
                       {p.old_price > p.price && (
                         <div style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>{idr(p.old_price)}</div>
                       )}
+                      <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, marginTop: 4 }}>
+                        Modal: {idr(p.cogs || 0)}
+                      </div>
                     </td>
                     {/* Status */}
                     <td style={A.td}>

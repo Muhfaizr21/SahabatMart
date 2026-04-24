@@ -227,6 +227,9 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/affiliate/profile", affiliateOnly(affiliateCtrl.GetProfile))
 	mux.HandleFunc("/api/affiliate/profile/update", affiliateOnly(affiliateCtrl.UpdateProfile))
 	mux.HandleFunc("/api/affiliate/link-upline", affiliateOnly(affiliateCtrl.LinkUpline))
+	mux.HandleFunc("/api/affiliate/notifications", affiliateOnly(affiliateCtrl.GetNotifications))
+	mux.HandleFunc("/api/affiliate/notifications/read", affiliateOnly(affiliateCtrl.MarkNotificationRead))
+	mux.HandleFunc("/api/affiliate/notifications/read-all", affiliateOnly(affiliateCtrl.MarkAllNotificationsRead))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
 
 	// --- Admin Routes ---

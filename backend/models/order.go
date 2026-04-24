@@ -139,6 +139,7 @@ type OrderItem struct {
 	Subtotal             float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
 	Metadata             string  `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
 	PlatformFeeAmount    float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee_amount"`
+	COGS                 float64 `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Snapshot modal saat beli
 	
 	// Commissions
 	CommissionRate         float64 `gorm:"type:decimal(5,4);not null;default:0" json:"commission_rate"`           // Affiliate Rate

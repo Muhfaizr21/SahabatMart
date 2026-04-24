@@ -80,9 +80,9 @@ export default function AdminFinance() {
 
       <StatRow stats={[
         { label: 'Total Revenue',   val: loading ? '...' : idr(overview?.total_revenue),    icon: 'bxs-dollar-circle', color: '#6366f1' },
-        { label: 'Platform Profit', val: loading ? '...' : idr(overview?.total_platform_fee),icon: 'bxs-line-chart',    color: '#10b981' },
-        { label: 'Payout Pending',  val: loading ? '...' : idr(overview?.pending_payout),   icon: 'bxs-wallet',        color: '#f59e0b' },
-        { label: 'Ledger Entries',  val: ledger.length || 0,                                 icon: 'bxs-file-archive',  color: '#8b5cf6' },
+        { label: 'Net Profit (HQ)', val: loading ? '...' : idr(overview?.net_profit),       icon: 'bxs-chart',         color: '#10b981' },
+        { label: 'Total COGS',      val: loading ? '...' : idr(overview?.total_cogs),       icon: 'bxs-package',       color: '#ef4444' },
+        { label: 'Platform Fee',    val: loading ? '...' : idr(overview?.total_platform_fee),icon: 'bxs-building-house',color: '#8b5cf6' },
       ]} />
 
       {/* Tab Switch */}
@@ -136,8 +136,8 @@ export default function AdminFinance() {
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:560 }}>
               <thead>
                 <tr>
-                  {['Period','Gross Revenue','Platform Fee','Margin Ratio'].map((h,i) => (
-                    <th key={h} style={{ ...A.th, textAlign:i===3?'right':'left', paddingLeft:i===0?24:16, paddingRight:i===3?24:16 }}>{h}</th>
+                  {['Period','Gross Revenue','HQ Profit','Platform Fee','Margin'].map((h,i) => (
+                    <th key={h} style={{ ...A.th, textAlign:i===4?'right':'left', paddingLeft:i===0?24:16, paddingRight:i===4?24:16 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -154,10 +154,11 @@ export default function AdminFinance() {
                       <span style={{ fontFamily:'monospace', fontWeight:800, color:'#0f172a' }}>{m.month}</span>
                     </td>
                     <td style={A.td}><span style={{ fontWeight:700, color:'#0f172a' }}>{idr(m.revenue)}</span></td>
-                    <td style={A.td}><span style={{ fontWeight:700, color:'#10b981' }}>{idr(m.fee)}</span></td>
+                    <td style={A.td}><span style={{ fontWeight:700, color:'#10b981' }}>{idr(m.profit)}</span></td>
+                    <td style={A.td}><span style={{ fontWeight:700, color:'#6366f1' }}>{idr(m.fee)}</span></td>
                     <td style={{ ...A.td, paddingRight:24, textAlign:'right' }}>
                       <span style={{ display:'inline-flex', padding:'4px 12px', borderRadius:20, background:'#eef2ff', color:'#6366f1', fontWeight:800, fontSize:12, fontFamily:'monospace' }}>
-                        {(m.revenue > 0 ? (m.fee/m.revenue)*100 : 0).toFixed(1)}%
+                        {(m.revenue > 0 ? (m.profit/m.revenue)*100 : 0).toFixed(1)}%
                       </span>
                     </td>
                   </tr>

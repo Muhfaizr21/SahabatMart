@@ -34,7 +34,7 @@ export default function AdminAddProduct() {
   const [uploading, setUploading] = useState(false);
 
   const [p, setP] = useState({
-    name: '', sku: '', description: '', price: 0, old_price: 0,
+    name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0,
     category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active'
   });
   const [gallery, setGallery] = useState([]);
@@ -254,6 +254,11 @@ export default function AdminAddProduct() {
             <FormField label="Harga Coret (Opsional)">
               <input style={S.input} type="number" min={0} value={p.old_price}
                 onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))}
+                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+            </FormField>
+            <FormField label="Modal Awal / COGS (IDR)">
+              <input style={{ ...S.input, color: '#ef4444', fontWeight: 600 }} type="number" min={0} value={p.cogs}
+                onChange={e => setP(prev => ({ ...prev, cogs: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
             <FormField label="Thumbnail Utama">

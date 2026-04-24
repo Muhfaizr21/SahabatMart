@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
+import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 
 // Menu items sesuai spesifikasi Mitra Area Akuglow
 // Ref: Alur Mitra Affiliate Akuglow — section 2 "Mitra Masuk ke Mitra Area"
@@ -51,6 +52,9 @@ const AffiliateLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -63,6 +67,51 @@ const AffiliateLayout = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  const fetchNotifs = async () => {
+    try {
+      const data = await fetchJson(`${AFFILIATE_API_BASE}/notifications`);
+      if (Array.isArray(data)) {
+        setNotifications(data);
+        setUnreadCount(data.filter(n => !n.is_read).length);
+      }
+    } catch (e) {
+      console.error('Failed to fetch notifications:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifs();
+    
+    // [Akuglow Sync] Real-time SSE Connection
+    const affiliateID = user.affiliate?.id || user.id; // Usually affiliate.id is used for pushing
+    const sse = new EventSource(`${API_BASE}/api/notifications/stream?user_id=${affiliateID}`);
+    
+    sse.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.type === 'notification') {
+          fetchNotifs(); // Refresh list on new notif
+        }
+      } catch (err) {}
+    };
+
+    return () => sse.close();
+  }, []);
+
+  const markAsRead = async (id) => {
+    try {
+      await fetchJson(`${AFFILIATE_API_BASE}/notifications/read?id=${id}`, { method: 'POST' });
+      fetchNotifs();
+    } catch (e) {}
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await fetchJson(`${AFFILIATE_API_BASE}/notifications/read-all`, { method: 'POST' });
+      fetchNotifs();
+    } catch (e) {}
+  };
 
   const sidebarRef = React.useRef(null);
 
@@ -262,12 +311,87 @@ const AffiliateLayout = () => {
           </button>
 
           <div className="flex items-center gap-4">
-            {/* Notification dot */}
+            {/* Notification system */}
             <div className="relative">
-              <button className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+              <button 
+                onClick={() => setNotifOpen(!notifOpen)}
+                className={`p-2 rounded-xl transition-all ${notifOpen ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
                 <span className="material-symbols-outlined">notifications</span>
               </button>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-purple-400 rounded-full border border-[#0c1324]" />
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-purple-400 rounded-full border border-[#0c1324] animate-pulse" />
+              )}
+
+              {/* Notification Dropdown */}
+              {notifOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute right-0 mt-3 w-80 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="px-5 py-4 border-bottom border-white/5 bg-white/5 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-bold text-white uppercase tracking-wider">Notifikasi</span>
+                        {unreadCount > 0 && (
+                          <span className="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAllAsRead();
+                        }}
+                        className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-tight"
+                      >
+                        Tandai Semua Dibaca
+                      </button>
+                    </div>
+                    
+                    <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
+                      {notifications.length === 0 ? (
+                        <div className="p-10 text-center">
+                          <span className="material-symbols-outlined text-slate-600 text-4xl mb-2">notifications_off</span>
+                          <p className="text-slate-500 text-xs">Belum ada notifikasi</p>
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div 
+                            key={n.id}
+                            onClick={() => {
+                              markAsRead(n.id);
+                              setNotifOpen(false);
+                              if (n.link) navigate(n.link);
+                            }}
+                            className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group ${!n.is_read ? 'bg-purple-500/5' : ''}`}
+                          >
+                            <div className="flex gap-3">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-purple-400' : 'bg-transparent'}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-[12px] leading-tight mb-1 ${!n.is_read ? 'text-white font-bold' : 'text-slate-300 font-medium'}`}>
+                                  {n.title}
+                                </p>
+                                <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed group-hover:text-slate-300">
+                                  {n.message}
+                                </p>
+                                <p className="text-[9px] text-slate-500 mt-2 font-semibold uppercase tracking-tighter">
+                                  {new Date(n.created_at).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    
+                    <div className="p-3 bg-white/5 border-t border-white/5">
+                      <button className="w-full py-2 text-[10px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-widest">
+                        Lihat Semua
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="h-6 w-px bg-white/10" />
