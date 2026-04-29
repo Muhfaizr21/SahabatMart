@@ -37,7 +37,7 @@ export default function AffiliateLinks() {
     setLoading(true);
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/links`);
-      setLinks(Array.isArray(res) ? res : []);
+      setLinks(Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []));
     } catch (err) {
       console.error(err);
     } finally {
@@ -48,7 +48,8 @@ export default function AffiliateLinks() {
   const fetchProducts = useCallback(async () => {
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/products`);
-      setProducts(Array.isArray(res) ? res.slice(0, 50) : []);
+      const dataArr = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
+      setProducts(dataArr.slice(0, 50));
     } catch (err) {
       console.error(err);
     }
