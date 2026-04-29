@@ -134,6 +134,24 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 	var totalDownline int64
 	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownline)
 
+	// Fetch next tier requirements for dynamic progress bar
+	var nextTier models.MembershipTier
+	reqMitra := 10
+	reqTurnover := 0.0
+	if affiliate.MembershipTierID > 0 {
+		var currentTier models.MembershipTier
+		if err := ac.DB.First(&currentTier, "id = ?", affiliate.MembershipTierID).Error; err == nil {
+			if err := ac.DB.Where("level > ? AND is_active = true", currentTier.Level).Order("level ASC").First(&nextTier).Error; err == nil {
+				reqMitra = nextTier.MinActiveMitra
+				reqTurnover = nextTier.MinMonthlyTurnover
+			} else {
+				// Sudah tier maksimum
+				reqMitra = currentTier.MinActiveMitra
+				reqTurnover = currentTier.MinMonthlyTurnover
+			}
+		}
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"affiliate": affiliate,
 		"stats": map[string]interface{}{
@@ -151,6 +169,8 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 			"total_downline":       totalDownline,
 			"active_mitra_count":   affiliate.ActiveMitraCount,
 			"team_monthly_turnover": affiliate.TeamMonthlyTurnover,
+			"next_tier_req_mitra":  reqMitra,
+			"next_tier_req_turnover": reqTurnover,
 		},
 		"monthly_data":       monthlyData,
 		"recent_commissions": recentCommissions,

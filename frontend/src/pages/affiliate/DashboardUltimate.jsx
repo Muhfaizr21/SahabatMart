@@ -161,10 +161,10 @@ export default function AffiliateDashboard() {
                 <p className="text-indigo-400 font-black text-xs">{tierName}</p>
               </div>
               <div className="w-full h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${Math.min((activeMitraCount / 10) * 100, 100)}%` }} />
+                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${Math.min((activeMitraCount / (stats.next_tier_req_mitra || 10)) * 100, 100)}%` }} />
               </div>
               <p className="text-[9px] text-slate-500 mt-3 italic text-center">
-                {activeMitraCount} mitra aktif · Omset {formatRp(stats.team_monthly_turnover)}
+                {activeMitraCount} / {stats.next_tier_req_mitra || 10} mitra aktif
               </p>
             </div>
           </div>
