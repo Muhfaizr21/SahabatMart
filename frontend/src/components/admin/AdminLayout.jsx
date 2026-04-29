@@ -26,7 +26,9 @@ const menu = [
     children: [
       { name: 'All Users', path: '/admin/users' },
       { name: 'Affiliates', path: '/admin/affiliates' },
+      { name: 'Membership Tiers', path: '/admin/membership-tiers' },
     ]
+
   },
   {
     name: 'Merchants', icon: 'bxs-store-alt',

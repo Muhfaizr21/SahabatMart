@@ -17,7 +17,16 @@ func NewNotificationService(db *gorm.DB) *NotificationService {
 
 // Push mengirim notifikasi ke user/merchant/admin tertentu
 func (ns *NotificationService) Push(receiverID, receiverType, notifType, title, message, link string) error {
+	userID := receiverID
+	if receiverType == "merchant" {
+		var merchant models.Merchant
+		if err := ns.DB.Select("user_id").First(&merchant, "id = ?", receiverID).Error; err == nil {
+			userID = merchant.UserID
+		}
+	}
+
 	notif := models.Notification{
+		UserID:       userID,
 		ReceiverID:   receiverID,
 		ReceiverType: receiverType,
 		Type:         notifType,

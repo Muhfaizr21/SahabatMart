@@ -127,22 +127,36 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
-// autoSeedCriticalData: seed tier kalau belum ada, tanpa overwrite data existing
+// autoSeedCriticalData: bootstrap MINIMAL — tidak hardcode data bisnis di sini!
+// Semua jenjang (level, syarat, komisi) dikonfigurasi via Superadmin → Membership Tiers.
 func autoSeedCriticalData(db *gorm.DB) {
 	var count int64
 	db.Model(&models.MembershipTier{}).Count(&count)
 	if count == 0 {
-		log.Println("🌱 Auto-seeding Membership Tiers (table is empty)...")
-		tiers := []models.MembershipTier{
-			{ID: 1, Name: "Bronze", Level: 1, BaseCommissionRate: 0.03, MinEarningsUpgrade: 5000000, MinWithdrawalAmount: 50000, CommissionHoldDays: 14, CookieDurationDays: 30, IsActive: true},
-			{ID: 2, Name: "Silver", Level: 2, BaseCommissionRate: 0.05, MinEarningsUpgrade: 20000000, MinWithdrawalAmount: 100000, CommissionHoldDays: 10, CookieDurationDays: 45, IsActive: true},
-			{ID: 3, Name: "Gold", Level: 3, BaseCommissionRate: 0.08, MinEarningsUpgrade: 100000000, MinWithdrawalAmount: 200000, CommissionHoldDays: 7, CookieDurationDays: 60, IsActive: true},
-			{ID: 4, Name: "Platinum", Level: 4, BaseCommissionRate: 0.12, MinWithdrawalAmount: 500000, CommissionHoldDays: 3, CookieDurationDays: 90, IsActive: true},
+		log.Println("⚠️  Tabel membership_tiers kosong. Membuat tier Bronze sebagai bootstrap...")
+
+		// Hanya buat 1 tier awal agar sistem tidak crash saat mitra pertama mendaftar.
+		// Superadmin HARUS tambah jenjang lain via Admin Panel → Membership Tiers.
+		bronze := models.MembershipTier{
+			ID:                  1,
+			Name:                "Bronze",
+			Level:               1,
+			BaseCommissionRate:  0.03,
+			MinActiveMitra:      0,
+			MinMonthlyTurnover:  0,
+			MinWithdrawalAmount: 50000,
+			CommissionHoldDays:  14,
+			CookieDurationDays:  30,
+			Color:               "#cd7f32",
+			Icon:                "military_tech",
+			Description:         "Jenjang awal. Tambah jenjang lain via Superadmin → Membership Tiers.",
+			IsActive:            true,
 		}
-		for _, t := range tiers {
-			db.Create(&t)
+		if err := db.Create(&bronze).Error; err != nil {
+			log.Printf("❌ Gagal buat tier Bronze bootstrap: %v", err)
+		} else {
+			log.Println("✅ Bronze (bootstrap) selesai. Tambah Silver, Gold, dll via Superadmin UI.")
 		}
-		log.Println("✅ Membership Tiers auto-seeded successfully!")
 	}
 
 	// [Auto-Fix] Pastikan admin@akugrow.com selalu ACTIVE
@@ -237,46 +251,45 @@ func cleanupVouchers(db *gorm.DB) error {
 }
 
 // releaseAffiliateCommissions: pending → approved after hold_until passes
+// [Audit Fix] Only release commissions where the associated ORDER is 'completed'
 func releaseAffiliateCommissions(db *gorm.DB, notif *services.NotificationService) error {
 	now := time.Now()
 
-	// [Audit Fix] Double-Check Order Status: Hanya cairkan komisi jika order 'completed'
-	// Ini mencegah komisi cair jika order dibatalkan/refund tanpa melalui service.
+	// Fetch commissions yang hold_until sudah lewat DAN order sudah completed
 	var commissions []models.AffiliateCommission
-	db.Table("affiliate_commissions").
-		Joins("JOIN orders ON orders.id = affiliate_commissions.order_id").
-		Where("affiliate_commissions.status = 'pending' AND affiliate_commissions.hold_until <= ?", now).
-		Where("orders.status = ?", models.OrderCompleted).
-		Select("affiliate_commissions.*").
+	db.Table("affiliate_commissions ac").
+		Joins("JOIN orders o ON o.id = ac.order_id").
+		Where("ac.status = 'pending' AND ac.hold_until <= ?", now).
+		Where("o.status = ?", models.OrderCompleted).
+		Select("ac.*").
 		Find(&commissions)
 
 	if len(commissions) == 0 {
 		return nil
 	}
 
-	// Group by affiliate for batch total_earned update
+	// Kumpulkan ID yang eligible
+	var eligibleIDs []string
 	earningsByAffiliate := make(map[string]float64)
 	for _, c := range commissions {
+		eligibleIDs = append(eligibleIDs, c.ID)
 		earningsByAffiliate[c.AffiliateID] += c.Amount
 	}
 
-	// Bulk update status to approved
-	db.Model(&models.AffiliateCommission{}).
-		Where("status = 'pending' AND hold_until <= ?", now).
-		Updates(map[string]interface{}{"status": "approved"})
+	// Bulk update HANYA ID yang eligible (bukan semua pending)
+	if err := db.Model(&models.AffiliateCommission{}).
+		Where("id IN ?", eligibleIDs).
+		Updates(map[string]interface{}{"status": "approved"}).Error; err != nil {
+		return err
+	}
 
-	// Update total_earned per affiliate
+	// Update total_earned per affiliate & kirim notifikasi
 	for affiliateID, earned := range earningsByAffiliate {
 		db.Model(&models.AffiliateMember{}).Where("id = ?", affiliateID).
-			Updates(map[string]interface{}{
-				"total_earned": gorm.Expr("total_earned + ?", earned),
-			})
+			UpdateColumn("total_earned", gorm.Expr("total_earned + ?", earned))
 
-		// [Audit Fix] Always use AffiliateID (Member ID) for Affiliate Area Notifications
 		msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair dan siap untuk ditarik!", earned)
-		notif.Push(affiliateID, "affiliate", "commission_released",
-			"Komisi Siap Cair! 🎉", msg, "/affiliate/commissions")
-		
+		notif.Push(affiliateID, "affiliate", "commission_released", "Komisi Siap Cair! 🎉", msg, "/affiliate/commissions")
 		log.Printf("✅ Affiliate %s: Released Rp %.0f in commissions", affiliateID, earned)
 	}
 	return nil

@@ -95,6 +95,8 @@ import SkinJourney from './pages/SkinJourney';
 import SkinJourneyAdmin from './pages/admin/SkinJourneyAdmin';
 import PusatInventory from './pages/admin/PusatInventory';
 import SkinCommunity from './pages/SkinCommunity';
+import MembershipTiers from './pages/admin/MembershipTiers';
+
 
 // ── Penanganan Khusus Header/Footer ─────────
 function NavbarManager() {
@@ -257,7 +259,9 @@ export default function App() {
             <Route path="skin-journey" element={<SkinJourneyAdmin />} />
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
+            <Route path="membership-tiers" element={<MembershipTiers />} />
             <Route path="settings" element={<AdminSettings />} />
+
           </Route>
 
           {/* Merchant Routes */}

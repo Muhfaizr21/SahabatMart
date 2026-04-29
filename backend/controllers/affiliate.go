@@ -61,71 +61,102 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Total commissions
-	var totalCommission, pendingCommission, totalWithdrawn float64
-	var totalConversions int64
+	// [Sync Fix] Total komisi by status (approved = bisa tarik, pending = dalam hold, paid = sudah cair)
+	var approvedCommission, pendingCommission, paidCommission float64
 	ac.DB.Model(&models.AffiliateCommission{}).
 		Where("affiliate_id = ? AND status = 'approved'", affiliateID).
-		Select("COALESCE(SUM(amount), 0)").Scan(&totalCommission)
+		Select("COALESCE(SUM(amount), 0)").Scan(&approvedCommission)
 	ac.DB.Model(&models.AffiliateCommission{}).
 		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
 		Select("COALESCE(SUM(amount), 0)").Scan(&pendingCommission)
 	ac.DB.Model(&models.AffiliateCommission{}).
 		Where("affiliate_id = ? AND status = 'paid'", affiliateID).
-		Select("COALESCE(SUM(amount), 0)").Scan(&totalWithdrawn)
-	ac.DB.Model(&models.AffiliateCommission{}).
-		Where("affiliate_id = ?", affiliateID).
-		Count(&totalConversions)
+		Select("COALESCE(SUM(amount), 0)").Scan(&paidCommission)
+
+	// [Sync Fix] Total order dari orders table (bukan commission count)
+	var totalOrders, totalOrdersPending int64
+	ac.DB.Model(&models.Order{}).
+		Where("affiliate_id = ? AND status NOT IN ?", affiliateID, []string{"cancelled", "expired"}).
+		Count(&totalOrders)
+	ac.DB.Model(&models.Order{}).
+		Where("affiliate_id = ? AND status = 'pending_payment'", affiliateID).
+		Count(&totalOrdersPending)
 
 	// Monthly commission chart (last 6 months)
 	type MonthlyData struct {
 		Month      string  `json:"month"`
 		Commission float64 `json:"commission"`
 		Clicks     int     `json:"clicks"`
+		Orders     int     `json:"orders"`
 	}
 	var monthlyData []MonthlyData
 	ac.DB.Raw(`
-		SELECT TO_CHAR(created_at, 'Mon YY') AS month,
+		SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YY') AS month,
 		       COALESCE(SUM(amount), 0) AS commission,
-		       0 AS clicks
+		       0 AS clicks,
+		       COUNT(*) AS orders
 		FROM affiliate_commissions
 		WHERE affiliate_id = ? AND created_at >= NOW() - INTERVAL '6 months'
-		GROUP BY TO_CHAR(created_at, 'Mon YY'), DATE_TRUNC('month', created_at)
+		GROUP BY DATE_TRUNC('month', created_at)
 		ORDER BY DATE_TRUNC('month', created_at) ASC
 	`, affiliateID).Scan(&monthlyData)
 
 	// Recent commissions
-	var recentCommissions []models.AffiliateCommission
-	ac.DB.Where("affiliate_id = ?", affiliateID).
-		Order("created_at DESC").Limit(5).
-		Find(&recentCommissions)
+	type RecentComm struct {
+		ID          string    `json:"id"`
+		OrderID     string    `json:"order_id"`
+		ProductName string    `json:"product_name"`
+		Amount      float64   `json:"amount"`
+		Status      string    `json:"status"`
+		CreatedAt   time.Time `json:"created_at"`
+	}
+	var recentCommissions []RecentComm
+	ac.DB.Raw(`
+		SELECT ac.id, ac.order_id, 
+		       COALESCE(p.name, 'Produk') AS product_name,
+		       ac.amount, ac.status, ac.created_at
+		FROM affiliate_commissions ac
+		LEFT JOIN products p ON p.id::text = ac.product_id::text
+		WHERE ac.affiliate_id = ?
+		ORDER BY ac.created_at DESC
+		LIMIT 5
+	`, affiliateID).Scan(&recentCommissions)
 
-	// Calculate available balance:
-	// approved commissions MINUS already-withdrawn MINUS in-flight withdrawals (pending/processed)
+	// [Sync Fix] Available balance = approved - in-flight withdrawals
 	var inFlightWithdrawals float64
 	ac.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM affiliate_withdrawals WHERE affiliate_id = ? AND status IN ('pending','processed')`, affiliateID).Scan(&inFlightWithdrawals)
+	availableBalance := approvedCommission - inFlightWithdrawals
+	if availableBalance < 0 {
+		availableBalance = 0
+	}
 
-	// Total downline count
+	// [Sync Fix] Total downline — cari by id, bukan user_id
 	var totalDownline int64
-	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliate.UserID).Count(&totalDownline)
+	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownline)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"affiliate": affiliate,
 		"stats": map[string]interface{}{
 			"total_clicks":         clicks,
-			"total_conversions":    totalConversions,
-			"total_commission":     totalCommission,
-			"pending_commission":   pendingCommission,
-			"total_withdrawn":      totalWithdrawn,
-			"total_downline":       totalDownline,
-			// balance = approved - already paid out - still in processing queue
-			"balance":              totalCommission - totalWithdrawn - inFlightWithdrawals,
+			"total_orders":         totalOrders,
+			"total_orders_pending": totalOrdersPending,
+			// Komisi
+			"total_commission":     approvedCommission + pendingCommission + paidCommission, // semua waktu
+			"approved_commission":  approvedCommission,  // siap tarik
+			"pending_commission":   pendingCommission,   // masih hold
+			"paid_commission":      paidCommission,      // sudah cair ke bank
+			"balance":              availableBalance,    // = approved - in-flight WD
 			"inflight_withdrawals": inFlightWithdrawals,
+			// Tim
+			"total_downline":       totalDownline,
+			"active_mitra_count":   affiliate.ActiveMitraCount,
+			"team_monthly_turnover": affiliate.TeamMonthlyTurnover,
 		},
-		"monthly_data":        monthlyData,
-		"recent_commissions":  recentCommissions,
+		"monthly_data":       monthlyData,
+		"recent_commissions": recentCommissions,
 	})
 }
+
 
 // GET /api/affiliate/commissions
 func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Request) {

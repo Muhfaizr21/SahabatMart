@@ -305,6 +305,7 @@ type Region struct {
 
 type Notification struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
+	UserID       string    `gorm:"type:uuid;not null;index" json:"user_id"` // Backwards compatibility & DB Constraint
 	ReceiverID   string    `gorm:"type:uuid;index" json:"receiver_id"`     // Global ID (User ID or Merchant ID)
 	ReceiverType string    `gorm:"type:varchar(20);index" json:"receiver_type"` // admin, merchant, buyer
 	Type         string    `gorm:"type:varchar(50)" json:"type"`           // order_new, payout_approved, product_approved, dispute_new
@@ -314,6 +315,7 @@ type Notification struct {
 	IsRead       bool      `gorm:"default:false" json:"is_read"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
 
 // BlogPost untuk CMS SahabatMart
 type BlogPost struct {

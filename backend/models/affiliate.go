@@ -42,6 +42,10 @@ type AffiliateMember struct {
 	TotalWithdrawn   float64 `gorm:"type:decimal(15,2);default:0" json:"total_withdrawn"`
 	PostbackURL      string  `gorm:"type:text" json:"postback_url"`
 	
+	// Team Stats Cache (di-sync setiap kali ada order selesai)
+	ActiveMitraCount    int     `gorm:"default:0" json:"active_mitra_count"`
+	TeamMonthlyTurnover float64 `gorm:"type:decimal(15,2);default:0" json:"team_monthly_turnover"`
+	
 	// Networking
 	UplineID         *string `gorm:"type:uuid" json:"upline_id"`
 	UplineCode       string  `gorm:"type:varchar(20)" json:"upline_code"`

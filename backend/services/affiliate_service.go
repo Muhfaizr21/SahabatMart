@@ -3,6 +3,7 @@ package services
 import (
 	"SahabatMart/backend/models"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 	"gorm.io/gorm"
@@ -82,25 +83,76 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		return nil
 	}
 
+	// [Sync Fix] Re-hitung stats real-time dari DB, jangan pakai nilai stale di kolom
+	// 1. Hitung total komisi approved (untuk TotalEarned sync)
+	var totalApproved float64
+	s.DB.Model(&models.AffiliateCommission{}).
+		Where("affiliate_id = ? AND status IN ?", affiliateMemberID, []string{"approved", "paid"}).
+		Select("COALESCE(SUM(amount), 0)").Scan(&totalApproved)
+
+	// 2. Hitung mitra aktif real-time (30 hari, bertransaksi)
+	startTime := time.Now().AddDate(0, -1, 0)
+	var activeMitraCount int
+	s.DB.Raw(`
+		SELECT COUNT(DISTINCT am.id)
+		FROM affiliate_members am
+		INNER JOIN orders o ON o.affiliate_id = am.id
+		WHERE am.upline_id = ?
+		  AND am.status = 'active'
+		  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
+		  AND o.created_at >= ?
+	`, affiliateMemberID, startTime).Scan(&activeMitraCount)
+
+	// 3. Hitung omset tim bulan ini (recursive downline)
+	var allDescIDs []string
+	s.DB.Raw(`
+		WITH RECURSIVE sub AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a INNER JOIN sub s ON a.upline_id = s.id
+		) SELECT id FROM sub
+	`, affiliateMemberID).Scan(&allDescIDs)
+
+	var teamMonthlyTurnover float64
+	if len(allDescIDs) > 0 {
+		s.DB.Model(&models.Order{}).
+			Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", allDescIDs, completedOrderStatuses, startTime).
+			Select("COALESCE(SUM(subtotal), 0)").Scan(&teamMonthlyTurnover)
+	}
+
+	// Sync ke DB
+	s.DB.Model(&affiliate).Updates(map[string]interface{}{
+		"total_earned":           totalApproved,
+		"active_mitra_count":     activeMitraCount,
+		"team_monthly_turnover":  teamMonthlyTurnover,
+	})
+
 	// Cari tier berikutnya (Level > current level)
 	var nextTier models.MembershipTier
-	err := s.DB.Order("level ASC").Where("level > ?", affiliate.Tier.Level).First(&nextTier).Error
-	if err != nil {
+	if err := s.DB.Order("level ASC").Where("level > ? AND is_active = true", affiliate.Tier.Level).First(&nextTier).Error; err != nil {
 		return nil // Sudah mencapai tier maksimal
 	}
 
-	// Cek apakah syarat terpenuhi (MinEarningsUpgrade)
-	if affiliate.TotalEarned >= nextTier.MinEarningsUpgrade && nextTier.MinEarningsUpgrade > 0 {
-		oldTierName := affiliate.Tier.Name
+	// Evaluasi syarat upgrade berdasarkan data real-time yang baru dihitung
+	isEligible := true
+	if nextTier.MinActiveMitra > 0 && activeMitraCount < nextTier.MinActiveMitra {
+		isEligible = false
+	}
+	if nextTier.MinMonthlyTurnover > 0 && teamMonthlyTurnover < nextTier.MinMonthlyTurnover {
+		isEligible = false
+	}
+
+	if isEligible && (nextTier.MinActiveMitra > 0 || nextTier.MinMonthlyTurnover > 0) {
+		oldName := affiliate.Tier.Name
 		if err := s.DB.Model(&affiliate).Update("membership_tier_id", nextTier.ID).Error; err != nil {
 			return err
 		}
-		
-		// Push Notification
+		_ = oldName
 		if s.Notif != nil {
-			msg := "Selamat! Tier Anda naik dari " + oldTierName + " ke " + nextTier.Name + ". Nikmati komisi yang lebih besar! 🚀"
-			// [Audit Fix] Always use AffiliateMember.ID for Affiliate Area notifications
-			s.Notif.Push(affiliate.ID, "affiliate", "tier_upgrade", "Tier Naik! 🎉", msg, "/affiliate")
+			s.Notif.Push(affiliateMemberID, "affiliate", "tier_upgrade",
+				"🎉 Selamat! Anda naik ke "+nextTier.Name,
+				"Anda telah memenuhi syarat jenjang "+nextTier.Name+". Pertahankan performa tim Anda!",
+				"/affiliate/status")
 		}
 	}
 
@@ -138,35 +190,25 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 }
 
 // CheckMerchantEligibility: Cek kelayakan upgrade ke Merchant
-// [Sync Fix] Definisi "mitra aktif" = mitra yang memiliki minimal 1 transaksi COMPLETED dalam 30 hari terakhir
-// Ini sesuai dengan dokumen bisnis Akuglow dan menutup gap ambiguitas sebelumnya
+// [Sync Fix] Ambil syarat dari MembershipTier level TERTINGGI (bukan platform_config)
+// Ini menyatukan sumber kebenaran dengan TriggerTierUpgrade
 func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64) {
 	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
 
-	// [FIX] Mitra "aktif" = memiliki min 1 order completed dalam 30 hari, bukan hanya status 'active'
-	// Ambil semua downline langsung dulu
-	var directDownlineIDs []string
-	s.DB.Model(&models.AffiliateMember{}).
-		Select("id").
-		Where("upline_id = ? AND status = 'active'", affiliateID).
-		Scan(&directDownlineIDs)
+	// Hitung mitra aktif real-time (bertransaksi dalam 30 hari)
+	s.DB.Raw(`
+		SELECT COUNT(DISTINCT am.id)
+		FROM affiliate_members am
+		INNER JOIN orders o ON o.affiliate_id = am.id
+		WHERE am.upline_id = ?
+		  AND am.status = 'active'
+		  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
+		  AND o.created_at >= ?
+	`, affiliateID, startTime).Scan(&activeMitra)
 
-	if len(directDownlineIDs) > 0 {
-		// Hitung yang benar-benar aktif bertransaksi dalam 30 hari
-		s.DB.Raw(`
-			SELECT COUNT(DISTINCT am.id)
-			FROM affiliate_members am
-			INNER JOIN orders o ON o.affiliate_id = am.id
-			WHERE am.upline_id = ?
-			  AND am.status = 'active'
-			  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
-			  AND o.created_at >= ?
-		`, affiliateID, startTime).Scan(&activeMitra)
-	}
-
-	// Hitung omset tim 30 hari terakhir (Recursive Depth - semua level)
+	// Hitung omset tim 30 hari (Recursive Depth - semua level)
 	var allDescendantIDs []string
-	query := `
+	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
 			SELECT id FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
@@ -174,8 +216,7 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 			INNER JOIN subordinates s ON a.upline_id = s.id
 		)
 		SELECT id FROM subordinates
-	`
-	s.DB.Raw(query, affiliateID).Scan(&allDescendantIDs)
+	`, affiliateID).Scan(&allDescendantIDs)
 
 	if len(allDescendantIDs) > 0 {
 		s.DB.Model(&models.Order{}).
@@ -184,26 +225,23 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 			Scan(&monthlyTurnover)
 	}
 
-	// Ambil syarat dari PlatformConfig (Dynamic, fallback ke default dokumen bisnis)
-	minActiveMitra := 100      // Syarat: 100 mitra aktif
-	minTurnover := 10000000.0  // Syarat: Omset tim Rp 10.000.000/bulan
+	// [SYNC FIX] Ambil syarat dari MembershipTier level TERTINGGI (tier Merchant/puncak)
+	// Ini sama sumber dengan TriggerTierUpgrade — tidak ada lagi 2 sumber berbeda
+	var merchantTier models.MembershipTier
+	reqMitra = 100      // default fallback
+	reqTurnover = 10000000.0
 
-	var configActive models.PlatformConfig
-	if err := s.DB.Where("key = ?", "merchant_min_active_mitra").First(&configActive).Error; err == nil {
-		if val, err := strconv.Atoi(configActive.Value); err == nil {
-			minActiveMitra = val
+	if err := s.DB.Order("level DESC").Where("is_active = true").First(&merchantTier).Error; err == nil {
+		if merchantTier.MinActiveMitra > 0 {
+			reqMitra = merchantTier.MinActiveMitra
+		}
+		if merchantTier.MinMonthlyTurnover > 0 {
+			reqTurnover = merchantTier.MinMonthlyTurnover
 		}
 	}
 
-	var configTurnover models.PlatformConfig
-	if err := s.DB.Where("key = ?", "merchant_min_team_turnover").First(&configTurnover).Error; err == nil {
-		if val, err := strconv.ParseFloat(configTurnover.Value, 64); err == nil {
-			minTurnover = val
-		}
-	}
-
-	isEligible = activeMitra >= int64(minActiveMitra) && monthlyTurnover >= minTurnover
-	return isEligible, activeMitra, monthlyTurnover, minActiveMitra, minTurnover
+	isEligible = activeMitra >= int64(reqMitra) && monthlyTurnover >= reqTurnover
+	return isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover
 }
 
 // CheckAndDowngradeMerchants: Cek merchant yang tidak memenuhi syarat dan downgrade otomatis
@@ -384,16 +422,26 @@ func (s *AffiliateService) SyncLeaderboard() error {
 }
 
 // UpdateUplineSnapshotsRecursive memperbarui snapshot omset untuk seluruh silsilah upline
+// [Safety Fix] Dibatasi maksimum 15 level kedalaman untuk mencegah infinite recursion
 func (s *AffiliateService) UpdateUplineSnapshotsRecursive(affiliateID string) {
-	// 1. Update diri sendiri dulu
+	s.updateUplineRecursive(affiliateID, 0)
+}
+
+func (s *AffiliateService) updateUplineRecursive(affiliateID string, depth int) {
+	const maxDepth = 15
+	if depth > maxDepth {
+		log.Printf("⚠️ UpdateUplineSnapshots: max depth %d reached at affiliate %s", maxDepth, affiliateID)
+		return
+	}
+
+	// Update diri sendiri
 	s.UpdateTurnoverSnapshot(affiliateID)
 
-	// 2. Cari upline
+	// Cari upline dan lanjut ke atas
 	var member models.AffiliateMember
 	if err := s.DB.Select("upline_id").Where("id = ?", affiliateID).First(&member).Error; err == nil {
 		if member.UplineID != nil && *member.UplineID != "" {
-			// Rekursif ke atas
-			s.UpdateUplineSnapshotsRecursive(*member.UplineID)
+			s.updateUplineRecursive(*member.UplineID, depth+1)
 		}
 	}
 }
