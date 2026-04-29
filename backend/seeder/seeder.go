@@ -43,6 +43,9 @@ func SeedAll(db *gorm.DB) {
 		"order_items", "order_merchant_groups", "orders",
 		"wallet_transactions", "wallets", "payout_requests",
 		"affiliate_commissions", "affiliate_withdrawals", "affiliate_click_logs",
+		"skin_pre_tests", "skin_progress", "skin_journals", 
+		"skin_community_posts", "skin_community_comments", "skin_community_likes",
+		"skin_community_groups", "skin_educations",
 		"inventories", "restock_requests", "restock_items",
 		"product_variants", "products", "vouchers", "banners",
 		"affiliate_members", "membership_tiers", "categories", "brands",
@@ -65,18 +68,98 @@ func SeedAll(db *gorm.DB) {
 	// 3. Seed Users & Merchants
 	merchants := seedUsers(db)
 
-	// 4. Seed 40 Products
-	seedProducts(db, categories, merchants)
+	// 4. Seed Warehouse (Suppliers)
+	suppliers := seedWarehouse(db)
 
-	// 5. Seed Marketing & RBAC
+	// 5. Seed 40 Products
+	seedProducts(db, categories, merchants, suppliers)
+
+	// 6. Seed Marketing & RBAC
 	seedMarketing(db)
 	seedRBAC(db)
 	seedConfigs(db)
 
-	// 6. Seed Network (Merchant & Affiliate relationship)
+	// 7. Seed Network (Merchant & Affiliate relationship)
 	SeedNetwork(db)
 
-	fmt.Println("✅ Seeding Completed! 40 Products created with full ecosystem.")
+	// 8. Mega Simulation (200+ Users & Real Activity)
+	SeedRealWorldData(db)
+
+	fmt.Println("✅ Seeding Completed! 200+ Users created with full ecosystem activity.")
+}
+
+func seedWarehouse(db *gorm.DB) []models.Supplier {
+	fmt.Println("  -> Seeding Warehouse Operations (Mata Elang)...")
+	
+	// 1. Seed Suppliers
+	suppliers := []models.Supplier{
+		{ID: uuid.New().String(), Name: "PT. Kimia Farma (Skincare Div)", Contact: "Bp. Ahmad", Phone: "08123456789", Email: "supply@kimiafarma.co.id", Address: "Jakarta Industrial Estate"},
+		{ID: uuid.New().String(), Name: "Cosmax Indonesia (Global Supply)", Contact: "Ms. Kim", Phone: "08998877665", Email: "production@cosmax.id", Address: "Jababeka Cikarang"},
+		{ID: uuid.New().String(), Name: "Herbalindo Utama", Contact: "Bp. Slamet", Phone: "087712344321", Email: "slamet@herbalindo.com", Address: "Solo, Jawa Tengah"},
+	}
+	for i := range suppliers { 
+		db.FirstOrCreate(&suppliers[i], models.Supplier{Name: suppliers[i].Name}) 
+	}
+
+	// 2. Mark Master Products & Set Wholesale Prices
+	var products []models.Product
+	db.Find(&products).Limit(10)
+	for i, p := range products {
+		db.Model(&p).Updates(map[string]interface{}{
+			"is_master":       true,
+			"wholesale_price": p.Price * 0.75, // Harga merchant diskon 25%
+			"cogs":            p.Price * 0.50, // Harga modal pusat 50%
+		})
+
+		// 3. Create Initial Inbound for Master Products
+		if i < 3 { // Just for the first 3 products
+			inbound := models.InboundStock{
+				SupplierID:  suppliers[0].ID,
+				ReferenceNo: fmt.Sprintf("TRK-IN-%d", 1000+i),
+				Note:        "Initial Master Seeding",
+				TotalItems:  500,
+			}
+			db.Create(&inbound)
+
+			db.Create(&models.InboundItem{
+				InboundID: inbound.ID,
+				ProductID: p.ID,
+				Quantity:  500,
+				CostPrice: p.Price * 0.50,
+			})
+
+			// Update Pusat Inventory
+			var inv models.Inventory
+			err := db.Where("product_id = ? AND merchant_id = ?", p.ID, models.PusatID).First(&inv).Error
+			if err == gorm.ErrRecordNotFound {
+				inv = models.Inventory{
+					ProductID:  p.ID,
+					MerchantID: models.PusatID,
+					Stock:      500,
+					BasePrice:  p.Price * 0.50,
+				}
+				db.Create(&inv)
+			} else {
+				db.Model(&inv).Update("stock", inv.Stock + 500)
+			}
+
+			// Update Global Stock
+			db.Model(&models.Product{}).Where("id = ?", p.ID).Update("stock", inv.Stock)
+
+			// Log Mutation (Mata Elang)
+			db.Create(&models.StockMutation{
+				ProductID:   p.ID,
+				MerchantID:  models.PusatID,
+				Type:        "IN",
+				Quantity:    500,
+				Reference:   inbound.ID,
+				StockBefore: 0,
+				StockAfter:  500,
+				Note:        "Auto-seeded Inbound",
+			})
+		}
+	}
+	return suppliers
 }
 
 func seedCategories(db *gorm.DB) map[string]uint {
@@ -118,12 +201,31 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	password, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	pwHash := string(password)
 
-	// Super Admin
+	// 1. Super Admin (Linked to Pusat for Stock Management)
 	admin := models.User{
 		ID: AdminID, Email: "admin@akugrow.com", PasswordHash: &pwHash, Role: "superadmin", Status: "active",
 	}
 	db.Create(&admin)
-	db.Create(&models.UserProfile{UserID: admin.ID, FullName: "CEO AkuGrow"})
+	db.Create(&models.UserProfile{UserID: admin.ID, FullName: "Super Admin (Pusat)"})
+	
+	// Create Pusat Merchant record owned by Super Admin
+	pusatMerch := models.Merchant{
+		ID: PusatID, 
+		UserID: admin.ID, 
+		StoreName: "Gudang Pusat SahabatMart", 
+		Slug: "pusat", 
+		Status: "active", 
+		IsVerified: true,
+	}
+	db.Create(&pusatMerch)
+
+	// [Akuglow] Admin/Pusat is also a top-tier affiliate
+	db.Create(&models.AffiliateMember{
+		UserID:           admin.ID,
+		RefCode:          "PUSAT-HQ",
+		MembershipTierID: 4, // Platinum
+		Status:           "active",
+	})
 	
 	// Buyers (Test Location Tracking)
 	buyerSby := models.User{Email: "buyer@akuglow.com", PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
@@ -145,21 +247,12 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 		Status:           "active",
 	})
 
-	// Pusat (Master Inventory)
-	pusatUser := models.User{ID: PusatID, Email: "pusat@akugrow.com", PasswordHash: &pwHash, Role: "merchant", Status: "active"}
+	// 2. Pusat Staff (Secondary access to same warehouse)
+	pusatUser := models.User{ID: uuid.New().String(), Email: "pusat@akugrow.com", PasswordHash: &pwHash, Role: "merchant", Status: "active"}
 	db.Create(&pusatUser)
-	db.Create(&models.UserProfile{UserID: pusatUser.ID, FullName: "Gudang Pusat SahabatMart"})
+	db.Create(&models.UserProfile{UserID: pusatUser.ID, FullName: "Staf Gudang Pusat"})
 	
-	pusatMerch := models.Merchant{ID: PusatID, UserID: pusatUser.ID, StoreName: "Gudang Pusat", Slug: "pusat", Status: "active", IsVerified: true}
-	db.Create(&pusatMerch)
-
-	// [Akuglow] Pusat is also an affiliate
-	db.Create(&models.AffiliateMember{
-		UserID:           pusatUser.ID,
-		RefCode:          "PUSAT-SM",
-		MembershipTierID: 4, // Platinum
-		Status:           "active",
-	})
+	// Note: We don't create a new merchant for pusatUser because they share the PusatID logic
 
 	// Merchants (Distributors)
 	merchantLocs := []struct{ name, email, slug, city string }{
@@ -194,7 +287,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	return mList
 }
 
-func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Merchant) {
+func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Merchant, suppliers []models.Supplier) {
 	fmt.Println("  -> Seeding 40 Premium Products...")
 
 	productTemplates := []struct {
@@ -260,6 +353,7 @@ func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Me
 			Image:       t.img,
 			Status:      "active",
 			MerchantID:  PusatID, // Set Pusat as the official owner of Master Products
+			SupplierID:  suppliers[i%len(suppliers)].ID,
 			Stock:       100,     // Initial master stock
 			Rating:      4.5 + (0.1 * float64(i%5)),
 			Reviews:     int(10 + i*2),
@@ -321,7 +415,7 @@ func seedMarketing(db *gorm.DB) {
 		{Title: "E-Book: 10 Teknik Closing WhatsApp", Slug: "ebook-closing-wa", Category: "Marketing", Content: "Panduan...", FileURL: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", IsActive: true},
 	}
 	for _, e := range edus {
-		db.Create(&e)
+		db.FirstOrCreate(&e, models.AffiliateEducation{Slug: e.Slug})
 	}
 
 	events := []models.AffiliateEvent{

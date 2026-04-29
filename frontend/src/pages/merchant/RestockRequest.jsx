@@ -31,7 +31,7 @@ export default function RestockRequest() {
   const openModal = async () => {
     setShowModal(true);
     try {
-      const prodRaw = await fetchJson(`${PUBLIC_API_BASE}/products`);
+      const prodRaw = await fetchJson(`${MERCHANT_API_BASE}/catalog`);
       setMasterProducts(prodRaw || []);
       setFilteredProducts(prodRaw || []);
     } catch (err) {}
@@ -44,9 +44,10 @@ export default function RestockRequest() {
   }, [searchTerm, masterProducts]);
 
   const addToCart = (p) => {
+    const buyPrice = p.wholesale_price || (p.price * 0.8);
     const ex = cart.find(i => i.product_id === p.id);
     if (ex) setCart(cart.map(i => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i));
-    else setCart([...cart, { product_id: p.id, qty: 1, name: p.name, price: p.price, image: p.image }]);
+    else setCart([...cart, { product_id: p.id, qty: 1, name: p.name, price: buyPrice, image: p.image }]);
   };
 
   const submitRestock = async () => {

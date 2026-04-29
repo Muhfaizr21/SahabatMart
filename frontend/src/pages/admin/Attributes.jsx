@@ -17,7 +17,8 @@ const AdminAttributes = () => {
     setLoading(true);
     fetchJson(`${API}/attributes`)
       .then(d => {
-        const processed = (d.data || []).map(a => ({
+        const data = Array.isArray(d) ? d : (d?.data || []);
+        const processed = data.map(a => ({
           ...a,
           values: a.values ? a.values.split(',').map(v => v.trim()) : []
         }));

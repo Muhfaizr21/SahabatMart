@@ -89,6 +89,12 @@ import AdminPOS from './pages/admin/POS';
 import AdminRBAC from './pages/admin/RBAC';
 import AdminRestock from './pages/admin/RestockModeration';
 import WishlistStats from './pages/admin/WishlistStats';
+import SkinPreTest from './pages/SkinPreTest';
+import SkinJourney from './pages/SkinJourney';
+
+import SkinJourneyAdmin from './pages/admin/SkinJourneyAdmin';
+import PusatInventory from './pages/admin/PusatInventory';
+import SkinCommunity from './pages/SkinCommunity';
 
 // ── Penanganan Khusus Header/Footer ─────────
 function NavbarManager() {
@@ -150,7 +156,7 @@ import MerchantVouchers from './pages/merchant/Vouchers';
 
 // Affiliate Portal
 import AffiliateLayout from './components/affiliate/AffiliateLayout';
-import AffiliateDashboard from './pages/affiliate/Dashboard';
+import AffiliateDashboard from './pages/affiliate/DashboardUltimate';
 import AffiliateLinks from './pages/affiliate/Links';
 import AffiliateProducts from './pages/affiliate/Products';
 import AffiliateCommissions from './pages/affiliate/Commissions';
@@ -163,6 +169,7 @@ import AffiliateLeaderboard from './pages/affiliate/Leaderboard';
 import AffiliateVouchers from './pages/affiliate/Vouchers';
 import AffiliateEvents from './pages/affiliate/Events';
 import AffiliateStats from './pages/affiliate/Stats';
+import AffiliateStatus from './pages/affiliate/Status';
 
 // ── Scroll To Top on Route Change ─────────
 function ScrollToTop() {
@@ -178,8 +185,9 @@ function ScrollToTop() {
 // ── App Root ─────────────────────
 export default function App() {
   useEffect(() => {
-    // Jalankan pelacakan affiliate di setiap akses pertama
-    // captureAffiliate(); 
+    // [Sync Fix] Aktifkan pelacakan affiliate di setiap akses pertama
+    // Sesuai dokumen: "Sistem mencatat referral secara otomatis" dari URL ?ref=...
+    captureAffiliate();
   }, []);
 
   return (
@@ -209,11 +217,16 @@ export default function App() {
           <Route path="/coupons" element={<CouponPage />} />
           <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
 
+          {/* Akuglow Skin Journey */}
+          <Route path="/skin/pretest" element={<ProtectedRoute><SkinPreTest /></ProtectedRoute>} />
+          <Route path="/skin/journey" element={<ProtectedRoute><SkinJourney /></ProtectedRoute>} />
+
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="pos" element={<AdminPOS />} />
             <Route path="wishlist" element={<WishlistStats />} />
+            <Route path="inventory/pusat" element={<PusatInventory />} />
             <Route path="products" element={<AdminProductList />} />
             <Route path="products/add" element={<AdminAddProduct />} />
             <Route path="products/edit" element={<AdminEditProduct />} />
@@ -241,6 +254,7 @@ export default function App() {
             <Route path="education" element={<AdminEducation />} />
             <Route path="events" element={<AdminEvents />} />
             <Route path="promo" element={<AdminPromo />} />
+            <Route path="skin-journey" element={<SkinJourneyAdmin />} />
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
             <Route path="settings" element={<AdminSettings />} />
@@ -259,20 +273,22 @@ export default function App() {
           </Route>
 
           {/* Affiliate Routes */}
-          <Route path="/affiliate" element={<AffiliateLayout />}>
-             <Route index element={<AffiliateDashboard />} />
-             <Route path="links" element={<AffiliateLinks />} />
-             <Route path="products" element={<AffiliateProducts />} />
-             <Route path="commissions" element={<AffiliateCommissions />} />
-             <Route path="withdrawals" element={<AffiliateWithdrawals />} />
-             <Route path="education" element={<AffiliateEducation />} />
-             <Route path="team" element={<AffiliateTeam />} />
-             <Route path="marketing" element={<AffiliateMarketing />} />
-             <Route path="leaderboard" element={<AffiliateLeaderboard />} />
-             <Route path="vouchers" element={<AffiliateVouchers />} />
-             <Route path="events" element={<AffiliateEvents />} />
-             <Route path="stats" element={<AffiliateStats />} />
-             <Route path="settings" element={<AffiliateSettings />} />
+          <Route path="/affiliate" element={<ProtectedRoute><AffiliateLayout /></ProtectedRoute>}>
+            <Route index element={<AffiliateDashboard />} />
+            <Route path="stats" element={<AffiliateStats />} />
+            <Route path="team" element={<AffiliateTeam />} />
+            <Route path="leaderboard" element={<AffiliateLeaderboard />} />
+            <Route path="commissions" element={<AffiliateCommissions />} />
+            <Route path="withdrawals" element={<AffiliateWithdrawals />} />
+            <Route path="links" element={<AffiliateLinks />} />
+            <Route path="education" element={<AffiliateEducation />} />
+            <Route path="marketing" element={<AffiliateMarketing />} />
+            <Route path="vouchers" element={<AffiliateVouchers />} />
+            <Route path="events" element={<AffiliateEvents />} />
+            <Route path="settings" element={<AffiliateSettings />} />
+            <Route path="community" element={<SkinCommunity />} />
+            {/* [Sync Fix] Status Mitra route sesuai dokumen alur mitra Akuglow */}
+            <Route path="status" element={<AffiliateStatus />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

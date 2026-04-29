@@ -54,7 +54,7 @@ export default function AdminOrders() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/orders?status=${tab}`)
-      .then(d => setOrders(d || []))
+      .then(d => setOrders(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error)
       .finally(() => setLoading(false));
   };

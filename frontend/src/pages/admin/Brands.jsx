@@ -13,7 +13,7 @@ export default function AdminBrands() {
   const EMPTY = { name: '', logo_url: '', is_featured: false };
   const load = () => {
     setLoading(true);
-    fetchJson(`${API}/brands`).then(d => setBrands(d || [])).catch(console.error).finally(() => setLoading(false));
+    fetchJson(`${API}/brands`).then(d => setBrands(Array.isArray(d) ? d : (d?.data || []))).catch(console.error).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 

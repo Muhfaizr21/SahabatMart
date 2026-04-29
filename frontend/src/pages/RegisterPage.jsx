@@ -15,14 +15,21 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // [Akuglow Sync] Capture ref from URL with safety check
+  // [Sync Fix] Capture ref dari URL dan simpan di localStorage
+  // Sesuai dokumen: referral dicatat otomatis dari link affiliate ?ref=...
   useEffect(() => {
     try {
       const params = new URLSearchParams(location.search);
       const ref = params.get('ref');
       if (ref) {
         setFormData(prev => ({ ...prev, referralCode: ref }));
-        console.log('✅ Affiliate Ref Captured:', ref);
+        // Simpan ke localStorage agar tetap ada saat checkout (jika belum daftar dulu)
+        localStorage.setItem('pending_ref', ref);
+        console.log('✅ Affiliate Ref Captured & Stored:', ref);
+      } else {
+        // Cek dari localStorage jika sudah pernah klik link affiliate sebelumnya
+        const storedRef = localStorage.getItem('pending_ref');
+        if (storedRef) setFormData(prev => ({ ...prev, referralCode: storedRef }));
       }
     } catch (err) {
       console.warn('Affiliate capture error:', err);
@@ -55,7 +62,11 @@ export default function RegisterPage() {
       if (data && data.token) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/');
+        // Hapus pending_ref setelah berhasil register
+        localStorage.removeItem('pending_ref');
+        // [Sync Fix] Redirect ke Mitra Area, bukan homepage
+        // Sesuai dokumen: "Setelah registrasi selesai, mitra dapat login ke Mitra Area"
+        navigate('/affiliate');
       }
     } catch (err) {
       setError(err.message || 'Pendaftaran gagal');
@@ -71,8 +82,8 @@ export default function RegisterPage() {
         {/* Form Column */}
         <div className="w-full md:w-1/2 p-10 md:p-14 flex flex-col justify-center">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Buat Akun Baru ✨</h1>
-            <p className="text-gray-500">Bergabunglah dengan ribuan pengguna SahabatMart lainnya.</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Daftar Jadi Mitra Akuglow ✨</h1>
+            <p className="text-gray-500">Bergabung gratis, dapatkan komisi dari setiap penjualan yang Anda referensikan.</p>
           </div>
           
           {error && (

@@ -47,10 +47,10 @@ export default function AdminAffiliates() {
       fetchJson(`${API}/affiliates/configs`),
       fetchJson(`${API}/affiliates/withdrawals`),
     ]).then(([af, cfg, wd]) => {
-      setAffiliates(af.data || []);
-      setTotal(af.total || 0);
-      setTiers(cfg.data || []);
-      setWithdrawals(wd.data || []);
+      setAffiliates(Array.isArray(af) ? af : (af?.data || []));
+      setTotal(af?.total || (Array.isArray(af) ? af.length : 0));
+      setTiers(Array.isArray(cfg) ? cfg : (cfg?.data || []));
+      setWithdrawals(Array.isArray(wd) ? wd : (wd?.data || []));
     }).catch(console.error).finally(() => setLoading(false));
   }, [search, page, limit]);
 

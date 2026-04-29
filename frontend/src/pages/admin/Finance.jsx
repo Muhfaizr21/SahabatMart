@@ -54,10 +54,10 @@ export default function AdminFinance() {
       const params = new URLSearchParams();
       if (dateFrom) params.append('from', dateFrom);
       if (dateTo)   params.append('to', dateTo);
-      fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(d || []));
+      fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(Array.isArray(d) ? d : (d?.data || [])));
     }
     if (tab === 'ledger') {
-      fetchJson(`${API}/finance/ledger`).then(d => setLedger(d || []));
+      fetchJson(`${API}/finance/ledger`).then(d => setLedger(Array.isArray(d) ? d : (d?.data || [])));
     }
   }, [tab]);
 
@@ -65,7 +65,7 @@ export default function AdminFinance() {
     const params = new URLSearchParams();
     if (dateFrom) params.append('from', dateFrom);
     if (dateTo)   params.append('to', dateTo);
-    fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(d || []));
+    fetchJson(`${API}/finance/transactions?${params}`).then(d => setTxList(Array.isArray(d) ? d : (d?.data || [])));
   };
 
   const maxRevenue = Math.max(...monthly.map(m => m.revenue), 1);
@@ -248,7 +248,7 @@ export default function AdminFinance() {
               <div style={{ fontWeight:800, color:'#3730a3', fontSize:14 }}>Immutable Financial Ledger</div>
               <div style={{ fontSize:12, color:'#4f46e5', marginTop:2 }}>Atomic reconciliation log dengan 99.9% data integrity via Postgres Engine.</div>
             </div>
-            <button style={{ ...A.btnGhost, marginLeft:'auto', fontSize:12 }} onClick={() => fetchJson(`${API}/finance/ledger`).then(d => setLedger(d || []))}>
+            <button style={{ ...A.btnGhost, marginLeft:'auto', fontSize:12 }} onClick={() => fetchJson(`${API}/finance/ledger`).then(d => setLedger(Array.isArray(d) ? d : (d?.data || [])))}>
               <i className="bx bx-refresh" /> Reload
             </button>
           </div>

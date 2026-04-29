@@ -734,9 +734,12 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 		ID          string    `json:"id"`
 		Name        string    `json:"name"`
 		Description string    `json:"description"`
+		SKU         string    `json:"sku"`
 		Slug        string    `json:"slug"`
 		Price       float64   `json:"price"`
 		OldPrice    float64   `json:"old_price"`
+		WholesalePrice float64 `json:"wholesale_price"`
+		COGS        float64   `json:"cogs"`
 		Category    string    `json:"category"`
 		Brand       string    `json:"brand"`
 		Stock       int       `json:"stock"`
@@ -746,11 +749,17 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 		Status      string    `json:"status"`
 		MerchantID  string    `json:"merchant_id"`
 		StoreName   string    `json:"store_name"`
+		
+		BaseAffiliateFee           float64 `json:"base_affiliate_fee"`
+		BaseAffiliateFeeNominal    float64 `json:"base_affiliate_fee_nominal"`
+		BaseDistributionFee        float64 `json:"base_distribution_fee"`
+		BaseDistributionFeeNominal float64 `json:"base_distribution_fee_nominal"`
+
 		CreatedAt   time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("products p").
-		Select("p.id, p.name, p.description, p.image, p.images, p.slug, p.price, p.old_price, p.stock, p.status, p.merchant_id, m.store_name, p.category, p.brand, p.attributes, p.created_at").
+		Select("p.id, p.name, p.description, p.sku, p.image, p.images, p.slug, p.price, p.old_price, p.wholesale_price, p.cogs, p.stock, p.status, p.merchant_id, m.store_name, p.category, p.brand, p.attributes, p.base_affiliate_fee, p.base_affiliate_fee_nominal, p.base_distribution_fee, p.base_distribution_fee_nominal, p.created_at").
 		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id")
 
 	if status != "" {
@@ -770,7 +779,11 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var rows []ProductRow
-	query.Order("p.created_at DESC").Scan(&rows)
+	err := query.Order("p.created_at DESC").Scan(&rows).Error
+	if err != nil {
+		fmt.Printf("DATABASE ERROR in GetProducts: %v\n", err)
+	}
+	fmt.Printf("DEBUG: GetProducts found %d products\n", len(rows))
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -862,11 +875,11 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// [Akuglow] Auto-populate PUSAT inventory with 0 stock
+	// [Akuglow] Auto-populate PUSAT inventory with provided stock
 	ac.DB.Create(&models.Inventory{
 		ProductID:  p.ID,
 		MerchantID: models.PusatID,
-		Stock:      0,
+		Stock:      p.Stock,
 	})
 
 	ac.Audit.Log(models.AdminID, "create_product", "product", p.ID, p.Name, r.RemoteAddr)
@@ -883,6 +896,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		ID          string  `json:"id"`
 		Name        string  `json:"name"`
 		Description string  `json:"description"`
+		SKU         string  `json:"sku"`
 		Price       float64 `json:"price"`
 		OldPrice    float64 `json:"old_price"`
 		COGS        float64 `json:"cogs"` // Modal Awal
@@ -906,12 +920,14 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 	updates := map[string]interface{}{
 		"name":                          req.Name,
 		"description":                   req.Description,
+		"sku":                           req.SKU,
 		"price":                         req.Price,
 		"old_price":                     req.OldPrice,
 		"cogs":                          req.COGS,
 		"category":                      req.Category,
 		"brand":                         req.Brand,
 		"attributes":                    req.Attributes,
+		"stock":                         req.Stock,
 		"image":                         req.Image,
 		"images":                        req.Images, // Ensuring gallery images are updated
 		"status":                        req.Status,
@@ -927,9 +943,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 	}
 
 	// [Akuglow] Sync PUSAT stock
-	if req.Stock > 0 {
-		ac.DB.Table("inventories").Where("merchant_id = ? AND product_id = ?", models.PusatID, req.ID).Update("stock", req.Stock)
-	}
+	ac.DB.Table("inventories").Where("merchant_id = ? AND product_id = ?", models.PusatID, req.ID).Update("stock", req.Stock)
 
 	ac.Audit.Log(models.AdminID, "update_product", "product", req.ID, req.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -1273,6 +1287,22 @@ func (ac *AdminController) ManageCommissions(w http.ResponseWriter, r *http.Requ
 			"status": "success",
 			"data":   comm,
 		})
+		return
+	}
+	if r.Method == http.MethodDelete {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			utils.JSONError(w, http.StatusBadRequest, "ID is required")
+			return
+		}
+		var comm models.CategoryCommission
+		if err := ac.DB.First(&comm, id).Error; err != nil {
+			utils.JSONError(w, http.StatusNotFound, "Commission not found")
+			return
+		}
+		ac.DB.Delete(&comm)
+		ac.Audit.Log(models.AdminID, "delete_commission", "category_commission", id, comm.CategoryName, r.RemoteAddr)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 	}
 }
 
@@ -1303,6 +1333,121 @@ func (ac *AdminController) ManageMerchantCommissions(w http.ResponseWriter, r *h
 			"status": "success",
 			"data":   comm,
 		})
+		return
+	}
+	if r.Method == http.MethodDelete {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			utils.JSONError(w, http.StatusBadRequest, "ID is required")
+			return
+		}
+		var comm models.MerchantCommission
+		if err := ac.DB.First(&comm, id).Error; err != nil {
+			utils.JSONError(w, http.StatusNotFound, "Commission not found")
+			return
+		}
+		ac.DB.Delete(&comm)
+		ac.Audit.Log(models.AdminID, "delete_merchant_commission", "merchant_commission", id, comm.MerchantID, r.RemoteAddr)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
+	}
+}
+
+// POST /api/admin/commissions/product
+func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost || r.Method == http.MethodPut {
+		var req struct {
+			ProductID          string  `json:"product_id"`
+			BaseAffiliateFee   float64 `json:"base_affiliate_fee"`
+			BaseDistFee        float64 `json:"base_distribution_fee"`
+			AffiliateFeeNominal float64 `json:"base_affiliate_fee_nominal"`
+			DistFeeNominal     float64 `json:"base_distribution_fee_nominal"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+			return
+		}
+
+		if req.ProductID == "" {
+			utils.JSONError(w, http.StatusBadRequest, "Product ID is required")
+			return
+		}
+
+		err := ac.DB.Model(&models.Product{}).Where("id = ?", req.ProductID).Updates(map[string]interface{}{
+			"base_affiliate_fee":           req.BaseAffiliateFee,
+			"base_distribution_fee":        req.BaseDistFee,
+			"base_affiliate_fee_nominal":   req.AffiliateFeeNominal,
+			"base_distribution_fee_nominal": req.DistFeeNominal,
+		}).Error
+
+		if err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Failed to update product commission")
+			return
+		}
+
+		ac.Audit.Log(models.AdminID, "update_product_commission", "product", req.ProductID, 
+			fmt.Sprintf("Aff=%.2f%% Dist=%.2f%%", req.BaseAffiliateFee, req.BaseDistFee), r.RemoteAddr)
+
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"message": "Product commission updated successfully",
+		})
+		return
+	}
+	if r.Method == http.MethodDelete {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			utils.JSONError(w, http.StatusBadRequest, "Product ID is required")
+			return
+		}
+		err := ac.DB.Model(&models.Product{}).Where("id = ?", id).Updates(map[string]interface{}{
+			"base_affiliate_fee":           0,
+			"base_distribution_fee":        0,
+			"base_affiliate_fee_nominal":   0,
+			"base_distribution_fee_nominal": 0,
+		}).Error
+		if err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Failed to reset product commission")
+			return
+		}
+		ac.Audit.Log(models.AdminID, "reset_product_commission", "product", id, "Reset to 0", r.RemoteAddr)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
+	}
+}
+
+// GET  /api/admin/commissions/presets
+// POST /api/admin/commissions/presets
+// DELETE /api/admin/commissions/presets
+func (ac *AdminController) ManageCommissionPresets(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		var presets []models.CommissionPreset
+		ac.DB.Order("name asc").Find(&presets)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"data":   presets,
+		})
+		return
+	}
+	if r.Method == http.MethodPost || r.Method == http.MethodPut {
+		var preset models.CommissionPreset
+		json.NewDecoder(r.Body).Decode(&preset)
+		ac.DB.Save(&preset)
+		ac.Audit.Log(models.AdminID, "upsert_commission_preset", "commission_preset",
+			fmt.Sprintf("%d", preset.ID), preset.Name, r.RemoteAddr)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"data":   preset,
+		})
+		return
+	}
+	if r.Method == http.MethodDelete {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			utils.JSONError(w, http.StatusBadRequest, "ID is required")
+			return
+		}
+		ac.DB.Delete(&models.CommissionPreset{}, id)
+		ac.Audit.Log(models.AdminID, "delete_commission_preset", "commission_preset", id, "", r.RemoteAddr)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 	}
 }
 

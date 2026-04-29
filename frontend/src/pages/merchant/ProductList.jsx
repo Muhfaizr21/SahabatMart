@@ -15,7 +15,8 @@ export default function MerchantInventory() {
     try {
       const data = await fetchJson(`${MERCHANT_API_BASE}/products`);
       // Results from backend now includes products JOIN inventories
-      setProducts(data.data || []);
+      // fetchJson already unwraps { status: 'success', data: [...] }
+      setProducts(data || []);
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {

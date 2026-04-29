@@ -25,6 +25,8 @@ type CategoryCommission struct {
 	ID           uint    `gorm:"primaryKey" json:"id"`
 	CategoryName string  `gorm:"type:varchar(100);uniqueIndex;not null" json:"category_name"`
 	FeePercent   float64 `gorm:"type:decimal(5,2);not null" json:"fee_percent"`
+	AffiliateFee float64 `gorm:"type:decimal(5,2);default:0" json:"affiliate_fee"`
+	DistFee      float64 `gorm:"type:decimal(5,2);default:0" json:"dist_fee"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -34,9 +36,23 @@ type MerchantCommission struct {
 	ID         uint    `gorm:"primaryKey" json:"id"`
 	MerchantID string  `gorm:"type:uuid;uniqueIndex;not null" json:"merchant_id"`
 	FeePercent float64 `gorm:"type:decimal(5,2);not null" json:"fee_percent"`
+	AffiliateFee float64 `gorm:"type:decimal(5,2);default:0" json:"affiliate_fee"`
+	DistFee      float64 `gorm:"type:decimal(5,2);default:0" json:"dist_fee"`
 	Note       string  `gorm:"type:text" json:"note"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// CommissionPreset menyimpan template komisi yang bisa digunakan ulang
+type CommissionPreset struct {
+	ID           uint    `gorm:"primaryKey" json:"id"`
+	Name         string  `gorm:"type:varchar(100);uniqueIndex;not null" json:"name"`
+	FeePercent   float64 `gorm:"type:decimal(5,2);not null" json:"fee_percent"`      // Platform Fee
+	AffiliateFee float64 `gorm:"type:decimal(5,2);default:0" json:"affiliate_fee"` // Base Affiliate
+	DistFee      float64 `gorm:"type:decimal(5,2);default:0" json:"dist_fee"`      // Base Distribution
+	Note         string  `gorm:"type:text" json:"note"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // AuditLog mencatat semua aksi admin ke sistem
@@ -116,6 +132,57 @@ type RestockRequest struct {
 	
 	Items       []RestockItem `gorm:"foreignKey:RestockID" json:"items"`
 	Merchant    Merchant      `gorm:"foreignKey:MerchantID;references:ID" json:"merchant"`
+	TrackingNumber string    `gorm:"type:varchar(100)" json:"tracking_number"` // Resi pengiriman B2B ke merchant
+}
+
+// Supplier pabrik/penyedia barang ke pusat
+type Supplier struct {
+	ID        string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	Name      string    `gorm:"type:varchar(255);not null" json:"name"`
+	Contact   string    `gorm:"type:varchar(100)" json:"contact"`
+	Phone     string    `gorm:"type:varchar(20)" json:"phone"`
+	Email     string    `gorm:"type:varchar(100)" json:"email"`
+	Address   string    `gorm:"type:text" json:"address"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// InboundStock penerimaan barang dari supplier ke pusat
+type InboundStock struct {
+	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	SupplierID  string    `gorm:"type:uuid;not null;index" json:"supplier_id"`
+	ReferenceNo string    `gorm:"type:varchar(100)" json:"reference_no"` // Nomor PO atau Surat Jalan Supplier
+	Status      string    `gorm:"type:varchar(50);default:'received'" json:"status"` // pending, received, cancelled
+	Note        string    `gorm:"type:text" json:"note"`
+	TotalItems  int       `json:"total_items"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+
+	Supplier    Supplier      `gorm:"foreignKey:SupplierID" json:"supplier"`
+	Items       []InboundItem `gorm:"foreignKey:InboundID" json:"items"`
+}
+
+type InboundItem struct {
+	ID         string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	InboundID  string  `gorm:"type:uuid;not null;index" json:"inbound_id"`
+	ProductID  string  `gorm:"type:uuid;not null;index" json:"product_id"`
+	Quantity   int     `json:"quantity"`
+	CostPrice  float64 `gorm:"type:decimal(15,2)" json:"cost_price"` // COGS saat barang masuk
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// StockMutation Mata Elang: Pencatatan mutasi stok global
+type StockMutation struct {
+	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ProductID   string    `gorm:"type:uuid;not null;index" json:"product_id"`
+	MerchantID  string    `gorm:"type:uuid;not null;index" json:"merchant_id"` // Lokasi gudang (Pusat atau Cabang)
+	Type        string    `gorm:"type:varchar(50)" json:"type"` // IN (Supplier), OUT (Order), RESTOCK_OUT (Pusat ke Cabang), RESTOCK_IN (Cabang nerima dari Pusat), ADJUST (Manual)
+	Quantity    int       `json:"quantity"`
+	Reference   string    `gorm:"type:varchar(255)" json:"reference"` // ID Order, ID Restock, ID Inbound
+	StockBefore int       `json:"stock_before"`
+	StockAfter  int       `json:"stock_after"`
+	Note        string    `gorm:"type:text" json:"note"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type RestockItem struct {
@@ -271,8 +338,13 @@ type Product struct {
 	SKU         string    `gorm:"type:varchar(100);unique;index" json:"sku"`
 	Description string    `gorm:"type:text" json:"description"`
 	Price       float64   `gorm:"type:decimal(15,2);not null" json:"price"`
+	WholesalePrice float64 `gorm:"type:decimal(15,2);default:0" json:"wholesale_price"` // Harga khusus merchant
 	OldPrice    float64   `gorm:"type:decimal(15,2)" json:"old_price"`
 	COGS        float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
+	
+	// Master Config
+	IsMaster    bool      `gorm:"default:false" json:"is_master"`
+	SupplierID  string    `gorm:"type:uuid;index" json:"supplier_id"`
 	
 	// Global Info
 	Category    string    `gorm:"type:varchar(100)" json:"category"`
@@ -382,6 +454,10 @@ func (Region) TableName() string              { return "regions" }
 func (ProductVariant) TableName() string      { return "product_variants" }
 func (Cart) TableName() string                { return "carts" }
 func (CartItem) TableName() string            { return "cart_items" }
+func (Supplier) TableName() string            { return "suppliers" }
+func (InboundStock) TableName() string        { return "inbound_stocks" }
+func (InboundItem) TableName() string         { return "inbound_items" }
+func (StockMutation) TableName() string       { return "stock_mutations" }
 func (Notification) TableName() string        { return "notifications" }
 func (BlogPost) TableName() string            { return "blog_posts" }
 func (Inventory) TableName() string        { return "inventories" }

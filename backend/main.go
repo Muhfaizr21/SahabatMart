@@ -45,12 +45,36 @@ func ConnectDB() {
 		&models.Permission{}, &models.Role{},
 		&models.Wallet{}, &models.WalletTransaction{}, &models.WithdrawalRequest{}, &models.Refund{},
 		&models.Inventory{}, &models.RestockRequest{}, &models.RestockItem{},
+		&models.Supplier{}, &models.InboundStock{}, &models.InboundItem{}, &models.StockMutation{},
 		// Affiliate portal models
 		&models.AffiliateCommission{}, &models.AffiliateLink{},
 		&models.AffiliateWithdrawal{},
 		&models.AffiliateEducation{}, &models.AffiliateEvent{}, &models.PromoMaterial{},
 		&models.AffiliateTurnoverSnapshot{}, &models.LeaderboardCache{},
+		// Akuglow Skin Journey
+		&models.SkinPreTest{}, &models.SkinProgress{}, &models.SkinJournal{}, &models.SkinWarriorLevel{},
+		&models.SkinEducation{}, &models.SkinCommunityGroup{}, &models.SkinCommunityPost{}, &models.SkinCommunityComment{},
 	)
+
+	// Seed Sample Education for testing
+	var count int64
+	DB.Model(&models.SkinEducation{}).Count(&count)
+	if count == 0 {
+		DB.Create(&models.SkinEducation{
+			Title:       "Berdamai dengan Jerawat",
+			ContentType: "article",
+			Content:     "Jerawat bukan tanda kamu kotor, tapi tanda kulitmu sedang bekerja keras. Mari belajar mencintainya...",
+			MediaURL:    "https://example.com/article-1",
+			DayTarget:   1,
+		})
+		DB.Create(&models.SkinEducation{
+			Title:       "Podcast: Inner Healing for Skin",
+			ContentType: "podcast",
+			Content:     "Dengarkan bagaimana kesehatan mental berpengaruh pada kilau wajahmu.",
+			MediaURL:    "https://example.com/podcast-1",
+			DayTarget:   2,
+		})
+	}
 }
 
 func buildDSN() string {
@@ -92,9 +116,15 @@ func main() {
 
 	handler := routes.SetupRoutes(DB)
 
+	// Serve Static Files (Uploaded Images)
+	fileServer := http.FileServer(http.Dir("./uploads"))
+	mux := http.NewServeMux()
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fileServer))
+	mux.Handle("/", handler)
+
 	port := getEnv("PORT", "8080")
 	log.Printf("🚀 Server running on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, handler))
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
 // autoSeedCriticalData: seed tier kalau belum ada, tanpa overwrite data existing
@@ -180,6 +210,13 @@ func startHousekeeping(db *gorm.DB) {
 		ledger, err := financeService.SyncPlatformLedger()
 		if err == nil {
 			log.Printf("📊 Platform Ledger Sync: %+v", ledger)
+		}
+
+		// 10. [Sync Fix] Update Merchant Stats & Send Warnings jika tidak memenuhi syarat
+		// Ini mengimplementasikan mekanisme downgrade yang didefinisikan dalam dokumen bisnis
+		_, errMerchant := affiliateService.CheckAndDowngradeMerchants()
+		if errMerchant != nil {
+			log.Printf("❌ Housekeeping Error (Merchant Downgrade Check): %v", errMerchant)
 		}
 
 	}

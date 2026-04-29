@@ -23,7 +23,7 @@ func NewMerchantService(db *gorm.DB) *MerchantService {
 
 func (s *MerchantService) GetCatalog(search string) ([]models.Product, error) {
 	var products []models.Product
-	query := s.DB.Where("status = ?", "active")
+	query := s.DB.Where("status = ? AND is_master = ?", "active", true)
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -80,12 +80,15 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 				return fmt.Errorf("produk %s tidak ditemukan", items[i].ProductID)
 			}
 			
-			// [Financial Audit Fix] Restock price should be the COGS (Modal Awal)
-			// not the Retail Price, so merchants have a margin to earn.
+			// [Financial Audit Fix] Use WholesalePrice for B2B transactions
+			// Fallback order: WholesalePrice -> COGS -> 80% Retail Price
 			items[i].RestockID = req.ID
-			items[i].UnitPrice = prod.COGS 
+			items[i].UnitPrice = prod.WholesalePrice
 			if items[i].UnitPrice <= 0 {
-				items[i].UnitPrice = prod.Price * 0.8 // Fallback 80% if COGS not set
+				items[i].UnitPrice = prod.COGS
+			}
+			if items[i].UnitPrice <= 0 {
+				items[i].UnitPrice = prod.Price * 0.8 // Default 20% margin for merchant
 			}
 			items[i].Subtotal = items[i].UnitPrice * float64(items[i].Quantity)
 			
@@ -324,13 +327,17 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 			return fmt.Errorf("hanya restock yang sudah dikirim yang dapat diterima (Status saat ini: %s)", req.Status)
 		}
 
-		// 1. Update Inventory
+		// 1. Update Inventory & Log Mutation
 		for _, item := range req.Items {
 			var prod models.Product
 			tx.First(&prod, "id = ?", item.ProductID)
 
 			var inv models.Inventory
 			err := tx.Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).First(&inv).Error
+			
+			stockBefore := 0
+			if err == nil { stockBefore = inv.Stock }
+
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				inv = models.Inventory{
 					MerchantID:    merchantID,
@@ -346,9 +353,22 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 					"base_price":      prod.Price,
 					"last_sync_price": time.Now(),
 				}).Error; err != nil { return err }
+				inv.Stock += item.Quantity // For mutation log
 			} else {
 				return err
 			}
+
+			// LOG MUTATION (Mata Elang) - Tracking Stock IN at Merchant
+			tx.Create(&models.StockMutation{
+				ProductID:   item.ProductID,
+				MerchantID:  merchantID,
+				Type:        "RESTOCK_IN",
+				Quantity:    item.Quantity,
+				Reference:   req.ID,
+				StockBefore: stockBefore,
+				StockAfter:  inv.Stock,
+				Note:        "Received from Pusat (Restock)",
+			})
 		}
 
 		// 2. Financial Transaction (Merchant pays HQ)

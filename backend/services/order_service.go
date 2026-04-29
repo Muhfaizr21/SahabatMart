@@ -4,6 +4,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/repositories"
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -110,21 +111,53 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			for _, item := range gItems {
 				affAmt, distAmt, platAmt, itemCogs, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
 
-				// [Akuglow Refactor] Decrement Stock from Inventory Table
+				// [Sync Fix - Stok Fallback] Sesuai Dokumen Bisnis:
+				// Jika stok Merchant habis, sistem otomatis cek gudang PUSAT sebagai fallback
 				var inventory models.Inventory
+				inventoryMerchantID := merchantID // Default: ambil dari merchant yang dipilih
+				
 				if err := tx.Set("gorm:query_option", "FOR UPDATE").
 					Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).
 					First(&inventory).Error; err != nil {
-					return fmt.Errorf("stok tidak ditemukan di merchant %s", merchant.StoreName)
+					// Stok tidak ditemukan di Merchant → coba gudang Pusat
+					pusatFallback := "00000000-0000-0000-0000-000000000000"
+					if err2 := tx.Set("gorm:query_option", "FOR UPDATE").
+						Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID).
+						First(&inventory).Error; err2 != nil {
+						return fmt.Errorf("stok produk '%s' tidak tersedia di merchant maupun gudang pusat", item.ProductName)
+					}
+					// Gunakan gudang pusat sebagai sumber stok
+					inventoryMerchantID = pusatFallback
 				}
 
 				if inventory.Stock < item.Quantity {
-					return fmt.Errorf("stok produk '%s' di merchant %s tidak mencukupi (Tersisa: %d)", item.ProductName, merchant.StoreName, inventory.Stock)
+					// [Fallback Level 2] Cek gudang pusat jika merchant tidak cukup stok
+					pusatFallback := "00000000-0000-0000-0000-000000000000"
+					if inventoryMerchantID != pusatFallback {
+						var pusatInventory models.Inventory
+						if err := tx.Set("gorm:query_option", "FOR UPDATE").
+							Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID).
+							First(&pusatInventory).Error; err == nil && pusatInventory.Stock >= item.Quantity {
+							// Pakai gudang pusat
+							inventory = pusatInventory
+							inventoryMerchantID = pusatFallback
+						} else {
+							return fmt.Errorf("stok produk '%s' tidak mencukupi di merchant %s maupun gudang pusat (Tersisa: %d)", item.ProductName, merchant.StoreName, inventory.Stock+pusatInventory.Stock)
+						}
+					} else {
+						return fmt.Errorf("stok produk '%s' di gudang pusat tidak mencukupi (Tersisa: %d)", item.ProductName, inventory.Stock)
+					}
 				}
 
 				if err := tx.Model(&inventory).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 					return err
 				}
+				
+				// Catat dari mana stok diambil (untuk audit trail)
+				if inventoryMerchantID != merchantID {
+					item.ProductName = item.ProductName + " [dari Gudang Pusat]"
+				}
+
 
 				// [Akuglow Sync] Low Stock Alert (Threshold: 5)
 				if inventory.Stock-item.Quantity <= 5 {
@@ -159,6 +192,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				// Formula: Subtotal - PlatformFee - AffiliateFee - DistributionFee
 				hqCut := item.Subtotal - platAmt - affAmt - distAmt
 				if hqCut < 0 { hqCut = 0 } // Safety check
+
 
 				if err := tx.Create(&item).Error; err != nil {
 					return err
@@ -372,13 +406,24 @@ func (s *OrderService) CompletePayment(orderID string) error {
 func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, distAmt float64, platAmt float64, cogs float64, err error) {
 	subtotal := item.UnitPrice * float64(item.Quantity)
 
-	// 1. Platform Fee (Percentage only)
-	platRate := s.ConfigService.GetFloat("default_platform_fee", 0.05)
-	platAmt = subtotal * platRate
-
-	// 2. Load Data
+	// 1. Platform Fee (Hierarchical Logic)
+	// Priority: Merchant Override > Category Default > Global Fallback
+	var platRate float64
+	var merchComm models.MerchantCommission
+	var catComm models.CategoryCommission
 	var product models.Product
 	db.Where("id = ?", item.ProductID).First(&product)
+
+	if err := db.Where("merchant_id = ?", merchantID).First(&merchComm).Error; err == nil {
+		platRate = merchComm.FeePercent
+	} else if err := db.Where("category_name = ?", product.Category).First(&catComm).Error; err == nil {
+		platRate = catComm.FeePercent
+	} else {
+		platRate = s.ConfigService.GetFloat("default_platform_fee", 0.05)
+	}
+	platAmt = subtotal * platRate
+
+	// 2. Load Data (Already loaded product above for category check)
 	cogs = product.COGS // Default to product COGS
 
 	// If variant, use variant COGS if set
@@ -395,32 +440,36 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	db.Where("id = ?", merchantID).First(&merchant)
 
 	// 3. Distribution Fee (Merchant's cut)
-	// Rules: Product Specific % > Product Nominal > Merchant Tier %
+	// Hierarchy: Product Specific % > Merchant Override > Category Default > Global Fallback
 	if product.BaseDistributionFee > 0 {
 		distAmt = subtotal * (product.BaseDistributionFee / 100.0)
 	} else if product.BaseDistributionFeeNominal > 0 {
 		distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
+	} else if merchComm.DistFee > 0 {
+		distAmt = subtotal * (merchComm.DistFee / 100.0)
+	} else if catComm.DistFee > 0 {
+		distAmt = subtotal * (catComm.DistFee / 100.0)
 	} else if merchant.DistributionFeePercent > 0 {
 		distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
 	}
 
 	// 4. Affiliate Fee (Referrer's cut)
-	// Rules Priority: Product Specific % > Product Nominal > Tier % > Global Fallback
+	// Hierarchy: Product Specific % > Merchant Override > Category Default > Tier %
 	if affiliateID != nil && *affiliateID != "" {
 		if aff, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
 			if product.BaseAffiliateFee > 0 {
-				// 1. Prioritas Utama: Komisi Persentase Produk
 				affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
 			} else if product.BaseAffiliateFeeNominal > 0 {
-				// 2. Prioritas Kedua: Komisi Nominal Produk
 				affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
+			} else if merchComm.AffiliateFee > 0 {
+				affAmt = subtotal * (merchComm.AffiliateFee / 100.0)
+			} else if catComm.AffiliateFee > 0 {
+				affAmt = subtotal * (catComm.AffiliateFee / 100.0)
 			} else {
-				// 3. Prioritas Ketiga: Berdasarkan Tier Affiliate
 				var tier models.MembershipTier
 				if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
 					affAmt = subtotal * tier.BaseCommissionRate
 				} else {
-					// 4. Fallback Terakhir: Global 3%
 					affAmt = subtotal * 0.03
 				}
 			}

@@ -13,7 +13,7 @@ export default function AdminBanners() {
   const load = () => {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/banners`)
-      .then(res => setBanners(res.data || []))
+      .then(res => setBanners(Array.isArray(res) ? res : (res.data || [])))
       .catch(() => toast.error('Gagal memuat banner'))
       .finally(() => setLoading(false));
   };

@@ -60,7 +60,8 @@ const MerchantLayout = () => {
     return () => clearInterval(timer);
   }, []);
 
-  if (!user || user.role !== 'merchant') {
+  // [SahabatMart] Allow both merchants and superadmins (for Pusat warehouse management)
+  if (!user || (user.role !== 'merchant' && user.role !== 'superadmin')) {
     return <Navigate to="/login" replace />;
   }
 

@@ -4,19 +4,6 @@ import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 import toast from 'react-hot-toast';
 
-const analyzePhotoWithAI = async (file) => {
-  const formData = new FormData();
-  formData.append('photo', file);
-  const token = localStorage.getItem('token');
-  const res = await fetch(`${API_BASE}/api/skin/analyze`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  if (!res.ok) throw new Error('Analisis gagal');
-  return res.json();
-};
-
 const formatRp = (n) =>
   'Rp ' + Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
@@ -53,13 +40,6 @@ export default function AffiliateDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); 
-  const fileInputRef = React.useRef(null);
-  
-  // AI Analyzer State
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
 
   // Skin Journey States
   const [journeyData, setJourneyData] = useState(null);
@@ -67,12 +47,33 @@ export default function AffiliateDashboard() {
   const [savingJournal, setSavingJournal] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showTracker, setShowTracker] = useState(false);
+  const [ritualActive, setRitualActive] = useState(false);
+  const [ritualSeconds, setRitualSeconds] = useState(60);
   const [trackerForm, setTrackerForm] = useState({
     skin_score: 5,
     emotional_score: 5,
     allow_marketing: false,
     notes: ''
   });
+
+  useEffect(() => {
+    let interval = null;
+    if (ritualActive && ritualSeconds > 0) {
+      interval = setInterval(() => {
+        setRitualSeconds(prev => prev - 1);
+      }, 1000);
+    } else if (ritualSeconds === 0) {
+      setRitualActive(false);
+      setRitualSeconds(60);
+      toast.success('Ritual Selesai! Kulitmu berterima kasih. ✨', { duration: 5000 });
+    }
+    return () => clearInterval(interval);
+  }, [ritualActive, ritualSeconds]);
+
+  const startRitual = () => {
+    setRitualActive(true);
+    toast('Ritual Dimulai... Tarik nafas dalam.', { icon: '🧘‍♀️' });
+  };
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -122,40 +123,6 @@ export default function AffiliateDashboard() {
     } catch (err) { toast.error('Gagal menyimpan progres'); }
   };
 
-  const handlePhotoSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
-    setAiResult(null);
-  };
-
-  const handleAnalyze = async () => {
-    if (!photoFile) return;
-    setAnalyzing(true);
-    try {
-      const result = await analyzePhotoWithAI(photoFile);
-      setAiResult(result);
-      if (result.skin_score) {
-        setTrackerForm(f => ({ ...f, skin_score: result.skin_score }));
-      }
-      toast.success('Analisis AI selesai!');
-    } catch (err) {
-      const mockResult = {
-        skin_score: Math.floor(Math.random() * 4) + 5,
-        redness: Math.floor(Math.random() * 40) + 10,
-        acne_count: Math.floor(Math.random() * 8),
-        moisture: Math.floor(Math.random() * 30) + 40,
-        summary: 'Kulit terdeteksi dalam kondisi sedang. Pertahankan rutinitas perawatan dan konsumsi air yang cukup.',
-        recommendations: ['Gunakan moisturizer 2x sehari', 'Hindari produk berbahan alkohol tinggi', 'Perbanyak konsumsi vitamin C'],
-      };
-      setAiResult(mockResult);
-      toast('Analisis AI (mode demo)', { icon: '🤖' });
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="w-12 h-12 rounded-full border-4 border-indigo-500/30 border-t-indigo-400 animate-spin" />
@@ -171,7 +138,7 @@ export default function AffiliateDashboard() {
         <div>
           <h1 className="text-3xl font-black text-white font-['Plus_Jakarta_Sans'] tracking-tight">
             Halo, <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{user?.profile?.full_name || 'Mitra'}!</span>
-            <span className="ml-3 text-[10px] bg-white/10 px-2 py-1 rounded text-white/50">VERSION ULTIMATE 1.0</span>
+            <span className="ml-3 text-[10px] bg-white/10 px-2 py-1 rounded text-white/50">VERSION ULTIMATE 1.1</span>
           </h1>
           <p className="text-slate-400 mt-1 text-sm">Selamat datang di Pusat Kendali Mitra SahabatMart.</p>
         </div>
@@ -184,19 +151,120 @@ export default function AffiliateDashboard() {
 
       {activeTab === 'overview' ? (
         <div className="space-y-6 animate-in fade-in duration-500">
-           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-br from-indigo-600/20 to-purple-600/10 border border-indigo-500/20">
-              <div>
-                <p className="text-[10px] font-bold text-indigo-400 tracking-[0.2em] uppercase mb-1">Kode Referral</p>
-                <p className="text-2xl font-black text-white tracking-widest">{user?.affiliate_ref_code || 'REF-CODE'}</p>
+          {/* Top Bar: Referral & Tier */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2 bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-[32px] flex justify-between items-center shadow-xl shadow-indigo-500/20 relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+              <div className="relative z-10">
+                <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kode Referral Anda</p>
+                <h3 className="text-white text-3xl font-black tracking-widest">{user?.affiliate?.ref_code || user?.affiliate_ref_code || 'AG-PRO-2024'}</h3>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => {navigator.clipboard.writeText(user?.affiliate?.ref_code || user?.affiliate_ref_code); toast.success('Kode disalin!')}} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
+                  <button onClick={() => window.open('/affiliate/links', '_self')} className="px-4 py-2 bg-indigo-900/40 text-white rounded-lg text-[10px] font-black hover:bg-indigo-900/60">GENERATE LINK</button>
+                </div>
               </div>
-              <button onClick={() => {navigator.clipboard.writeText(user?.affiliate_ref_code); toast.success('Disalin!')}} className="px-6 py-2 bg-indigo-600 rounded-xl text-xs font-bold text-white">SALIN KODE</button>
-           </div>
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard icon="ads_click" label="Klik" value={formatNum(stats.total_clicks)} color="#ddb7ff" />
-              <StatCard icon="shopping_cart" label="Order" value={formatNum(stats.total_conversions)} color="#fabc4e" />
-              <StatCard icon="payments" label="Saldo" value={formatRp(stats.balance)} color="#4ade80" />
-              <StatCard icon="account_balance_wallet" label="Ditarik" value={formatRp(stats.total_withdrawn)} color="#60a5fa" />
-           </div>
+              <div className="text-right hidden sm:block relative z-10">
+                <span className="material-symbols-outlined text-6xl text-white/20">qr_code_2</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/40 border border-white/5 p-8 rounded-[32px] flex flex-col justify-center">
+               <div className="flex justify-between items-end mb-3">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progress Tier</p>
+                  <p className="text-indigo-400 font-black text-xs">{user?.affiliate?.membership_tier?.name || 'Bronze'}</p>
+               </div>
+               <div className="w-full h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: '65%' }} />
+               </div>
+               <p className="text-[9px] text-slate-500 mt-3 italic text-center">Butuh beberapa order lagi untuk naik ke Silver</p>
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <StatCard 
+               icon="ads_click" 
+               label="Klik" 
+               value={formatNum(stats.total_clicks)} 
+               sub="+12% minggu ini"
+               color="#ddb7ff" 
+             />
+             <StatCard 
+               icon="shopping_cart" 
+               label="Order" 
+               value={formatNum(stats.total_conversions || stats.total_orders)} 
+               sub={`${stats.total_orders_pending || 0} pending`}
+               color="#fabc4e" 
+             />
+             <StatCard 
+               icon="payments" 
+               label="Saldo" 
+               value={formatRp(stats.balance)} 
+               sub="Siap ditarik"
+               color="#4ade80" 
+             />
+             <StatCard 
+               icon="insights" 
+               label="Konversi" 
+               value={`${(( (stats.total_conversions || stats.total_orders) / (stats.total_clicks || 1)) * 100).toFixed(1)}%`} 
+               sub="Rate efektivitas"
+               color="#f43f5e" 
+             />
+          </div>
+
+          {/* Recent Activity & Quick Action */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+             <div className="lg:col-span-2 p-8 bg-slate-800/40 border border-white/5 rounded-[32px]">
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-white font-bold text-sm uppercase tracking-widest flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-400 text-lg">history</span> Aktivitas Terakhir
+                  </h4>
+                  <button onClick={() => window.open('/affiliate/commissions', '_self')} className="text-[10px] text-slate-500 font-bold hover:text-indigo-400 uppercase tracking-tighter">Lihat Semua</button>
+                </div>
+                <div className="space-y-4">
+                   {[
+                     { type: 'Order', msg: 'Order baru dari Link Affiliate', time: 'Baru saja', amount: '+Rp 25.000', icon: 'shopping_basket', color: 'text-emerald-400' },
+                     { type: 'Click', msg: 'Klik unik terdeteksi', time: '2 jam lalu', amount: 'Update', icon: 'ads_click', color: 'text-purple-400' },
+                     { type: 'System', msg: 'Selamat bergabung di Akuglow!', time: '1 hari lalu', amount: 'INFO', icon: 'stars', color: 'text-blue-400' }
+                   ].map((act, i) => (
+                     <div key={i} className="flex items-center justify-between p-4 bg-slate-900/40 rounded-2xl border border-white/5 hover:bg-slate-900/60 transition-all cursor-pointer">
+                        <div className="flex items-center gap-4">
+                           <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${act.color}`}>
+                              <span className="material-symbols-outlined text-xl">{act.icon}</span>
+                           </div>
+                           <div>
+                              <p className="text-white text-[12px] font-bold">{act.msg}</p>
+                              <p className="text-slate-500 text-[10px] uppercase tracking-tighter mt-1">{act.time}</p>
+                           </div>
+                        </div>
+                        <p className={`font-black text-xs ${act.amount.startsWith('+') ? 'text-emerald-400' : 'text-slate-400'}`}>{act.amount}</p>
+                     </div>
+                   ))}
+                </div>
+             </div>
+
+             <div className="space-y-6">
+                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[32px] text-center">
+                  <span className="material-symbols-outlined text-4xl text-indigo-400 mb-4">rocket_launch</span>
+                  <h5 className="text-white font-bold text-sm mb-2">Tips Hari Ini</h5>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">Bagikan link ke komunitas Survivor untuk konversi lebih tinggi!</p>
+                </div>
+                
+                <div className="p-8 bg-slate-800/40 border border-white/5 rounded-[32px]">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white text-lg">emoji_events</span>
+                    </div>
+                    <div>
+                      <p className="text-white text-xs font-bold">Top Partner</p>
+                      <p className="text-[9px] text-slate-500 uppercase">Leaderboard</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed italic mb-4">"Semakin banyak membantu orang, semakin besar rezeki mengalir."</p>
+                  <button onClick={() => window.open('/affiliate/leaderboard', '_self')} className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-white text-[10px] font-black hover:bg-white/10 transition-all uppercase">Cek Peringkat</button>
+                </div>
+             </div>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -235,79 +303,17 @@ export default function AffiliateDashboard() {
 
                {showTracker && (
                  <div className="mb-8 p-6 bg-slate-900/50 rounded-3xl border border-white/10">
-                    <div className="flex justify-between items-center mb-6">
-                      <h4 className="text-white font-bold flex items-center gap-2 text-sm"><span className="material-symbols-outlined text-rose-400">psychology</span> AI Skin Analyzer</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                       <div>
+                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Kondisi Kulit ({trackerForm.skin_score}/10)</label>
+                         <input type="range" min="1" max="10" className="w-full accent-rose-500" value={trackerForm.skin_score} onChange={e => setTrackerForm({...trackerForm, skin_score: parseInt(e.target.value)})} />
+                       </div>
+                       <div>
+                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Emosi ({trackerForm.emotional_score}/10)</label>
+                         <input type="range" min="1" max="10" className="w-full accent-indigo-500" value={trackerForm.emotional_score} onChange={e => setTrackerForm({...trackerForm, emotional_score: parseInt(e.target.value)})} />
+                       </div>
                     </div>
-
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
-
-                    {!photoPreview ? (
-                      <button onClick={() => fileInputRef.current?.click()} className="w-full py-12 border-2 border-dashed border-rose-500/30 rounded-2xl flex flex-col items-center justify-center text-rose-400 hover:bg-rose-500/5 transition-colors">
-                        <span className="material-symbols-outlined text-4xl mb-2">add_a_photo</span>
-                        <span className="font-bold text-sm">Upload Foto Bare-Face</span>
-                        <span className="text-[10px] mt-2 opacity-70">AI akan menganalisis kemerahan, jerawat & kelembapan</span>
-                      </button>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="relative">
-                          <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-2xl border border-rose-500/30" />
-                          <button onClick={() => { setPhotoPreview(null); setPhotoFile(null); setAiResult(null); }} className="absolute top-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-rose-500 transition-colors">✕</button>
-                        </div>
-                        
-                        {!aiResult ? (
-                          <button onClick={handleAnalyze} disabled={analyzing} className="w-full py-4 bg-gradient-to-r from-rose-500 to-indigo-600 text-white font-black text-xs rounded-xl disabled:opacity-50">
-                            {analyzing ? 'MENGANALISIS...' : 'MULAI ANALISIS AI'}
-                          </button>
-                        ) : (
-                          <div className="bg-slate-800/80 p-5 rounded-2xl border border-indigo-500/20">
-                            <h5 className="text-white text-xs font-bold mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-indigo-400">auto_awesome</span> Hasil Analisis AI</h5>
-                            
-                            <div className="space-y-4 mb-6">
-                              {[
-                                { label: 'Kondisi Kulit', value: aiResult.skin_score, max: 10, color: 'bg-green-500' },
-                                { label: 'Kemerahan', value: aiResult.redness, max: 100, color: 'bg-rose-500' },
-                                { label: 'Kelembapan', value: aiResult.moisture, max: 100, color: 'bg-blue-500' }
-                              ].map(m => (
-                                <div key={m.label}>
-                                  <div className="flex justify-between text-[10px] font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
-                                    <span>{m.label}</span>
-                                    <span>{m.value}/{m.max}</span>
-                                  </div>
-                                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                                    <div className={`h-full ${m.color} transition-all duration-1000`} style={{ width: `${(m.value/m.max)*100}%` }} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                              <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
-                                <p className="text-rose-400 text-[10px] font-bold mb-1 uppercase tracking-wider">Jerawat Terdeteksi</p>
-                                <p className="text-white text-xl font-black">{aiResult.acne_count} titik</p>
-                              </div>
-                            </div>
-
-                            <div className="bg-indigo-500/10 p-4 rounded-xl border border-indigo-500/20 mb-6">
-                              <p className="text-indigo-200 text-xs leading-relaxed">{aiResult.summary}</p>
-                            </div>
-
-                            <div className="mt-6 pt-6 border-t border-white/10">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                <div>
-                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Skor Kondisi (AI: {aiResult.skin_score})</label>
-                                  <input type="range" min="1" max="10" className="w-full accent-rose-500" value={trackerForm.skin_score} onChange={e => setTrackerForm({...trackerForm, skin_score: parseInt(e.target.value)})} />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Emosi ({trackerForm.emotional_score}/10)</label>
-                                  <input type="range" min="1" max="10" className="w-full accent-indigo-500" value={trackerForm.emotional_score} onChange={e => setTrackerForm({...trackerForm, emotional_score: parseInt(e.target.value)})} />
-                                </div>
-                              </div>
-                              <button onClick={handleSaveProgress} className="w-full py-4 bg-indigo-600 text-white font-black text-xs rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20">SIMPAN PROGRES</button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <button onClick={handleSaveProgress} className="w-full py-4 bg-indigo-600 text-white font-black text-xs rounded-2xl">SIMPAN & ANALISIS AI</button>
                  </div>
                )}
 
@@ -339,10 +345,18 @@ export default function AffiliateDashboard() {
 
           <div className="space-y-6">
             <div className="p-8 rounded-[32px] bg-slate-800/40 border border-white/5 text-center">
-               <span className="material-symbols-outlined text-4xl text-rose-400 mb-4 animate-pulse">self_improvement</span>
+               <span className={`material-symbols-outlined text-4xl mb-4 ${ritualActive ? 'animate-ping text-rose-400' : 'animate-pulse text-rose-500/50'}`}>self_improvement</span>
                <h4 className="text-white font-bold mb-2 text-sm uppercase tracking-widest">Ritual 60 Detik</h4>
-               <p className="text-slate-400 text-[10px] leading-relaxed mb-6 italic">"Ucapkan terima kasih pada kulitmu."</p>
-               <button onClick={() => toast('Ritual Dimulai... Tarik nafas.', { icon: '🧘‍♀️' })} className="w-full py-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl text-[10px] font-black">MULAI RITUAL</button>
+               <p className="text-slate-400 text-[10px] leading-relaxed mb-6 italic">
+                 {ritualActive ? 'Ucapkan: "Terima kasih kulitku sudah bertahan sejauh ini."' : '"Sambil mengoleskan krim, syukuri setiap inci kulitmu."'}
+               </p>
+               <button 
+                 onClick={startRitual} 
+                 disabled={ritualActive}
+                 className={`w-full py-4 rounded-2xl text-[10px] font-black transition-all ${ritualActive ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-rose-500 text-white shadow-lg shadow-rose-500/20 hover:bg-rose-600'}`}
+               >
+                 {ritualActive ? `SISA WAKTU: ${ritualSeconds} DETIK` : 'MULAI RITUAL'}
+               </button>
             </div>
             <div className="p-6 rounded-[32px] bg-slate-800/40 border border-white/5 text-center">
                <button onClick={() => setShowQR(true)} className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-slate-300 text-[10px] font-bold tracking-widest uppercase">Digital Barcode</button>

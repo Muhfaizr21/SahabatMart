@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import toast from 'react-hot-toast';
 import { A } from '../../lib/adminStyles';
 
 const API = ADMIN_API_BASE;
@@ -20,7 +21,9 @@ export default function AdminEditProduct() {
   const [p, setP] = useState({
     id: '', name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0,
     category: '', brand: '', attributes: '{}', image: '',
-    images: '[]', stock: 0, status: 'active'
+    images: '[]', stock: 0, status: 'active',
+    base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
+    base_distribution_fee: 0, base_distribution_fee_nominal: 0
   });
 
   const [gallery, setGallery] = useState([]);
@@ -120,8 +123,13 @@ export default function AdminEditProduct() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p)
     })
-    .then(() => navigate('/admin/products'))
-    .catch(err => alert("Gagal update: " + err.message))
+    .then(() => {
+      toast.success('Produk berhasil diperbarui!');
+      navigate('/admin/products');
+    })
+    .catch(err => {
+      toast.error("Gagal update: " + err.message);
+    })
     .finally(() => setSaving(false));
   };
 

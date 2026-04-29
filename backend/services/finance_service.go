@@ -104,17 +104,37 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 				}
 			}
 
-			// Hitung Payout Merchant: Subtotal - PlatformFee - KomisiAffiliate - BebanDiskon
-			merchantPayout := (group.Subtotal - group.PlatformFee - group.AffiliateCommission) - merchantDiscShare
-			
-			// 1. Bayar Merchant (Pendapatan Penjualan)
-			if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, merchantPayout, order.ID, "order", fmt.Sprintf("Penjualan order %s", order.OrderNumber)); err != nil {
-				return err
+			// [Sync Fix] Sesuai Dokumen Bisnis Akuglow:
+			// Merchant sebagai DISTRIBUTOR mendapat KOMISI DISTRIBUSI saja.
+			// Ini beda dari model reseller biasa — Merchant tidak beli putus.
+			// Formula distribusi:
+			//   Merchant  = DistributionFee - BebanDiskon Merchant
+			//   HQ        = Subtotal - PlatformFee - AffiliateFee - DistributionFee - BebanDiskon HQ
+			//   Platform  = PlatformFee (dicatat terpisah)
+			//   Affiliate = TotalCommission (dicatat di step 3)
+
+			// 1. Bayar Merchant (Komisi Distribusi saja, sesuai peran distributor)
+			merchantPayout := group.DistributionCommission - merchantDiscShare
+			if merchantPayout < 0 { merchantPayout = 0 }
+
+			if merchantPayout > 0 {
+				if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, merchantPayout, order.ID, "order", fmt.Sprintf("Komisi Distribusi order %s", order.OrderNumber)); err != nil {
+					return err
+				}
 			}
 
-			// 2. HQ berhak atas profit kotor (Subtotal - COGS) - Subsidi Diskon - Affiliate Commission
-			// Namun dalam model reseller, HQ menerima uang di awal (Restock). 
-			// Di sini HQ hanya perlu mencatat "Subsidi Diskon" jika ada.
+			// 2. HQ mendapat sisa: Subtotal - PlatformFee - AffiliateFee - DistributionFee - BebanDiskon HQ
+			hqRevenue := group.Subtotal - group.PlatformFee - group.AffiliateCommission - group.DistributionCommission - hqDiscShare
+			if hqRevenue < 0 { hqRevenue = 0 }
+			
+			if hqRevenue > 0 {
+				desc := fmt.Sprintf("Revenue HQ dari order %s (setelah distribusi)", order.OrderNumber)
+				if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqRevenue, order.ID, "order", desc); err != nil {
+					return err
+				}
+			}
+
+			// Catat subsidi diskon HQ jika ada
 			if hqDiscShare > 0 {
 				if err := s.ProcessTransaction(tx, models.PusatID, models.WalletBuyer, models.TxPlatformFee, -hqDiscShare, order.ID, "order", fmt.Sprintf("Subsidi Diskon order %s", order.OrderNumber)); err != nil {
 					return err
@@ -153,10 +173,10 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 			fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
 	}
 	
-	// Notifikasi ke Merchant
+	// Notifikasi ke Merchant (dengan info komisi distribusi yang benar)
 	for _, group := range order.MerchantGroups {
 		_ = s.Notification.Push(group.MerchantID, "merchant", "order_paid", "Pesanan Dibayar", 
-			fmt.Sprintf("Pesanan %s telah dibayar. Dana Rp%.2f masuk ke saldo tertunda.", order.OrderNumber, group.MerchantPayout), 
+			fmt.Sprintf("Pesanan %s telah dibayar. Komisi distribusi Rp%.2f masuk ke saldo tertunda.", order.OrderNumber, group.DistributionCommission), 
 			fmt.Sprintf("/merchant/orders/%s", order.ID))
 	}
 

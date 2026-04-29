@@ -53,8 +53,8 @@ export default function AdminSettings() {
 
   useEffect(() => {
     fetchJson(API + '/configs')
-      .then(d => {
-        const saved = d.data || [];
+      .then(res => {
+        const saved = Array.isArray(res) ? res : (res.data || []);
         const merged = DEFAULT_CONFIGS.map(def => {
           const found = saved.find(s => s.key === def.key);
           return found ? { ...def, ...found, type: def.type, options: def.options } : def;

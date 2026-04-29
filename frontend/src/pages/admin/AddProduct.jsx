@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import toast from 'react-hot-toast';
 
 const API = ADMIN_API_BASE;
 
@@ -35,7 +36,9 @@ export default function AdminAddProduct() {
 
   const [p, setP] = useState({
     name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0,
-    category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active'
+    category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active',
+    base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
+    base_distribution_fee: 0, base_distribution_fee_nominal: 0
   });
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
@@ -46,11 +49,16 @@ export default function AdminAddProduct() {
       fetchJson(`${API}/brands`),
       fetchJson(`${API}/attributes`)
     ]).then(([c, b, a]) => {
-      setCategories(c.data || []);
-      setBrands(b.data || []);
-      setAttrs(a.data || []);
-      if (c.data?.length > 0) setP(prev => ({ ...prev, category: c.data[0].name }));
-      if (b.data?.length > 0) setP(prev => ({ ...prev, brand: b.data[0].name }));
+      const cats = Array.isArray(c) ? c : (c.data || []);
+      const brds = Array.isArray(b) ? b : (b.data || []);
+      const atts = Array.isArray(a) ? a : (a.data || []);
+
+      setCategories(cats);
+      setBrands(brds);
+      setAttrs(atts);
+
+      if (cats.length > 0) setP(prev => ({ ...prev, category: cats[0].name }));
+      if (brds.length > 0) setP(prev => ({ ...prev, brand: brds[0].name }));
     });
   }, []);
 
@@ -117,8 +125,13 @@ export default function AdminAddProduct() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p)
     })
-    .then(() => navigate('/admin/products'))
-    .catch(err => alert('Gagal: ' + err.message))
+    .then(() => {
+      toast.success('Produk berhasil ditambahkan!');
+      navigate('/admin/products');
+    })
+    .catch(err => {
+      toast.error('Gagal: ' + err.message);
+    })
     .finally(() => setSaving(false));
   };
 

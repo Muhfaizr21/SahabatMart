@@ -15,7 +15,7 @@ export default function AdminVouchers() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/vouchers`)
-      .then(d => setVouchers(d || []))
+      .then(d => setVouchers(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error).finally(() => setLoading(false));
   };
 

@@ -38,7 +38,8 @@ const menu = [
   {
     name: 'Catalog', icon: 'bxs-package',
     children: [
-      { name: 'Products', path: '/admin/products' },
+      { name: 'Gudang Pusat (Stok)', path: '/admin/inventory/pusat' },
+      { name: 'All Products', path: '/admin/products' },
       { name: 'Categories', path: '/admin/categories' },
       { name: 'Brands', path: '/admin/brands' },
       { name: 'Moderation', path: '/admin/moderation' },
@@ -68,6 +69,12 @@ const menu = [
       { name: 'Affiliate Education', path: '/admin/education' },
       { name: 'Affiliate Events', path: '/admin/events' },
       { name: 'Promo Materials', path: '/admin/promo' },
+    ]
+  },
+  {
+    name: 'Skin Journey', icon: 'bx-leaf',
+    children: [
+      { name: 'Journey Monitoring', path: '/admin/skin-journey' },
     ]
   },
   { name: 'Audit Log', icon: 'bxs-file-find', path: '/admin/audit' },
@@ -313,6 +320,22 @@ const AdminLayout = () => {
                 <div style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>superadmin</div>
               </div>
             </div>
+            
+            <button
+              onClick={() => navigate('/admin/inventory/pusat')}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)',
+                background: 'rgba(99,102,241,0.05)', cursor: 'pointer', color: '#6366f1',
+                fontSize: 13, fontWeight: 700, marginBottom: 8, transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.05)'; }}
+            >
+              <i className="bx bx-buildings" style={{ fontSize: 18 }} />
+              Manajemen Gudang Pusat
+            </button>
+
             <button
               onClick={handleLogout}
               style={{

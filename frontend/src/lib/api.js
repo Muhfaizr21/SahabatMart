@@ -64,6 +64,29 @@ export async function fetchJson(url, options = {}) {
   }
 }
 
+export async function postJson(url, data, options = {}) {
+  return fetchJson(url, {
+    ...options,
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function putJson(url, data, options = {}) {
+  return fetchJson(url, {
+    ...options,
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteJson(url, options = {}) {
+  return fetchJson(url, {
+    ...options,
+    method: 'DELETE',
+  });
+}
+
 // Fungsi yang hilang dan menyebabkan error
 export function formatImage(path) {
   const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; // Premium Placeholder

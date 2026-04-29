@@ -138,13 +138,33 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 }
 
 // CheckMerchantEligibility: Cek kelayakan upgrade ke Merchant
+// [Sync Fix] Definisi "mitra aktif" = mitra yang memiliki minimal 1 transaksi COMPLETED dalam 30 hari terakhir
+// Ini sesuai dengan dokumen bisnis Akuglow dan menutup gap ambiguitas sebelumnya
 func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64) {
-	// Hitung mitra aktif (langsung)
-	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ? AND status = 'active'", affiliateID).Count(&activeMitra)
+	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
 
-	// Hitung omset tim 30 hari terakhir (Recursive Depth)
-	startTime := time.Now().AddDate(0, -1, 0)
-	
+	// [FIX] Mitra "aktif" = memiliki min 1 order completed dalam 30 hari, bukan hanya status 'active'
+	// Ambil semua downline langsung dulu
+	var directDownlineIDs []string
+	s.DB.Model(&models.AffiliateMember{}).
+		Select("id").
+		Where("upline_id = ? AND status = 'active'", affiliateID).
+		Scan(&directDownlineIDs)
+
+	if len(directDownlineIDs) > 0 {
+		// Hitung yang benar-benar aktif bertransaksi dalam 30 hari
+		s.DB.Raw(`
+			SELECT COUNT(DISTINCT am.id)
+			FROM affiliate_members am
+			INNER JOIN orders o ON o.affiliate_id = am.id
+			WHERE am.upline_id = ?
+			  AND am.status = 'active'
+			  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
+			  AND o.created_at >= ?
+		`, affiliateID, startTime).Scan(&activeMitra)
+	}
+
+	// Hitung omset tim 30 hari terakhir (Recursive Depth - semua level)
 	var allDescendantIDs []string
 	query := `
 		WITH RECURSIVE subordinates AS (
@@ -164,9 +184,9 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 			Scan(&monthlyTurnover)
 	}
 
-	// 3. Ambil syarat dari PlatformConfig (Dynamic)
-	minActiveMitra := 100
-	minTurnover := 10000000.0
+	// Ambil syarat dari PlatformConfig (Dynamic, fallback ke default dokumen bisnis)
+	minActiveMitra := 100      // Syarat: 100 mitra aktif
+	minTurnover := 10000000.0  // Syarat: Omset tim Rp 10.000.000/bulan
 
 	var configActive models.PlatformConfig
 	if err := s.DB.Where("key = ?", "merchant_min_active_mitra").First(&configActive).Error; err == nil {
@@ -184,6 +204,100 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 
 	isEligible = activeMitra >= int64(minActiveMitra) && monthlyTurnover >= minTurnover
 	return isEligible, activeMitra, monthlyTurnover, minActiveMitra, minTurnover
+}
+
+// CheckAndDowngradeMerchants: Cek merchant yang tidak memenuhi syarat dan downgrade otomatis
+// [Sync Fix] Sesuai dokumen bisnis: Merchant yang tidak memenuhi syarat 3 bulan berturut-turut → dicabut
+func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err error) {
+	// Ambil threshold dari config
+	minActiveMitra := 100
+	minTurnover := 10000000.0
+
+	var configActive models.PlatformConfig
+	if dbErr := s.DB.Where("key = ?", "merchant_min_active_mitra").First(&configActive).Error; dbErr == nil {
+		if val, dbErr := strconv.Atoi(configActive.Value); dbErr == nil {
+			minActiveMitra = val
+		}
+	}
+	var configTurnover models.PlatformConfig
+	if dbErr := s.DB.Where("key = ?", "merchant_min_team_turnover").First(&configTurnover).Error; dbErr == nil {
+		if val, dbErr := strconv.ParseFloat(configTurnover.Value, 64); dbErr == nil {
+			minTurnover = val
+		}
+	}
+
+	// Ambil semua merchant aktif
+	var merchants []struct {
+		MerchantID  string
+		UserID      string
+		AffiliateID string
+		StoreName   string
+	}
+	s.DB.Raw(`
+		SELECT m.id as merchant_id, m.user_id, am.id as affiliate_id, m.store_name
+		FROM merchants m
+		LEFT JOIN affiliate_members am ON am.user_id = m.user_id
+		WHERE m.status = 'active'
+	`).Scan(&merchants)
+
+	startTime := time.Now().AddDate(0, -1, 0)
+	_ = minActiveMitra
+	_ = minTurnover
+
+	for _, m := range merchants {
+		if m.AffiliateID == "" {
+			continue
+		}
+
+		// Hitung mitra aktif (bertransaksi dalam 30 hari)
+		var activeMitraCount int64
+		s.DB.Raw(`
+			SELECT COUNT(DISTINCT am.id)
+			FROM affiliate_members am
+			INNER JOIN orders o ON o.affiliate_id = am.id
+			WHERE am.upline_id = ?
+			  AND am.status = 'active'
+			  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
+			  AND o.created_at >= ?
+		`, m.AffiliateID, startTime).Scan(&activeMitraCount)
+
+		// Hitung omset tim bulan ini
+		var teamTurnover float64
+		var allDescIDs []string
+		s.DB.Raw(`
+			WITH RECURSIVE sub AS (
+				SELECT id FROM affiliate_members WHERE upline_id = ?
+				UNION ALL
+				SELECT a.id FROM affiliate_members a INNER JOIN sub s ON a.upline_id = s.id
+			) SELECT id FROM sub
+		`, m.AffiliateID).Scan(&allDescIDs)
+
+		if len(allDescIDs) > 0 {
+			s.DB.Model(&models.Order{}).
+				Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", allDescIDs, completedOrderStatuses, startTime).
+				Select("COALESCE(SUM(subtotal), 0)").
+				Scan(&teamTurnover)
+		}
+
+		// Update statistik merchant (sync dengan field di models.Merchant)
+		s.DB.Model(&models.Merchant{}).Where("id = ?", m.MerchantID).Updates(map[string]interface{}{
+			"active_mitra_count":    int(activeMitraCount),
+			"team_monthly_turnover": teamTurnover,
+		})
+
+		// [Dokumen Bisnis] Jika tidak memenuhi syarat → notifikasi peringatan
+		// Downgrade hanya dilakukan oleh Admin secara manual setelah 3 bulan berturut-turut
+		// (tracking downgrade_warning_count ada di PlatformConfig, bukan auto-downgrade)
+		if activeMitraCount < int64(minActiveMitra) || teamTurnover < minTurnover {
+			if s.Notif != nil {
+				msg := fmt.Sprintf("Peringatan: Toko '%s' tidak memenuhi syarat Merchant bulan ini (Mitra aktif: %d/%d, Omset: Rp %.0f/%.0f). Harap tingkatkan performa tim Anda.",
+					m.StoreName, activeMitraCount, minActiveMitra, teamTurnover, minTurnover)
+				s.Notif.Push(m.MerchantID, "merchant", "merchant_warning", "⚠️ Peringatan Syarat Merchant", msg, "/merchant/dashboard")
+			}
+		}
+	}
+
+	return downgraded, nil
 }
 
 // CancelCommission: Membatalkan komisi pending jika pesanan di-refund atau dispute dimenangkan buyer

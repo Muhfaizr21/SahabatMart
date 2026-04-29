@@ -23,29 +23,41 @@ export default function RestockModeration() {
     }
   };
 
+  const [trackingNumber, setTrackingNumber] = useState('');
+
   const handleModerate = async (status) => {
     if (!modal) return;
     try {
-      await fetchJson(`${ADMIN_API_BASE}/merchants/restock/moderate`, {
+      let url = `${ADMIN_API_BASE}/merchants/restock/moderate`;
+      let body = { request_id: modal.id, status, admin_note: note };
+
+      // Use new warehouse logic for actual stock movement
+      if (status === 'approved') {
+        url = `${ADMIN_API_BASE}/warehouse/restock/approve/${modal.id}`;
+        body = { admin_note: note };
+      } else if (status === 'shipped') {
+        url = `${ADMIN_API_BASE}/warehouse/restock/ship/${modal.id}`;
+        body = { tracking_number: trackingNumber, admin_note: note };
+      }
+
+      await fetchJson(url, {
         method: 'POST',
-        body: JSON.stringify({
-          request_id: modal.id,
-          status,
-          admin_note: note
-        })
+        body: JSON.stringify(body)
       });
-      alert(`Status updated to ${status}.`);
+      
+      toast.success(`Berhasil update status ke ${status}`);
       setModal(null);
+      setTrackingNumber('');
       load();
     } catch (err) {
-      alert('Failed: ' + err.message);
+      toast.error('Gagal: ' + err.message);
     }
   };
 
   const getStatusStyle = (status) => {
     switch(status) {
       case 'requested': return { color: '#6366f1', bg: '#eef2ff', label: 'Requested' };
-      case 'approved':  return { color: '#16a34a', bg: '#f0fdf4', label: 'Approved' };
+      case 'approved':  return { color: '#16a34a', bg: '#f0fdf4', label: 'Ready to Ship' };
       case 'shipped':   return { color: '#7c3aed', bg: '#f5f3ff', label: 'Shipped' };
       case 'rejected':  return { color: '#dc2626', bg: '#fff1f2', label: 'Rejected' };
       case 'received':  return { color: '#0891b2', bg: '#ecfeff', label: 'Received' };
@@ -178,10 +190,24 @@ export default function RestockModeration() {
                   </>
                 )}
                 {modal.status === 'approved' && (
-                  <button onClick={() => handleModerate('shipped')} style={{ ...A.btnPrimary, flex: 1, background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
-                    <i className='bx bxs-truck' style={{ marginRight: 8 }} />
-                    Mark as Shipped (In-Transit)
-                  </button>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <FieldLabel>Nomor Resi / Surat Jalan (B2B)</FieldLabel>
+                    <input 
+                      type="text" 
+                      style={A.input} 
+                      placeholder="Contoh: RESI-GUDANG-001..." 
+                      value={trackingNumber}
+                      onChange={e => setTrackingNumber(e.target.value)}
+                    />
+                    <button 
+                      onClick={() => handleModerate('shipped')} 
+                      disabled={!trackingNumber}
+                      style={{ ...A.btnPrimary, background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', opacity: !trackingNumber ? 0.6 : 1 }}
+                    >
+                      <i className='bx bxs-truck' style={{ marginRight: 8 }} />
+                      Konfirmasi Pengiriman Barang
+                    </button>
+                  </div>
                 )}
                 {modal.status === 'shipped' && (
                   <div style={{ flex: 1, textAlign: 'center', padding: '16px', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 12, color: '#64748b', fontSize: 13, fontWeight: 600 }}>

@@ -13,7 +13,7 @@ export default function AdminModeration() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/products?status=pending&search=${search}`)
-      .then(d => setProducts(d || []))
+      .then(d => setProducts(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error).finally(() => setLoading(false));
   };
 

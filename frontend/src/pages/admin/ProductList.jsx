@@ -91,7 +91,7 @@ export default function AdminProductList() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/products?status=${tab}&search=${search}`)
-      .then(d => setProducts(d || []))
+      .then(d => setProducts(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -114,12 +114,15 @@ export default function AdminProductList() {
     }).then(load).catch(e => { alert(e.message); setLoading(false); });
   };
 
-  const stats = useMemo(() => ({
-    total:    products.length,
-    active:   products.filter(p => p.status === 'active').length,
-    takenDown:products.filter(p => p.status === 'taken_down').length,
-    pending:  products.filter(p => p.status === 'pending').length,
-  }), [products]);
+  const stats = useMemo(() => {
+    const list = Array.isArray(products) ? products : [];
+    return {
+      total:    list.length,
+      active:   list.filter(p => p.status === 'active').length,
+      takenDown:list.filter(p => p.status === 'taken_down').length,
+      pending:  list.filter(p => p.status === 'pending').length,
+    };
+  }, [products]);
 
   return (
     <div style={A.page} className="fade-in">

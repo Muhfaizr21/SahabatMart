@@ -3,19 +3,26 @@ import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-route
 import { getStoredUser } from '../../lib/auth';
 import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 
-// Menu items sesuai spesifikasi Mitra Area Akuglow
-// Ref: Alur Mitra Affiliate Akuglow — section 2 "Mitra Masuk ke Mitra Area"
+// Menu items sesuai DOKUMEN RESMI Alur Mitra Affiliate Akuglow - Section 2
+// Urutan persis sesuai spesifikasi: Dashboard, Merchant Area*, Profil Saya, Omset Tim,
+// Pesanan Saya, Status Mitra, Team, Edukasi Bisnis, Leaderboard, Link Affiliate,
+// Event Terdekat, Materi Promo, Voucher, Belanja Yuk
+// (* Merchant Area muncul dinamis hanya jika role = merchant)
 const menuItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/affiliate', end: true },
-  { name: 'Statistik & Omset', icon: 'monitoring', path: '/affiliate/stats' }, // Halaman Eligibility & Progres
-  { name: 'Team Saya', icon: 'groups', path: '/affiliate/team' },
+  // Merchant Area: injected dynamically for merchant role users (line ~137)
+  { name: 'Profil Saya', icon: 'person_outline', path: '/affiliate/settings' },
+  { name: 'Omset Tim', icon: 'monitoring', path: '/affiliate/stats' },
+  { name: 'Pesanan Saya', icon: 'receipt_long', path: '/profile' }, // Link ke profil buyer (pesanan)
+  { name: 'Status Mitra', icon: 'workspace_premium', path: '/affiliate/status' },
+  { name: 'Team', icon: 'groups', path: '/affiliate/team' },
+  { name: 'Edukasi Bisnis', icon: 'school', path: '/affiliate/education' },
   { name: 'Leaderboard', icon: 'emoji_events', path: '/affiliate/leaderboard' },
-  { name: 'Komisi', icon: 'account_balance_wallet', path: '/affiliate/commissions' },
-  { name: 'Penarikan', icon: 'payments', path: '/affiliate/withdrawals' },
   { name: 'Link Affiliate', icon: 'link', path: '/affiliate/links' },
-  { name: 'Edukasi & Event', icon: 'school', path: '/affiliate/education' },
+  { name: 'Event Terdekat', icon: 'event', path: '/affiliate/events' },
   { name: 'Materi Promo', icon: 'campaign', path: '/affiliate/marketing' },
-  { name: 'Profil & Bank', icon: 'person_outline', path: '/affiliate/settings' },
+  { name: 'Voucher', icon: 'local_offer', path: '/affiliate/vouchers' },
+  { name: 'Komunitas', icon: 'forum', path: '/affiliate/community' },
   { name: 'Belanja Yuk', icon: 'shopping_basket', path: '/' },
 ];
 

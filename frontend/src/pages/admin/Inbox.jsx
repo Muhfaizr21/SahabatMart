@@ -11,7 +11,7 @@ export default function AdminInbox() {
   const load = () => {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/inbox`)
-      .then(d => setMessages(d || []))
+      .then(d => setMessages(Array.isArray(d) ? d : (d?.data || [])))
       .catch(() => toast.error('Gagal memuat pesan'))
       .finally(() => setLoading(false));
   };

@@ -27,6 +27,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	contactCtrl := &controllers.ContactController{DB: db}
 	rbacCtrl := controllers.NewRBACController(db)
 	paymentCtrl := controllers.NewPaymentController(db)
+	skinCtrl := controllers.NewSkinController(db)
+	warehouseCtrl := controllers.NewWarehouseController(db)
 
 	// Middleware
 	cors := corsMiddleware
@@ -236,6 +238,33 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	adminOnly = actorOnly("admin", "superadmin")
 	superAdminOnly = actorOnly("superadmin")
 	
+	// Skin Journey (Akuglow)
+	mux.HandleFunc("/api/skin/pretest", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.SubmitPreTest))
+	mux.HandleFunc("/api/skin/journey", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetJourneyData))
+	mux.HandleFunc("/api/skin/journal", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostDailyJournal))
+	mux.HandleFunc("/api/skin/progress", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostWeeklyProgress))
+	mux.HandleFunc("/api/skin/analyze", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.AnalyzeSkinPhoto))
+	// Community Features
+	mux.HandleFunc("/api/skin/community/groups", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetCommunityGroups))
+	mux.HandleFunc("/api/skin/community", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetCommunityFeed))
+	mux.HandleFunc("/api/skin/community/post", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostCommunityPost))
+	mux.HandleFunc("/api/skin/community/comment", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostCommunityComment))
+	mux.HandleFunc("/api/skin/community/like", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.LikeCommunityPost))
+	mux.HandleFunc("/api/skin/community/post/delete", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.DeleteCommunityPost))
+	mux.HandleFunc("/api/skin/community/comment/delete", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.DeleteCommunityComment))
+	mux.HandleFunc("/api/skin/community/upload", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.UploadCommunityImage))
+
+	// Admin Community Management
+	mux.HandleFunc("/api/admin/skin/community/group", actorOnly("admin", "superadmin")(skinCtrl.AdminCreateGroup))
+	
+	// Admin Skin Journey Monitoring
+	mux.HandleFunc("/api/admin/skin/pretests", adminOnly(skinCtrl.AdminGetAllPreTests))
+	mux.HandleFunc("/api/admin/skin/journals", adminOnly(skinCtrl.AdminGetAllJournals))
+	mux.HandleFunc("/api/admin/skin/progress", adminOnly(skinCtrl.AdminGetAllProgress))
+	mux.HandleFunc("/api/admin/skin/education", adminOnly(skinCtrl.AdminGetAllEducation))
+	mux.HandleFunc("/api/admin/skin/education/create", adminOnly(skinCtrl.AdminCreateEducation))
+	mux.HandleFunc("/api/admin/skin/education/delete", adminOnly(skinCtrl.AdminDeleteEducation))
+
 	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
 	mux.HandleFunc("/api/admin/stats", adminOnly(adminCtrl.GetUserStats)) // Alias for dashboard stats
@@ -302,6 +331,10 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliates/withdrawals/process", adminOnly(adminCtrl.ProcessAffiliateWithdrawal))
 	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
 	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
+	mux.HandleFunc("/api/admin/commissions/category", adminOnly(adminCtrl.ManageCommissions))
+	mux.HandleFunc("/api/admin/commissions/merchant", adminOnly(adminCtrl.ManageMerchantCommissions))
+	mux.HandleFunc("/api/admin/commissions/product", adminOnly(adminCtrl.ManageProductCommissions))
+	mux.HandleFunc("/api/admin/commissions/presets", adminOnly(adminCtrl.ManageCommissionPresets))
 
 	// Finance & Payouts
 	mux.HandleFunc("/api/admin/finance", adminOnly(adminCtrl.GetFinance))
@@ -352,6 +385,14 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/regions/upsert", adminOnly(adminCtrl.UpsertRegion))
 	mux.HandleFunc("/api/admin/audit-logs", adminOnly(adminCtrl.GetAuditLogs))
 	mux.HandleFunc("/api/admin/upload", adminOnly(adminCtrl.UploadImage))
+
+	// --- Warehouse (Master Gudang) Routes ---
+	mux.HandleFunc("/api/admin/warehouse/suppliers", adminOnly(warehouseCtrl.GetSuppliers))
+	mux.HandleFunc("/api/admin/warehouse/suppliers/create", adminOnly(warehouseCtrl.CreateSupplier))
+	mux.HandleFunc("/api/admin/warehouse/inbound", adminOnly(warehouseCtrl.CreateInbound))
+	mux.HandleFunc("/api/admin/warehouse/stock-history", adminOnly(warehouseCtrl.GetStockHistory))
+	mux.HandleFunc("/api/admin/warehouse/restock/approve/", adminOnly(warehouseCtrl.ApproveRestock))
+	mux.HandleFunc("/api/admin/warehouse/restock/ship/", adminOnly(warehouseCtrl.ShipRestock))
 
 	// --- Public Routes (Continued) ---
 	mux.HandleFunc("/api/public/categories", adminCtrl.GetPublicCategories)

@@ -157,8 +157,8 @@ func (s *AuthService) GetExtraIDs(userID, role string) (string, string) {
 		aID = a.ID
 	}
 
-	// Only merchants have merchant records
-	if role == "merchant" {
+	// [SahabatMart] Both merchants and superadmins can have a merchant/warehouse context
+	if role == "merchant" || role == "superadmin" {
 		if m, err := s.Repo.GetMerchantByID(userID); err == nil {
 			mID = m.ID
 		}

@@ -116,25 +116,32 @@ export default function CheckoutPage() {
           product_image_url: item.product?.image
       }));
 
-      const payload = {
-        email: form.email,
-        password: form.password || '', // Only for guests
-        full_name: `${form.firstName} ${form.lastName}`,
-        phone: form.phone,
-        items: orderItems,
-        shipping_info: {
-          shipping_name: `${form.firstName} ${form.lastName}`,
-          shipping_phone: form.phone,
-          shipping_address: form.address,
-          shipping_city: form.city,
-          shipping_province: form.province,
-          shipping_postal_code: form.postalCode,
-          notes: form.notes,
-        },
-        upline_id: localStorage.getItem('affiliate_id') || '',
-        voucher_code: appliedVoucher?.code || '',
-        payment_method: paymentMethod,
-      };
+        // [Sync Fix] Ambil upline dari localStorage dengan prioritas:
+        // 1. affiliate_id = sudah di-track backend via captureAffiliate()
+        // 2. pending_ref = ref code dari URL yang belum di-track (belum klik link, langsung checkout)
+        const trackedAffiliateId = localStorage.getItem('affiliate_id') || '';
+        const pendingRef = localStorage.getItem('pending_ref') || '';
+        const uplineRef = trackedAffiliateId || pendingRef;
+
+        const payload = {
+          email: form.email,
+          password: form.password || '', // Only for guests
+          full_name: `${form.firstName} ${form.lastName}`,
+          phone: form.phone,
+          items: orderItems,
+          shipping_info: {
+            shipping_name: `${form.firstName} ${form.lastName}`,
+            shipping_phone: form.phone,
+            shipping_address: form.address,
+            shipping_city: form.city,
+            shipping_province: form.province,
+            shipping_postal_code: form.postalCode,
+            notes: form.notes,
+          },
+          upline_id: uplineRef,
+          voucher_code: appliedVoucher?.code || '',
+          payment_method: paymentMethod,
+        };
 
       const res = await fetchJson(`${PUBLIC_API_BASE}/checkout`, {
         method: 'POST',

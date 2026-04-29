@@ -13,7 +13,7 @@ export default function AdminCategories() {
   const EMPTY = { name: '', slug: '', description: '', order: 0 };
   const load = () => {
     setLoading(true);
-    fetchJson(`${API}/categories`).then(d => setCategories(d || [])).catch(console.error).finally(() => setLoading(false));
+    fetchJson(`${API}/categories`).then(d => setCategories(Array.isArray(d) ? d : (d?.data || []))).catch(console.error).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 

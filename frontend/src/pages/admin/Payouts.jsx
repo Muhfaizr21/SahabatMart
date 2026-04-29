@@ -16,7 +16,7 @@ export default function AdminPayouts() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/payouts${tab ? `?status=${tab}` : ''}`)
-      .then(d => setPayouts(d || []))
+      .then(d => setPayouts(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
