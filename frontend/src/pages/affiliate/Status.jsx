@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
@@ -11,17 +11,18 @@ const cardStyle = {
   border: '1px solid rgba(77, 67, 84, 0.15)',
 };
 
-// Skema jenjang karir mitra Akuglow (mengikuti pola Dagang.co.id)
-const TIERS = [
-  { id: 'bronze',   name: 'Bronze',   color: '#cd7f32', minMitra: 0,   minTurnover: 0,          icon: 'military_tech', desc: 'Jenjang awal semua mitra Akuglow' },
-  { id: 'silver',   name: 'Silver',   color: '#a8a9ad', minMitra: 10,  minTurnover: 1000000,    icon: 'military_tech', desc: 'Min 10 mitra aktif & omset Rp 1jt/bln' },
-  { id: 'gold',     name: 'Gold',     color: '#ffd700', minMitra: 30,  minTurnover: 5000000,    icon: 'emoji_events',  desc: 'Min 30 mitra aktif & omset Rp 5jt/bln' },
-  { id: 'platinum', name: 'Platinum', color: '#e5e4e2', minMitra: 50,  minTurnover: 7500000,    icon: 'diamond',       desc: 'Min 50 mitra aktif & omset Rp 7.5jt/bln' },
-  { id: 'merchant', name: 'Merchant', color: '#b76dff', minMitra: 100, minTurnover: 10000000,   icon: 'storefront',    desc: 'Jenjang tertinggi: Distributor resmi Akuglow' },
+// Fallback default jika API belum punya data
+const DEFAULT_TIERS = [
+  { id: 1, name: 'Bronze',   level: 1, color: '#cd7f32', min_active_mitra: 0,   min_monthly_turnover: 0,        icon: 'military_tech', description: 'Jenjang awal semua mitra Akuglow' },
+  { id: 2, name: 'Silver',   level: 2, color: '#a8a9ad', min_active_mitra: 10,  min_monthly_turnover: 1000000,  icon: 'military_tech', description: 'Min 10 mitra aktif & omset Rp 1jt/bln' },
+  { id: 3, name: 'Gold',     level: 3, color: '#ffd700', min_active_mitra: 30,  min_monthly_turnover: 5000000,  icon: 'emoji_events',  description: 'Min 30 mitra aktif & omset Rp 5jt/bln' },
+  { id: 4, name: 'Platinum', level: 4, color: '#e5e4e2', min_active_mitra: 50,  min_monthly_turnover: 7500000,  icon: 'diamond',       description: 'Min 50 mitra aktif & omset Rp 7.5jt/bln' },
+  { id: 5, name: 'Merchant', level: 5, color: '#b76dff', min_active_mitra: 100, min_monthly_turnover: 10000000, icon: 'storefront',    description: 'Jenjang tertinggi: Distributor resmi Akuglow' },
 ];
 
 export default function AffiliateStatus() {
   const user = getStoredUser();
+  const [tiers, setTiers] = useState([]);
   const [eligibility, setEligibility] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,10 +33,13 @@ export default function AffiliateStatus() {
     const load = async () => {
       setLoading(true);
       try {
-        const [elig, teamStats] = await Promise.all([
+        const [tierData, elig, teamStats] = await Promise.all([
+          fetch(`${API_BASE}/api/public/membership-tiers`).then(r => r.ok ? r.json() : null).catch(() => null),
           fetchJson(`${AFFILIATE_API_BASE}/merchant-eligibility`).catch(() => null),
           fetchJson(`${AFFILIATE_API_BASE}/team-stats`).catch(() => null),
         ]);
+        // Gunakan data dari API, fallback ke default jika kosong
+        setTiers(Array.isArray(tierData) && tierData.length > 0 ? tierData : DEFAULT_TIERS);
         setEligibility(elig);
         setStats(teamStats);
       } finally {
@@ -59,8 +63,9 @@ export default function AffiliateStatus() {
   };
 
   const currentTierName = user?.affiliate?.membership_tier?.name?.toLowerCase() || 'bronze';
-  const currentTierIdx = TIERS.findIndex(t => t.id === currentTierName) || 0;
-  const currentTier = TIERS[currentTierIdx] || TIERS[0];
+  const currentTierIdx = tiers.findIndex(t => t.name?.toLowerCase() === currentTierName);
+  const currentTier = tiers[currentTierIdx >= 0 ? currentTierIdx : 0] || DEFAULT_TIERS[0];
+  const nextTier = tiers[currentTierIdx + 1] || null;
 
   const activeMitra = eligibility?.active_mitra || 0;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
@@ -78,7 +83,6 @@ export default function AffiliateStatus() {
         <p className="text-slate-400 text-sm mt-0.5">Pantau jenjang karir dan progres Anda sebagai Mitra Akuglow</p>
       </div>
 
-      {/* Success Banner */}
       {successMsg && (
         <div className="p-4 rounded-xl flex items-center gap-3 text-green-300"
           style={{ background: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.3)' }}>
@@ -100,12 +104,11 @@ export default function AffiliateStatus() {
             background: `linear-gradient(135deg, rgba(35,41,60,0.6), rgba(35,41,60,0.3))`,
           }}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              {/* Badge */}
               <div className="relative flex-shrink-0">
                 <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-2xl"
                   style={{ background: `${currentTier.color}20`, border: `2px solid ${currentTier.color}60` }}>
                   <span className="material-symbols-outlined text-4xl" style={{ color: currentTier.color }}>
-                    {currentTier.icon}
+                    {currentTier.icon || 'military_tech'}
                   </span>
                 </div>
                 {user?.role === 'merchant' && (
@@ -115,7 +118,6 @@ export default function AffiliateStatus() {
                 )}
               </div>
 
-              {/* Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-1">
                   <h2 className="text-2xl font-black text-white font-['Plus_Jakarta_Sans']"
@@ -125,7 +127,7 @@ export default function AffiliateStatus() {
                     {user?.role === 'merchant' ? 'Aktif Merchant' : 'Mitra Aktif'}
                   </span>
                 </div>
-                <p className="text-slate-400 text-sm mb-3">{currentTier.desc}</p>
+                <p className="text-slate-400 text-sm mb-3">{currentTier.description || '-'}</p>
                 <div className="flex flex-wrap gap-4 text-xs">
                   <div>
                     <p className="text-slate-500 uppercase tracking-wider font-bold">Kode Referral</p>
@@ -148,18 +150,52 @@ export default function AffiliateStatus() {
             </div>
           </div>
 
-          {/* Career Ladder */}
+          {/* Progress ke tier berikutnya */}
+          {nextTier && (
+            <div className="rounded-2xl p-5" style={{ ...cardStyle, border: `1px solid ${nextTier.color}30` }}>
+              <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm" style={{ color: nextTier.color }}>trending_up</span>
+                Progres ke <span style={{ color: nextTier.color }}>{nextTier.name}</span>
+              </h3>
+              <div className="space-y-3">
+                {/* Mitra Aktif */}
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">
+                    <span>Mitra Aktif</span>
+                    <span>{activeMitra}/{nextTier.min_active_mitra}</span>
+                  </div>
+                  <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-1000"
+                      style={{ width: `${Math.min((activeMitra / (nextTier.min_active_mitra || 1)) * 100, 100)}%`, background: nextTier.color }} />
+                  </div>
+                </div>
+                {/* Omset Tim */}
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">
+                    <span>Omset Tim/Bulan</span>
+                    <span>{formatRp(monthlyTurnover)} / {formatRp(nextTier.min_monthly_turnover)}</span>
+                  </div>
+                  <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-1000"
+                      style={{ width: `${Math.min((monthlyTurnover / (nextTier.min_monthly_turnover || 1)) * 100, 100)}%`, background: '#fbbf24' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Career Ladder — dari API */}
           <div className="rounded-2xl p-6 space-y-4" style={cardStyle}>
             <div>
               <h3 className="text-white font-bold font-['Plus_Jakarta_Sans']">Jenjang Karir Mitra</h3>
-              <p className="text-slate-400 text-xs mt-0.5">Skema mengikuti sistem Dagang.co.id — semakin tinggi jenjang, semakin besar komisi</p>
+              <p className="text-slate-400 text-xs mt-0.5">Semakin tinggi jenjang, semakin besar komisi yang Anda dapatkan</p>
             </div>
 
             <div className="space-y-3">
-              {TIERS.map((tier, idx) => {
-                const isCurrentTier = idx === currentTierIdx;
-                const isPassed = idx < currentTierIdx;
-                const isNext = idx === currentTierIdx + 1;
+              {tiers.map((tier, idx) => {
+                const isCurrentTier = idx === (currentTierIdx >= 0 ? currentTierIdx : 0);
+                const isPassed = idx < (currentTierIdx >= 0 ? currentTierIdx : 0);
+                const isNext = idx === (currentTierIdx >= 0 ? currentTierIdx : 0) + 1;
 
                 return (
                   <div key={tier.id}
@@ -168,15 +204,13 @@ export default function AffiliateStatus() {
                       background: isCurrentTier ? `${tier.color}12` : 'rgba(255,255,255,0.02)',
                       border: isCurrentTier ? `1px solid ${tier.color}40` : '1px solid rgba(255,255,255,0.05)',
                     }}>
-                    {/* Icon */}
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{ background: `${tier.color}20`, opacity: isPassed || isCurrentTier ? 1 : 0.5 }}>
                       <span className="material-symbols-outlined text-xl" style={{ color: tier.color }}>
-                        {isPassed ? 'check_circle' : tier.icon}
+                        {isPassed ? 'check_circle' : (tier.icon || 'military_tech')}
                       </span>
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-black text-sm" style={{ color: isCurrentTier ? tier.color : isPassed ? '#4ade80' : '#64748b' }}>
@@ -191,13 +225,12 @@ export default function AffiliateStatus() {
                             style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>Berikutnya</span>
                         )}
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{tier.desc}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{tier.description || '-'}</p>
                     </div>
 
-                    {/* Requirement */}
                     <div className="text-right text-[10px] flex-shrink-0 hidden sm:block">
-                      <p className="text-slate-500">Min {tier.minMitra} mitra aktif</p>
-                      <p className="text-slate-500">{formatRp(tier.minTurnover)}/bln</p>
+                      <p className="text-slate-500">Min {tier.min_active_mitra} mitra aktif</p>
+                      <p className="text-slate-500">{formatRp(tier.min_monthly_turnover)}/bln</p>
                     </div>
                   </div>
                 );
@@ -220,16 +253,22 @@ export default function AffiliateStatus() {
                   <p className="text-slate-400 text-sm mt-1">
                     Jadilah pusat distribusi untuk mitra lain dan dapatkan komisi distribusi tambahan.
                   </p>
-                  <div className="flex flex-wrap gap-3 mt-3 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full`} style={{ background: activeMitra >= 100 ? '#4ade80' : '#64748b' }} />
-                      <span className="text-slate-400">100 mitra aktif ({activeMitra}/100)</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ background: monthlyTurnover >= 10000000 ? '#4ade80' : '#64748b' }} />
-                      <span className="text-slate-400">Omset Rp 10jt/bln ({formatRp(monthlyTurnover)})</span>
-                    </div>
-                  </div>
+                  {/* Requirement dari tier Merchant di API */}
+                  {tiers.find(t => t.name?.toLowerCase() === 'merchant') && (() => {
+                    const merchantTier = tiers.find(t => t.name?.toLowerCase() === 'merchant');
+                    return (
+                      <div className="flex flex-wrap gap-3 mt-3 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ background: activeMitra >= merchantTier.min_active_mitra ? '#4ade80' : '#64748b' }} />
+                          <span className="text-slate-400">{merchantTier.min_active_mitra} mitra aktif ({activeMitra}/{merchantTier.min_active_mitra})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ background: monthlyTurnover >= merchantTier.min_monthly_turnover ? '#4ade80' : '#64748b' }} />
+                          <span className="text-slate-400">Omset {formatRp(merchantTier.min_monthly_turnover)}/bln ({formatRp(monthlyTurnover)})</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex-shrink-0">
                   {isEligibleMerchant ? (

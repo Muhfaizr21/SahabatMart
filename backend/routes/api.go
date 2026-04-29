@@ -29,6 +29,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	paymentCtrl := controllers.NewPaymentController(db)
 	skinCtrl := controllers.NewSkinController(db)
 	warehouseCtrl := controllers.NewWarehouseController(db)
+	tierCtrl := controllers.NewMembershipTierController(db)
 
 	// Middleware
 	cors := corsMiddleware
@@ -336,6 +337,11 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/commissions/product", adminOnly(adminCtrl.ManageProductCommissions))
 	mux.HandleFunc("/api/admin/commissions/presets", adminOnly(adminCtrl.ManageCommissionPresets))
 
+	// Membership Tiers (Jenjang Status Mitra — Dapat diatur superadmin)
+	mux.HandleFunc("/api/admin/membership-tiers", adminOnly(tierCtrl.GetTiers))
+	mux.HandleFunc("/api/admin/membership-tiers/upsert", superAdminOnly(tierCtrl.UpsertTier))
+	mux.HandleFunc("/api/admin/membership-tiers/delete", superAdminOnly(tierCtrl.DeleteTier))
+
 	// Finance & Payouts
 	mux.HandleFunc("/api/admin/finance", adminOnly(adminCtrl.GetFinance))
 	mux.HandleFunc("/api/admin/transactions", adminOnly(adminCtrl.GetTransactions))
@@ -408,6 +414,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/products/detail", adminCtrl.GetPublicProductDetail)
 	mux.HandleFunc("/api/public/products", adminCtrl.GetPublicProducts)
 	mux.HandleFunc("/api/public/products/reviews", productCtrl.GetReviews)
+	mux.HandleFunc("/api/public/membership-tiers", tierCtrl.GetPublicTiers)
 	
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)
