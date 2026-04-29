@@ -46,38 +46,38 @@ export default function Events() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-        <h2 className="text-2xl font-black text-gray-900 mb-6 italic tracking-tight">Event Terdekat Akuglow</h2>
+      <div className="bg-slate-800/40 backdrop-blur-md p-8 rounded-3xl shadow-xl shadow-black/20 border border-white/5">
+        <h2 className="text-2xl font-black text-white mb-6 italic tracking-tight">Event Terdekat Akuglow</h2>
         
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <span className="material-symbols-outlined text-6xl text-gray-200 mb-4">event_busy</span>
-            <h3 className="text-xl font-bold text-gray-400">Belum Ada Event</h3>
-            <p className="text-gray-400 text-sm">Cek kembali nanti untuk jadwal webinar dan kopdar terbaru.</p>
+            <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">event_busy</span>
+            <h3 className="text-xl font-bold text-slate-400">Belum Ada Event</h3>
+            <p className="text-slate-500 text-sm">Cek kembali nanti untuk jadwal webinar dan kopdar terbaru.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {events.map((event, idx) => (
-            <div key={idx} className="bg-gray-50 border border-gray-100 p-6 rounded-3xl relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-              <div className="absolute top-4 right-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">
+            <div key={idx} className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+              <div className="absolute top-4 right-4 bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-500/20">
                 {event.type}
               </div>
               
               <div className="mb-4">
-                <span className="material-symbols-outlined text-3xl text-blue-500 mb-2">calendar_month</span>
-                <div className="text-xl font-bold text-gray-900 mb-1">{event.title}</div>
-                <div className="text-sm font-bold text-gray-500 italic">
+                <span className="material-symbols-outlined text-3xl text-indigo-500 mb-2">calendar_month</span>
+                <div className="text-xl font-bold text-white mb-1">{event.title}</div>
+                <div className="text-sm font-bold text-slate-400 italic">
                   {new Date(event.start_time).toLocaleDateString('id', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
               </div>
 
               {event.type.toLowerCase() === 'online' ? (
-                <a href={event.location} target="_blank" rel="noreferrer" className="w-full bg-blue-600 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-center block shadow-lg shadow-blue-200">
+                <a href={event.location} target="_blank" rel="noreferrer" className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-center block shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 transition-colors">
                   Join Webinar <i className='bx bx-video ml-1'></i>
                 </a>
               ) : (
-                <div className="flex items-center gap-2 text-gray-600 font-bold text-xs uppercase tracking-widest">
-                  <i className='bx bxs-map text-red-500'></i> {event.location}
+                <div className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase tracking-widest">
+                  <i className='bx bxs-map text-rose-500'></i> {event.location}
                 </div>
               )}
             </div>
