@@ -35,6 +35,7 @@ export default function ProductDetailPage() {
   const [sellers, setSellers] = useState([]);
   const [selectedMerchant, setSelectedMerchant] = useState(null);
   const [selectedAttributes, setSelectedAttributes] = useState({}); // Track user selections
+  const [merchantPage, setMerchantPage] = useState(1);
 
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -68,17 +69,22 @@ export default function ProductDetailPage() {
         if (productData && productData.id) {
           if (cancelled) return;
           setProduct(productData);
-          setSellers(sellersData);
-          
-          // [Akuglow Update] Default merchant selection (Prefer local merchant)
+          // [Akuglow Update] Sort merchants: Prefer local merchant
+          let sortedSellers = sellersData;
           if (sellersData.length > 0) {
             const currentUser = isAuthenticated() ? JSON.parse(localStorage.getItem('user')) : null;
-            const nearMerchant = sellersData.find(s => 
-              currentUser?.profile?.city && s.city && 
-              s.city.toLowerCase() === currentUser.profile.city.toLowerCase()
-            );
-            setSelectedMerchant(nearMerchant || sellersData[0]);
+            
+            sortedSellers = [...sellersData].sort((a, b) => {
+              const isANear = currentUser?.profile?.city && a.city && a.city.toLowerCase() === currentUser.profile.city.toLowerCase();
+              const isBNear = currentUser?.profile?.city && b.city && b.city.toLowerCase() === currentUser.profile.city.toLowerCase();
+              if (isANear && !isBNear) return -1;
+              if (!isANear && isBNear) return 1;
+              return 0;
+            });
+
+            setSelectedMerchant(sortedSellers[0]);
           }
+          setSellers(sortedSellers);
           
           // Initial Attribute Selection (Default to first value of each)
           try {
@@ -345,7 +351,7 @@ export default function ProductDetailPage() {
                    )}
                 </div>
                 <div className="flex flex-col gap-3">
-                  {sellers.map((s) => {
+                  {sellers.slice((merchantPage - 1) * 3, merchantPage * 3).map((s) => {
                     const isNear = user?.profile?.city && s.city && s.city.toLowerCase() === user.profile.city.toLowerCase();
                     
                     return (
@@ -382,6 +388,29 @@ export default function ProductDetailPage() {
                       </button>
                     );
                   })}
+
+                  {/* Pagination Controls */}
+                  {sellers.length > 3 && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                      <button 
+                        onClick={() => setMerchantPage(prev => Math.max(prev - 1, 1))}
+                        disabled={merchantPage === 1}
+                        className="text-xs font-bold text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-400 flex items-center gap-1 px-2 py-1"
+                      >
+                        <i className="bx bx-chevron-left text-lg"></i> Prev
+                      </button>
+                      <span className="text-xs font-bold text-gray-400">
+                        {merchantPage} / {Math.ceil(sellers.length / 3)}
+                      </span>
+                      <button 
+                        onClick={() => setMerchantPage(prev => Math.min(prev + 1, Math.ceil(sellers.length / 3)))}
+                        disabled={merchantPage === Math.ceil(sellers.length / 3)}
+                        className="text-xs font-bold text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-400 flex items-center gap-1 px-2 py-1"
+                      >
+                        Next <i className="bx bx-chevron-right text-lg"></i>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
