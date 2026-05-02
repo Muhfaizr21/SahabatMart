@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { API_BASE, AUTH_API_BASE, ADMIN_API_BASE, fetchJson } from '../../lib/api';
 
 const API = ADMIN_API_BASE;
 
@@ -7,7 +7,7 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_name',           value: 'AkuGrow',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
   { key: 'platform_maintenance',    value: 'false',            description: 'Mode Pemeliharaan',           group: 'platform',  type: 'bool' },
   { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
-  { key: 'platform_fee_default',    value: '0.05',             description: 'Fee Platform Default (%)',   group: 'platform',  type: 'number' },
+  { key: 'default_platform_fee',    value: '0.05',             description: 'Fee Platform Default (%)',   group: 'platform',  type: 'number' },
   { key: 'platform_currency',       value: 'IDR',              description: 'Mata Uang',                  group: 'platform',  type: 'text' },
   { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
   { key: 'merchant_min_active_mitra',  value: '100',          description: 'Min. Mitra Aktif (Merchant)', group: 'platform',  type: 'number' },
@@ -16,7 +16,11 @@ const DEFAULT_CONFIGS = [
   { key: 'payout_schedule',         value: 'weekly',           description: 'Jadwal Payout',              group: 'payout',    type: 'select', options: ['daily', 'weekly', 'monthly'] },
   { key: 'payout_day',              value: 'friday',           description: 'Hari Payout (jika weekly)',  group: 'payout',    type: 'select', options: ['monday','tuesday','wednesday','thursday','friday'] },
   { key: 'payout_bank_code',        value: '',                 description: 'Kode Bank Default',          group: 'payout',    type: 'text' },
-  { key: 'payment_gateway',         value: 'midtrans',         description: 'Payment Gateway Aktif',      group: 'payment',   type: 'select', options: ['midtrans', 'xendit'] },
+  { key: 'payment_gateway',         value: 'tripay',           description: 'Payment Gateway Aktif',      group: 'payment',   type: 'select', options: ['tripay', 'midtrans', 'xendit'] },
+  { key: 'payment_tripay_merchant', value: '',                 description: 'Tripay Merchant Code',       group: 'payment',   type: 'text' },
+  { key: 'payment_tripay_key',      value: '',                 description: 'Tripay API Key',              group: 'payment',   type: 'secret' },
+  { key: 'payment_tripay_private',  value: '',                 description: 'Tripay Private Key',          group: 'payment',   type: 'secret' },
+  { key: 'payment_tripay_url',      value: 'https://tripay.co.id/api-sandbox', description: 'Tripay Base URL', group: 'payment',   type: 'text' },
   { key: 'payment_midtrans_key',    value: '',                 description: 'Midtrans Server Key',        group: 'payment',   type: 'secret' },
   { key: 'payment_sandbox_mode',    value: 'true',             description: 'Mode Sandbox',               group: 'payment',   type: 'bool' },
   { key: 'payment_timeout_minutes', value: '60',               description: 'Timeout Pembayaran (menit)', group: 'payment',   type: 'number' },
@@ -33,6 +37,7 @@ const GROUP_META = {
   payout:       { icon: 'bx-wallet',      label: 'Payout',        color: '#f59e0b' },
   payment:      { icon: 'bx-credit-card', label: 'Pembayaran',    color: '#10b981' },
   notification: { icon: 'bx-bell',        label: 'Notifikasi',    color: '#8b5cf6' },
+  security:     { icon: 'bx-lock-alt',    label: 'Keamanan',      color: '#ef4444' },
 };
 
 const S = {
@@ -130,7 +135,65 @@ export default function AdminSettings() {
     );
   };
 
-  const groups = [...new Set(DEFAULT_CONFIGS.map(c => c.group))];
+  const renderSecurity = () => {
+    return (
+      <div className="animate-fade-in" style={{ padding: 24 }}>
+        <div style={{ maxWidth: 400 }}>
+          <h4 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Ganti Password Admin</h4>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>Ubah password akun Super Admin Anda untuk keamanan maksimal.</p>
+          
+          <form 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const oldPass = e.target.old_password.value;
+              const newPass = e.target.new_password.value;
+              const confirmPass = e.target.confirm_password.value;
+
+              if (newPass !== confirmPass) return alert('Konfirmasi password tidak cocok');
+              if (newPass.length < 6) return alert('Password minimal 6 karakter');
+              
+              setSaving(true);
+              try {
+                await fetchJson(`${API_BASE}/api/auth/change-password`, {
+                  method: 'POST',
+                  body: JSON.stringify({ old_password: oldPass, new_password: newPass })
+                });
+                alert('Password berhasil diubah!');
+                e.target.reset();
+              } catch (err) {
+                alert(err.message);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.label}>Password Lama</label>
+              <input style={S.input} type="password" name="old_password" required />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.label}>Password Baru</label>
+              <input style={S.input} type="password" name="new_password" required minLength={6} />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <label style={S.label}>Konfirmasi Password Baru</label>
+              <input style={S.input} type="password" name="confirm_password" required />
+            </div>
+            
+            <button 
+              type="submit" 
+              disabled={saving}
+              style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: '#0f172a', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            >
+              {saving ? 'Memproses...' : 'Perbarui Password'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const groups = [...new Set(DEFAULT_CONFIGS.map(c => c.group)), 'security'];
   const filtered = configs.filter(c => c.group === activeGroup);
   const gm = GROUP_META[activeGroup];
 
@@ -188,7 +251,8 @@ export default function AdminSettings() {
           </div>
 
           {/* Config Fields */}
-          <div style={{ padding: 24 }}>
+          {activeGroup === 'security' ? renderSecurity() : (
+            <div style={{ padding: 24 }}>
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px 0' }}>
                 <div className="spinner-border" style={{ color: '#4361ee', width: 32, height: 32, borderWidth: 3 }} />
@@ -214,6 +278,7 @@ export default function AdminSettings() {
               </>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

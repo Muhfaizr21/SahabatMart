@@ -38,3 +38,7 @@ func Slugify(s string) string {
 	reg, _ := regexp.Compile("[^a-z0-9]+")
 	return strings.Trim(reg.ReplaceAllString(s, "-"), "-")
 }
+
+func GenerateRandomString(length int) string {
+	return GenerateShortCode(length)
+}

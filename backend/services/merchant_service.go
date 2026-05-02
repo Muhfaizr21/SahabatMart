@@ -5,6 +5,7 @@ import (
 	"SahabatMart/backend/repositories"
 	"errors"
 	"fmt"
+	"log"
 	"gorm.io/gorm"
 	"time"
 )
@@ -33,22 +34,77 @@ func (s *MerchantService) GetCatalog(search string) ([]models.Product, error) {
 
 // ── PRODUCT MANAGEMENT ─────────────────────
 
-func (s *MerchantService) GetProducts(merchantID string) ([]interface{}, error) {
-	type ProductWithStock struct {
-		models.Product
-		Stock int `json:"stock"`
+func (s *MerchantService) GetProducts(merchantID string, search, categoryID, stockStatus string, page, limit int) (map[string]interface{}, error) {
+	if merchantID == "" || merchantID == "undefined" {
+		return nil, fmt.Errorf("merchant identity not found or invalid")
 	}
-	var results []ProductWithStock
-	err := s.DB.Table("products").
-		Select("products.*, inv.stock as stock").
+
+	type ProductResult struct {
+		models.Product
+		InventoryStock int `json:"stock" gorm:"column:inventory_stock"`
+	}
+	var results []ProductResult
+	var total int64
+
+	// Build Base Query
+	query := s.DB.Table("products").
+		Select("products.*, inv.stock as inventory_stock").
 		Joins("JOIN inventories inv ON inv.product_id = products.id").
 		Where("inv.merchant_id = ?", merchantID).
-		Scan(&results).Error
+		Where("products.deleted_at IS NULL")
+
+	// Filters
+	if search != "" {
+		query = query.Where("products.name ILIKE ?", "%"+search+"%")
+	}
+	if categoryID != "" {
+		var cat models.Category
+		if err := s.DB.First(&cat, categoryID).Error; err == nil {
+			query = query.Where("products.category = ?", cat.Name)
+		}
+	}
+	if stockStatus == "low" {
+		query = query.Where("inv.stock > 0 AND inv.stock <= 5")
+	} else if stockStatus == "out" {
+		query = query.Where("inv.stock <= 0")
+	} else if stockStatus == "ready" {
+		query = query.Where("inv.stock > 5")
+	}
+
+	// Count Total
+	if err := query.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	// Pagination
+	if limit <= 0 { limit = 10 }
+	if page <= 1 { page = 1 }
+	offset := (page - 1) * limit
+
+	err := query.Order("products.created_at desc").Limit(limit).Offset(offset).Find(&results).Error
+	if err != nil {
+		log.Printf("[MerchantService] GetProducts Error: %v", err)
+		return nil, err
+	}
 	
+	if len(results) == 0 {
+		var count int64
+		s.DB.Table("inventories").Where("merchant_id = ?", merchantID).Count(&count)
+		log.Printf("[MerchantService] DEBUG: No results found for merchant %s. Total inventory records in DB: %d", merchantID, count)
+	}
+
+	log.Printf("[MerchantService] GetProducts: merchant=%s, found=%d, total=%d", merchantID, len(results), total)
+
 	// Convert to interface slice for easy JSON response
 	final := make([]interface{}, len(results))
 	for i, v := range results { final[i] = v }
-	return final, err
+	
+	return map[string]interface{}{
+		"data":  final,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	}, err
 }
 
 // [Akuglow Refactor] Merchants can no longer add/delete products directly.
@@ -122,14 +178,29 @@ func (s *MerchantService) GetRestockRequests(merchantID string) ([]models.Restoc
 
 // ── ORDER MANAGEMENT ───────────────────────
 
-func (s *MerchantService) GetOrders(merchantID string, status string) ([]models.OrderMerchantGroup, error) {
+func (s *MerchantService) GetOrders(merchantID string, status string, page, limit int) (map[string]interface{}, error) {
 	var groups []models.OrderMerchantGroup
-	query := s.DB.Preload("Items").Where("merchant_id = ?", merchantID)
+	var total int64
+
+	query := s.DB.Model(&models.OrderMerchantGroup{}).Where("merchant_id = ?", merchantID)
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-	err := query.Order("created_at desc").Find(&groups).Error
-	return groups, err
+
+	query.Count(&total)
+
+	if limit <= 0 { limit = 10 }
+	if page <= 0 { page = 1 }
+	offset := (page - 1) * limit
+
+	err := query.Preload("Items").Order("created_at desc").Limit(limit).Offset(offset).Find(&groups).Error
+	
+	return map[string]interface{}{
+		"data": groups,
+		"total": total,
+		"page": page,
+		"limit": limit,
+	}, err
 }
 
 func (s *MerchantService) UpdateOrderStatus(groupID, merchantID, status, trackingNo, courierCode string) (*models.OrderMerchantGroup, error) {
@@ -138,12 +209,30 @@ func (s *MerchantService) UpdateOrderStatus(groupID, merchantID, status, trackin
 		return nil, err
 	}
 
+	oldStatus := string(group.Status)
 	group.Status = models.MerchantOrderStatus(status)
 	if trackingNo != "" {
 		group.TrackingNumber = trackingNo
 	}
 	if courierCode != "" {
 		group.CourierCode = courierCode
+	}
+
+	// Trigger Biteship Order Creation when confirmed
+	if status == string(models.MOrderConfirmed) && oldStatus != status {
+		var order models.Order
+		if err := s.DB.First(&order, "id = ?", group.OrderID).Error; err == nil {
+			shippingSvc := NewShippingService(s.DB)
+			biteshipOrderID, waybill, err := shippingSvc.CreateOrder(order, group)
+			if err == nil {
+				group.BiteshipOrderID = biteshipOrderID
+				group.TrackingNumber = waybill
+			} else {
+				log.Printf("[Shipping] Error creating Biteship order for Group %s: %v", groupID, err)
+				// Option: fail the status update or just log it
+				return nil, fmt.Errorf("gagal membuat pengiriman Biteship: %v", err)
+			}
+		}
 	}
 
 	if status == string(models.MOrderShipped) {

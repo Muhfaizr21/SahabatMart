@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
 import toast from 'react-hot-toast';
 
@@ -7,32 +7,43 @@ export default function MarketingMaterials() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
-
   const [affiliate, setAffiliate] = useState(null);
+  
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const fetchMaterials = useCallback(async (p) => {
+    try {
+      setLoading(true);
+      const res = await fetchJson(`${AFFILIATE_API_BASE}/promo-materials?page=${p}&limit=12`);
+      setAssets(res.data || []);
+      setTotalPages(res.total_pages || 1);
+      setPage(res.page || p);
+    } catch (err) {
+      console.error("Gagal memuat materi promo", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Load materials
-    fetchJson(`${AFFILIATE_API_BASE}/promo-materials`)
-      .then(res => {
-        setAssets(res || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Gagal memuat materi promo", err);
-        setLoading(false);
-      });
+    fetchMaterials(1);
 
     // Load affiliate profile for ref_code
     fetchJson(`${AFFILIATE_API_BASE}/profile`)
       .then(res => setAffiliate(res))
       .catch(err => console.error("Gagal memuat profile affiliate", err));
-  }, []);
+  }, [fetchMaterials]);
+
+  const handlePageChange = (p) => {
+    fetchMaterials(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleCopyCode = (asset) => {
     const refCode = affiliate?.affiliate?.ref_code || 'AG-PROMO';
     const promoLink = `${window.location.origin}?ref=${refCode}`;
     
-    // Include caption if available
     const textToCopy = asset.caption 
       ? `${asset.caption}\n\nLink: ${promoLink}`
       : promoLink;
@@ -54,59 +65,55 @@ export default function MarketingMaterials() {
       <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] -mr-48 -mt-48"></div>
       
       <div className="flex items-center gap-6 mb-12 relative z-10">
-        <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-purple-500/20">📸</div>
+        <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-purple-500/20">📸</div>
         <div>
-          <h2 className="text-3xl font-black text-white leading-tight italic tracking-tighter">Materi Promosi AkuGrow</h2>
-          <p className="text-slate-400 font-medium mt-1">Gunakan aset profesional untuk meningkatkan konversi iklanmu.</p>
+          <h2 className="text-2xl font-black text-white leading-tight italic tracking-tighter">Materi Promosi AkuGrow</h2>
+          <p className="text-slate-400 text-xs font-medium mt-1">Aset profesional untuk konversi tinggi.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 relative z-10">
         {assets.map(asset => (
-          <div key={asset.id} className="group border border-slate-800 rounded-[2.5rem] overflow-hidden bg-slate-900/50 backdrop-blur-xl hover:border-purple-500/50 transition-all duration-500 flex flex-col hover:shadow-2xl hover:shadow-purple-500/10">
-            <div className={`aspect-square relative overflow-hidden ${asset.type === 'copywriting' ? 'bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center p-10' : 'bg-slate-800'}`}>
+          <div key={asset.id} className="group border border-slate-800 rounded-3xl overflow-hidden bg-slate-900/50 backdrop-blur-xl hover:border-purple-500/50 transition-all duration-500 flex flex-col hover:shadow-xl">
+            <div className={`aspect-[4/5] relative overflow-hidden ${asset.type === 'copywriting' ? 'bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center p-6' : 'bg-slate-800'}`}>
                {asset.type === 'copywriting' ? (
                  <div className="text-center">
-                    <div className="w-16 h-16 bg-purple-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                      <span className="material-symbols-outlined text-4xl text-purple-400">content_paste</span>
+                    <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                      <span className="material-symbols-outlined text-2xl text-purple-400">content_paste</span>
                     </div>
-                    <p className="text-slate-400 text-xs font-medium italic leading-relaxed">" {asset.caption?.substring(0, 120)}... "</p>
+                    <p className="text-slate-400 text-[10px] font-medium italic leading-relaxed line-clamp-4">" {asset.caption} "</p>
                  </div>
                ) : (
                  <img src={asset.file_url} alt={asset.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
                )}
                
-               <div className="absolute top-6 right-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-purple-400 border border-purple-500/30">
+               <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest text-purple-400 border border-purple-500/30">
                   {asset.type}
                </div>
             </div>
             
-            <div className="p-8 flex-1 flex flex-col justify-between">
-              <div>
-                <h4 className="font-bold text-white text-lg mb-3 tracking-tight">{asset.title}</h4>
+            <div className="p-4 flex-1 flex flex-col justify-between">
+              <div className="mb-4">
+                <h4 className="font-bold text-white text-sm mb-1 tracking-tight line-clamp-1">{asset.title}</h4>
                 {asset.type === 'copywriting' && (
-                  <p className="text-slate-500 text-xs line-clamp-2 mb-6 leading-relaxed">{asset.caption}</p>
+                  <p className="text-slate-500 text-[10px] line-clamp-1 leading-relaxed">{asset.caption}</p>
                 )}
               </div>
               
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                  <button 
                   onClick={() => handleCopyCode(asset)}
-                  className={`w-full py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${
-                    copied === asset.id ? 'bg-green-500 text-white' : 'bg-white text-slate-900 hover:bg-purple-100 shadow-xl shadow-white/5'
+                  className={`w-full py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${
+                    copied === asset.id ? 'bg-green-500 text-white' : 'bg-white text-slate-900 hover:bg-purple-100'
                   }`}
                 >
-                  {copied === asset.id ? 'Copied! ✅' : (
-                    <span className="flex items-center justify-center gap-2">
-                       Copy Link & Text <span className="material-symbols-outlined text-sm">content_copy</span>
-                    </span>
-                  )}
+                  {copied === asset.id ? 'Copied! ✅' : 'Copy Link & Text'}
                 </button>
                 
                 {asset.type === 'copywriting' ? (
                   <button 
                     onClick={() => setSelectedAsset(asset)}
-                    className="w-full bg-slate-800 text-slate-300 py-3 rounded-2xl font-bold text-[10px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700"
+                    className="w-full bg-slate-800 text-slate-300 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700"
                   >
                     Lihat Full Teks
                   </button>
@@ -115,9 +122,9 @@ export default function MarketingMaterials() {
                     href={asset.file_url} 
                     target="_blank" 
                     rel="noreferrer"
-                    className="w-full bg-slate-800 text-slate-300 py-3 rounded-2xl font-bold text-[10px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700"
+                    className="w-full bg-slate-800 text-slate-300 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700"
                   >
-                    Download Asset ⬇️
+                    Download ⬇️
                   </a>
                 )}
               </div>
@@ -125,6 +132,38 @@ export default function MarketingMaterials() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-3 mt-12 relative z-10">
+          <button 
+            onClick={() => handlePageChange(page - 1)} 
+            disabled={page === 1}
+            className={`p-2.5 rounded-xl border border-slate-800 text-white transition-all ${page === 1 ? 'opacity-20 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700'}`}
+          >
+            <span className="material-symbols-outlined text-xl">chevron_left</span>
+          </button>
+          
+          <div className="flex gap-2">
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => handlePageChange(i + 1)}
+                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${page === i + 1 ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            onClick={() => handlePageChange(page + 1)} 
+            disabled={page === totalPages}
+            className={`p-2.5 rounded-xl border border-slate-800 text-white transition-all ${page === totalPages ? 'opacity-20 cursor-not-allowed' : 'bg-slate-800 hover:bg-slate-700'}`}
+          >
+            <span className="material-symbols-outlined text-xl">chevron_right</span>
+          </button>
+        </div>
+      )}
 
       {/* Modern Modal for Full Text */}
       {selectedAsset && (

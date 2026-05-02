@@ -2,7 +2,10 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type APIResponse struct {
@@ -46,4 +49,36 @@ func ToStringPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func QueryInt(r *http.Request, key string, defaultValue int) int {
+	val := r.URL.Query().Get(key)
+	if val == "" {
+		return defaultValue
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultValue
+	}
+	return i
+}
+
+func FormatNumber(n float64) string {
+	s := fmt.Sprintf("%.0f", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var res []string
+	for i := len(s); i > 0; i -= 3 {
+		start := i - 3
+		if start < 0 {
+			start = 0
+		}
+		res = append([]string{s[start:i]}, res...)
+	}
+	return strings.Join(res, ".")
+}
+
+func FormatIDR(n float64) string {
+	return "Rp" + FormatNumber(n)
 }

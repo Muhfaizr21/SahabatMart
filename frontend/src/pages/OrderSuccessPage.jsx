@@ -47,6 +47,17 @@ export default function OrderSuccessPage() {
                 </div>
               </div>
 
+              {order.expired_at && (
+                <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-100 text-red-600">
+                  <span className="material-symbols-outlined text-sm">schedule</span>
+                  <p className="text-[11px] font-bold">
+                    Bayar sebelum: {new Date(order.expired_at).toLocaleString('id-ID', {
+                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                    })} WIB
+                  </p>
+                </div>
+              )}
+
               {/* QRIS Display */}
               {payment.qr_url && (
                 <div className="flex flex-col items-center py-4 bg-white rounded-xl mb-4">

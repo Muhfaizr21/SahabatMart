@@ -7,14 +7,29 @@ export default function MerchantOrders() {
   const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState('');
   const [updating, setUpdating] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 5; // User wants shorter pages
 
-  useEffect(() => { loadOrders(); }, [activeStatus]);
+  useEffect(() => { 
+    setPage(1);
+    loadOrders(1); 
+  }, [activeStatus]);
 
-  const loadOrders = async () => {
+  const loadOrders = async (targetPage = page) => {
     setLoading(true);
     try {
-      const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}`);
-      setOrders(Array.isArray(data) ? data : (data.data || []));
+      const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}&page=${targetPage}&limit=${limit}`);
+      // Handling both direct array (old) and paginated response (new)
+      const list = Array.isArray(data) ? data : (data.data || []);
+      setOrders(list);
+      
+      if (!Array.isArray(data)) {
+        const total = data.total || 0;
+        setTotalPages(Math.ceil(total / limit) || 1);
+      } else {
+        setTotalPages(1);
+      }
     } catch (err) {
       console.error('Failed to load orders:', err);
     } finally {
@@ -38,12 +53,19 @@ export default function MerchantOrders() {
         method: 'POST',
         body: JSON.stringify({ group_id: groupId, status: newStatus, tracking_number: trackingNumber, courier_code: courierCode })
       });
-      loadOrders();
+      loadOrders(page);
     } catch (err) {
       alert('Gagal update status: ' + err.message);
     } finally {
       setUpdating(null);
     }
+  };
+
+  const handlePageChange = (p) => {
+    if (p < 1 || p > totalPages) return;
+    setPage(p);
+    loadOrders(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const statuses = [
@@ -147,42 +169,123 @@ export default function MerchantOrders() {
                  ))}
                </div>
 
-               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                 <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                   <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Logistics Details</div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Carrier</span>
-                     <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.courier_code || 'Pending Discovery'}</span>
-                   </div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                     <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Tracking Info</span>
-                     <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.tracking_number || 'Awaiting Shipment'}</span>
-                   </div>
-                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Logistics Details</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Carrier</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.courier_code || 'Pending Discovery'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Tracking Info</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.tracking_number || 'Awaiting Shipment'}</span>
+                    </div>
+                  </div>
 
-                 <div style={{ display: 'flex', gap: 12 }}>
-                   {order.status === 'new' && (
-                     <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'confirmed')} disabled={updating === order.id}>Confirm Order</button>
-                   )}
-                   {order.status === 'confirmed' && (
-                     <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'processing')} disabled={updating === order.id}>Process Item</button>
-                   )}
-                   {order.status === 'processing' && (
-                     <button style={{ ...A.btnPrimary, flex: 1, height: 48, background: '#4f46e5', borderColor: '#4f46e5' }} onClick={() => handleUpdateStatus(order.id, 'shipped')} disabled={updating === order.id}>Input Resi & Ship</button>
-                   )}
-                   {order.status === 'shipped' && (
-                     <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Package in Transit</div>
-                   )}
-                   {order.status === 'completed' && (
-                     <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#ecfdf5', color: '#10b981', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Transaction Finalized</div>
-                   )}
-                 </div>
-               </div>
+                  {/* [Sync Audit] Financial Breakdown for Merchant Transparency */}
+                  <div style={{ background: '#fff', padding: 20, borderRadius: 12, border: '1px solid #c7d2fe', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.05)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="bx bx-wallet" /> Financial Summary
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal Barang</span>
+                        <span style={{ color: '#0f172a', fontWeight: 800 }}>{idr(order.subtotal)}</span>
+                      </div>
+                      
+                      {order.discount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                          <span style={{ color: '#64748b', fontWeight: 600 }}>Potongan Diskon</span>
+                          <span style={{ color: '#ef4444', fontWeight: 800 }}>-{idr(order.discount)}</span>
+                        </div>
+                      )}
+
+                      <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 0' }} />
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>Biaya Platform (Fee)</span>
+                        <span style={{ color: '#64748b', fontWeight: 700 }}>-{idr(order.platform_fee)}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>Komisi Afiliasi</span>
+                        <span style={{ color: '#64748b', fontWeight: 700 }}>-{idr(order.affiliate_commission)}</span>
+                      </div>
+
+                      <div style={{ marginTop: 8, padding: '12px', background: '#f5f3ff', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase' }}>Net Payout</span>
+                        <span style={{ fontSize: 14, fontWeight: 900, color: '#4f46e5' }}>{idr(order.merchant_payout)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    {order.status === 'new' && (
+                      <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'confirmed')} disabled={updating === order.id}>Confirm Order</button>
+                    )}
+                    {order.status === 'confirmed' && (
+                      <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'processing')} disabled={updating === order.id}>Process Item</button>
+                    )}
+                    {order.status === 'processing' && (
+                      <button style={{ ...A.btnPrimary, flex: 1, height: 48, background: '#4f46e5', borderColor: '#4f46e5' }} onClick={() => handleUpdateStatus(order.id, 'shipped')} disabled={updating === order.id}>Input Resi & Ship</button>
+                    )}
+                    {order.status === 'shipped' && (
+                      <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Package in Transit</div>
+                    )}
+                    {order.status === 'completed' && (
+                      <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#ecfdf5', color: '#10b981', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Transaction Finalized</div>
+                    )}
+                  </div>
+                </div>
 
             </div>
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 40, paddingBottom: 40 }}>
+          <button 
+            onClick={() => handlePageChange(page - 1)} 
+            disabled={page === 1}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1 }}
+          >
+            <i className="bx bx-chevron-left" /> Previous
+          </button>
+          
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => handlePageChange(i + 1)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  transition: 'all 0.2s',
+                  background: page === i + 1 ? '#4f46e5' : '#fff',
+                  color: page === i + 1 ? '#fff' : '#64748b',
+                  border: page === i + 1 ? 'none' : '1px solid #e2e8f0',
+                  cursor: 'pointer'
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            onClick={() => handlePageChange(page + 1)} 
+            disabled={page === totalPages}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1 }}
+          >
+            Next <i className="bx bx-chevron-right" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

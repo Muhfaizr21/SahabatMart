@@ -18,6 +18,9 @@ export default function MembershipTiers() {
     base_commission_rate: 0.1,
     min_active_mitra: 0,
     min_monthly_turnover: 0,
+    min_total_transactions: 0,
+    min_referrals: 0,
+    min_performance_points: 0,
     color: '#6366f1',
     icon: 'military_tech',
     description: '',
@@ -44,7 +47,10 @@ export default function MembershipTiers() {
         level: parseInt(modal.level),
         base_commission_rate: parseFloat(modal.base_commission_rate),
         min_active_mitra: parseInt(modal.min_active_mitra),
-        min_monthly_turnover: parseFloat(modal.min_monthly_turnover)
+        min_monthly_turnover: parseFloat(modal.min_monthly_turnover),
+        min_total_transactions: parseInt(modal.min_total_transactions),
+        min_referrals: parseInt(modal.min_referrals),
+        min_performance_points: parseInt(modal.min_performance_points)
     };
 
     fetchJson(`${API}/membership-tiers/upsert`, { 
@@ -127,6 +133,11 @@ export default function MembershipTiers() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                         <i className='bx bx-trending-up' style={{color: '#94a3b8'}} /> {formatRp(tier.min_monthly_turnover)} / bln
                       </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', marginTop: 4, fontSize: 10, color: '#94a3b8' }}>
+                         {tier.min_total_transactions > 0 && <span>• {tier.min_total_transactions} Trx</span>}
+                         {tier.min_referrals > 0 && <span>• {tier.min_referrals} Ref</span>}
+                         {tier.min_performance_points > 0 && <span>• {tier.min_performance_points} Pts</span>}
+                      </div>
                     </div>
                   </td>
                   <td style={A.td}>
@@ -192,6 +203,21 @@ export default function MembershipTiers() {
               <div>
                 <FieldLabel>Min. Omset Bulanan</FieldLabel>
                 <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_monthly_turnover} onChange={e => setModal({...modal, min_monthly_turnover: e.target.value})} required />
+              </div>
+
+              <div>
+                <FieldLabel>Min. Transaksi</FieldLabel>
+                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_total_transactions} onChange={e => setModal({...modal, min_total_transactions: e.target.value})} required />
+              </div>
+
+              <div>
+                <FieldLabel>Min. Referal</FieldLabel>
+                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_referrals} onChange={e => setModal({...modal, min_referrals: e.target.value})} required />
+              </div>
+
+              <div>
+                <FieldLabel>Min. Poin Performa</FieldLabel>
+                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_performance_points} onChange={e => setModal({...modal, min_performance_points: e.target.value})} required />
               </div>
 
               <div>

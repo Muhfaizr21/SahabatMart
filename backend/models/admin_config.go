@@ -11,6 +11,18 @@ const (
 	PusatID = "00000000-0000-0000-0000-000000000000"
 )
 
+// ProductTierCommission mengatur komisi spesifik per produk per jenjang (Req 1 & 2)
+type ProductTierCommission struct {
+	ID             uint    `gorm:"primaryKey" json:"id"`
+	ProductID      string  `gorm:"type:uuid;not null;index" json:"product_id"`
+	MembershipTierID uint  `gorm:"not null;index" json:"membership_tier_id"`
+	CommissionRate float64 `gorm:"type:decimal(5,4);not null" json:"commission_rate"` // e.g. 0.10 = 10%
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+func (ProductTierCommission) TableName() string { return "product_tier_commissions" }
+
 // PlatformConfig menyimpan pengaturan global platform
 type PlatformConfig struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
@@ -43,17 +55,6 @@ type MerchantCommission struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// CommissionPreset menyimpan template komisi yang bisa digunakan ulang
-type CommissionPreset struct {
-	ID           uint    `gorm:"primaryKey" json:"id"`
-	Name         string  `gorm:"type:varchar(100);uniqueIndex;not null" json:"name"`
-	FeePercent   float64 `gorm:"type:decimal(5,2);not null" json:"fee_percent"`      // Platform Fee
-	AffiliateFee float64 `gorm:"type:decimal(5,2);default:0" json:"affiliate_fee"` // Base Affiliate
-	DistFee      float64 `gorm:"type:decimal(5,2);default:0" json:"dist_fee"`      // Base Distribution
-	Note         string  `gorm:"type:text" json:"note"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
 
 // AuditLog mencatat semua aksi admin ke sistem
 type AuditLog struct {
@@ -98,6 +99,8 @@ type Merchant struct {
 	ActiveMitraCount int     `gorm:"default:0" json:"active_mitra_count"`
 	TeamMonthlyTurnover float64 `gorm:"type:decimal(15,2);default:0" json:"team_monthly_turnover"`
 	DistributionFeePercent float64 `gorm:"type:decimal(5,2);default:0" json:"distribution_fee_percent"` // Komisi distribusi
+	BiteshipAreaID         string  `gorm:"type:varchar(100)" json:"biteship_area_id"`                 // Origin for Biteship
+	EnabledCouriers       string  `gorm:"type:text" json:"enabled_couriers"`                         // Comma-separated courier codes
 
 	JoinedAt    time.Time  `json:"joined_at"`
 	SuspendedAt *time.Time `json:"suspended_at"`
@@ -221,11 +224,12 @@ type Category struct {
 
 // Brand merk produk
 type Brand struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	Name       string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"name"`
-	LogoURL    string    `gorm:"type:text" json:"logo_url"`
-	IsFeatured bool      `gorm:"default:false" json:"is_featured"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"name"`
+	LogoURL      string    `gorm:"type:text" json:"logo_url"`
+	IsFeatured   bool      `gorm:"default:false" json:"is_featured"`
+	ProductCount int64     `gorm:"-" json:"product_count"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // Attribute global (Ukuran, Warna, dsb)
@@ -304,13 +308,14 @@ type Region struct {
 }
 
 type Notification struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
+	ID           string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	UserID       string    `gorm:"type:uuid;not null;index" json:"user_id"` // Backwards compatibility & DB Constraint
 	ReceiverID   string    `gorm:"type:uuid;index" json:"receiver_id"`     // Global ID (User ID or Merchant ID)
 	ReceiverType string    `gorm:"type:varchar(20);index" json:"receiver_type"` // admin, merchant, buyer
 	Type         string    `gorm:"type:varchar(50)" json:"type"`           // order_new, payout_approved, product_approved, dispute_new
 	Title        string    `gorm:"type:varchar(100)" json:"title"`
-	Message      string    `gorm:"type:text" json:"message"`
+	Message      string    `gorm:"type:text;column:body" json:"message"` // Synced with DB 'body' column
+	Body         string    `gorm:"type:text;column:body" json:"body"`    // Alias for 'body' column to satisfy constraint
 	Link         string    `gorm:"type:varchar(255)" json:"link"`
 	IsRead       bool      `gorm:"default:false" json:"is_read"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -361,6 +366,13 @@ type Product struct {
 	BaseAffiliateFee          float64 `gorm:"type:decimal(15,2);default:0" json:"base_affiliate_fee"`
 	BaseAffiliateFeeNominal   float64 `gorm:"type:decimal(15,2);default:0" json:"base_affiliate_fee_nominal"`	
 	
+	// Merchant/Distributor Cut (Req 3)
+	MerchantCommissionPercent float64  `gorm:"type:decimal(5,2);default:0" json:"merchant_commission_percent"` // Bagi hasil merchant per produk
+
+	// Multi-Level Commission Preset (Req 4)
+	// Assign preset ini untuk mendistribusikan komisi ke seluruh jaringan upline secara otomatis.
+	CommissionPresetID *string `gorm:"type:uuid;index" json:"commission_preset_id"` // nullable = tidak pakai preset
+	
 	MerchantID  string    `gorm:"type:uuid;index" json:"merchant_id"`
 	Stock       int       `gorm:"default:0" json:"stock"`
 
@@ -372,6 +384,7 @@ type Product struct {
 	Badge       string    `gorm:"type:varchar(50)" json:"badge"`
 	BadgeClass  string    `gorm:"type:varchar(50)" json:"badge_class"`
 	Status      string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, taken_down, draft
+	Weight      int       `gorm:"default:0" json:"weight"`                         // Weight in grams
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
@@ -385,9 +398,11 @@ type ProductVariant struct {
 	ProductID string    `gorm:"type:uuid;not null;index" json:"product_id"`
 	Name      string    `gorm:"type:varchar(255);not null" json:"name"` // e.g., "Red, XL"
 	SKU       string    `gorm:"type:varchar(100);unique;not null" json:"sku"`
-	Price     float64   `gorm:"type:decimal(15,2);not null" json:"price"`
-	COGS      float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
-	Stock     int       `gorm:"default:0" json:"stock"`
+	Price          float64   `gorm:"type:decimal(15,2);not null" json:"price"`
+	WholesalePrice float64   `gorm:"type:decimal(15,2);not null;default:0" json:"wholesale_price"`
+	COGS           float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
+	Stock          int       `gorm:"default:0" json:"stock"`
+	Weight    int       `gorm:"default:0" json:"weight"` // Weight in grams (overrides product weight if > 0)
 	Image     string    `gorm:"type:text" json:"image"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

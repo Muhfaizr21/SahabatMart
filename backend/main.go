@@ -32,7 +32,7 @@ func ConnectDB() {
 	DB.AutoMigrate(
 		&models.User{}, &models.UserProfile{},
 		&models.Merchant{}, &models.AffiliateMember{}, &models.MembershipTier{},
-		&models.Category{}, &models.Product{}, &models.ProductVariant{},
+		&models.Category{}, &models.Product{}, &models.ProductVariant{}, &models.ProductTierCommission{},
 		&models.Order{}, &models.OrderMerchantGroup{}, &models.OrderItem{},
 		&models.Cart{}, &models.CartItem{},
 		&models.AffiliateClick{}, &models.PlatformConfig{},
@@ -54,7 +54,18 @@ func ConnectDB() {
 		// Akuglow Skin Journey
 		&models.SkinPreTest{}, &models.SkinProgress{}, &models.SkinJournal{}, &models.SkinWarriorLevel{},
 		&models.SkinEducation{}, &models.SkinCommunityGroup{}, &models.SkinCommunityPost{}, &models.SkinCommunityComment{},
+		&models.PasswordReset{},
+		// Commission Preset System (Multi-Level)
+		&models.CommissionPreset{}, &models.CommissionPresetLevel{},
 	)
+	
+	// [Migration Fixes] Run startup migrations to fix schema issues
+	// Fix 1: cancelled_by dari uuid ke varchar agar bisa menyimpan "system"
+	DB.Exec("ALTER TABLE orders ALTER COLUMN cancelled_by TYPE varchar(100) USING cancelled_by::varchar(100)")
+	// Fix 2: Perbaiki constraint keranjang agar mendukung multi-merchant & metadata berbeda
+	DB.Exec("ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_cart_id_product_variant_id_key")
+	DB.Exec("DROP INDEX IF EXISTS idx_cart_items_cart_id_product_variant_id_key")
+	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_composite_v2 ON cart_items (cart_id, product_variant_id, merchant_id, COALESCE(metadata, ''))")
 
 	// Seed Sample Education for testing
 	var count int64
@@ -161,6 +172,26 @@ func autoSeedCriticalData(db *gorm.DB) {
 
 	// [Auto-Fix] Pastikan admin@akugrow.com selalu ACTIVE
 	db.Model(&models.User{}).Where("email = ?", "admin@akugrow.com").Update("status", "active")
+
+	// [Logistics] Seed default couriers if empty
+	var logCount int64
+	db.Model(&models.LogisticChannel{}).Count(&logCount)
+	if logCount == 0 {
+		log.Println("🚚 Seeding default logistics channels...")
+		channels := []models.LogisticChannel{
+			{Code: "jne", Name: "JNE", IsActive: true},
+			{Code: "sicepat", Name: "SiCepat", IsActive: true},
+			{Code: "jnt", Name: "J&T", IsActive: true},
+			{Code: "tiki", Name: "TIKI", IsActive: true},
+			{Code: "anteraja", Name: "AnterAja", IsActive: true},
+		}
+		for _, c := range channels {
+			db.Create(&c)
+		}
+	}
+
+	// [Platform Settings] Ensure default configs exist
+	seeder.SeedConfigs(db)
 }
 
 

@@ -73,7 +73,23 @@ export default function CartPage() {
     }
   };
 
-  const subtotal = items.reduce((sum, item) => sum + (item.product_variant?.price || 0) * item.quantity, 0);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) setUser(JSON.parse(userData));
+  }, []);
+
+  const getItemPrice = (item) => {
+    const isMitra = user?.role === 'mitra' || user?.role === 'affiliate';
+    if (isMitra) {
+      if (item.product_variant?.wholesale_price > 0) return item.product_variant.wholesale_price;
+      if (item.product?.wholesale_price > 0) return item.product.wholesale_price;
+    }
+    return item.product_variant?.price || item.product?.price || 0;
+  };
+
+  const subtotal = items.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
   const discount = couponApplied ? subtotal * 0.1 : 0;
   const shipping = subtotal > 500000 || subtotal === 0 ? 0 : 15000;
   const total = subtotal - discount + shipping;
@@ -145,7 +161,7 @@ export default function CartPage() {
                       </div>
                       {/* Price */}
                       <div className="md:col-span-2 text-center">
-                        <div className="text-sm font-bold text-gray-700">Rp{(item.product_variant?.price || 0).toLocaleString('id')}</div>
+                        <div className="text-sm font-bold text-gray-700">Rp{getItemPrice(item).toLocaleString('id')}</div>
                       </div>
                       {/* Qty */}
                       <div className="md:col-span-2 flex items-center justify-center">
@@ -157,7 +173,7 @@ export default function CartPage() {
                       </div>
                       {/* Total */}
                       <div className="md:col-span-2 text-center">
-                        <div className="text-sm font-black text-gray-900">Rp{((item.product_variant?.price || 0) * item.quantity).toLocaleString('id')}</div>
+                        <div className="text-sm font-black text-gray-900">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id')}</div>
                       </div>
                       {/* Remove */}
                       <div className="md:col-span-1 flex justify-center">

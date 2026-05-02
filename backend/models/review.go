@@ -13,6 +13,7 @@ type Review struct {
 	OrderItemID string    `gorm:"type:uuid;not null" json:"order_item_id"`
 	Rating     int       `gorm:"type:int;not null" json:"rating"` // 1-5
 	Comment    string    `gorm:"type:text" json:"comment"`
+	ImageURL   string    `gorm:"type:text" json:"image_url"`
 	IsHidden   bool      `gorm:"default:false" json:"is_hidden"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`

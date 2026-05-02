@@ -5,6 +5,7 @@ import (
 	"SahabatMart/backend/repositories"
 	"fmt"
 	"gorm.io/gorm"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AdminService struct {
@@ -83,4 +84,18 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 		s.Audit.Log(adminID, "moderate_restock", "restock_request", requestID, "status="+status, "internal")
 		return nil
 	})
+}
+
+func (s *AdminService) ResetUserPassword(adminID, userID, newPassword, ip string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	hashedPasswordStr := string(hashedPassword)
+	err = s.UserRepo.Update(&models.User{ID: userID}, map[string]interface{}{"password_hash": &hashedPasswordStr})
+	if err == nil {
+		s.Audit.Log(adminID, "reset_user_password", "user", userID, "manual_reset", ip)
+	}
+	return err
 }

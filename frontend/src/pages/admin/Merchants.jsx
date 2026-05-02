@@ -16,6 +16,18 @@ export default function AdminMerchants() {
 
   // Commission override state
   const [commission, setCommission] = useState({ fee_percent: 0, loading: false });
+  const [areas, setAreas] = useState([]);
+  const [searchingArea, setSearchingArea] = useState(false);
+  const [logisticChannels, setLogisticChannels] = useState([]);
+
+  const loadLogistics = () => {
+    fetchJson(`${API}/logistics`)
+      .then(res => {
+        const data = Array.isArray(res) ? res : (res.data || []);
+        setLogisticChannels(data);
+      })
+      .catch(console.error);
+  };
 
   // Handle window resize
   useEffect(() => {
@@ -39,7 +51,7 @@ export default function AdminMerchants() {
     }).catch(console.error).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { load(); loadLogistics(); }, [filter]);
 
   const loadCommission = (merchantId) => {
     setCommission({ ...commission, loading: true });
@@ -83,9 +95,61 @@ export default function AdminMerchants() {
       method: 'PUT',
       body: JSON.stringify({ merchant_id: id, verified: !current }),
     }).then(() => {
-      if (modal) setModal({ ...modal, is_verified: !current });
       load();
     });
+  };
+
+  const handleSearchArea = async (input) => {
+    if (input.length < 3) return;
+    setSearchingArea(true);
+    try {
+      const res = await fetchJson(`/api/shipping/areas?input=${input}`);
+      setAreas(res.areas || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSearchingArea(true);
+      setTimeout(() => setSearchingArea(false), 500);
+    }
+  };
+
+  const updateMerchantArea = (area) => {
+    if (!modal) return;
+    fetchJson(`${API}/merchants/update`, {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        merchant_id: modal.id, 
+        biteship_area_id: area.id,
+        is_verified: modal.is_verified 
+      }),
+    }).then(() => {
+      setModal({ ...modal, biteship_area_id: area.id });
+      setAreas([]);
+      load();
+    }).catch(alert);
+  };
+
+  const toggleCourier = (code) => {
+    if (!modal) return;
+    let current = modal.enabled_couriers ? modal.enabled_couriers.split(',').filter(Boolean) : [];
+    if (current.includes(code)) {
+        current = current.filter(c => c !== code);
+    } else {
+        current.push(code);
+    }
+    const newList = current.join(',');
+    
+    fetchJson(`${API}/merchants/update`, {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        merchant_id: modal.id, 
+        enabled_couriers: newList,
+        is_verified: modal.is_verified 
+      }),
+    }).then(() => {
+      setModal({ ...modal, enabled_couriers: newList });
+      load();
+    }).catch(alert);
   };
 
   const isMobile = windowWidth < 640;
@@ -341,11 +405,69 @@ export default function AdminMerchants() {
                   ...A.btnGhost, width: '100%', justifyContent: 'center', padding: '12px', fontSize: 12,
                   borderColor: modal.is_verified ? '#64748b' : '#10b981',
                   color: modal.is_verified ? '#64748b' : '#10b981',
+                  marginBottom: 16
                 }}
               >
                 <i className={`bx ${modal.is_verified ? 'bxs-badge-check' : 'bx-badge'}`} />
                 {modal.is_verified ? 'Revoke Verification' : 'Grant Verification Seal'}
               </button>
+
+              <div style={{ marginTop: 8, padding: 16, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                <FieldLabel>Biteship Logistics Area</FieldLabel>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    style={{ ...A.input, padding: '10px 12px', fontSize: 12 }} 
+                    placeholder="Search Area (Kecamatan)..." 
+                    onChange={e => handleSearchArea(e.target.value)}
+                  />
+                  {searchingArea && <div style={{ position: 'absolute', right: 10, top: 12, fontSize: 10, color: '#4f46e5' }}>Searching...</div>}
+                  
+                  {areas.length > 0 && (
+                    <div style={{ position: 'absolute', zIndex: 100, left: 0, right: 0, top: '100%', mt: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', maxH: 200, overflowY: 'auto' }}>
+                      {areas.map(a => (
+                        <div key={a.id} onClick={() => updateMerchantArea(a)} style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 11 }}>
+                          <div style={{ fontWeight: 800 }}>{a.name}</div>
+                          <div style={{ color: '#64748b' }}>{a.city_name}, {a.province_name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {modal.biteship_area_id ? (
+                  <div style={{ marginTop: 10, fontSize: 11, fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="bx bxs-map-pin" /> AREA-ID: {modal.biteship_area_id}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>
+                    <i className="bx bx-error-circle" /> Logistics Area not configured
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 12, padding: 16, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                <FieldLabel>Enabled Couriers</FieldLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                  {logisticChannels.filter(lc => lc.is_active).map(c => {
+                    const active = modal.enabled_couriers?.split(',').includes(c.code);
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => toggleCourier(c.code)}
+                        style={{
+                          padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: 800,
+                          border: active ? '1px solid #4f46e5' : '1px solid #e2e8f0',
+                          background: active ? '#f5f7ff' : '#fff',
+                          color: active ? '#4f46e5' : '#64748b',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: 9, color: '#94a3b8', marginTop: 8 }}>Select which logistics are available for this merchant. Empty means platform default.</p>
+              </div>
             </div>
           </div>
 

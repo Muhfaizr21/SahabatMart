@@ -144,9 +144,9 @@ export default function AffiliateDashboard() {
               <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
               <div className="relative z-10">
                 <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kode Referral Anda</p>
-                <h3 className="text-white text-3xl font-black tracking-widest">{user?.affiliate?.ref_code || user?.affiliate_ref_code || '-'}</h3>
+                <h3 className="text-white text-3xl font-black tracking-widest">{data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || '-'}</h3>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => { navigator.clipboard.writeText(user?.affiliate?.ref_code || user?.affiliate_ref_code || ''); toast.success('Kode disalin!'); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
+                  <button onClick={() => { navigator.clipboard.writeText(data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || ''); toast.success('Kode disalin!'); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
                   <button onClick={() => window.open('/affiliate/links', '_self')} className="px-4 py-2 bg-indigo-900/40 text-white rounded-lg text-[10px] font-black hover:bg-indigo-900/60">GENERATE LINK</button>
                 </div>
               </div>

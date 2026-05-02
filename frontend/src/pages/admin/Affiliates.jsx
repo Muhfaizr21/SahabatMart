@@ -69,6 +69,15 @@ export default function AdminAffiliates() {
       .catch(console.error).finally(() => setSaving(false));
   };
 
+  const deleteTier = (id) => {
+    if (!window.confirm('Hapus tier ini? Pastikan tidak ada member yang menggunakannya.')) return;
+    setSaving(true);
+    fetchJson(`${API}/affiliates/configs/delete?id=${id}`, { method: 'DELETE' })
+      .then(() => load())
+      .catch(err => alert(err.message || 'Gagal menghapus tier'))
+      .finally(() => setSaving(false));
+  };
+
   const processWithdrawal = (action) => {
     if (!processWd) return;
     setSaving(true);
@@ -237,9 +246,14 @@ export default function AdminAffiliates() {
                       <div style={{ fontSize: 18, fontWeight: 900, color: tc }}>{t.name}</div>
                       <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Level {t.level}</div>
                     </div>
-                    <button style={A.iconBtn(tc, `${tc}14`)} onClick={() => setEditTier({ ...t, tier_name: t.name, comm_rate: t.base_commission_rate, min_sales: t.min_earnings_upgrade })} title="Edit">
-                      <i className="bx bx-pencil" />
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button style={A.iconBtn(tc, `${tc}14`)} onClick={() => setEditTier({ ...t, tier_name: t.name, comm_rate: t.base_commission_rate, min_sales: t.min_earnings_upgrade })} title="Edit">
+                        <i className="bx bx-pencil" />
+                      </button>
+                      <button style={A.iconBtn('#ef4444', '#fee2e2')} onClick={() => deleteTier(t.id)} title="Hapus">
+                        <i className="bx bx-trash" />
+                      </button>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[

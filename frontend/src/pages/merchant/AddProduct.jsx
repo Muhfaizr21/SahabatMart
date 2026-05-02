@@ -52,7 +52,7 @@ export default function AddEditProduct() {
   const [brands, setBrands] = useState([]);
   const [attrs, setAttrs] = useState([]);
   const [formData, setFormData] = useState({
-    name: '', slug: '', description: '', price: 0, old_price: 0, stock: 0,
+    name: '', slug: '', description: '', price: 0, old_price: 0, stock: 0, weight: 0,
     category: '', brand: '', image: '', images: '[]', attributes: '{}', status: 'active'
   });
   const [gallery, setGallery] = useState([]);
@@ -97,7 +97,7 @@ export default function AddEditProduct() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'price' || name === 'old_price' || name === 'stock' ? Number(value) : value,
+      [name]: name === 'price' || name === 'old_price' || name === 'stock' || name === 'weight' ? Number(value) : value,
       slug: name === 'name' ? value.toLowerCase().replace(/[^a-z0-9]+/g, '-') : prev.slug
     }));
   };
@@ -153,11 +153,11 @@ export default function AddEditProduct() {
     });
   };
 
-  const addVariant = () => setVariants([...variants, { id: Date.now().toString(), name: '', sku: '', price: formData.price, stock: 0 }]);
+  const addVariant = () => setVariants([...variants, { id: Date.now().toString(), name: '', sku: '', price: formData.price, stock: 0, weight: formData.weight }]);
   const removeVariant = (idx) => setVariants(variants.filter((_, i) => i !== idx));
   const handleVariantChange = (idx, field, value) => {
     const nov = [...variants];
-    nov[idx][field] = field === 'price' || field === 'stock' ? Number(value) : value;
+    nov[idx][field] = field === 'price' || field === 'stock' || field === 'weight' ? Number(value) : value;
     setVariants(nov);
   };
 
@@ -278,6 +278,7 @@ export default function AddEditProduct() {
                  <div key={v.id || i} style={{ display: 'flex', gap: 12, padding: 16, background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9' }}>
                    <div style={{ flex: 2 }}><input placeholder="Name (e.g. Red, XL)" value={v.name} onChange={e => handleVariantChange(i, 'name', e.target.value)} style={A.input} /></div>
                    <div style={{ flex: 1 }}><input type="number" placeholder="Price" value={v.price} onChange={e => handleVariantChange(i, 'price', e.target.value)} style={A.input} /></div>
+                   <div style={{ flex: 1 }}><input type="number" placeholder="Weight (g)" value={v.weight} onChange={e => handleVariantChange(i, 'weight', e.target.value)} style={A.input} /></div>
                    <div style={{ flex: 1 }}><input type="number" placeholder="Stock" value={v.stock} onChange={e => handleVariantChange(i, 'stock', e.target.value)} style={A.input} /></div>
                    <button type="button" style={{ ...A.btnGhost, padding: '0 12px', color: '#ef4444' }} onClick={() => removeVariant(i)}><i className="bx bx-trash" /></button>
                  </div>
@@ -348,6 +349,10 @@ export default function AddEditProduct() {
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>ON-HAND STOCK</label>
                   <input name="stock" type="number" value={formData.stock} onChange={handleChange} required style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 18, fontWeight: 800, color: '#fff', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>WEIGHT (GRAMS)</label>
+                  <input name="weight" type="number" value={formData.weight} onChange={handleChange} required style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 18, fontWeight: 800, color: '#fff', outline: 'none' }} />
                 </div>
                 
                 <button type="submit" disabled={saving} style={{ 

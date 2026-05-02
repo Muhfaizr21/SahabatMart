@@ -76,7 +76,10 @@ function ActionDropdown({ product, onToggle, onDelete, onViewQR }) {
           </div>
         </>
       )}
-      <style>{`@keyframes dropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }`}</style>
+      <style>{`
+        @keyframes dropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+        .product-name-hover:hover { color: #6366f1 !important; text-decoration: underline; }
+      `}</style>
     </div>
   );
 }
@@ -87,9 +90,11 @@ export default function AdminProductList() {
   const [tab, setTab] = useState('');
   const [search, setSearch] = useState('');
   const [showQR, setShowQR] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const load = () => {
     setLoading(true);
+    setSelectedIds([]); // Reset selection on reload
     fetchJson(`${API}/products?status=${tab}&search=${search}`)
       .then(d => setProducts(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error)
@@ -103,6 +108,24 @@ export default function AdminProductList() {
     setLoading(true);
     fetchJson(`${API}/products/delete?id=${id}`, { method: 'DELETE' })
       .then(load).catch(e => { alert(e.message); setLoading(false); });
+  };
+
+  const bulkDelete = () => {
+    if (!window.confirm(`Hapus ${selectedIds.length} produk terpilih secara permanen?`)) return;
+    setLoading(true);
+    fetchJson(`${API}/products/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids: selectedIds })
+    }).then(load).catch(e => { alert(e.message); setLoading(false); });
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === products.length) setSelectedIds([]);
+    else setSelectedIds(products.map(p => p.id));
   };
 
   const toggle = (id, status) => {
@@ -237,9 +260,22 @@ export default function AdminProductList() {
             </div>
           }
           toolbar={
-            <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-              {loading ? 'Memuat...' : `${products.length} produk`}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              {selectedIds.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 12px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fee2e2' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
+                  <button 
+                    onClick={bulkDelete}
+                    style={{ ...A.btnPrimary, background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
+                  >
+                    <i className="bx bx-trash" /> Hapus Terpilih
+                  </button>
+                </div>
+              )}
+              <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
+                {loading ? 'Memuat...' : `${products.length} produk`}
+              </span>
+            </div>
           }
         >
         {products.length === 0 && !loading ? (
@@ -255,42 +291,60 @@ export default function AdminProductList() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
               <tr>
-                {['Produk', 'Merchant', 'Kategori', 'Harga', 'Status', 'Ditambahkan', ''].map((h, i) => (
-                  <th key={i} style={{ ...A.th, textAlign: i === 6 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 6 ? 24 : 16 }}>{h}</th>
+                <th style={{ ...A.th, width: 40, paddingLeft: 24 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={products.length > 0 && selectedIds.length === products.length} 
+                    onChange={toggleSelectAll}
+                    style={{ width: 18, height: 18, cursor: 'pointer' }}
+                  />
+                </th>
+                {['Produk', 'Merchant', 'Kategori', 'Berat', 'Harga', 'Status', 'Ditambahkan', ''].map((h, i) => (
+                  <th key={i} style={{ ...A.th, textAlign: i === 7 ? 'right' : 'left', paddingLeft: 16, paddingRight: i === 7 ? 24 : 16 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {products.map((p, idx) => {
                 const sCfg = STATUS_CFG[p.status];
+                const isSelected = selectedIds.includes(p.id);
                 return (
                   <tr key={p.id}
-                    style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
-                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+                    style={{ background: isSelected ? '#f5f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa') }}
+                    onMouseEnter={e => !isSelected && (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => !isSelected && (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
                   >
-                    {/* Product */}
                     <td style={{ ...A.td, paddingLeft: 24 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <img
-                          src={formatImage(p.image) || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'P')}&background=eef2ff&color=6366f1&size=80`}
-                          alt={p.name}
-                          style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', border: '1px solid #f1f5f9', flexShrink: 0 }}
-                        />
+                      <input 
+                        type="checkbox" 
+                        checked={isSelected} 
+                        onChange={() => toggleSelect(p.id)}
+                        style={{ width: 17, height: 17, cursor: 'pointer' }}
+                      />
+                    </td>
+                    {/* Product */}
+                    <td style={{ ...A.td }}>
+                      <Link to={`/admin/products/edit?id=${p.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
+                        <div style={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
+                          <img
+                            src={formatImage(p.image) || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'P')}&background=eef2ff&color=6366f1&size=80`}
+                            alt={p.name}
+                            style={{ width: '100%', height: '100%', borderRadius: 10, objectFit: 'cover', border: '1px solid #f1f5f9', transition: 'transform 0.2s' }}
+                          />
+                        </div>
                         <div>
-                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5, marginBottom: 2 }}>{p.name}</div>
+                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5, marginBottom: 2 }} className="product-name-hover">{p.name}</div>
                           <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
                             SKU #{String(p.id).slice(0, 8).toUpperCase()}
                             <button 
-                              onClick={(e) => { e.stopPropagation(); setShowQR(p); }}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowQR(p); }}
                               style={{ color: '#ec4899', cursor: 'pointer', border: 'none', background: 'none', padding: 0, display: 'flex', alignItems: 'center' }}
-                              title="Generate QR Code"
                             >
                               <i className="bx bx-qr-scan" style={{ fontSize: 14 }} />
                             </button>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     {/* Merchant */}
                     <td style={A.td}>
@@ -302,15 +356,18 @@ export default function AdminProductList() {
                     <td style={A.td}>
                       <span style={{ fontSize: 13, color: '#475569' }}>{p.category || '—'}</span>
                     </td>
+                    {/* Weight */}
+                    <td style={A.td}>
+                      <span style={{ fontSize: 13, color: p.weight > 0 ? '#475569' : '#ef4444', fontWeight: p.weight > 0 ? 400 : 800 }}>
+                        {p.weight || 0}g
+                      </span>
+                    </td>
                     {/* Price */}
                     <td style={A.td}>
                       <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>{idr(p.price)}</div>
                       {p.old_price > p.price && (
                         <div style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>{idr(p.old_price)}</div>
                       )}
-                      <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, marginTop: 4 }}>
-                        Modal: {idr(p.cogs || 0)}
-                      </div>
                     </td>
                     {/* Status */}
                     <td style={A.td}>

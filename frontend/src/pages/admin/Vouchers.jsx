@@ -10,7 +10,11 @@ export default function AdminVouchers() {
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const EMPTY = { id:0, code:'', title:'', discount_type:'fixed', discount_value:0, min_order:0, quota:100, status:'active' };
+  const EMPTY = { 
+    id:0, code:'', title:'', description:'', discount_type:'fixed', 
+    discount_value:0, min_order:0, quota:100, status:'active',
+    expiry_date: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().slice(0,16)
+  };
 
   const load = () => {
     setLoading(true);
@@ -71,13 +75,15 @@ export default function AdminVouchers() {
                     </div>
                     <span style={statusBadge(v.status)}>{v.status}</span>
                   </div>
-                  <div style={{ fontSize:16, fontWeight:800, color:'#0f172a', marginBottom:6 }}>{v.title}</div>
+                  <div style={{ fontSize:16, fontWeight:800, color:'#0f172a', marginBottom:2 }}>{v.title}</div>
+                  <div style={{ fontSize:12, color:'#64748b', marginBottom:10, minHeight:18 }}>{v.description || '-'}</div>
                   <div style={{ fontFamily:'monospace', fontSize:13, fontWeight:800, color:'#6366f1', background:'#eef2ff', display:'inline-block', padding:'4px 12px', borderRadius:8, letterSpacing:1 }}>{v.code}</div>
                 </div>
                 <div style={{ padding:'0 22px 18px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, borderBottom:'1px dashed #f1f5f9' }}>
                   {[
                     { label:'Diskon', val: v.discount_type==='percent' ? `${v.discount_value}%` : idr(v.discount_value) },
                     { label:'Min. Order', val: idr(v.min_order) },
+                    { label:'Kadaluarsa', val: fmtDate(v.expiry_date) },
                   ].map(r => (
                     <div key={r.label}>
                       <div style={{ fontSize:10, fontWeight:800, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>{r.label}</div>
@@ -119,6 +125,10 @@ export default function AdminVouchers() {
               <FieldLabel>Kode (Unik)</FieldLabel>
               <input style={{ ...A.select, width:'100%', fontFamily:'monospace', fontWeight:800, color:'#6366f1' }} placeholder="KODE123" value={modal.code} onChange={e=>setModal(p=>({...p,code:e.target.value.toUpperCase()}))} />
             </div>
+            <div style={{ gridColumn: window.innerWidth < 640 ? 'span 1' : '1/-1' }}>
+              <FieldLabel>Deskripsi Kupon</FieldLabel>
+              <input style={{ ...A.select, width:'100%' }} placeholder="Deskripsi untuk menarik pembeli..." value={modal.description} onChange={e=>setModal(p=>({...p,description:e.target.value}))} />
+            </div>
             <div>
               <FieldLabel>Status</FieldLabel>
               <select style={{ ...A.select, width:'100%' }} value={modal.status} onChange={e=>setModal(p=>({...p,status:e.target.value}))}>
@@ -144,6 +154,10 @@ export default function AdminVouchers() {
             <div>
               <FieldLabel>Kuota Total</FieldLabel>
               <input type="number" style={{ ...A.select, width:'100%' }} value={modal.quota} onChange={e=>setModal(p=>({...p,quota:parseInt(e.target.value)||0}))} />
+            </div>
+            <div>
+              <FieldLabel>Tanggal Kedaluwarsa</FieldLabel>
+              <input type="datetime-local" style={{ ...A.select, width:'100%' }} value={modal.expiry_date ? new Date(modal.expiry_date).toISOString().slice(0,16) : ''} onChange={e=>setModal(p=>({...p,expiry_date:new Date(e.target.value).toISOString()}))} />
             </div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:20 }}>

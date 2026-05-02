@@ -167,3 +167,30 @@ func (s *BuyerService) GetWishlistProducts(buyerID string) ([]models.Product, er
 		Find(&products).Error
 	return products, err
 }
+
+func (s *BuyerService) ClearCart(buyerID string) error {
+	fmt.Printf("[DEBUG] ClearCart: Attempting to clear cart for buyer %s\n", buyerID)
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var cart models.Cart
+		if err := tx.Where("buyer_id = ?", buyerID).First(&cart).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				fmt.Printf("[DEBUG] ClearCart: No cart found for buyer %s, nothing to clear\n", buyerID)
+				return nil // Already clear
+			}
+			return err
+		}
+		// Explicitly delete items belonging to this cart
+		result := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{})
+		if result.Error != nil {
+			fmt.Printf("[ERROR] ClearCart: Failed to delete cart items for cart %s: %v\n", cart.ID, result.Error)
+			return result.Error
+		}
+		
+		fmt.Printf("[DEBUG] ClearCart: Deleted %d items from cart %s for buyer %s\n", result.RowsAffected, cart.ID, buyerID)
+		
+		// Optional: We could delete the cart record too, but keeping it empty is usually fine
+		
+		utils.Hub.Broadcast(buyerID, map[string]interface{}{"type": "cart_update", "trigger": "cart_cleared"})
+		return nil
+	})
+}

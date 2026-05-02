@@ -44,6 +44,54 @@ func (ctrl *WarehouseController) CreateSupplier(w http.ResponseWriter, r *http.R
 	utils.JSONResponse(w, http.StatusCreated, supplier)
 }
 
+func (ctrl *WarehouseController) UpdateSupplier(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/admin/warehouse/suppliers/update/")
+	if id == "" || id == r.URL.Path {
+		utils.JSONError(w, http.StatusBadRequest, "ID Supplier diperlukan")
+		return
+	}
+
+	var input models.Supplier
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Data tidak valid")
+		return
+	}
+
+	var supplier models.Supplier
+	if err := ctrl.DB.First(&supplier, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Supplier tidak ditemukan")
+		return
+	}
+
+	supplier.Name = input.Name
+	supplier.Contact = input.Contact
+	supplier.Phone = input.Phone
+	supplier.Email = input.Email
+	supplier.Address = input.Address
+
+	if err := ctrl.DB.Save(&supplier).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate supplier")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, supplier)
+}
+
+func (ctrl *WarehouseController) DeleteSupplier(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/admin/warehouse/suppliers/delete/")
+	if id == "" || id == r.URL.Path {
+		utils.JSONError(w, http.StatusBadRequest, "ID Supplier diperlukan")
+		return
+	}
+
+	if err := ctrl.DB.Delete(&models.Supplier{}, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus supplier")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Supplier berhasil dihapus"})
+}
+
 // ── INBOUND STOCK (TRUK MASUK DARI SUPPLIER) ─────────────────────
 
 func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Request) {

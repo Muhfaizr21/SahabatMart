@@ -409,16 +409,30 @@ export default function AdminUsers() {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 24, display: 'flex', gap: 12 }}>
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               <button
                 onClick={() => impersonate(modal.id)}
-                style={{ ...A.btnPrimary, flex: 1, height: 46, justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e293b)' }}
+                style={{ ...A.btnPrimary, flex: 1, minWidth: 150, height: 46, justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e293b)' }}
               >
                 <i className="bx bx-ghost" /> Ghost Login
               </button>
               <button
+                onClick={() => {
+                  const pass = window.prompt('Masukkan password baru untuk user ini:');
+                  if (!pass) return;
+                  if (pass.length < 6) return alert('Password minimal 6 karakter');
+                  fetchJson(`${API}/users/reset-password`, {
+                    method: 'POST',
+                    body: JSON.stringify({ user_id: modal.id, new_password: pass })
+                  }).then(res => alert(res.message || 'Password berhasil diubah')).catch(e => alert(e.message));
+                }}
+                style={{ ...A.btnPrimary, flex: 1, minWidth: 150, height: 46, justifyContent: 'center', background: '#6366f1' }}
+              >
+                <i className="bx bx-key" /> Reset Password
+              </button>
+              <button
                 onClick={() => deleteUser(modal.id)}
-                style={{ width: 46, height: 46, borderRadius: 12, border: '1px solid #fee2e2', background: '#fff', color: '#ef4444', cursor: 'pointer' }}
+                style={{ width: 46, height: 46, borderRadius: 12, border: '1px solid #fee2e2', background: '#fff', color: '#ef4444', cursor: 'pointer', flexShrink: 0 }}
                 title="Hapus User"
               >
                 <i className="bx bx-trash" style={{ fontSize: 20 }} />

@@ -17,10 +17,21 @@ export default function WishlistStats() {
         setStats(data || []);
       })
       .catch(err => {
-        console.error(err);
-        toast.error('Gagal mengambil data wishlist');
+        console.error("WISH-FETCH-ERROR:", err);
+        if (err.message === "Load failed") {
+          toast.error('Gagal terhubung ke server (CORS/Down)');
+        } else {
+          toast.error('Gagal mengambil data wishlist: ' + err.message);
+        }
       })
       .finally(() => setLoading(false));
+  };
+
+  const formatUserNames = (names) => {
+    if (!names) return '-';
+    const arr = names.split(', ');
+    if (arr.length <= 2) return names;
+    return `${arr[0]}, ${arr[1]} dan ${arr.length - 2} lainnya`;
   };
 
   useEffect(() => { load(); }, []);
@@ -45,14 +56,14 @@ export default function WishlistStats() {
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
           <thead>
             <tr>
-              {['Peringkat', 'Produk', 'Merchant', 'Harga', 'Total Wishlist', 'Tingkat Minat'].map((h, i) => (
+              {['Peringkat', 'Produk', 'Merchant', 'Harga', 'Total Wishlist', 'Daftar Peminat', 'Tingkat Minat'].map((h, i) => (
                 <th key={i} style={{ ...A.th, textAlign: i === 0 || i === 4 ? 'center' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: 16 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {stats.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
+              <tr><td colSpan={7} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
                 <i className="bx bx-heart" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
                 Belum ada data wishlist yang terkumpul.
               </td></tr>
@@ -98,6 +109,12 @@ export default function WishlistStats() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <i className="bx bxs-heart" style={{ color: '#ec4899', fontSize: 14 }} />
                     <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 16 }}>{s.count}</span>
+                  </div>
+                </td>
+                <td style={A.td}>
+                  <div style={{ fontSize: 11, color: '#64748b', maxWidth: 180 }} title={s.user_names}>
+                    <i className="bx bx-user" style={{ marginRight: 4, color: '#94a3b8' }} />
+                    {formatUserNames(s.user_names)}
                   </div>
                 </td>
                 <td style={A.td}>

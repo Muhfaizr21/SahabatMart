@@ -11,8 +11,10 @@ func ValidateOrderTransition(current, next models.OrderStatus) error {
 	case models.OrderPendingPayment:
 		allowed = (next == models.OrderPaid || next == models.OrderCancelled)
 	case models.OrderPaid:
-		allowed = (next == models.OrderProcessing || next == models.OrderRefunded)
+		allowed = (next == models.OrderProcessing || next == models.OrderReadyToShip || next == models.OrderRefunded)
 	case models.OrderProcessing:
+		allowed = (next == models.OrderReadyToShip || next == models.OrderShipped)
+	case models.OrderReadyToShip:
 		allowed = (next == models.OrderShipped)
 	case models.OrderShipped:
 		allowed = (next == models.OrderDelivered || next == models.OrderDisputed)

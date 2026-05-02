@@ -19,71 +19,74 @@ const C = {
 // ─── MENU STRUCTURE ────────────────────────────────────
 const menu = [
   { name: 'Dashboard', icon: 'bxs-dashboard', path: '/admin', end: true },
-  { name: 'Point of Sale', icon: 'bxs-calculator', path: '/admin/pos' },
-  { name: 'Wishlist Insights', icon: 'bxs-heart', path: '/admin/wishlist' },
+  { name: 'Kasir (POS)', icon: 'bxs-calculator', path: '/admin/pos' },
+  { name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist' },
   {
-    name: 'Users', icon: 'bxs-user-account',
+    name: 'Manajemen User', icon: 'bxs-user-account',
     children: [
-      { name: 'All Users', path: '/admin/users' },
-      { name: 'Affiliates', path: '/admin/affiliates' },
-      { name: 'Membership Tiers', path: '/admin/membership-tiers' },
+      { name: 'Semua Pengguna', path: '/admin/users' },
+      { name: 'Daftar Afiliasi', path: '/admin/affiliates' },
+      { name: 'Level Keanggotaan', path: '/admin/membership-tiers' },
     ]
 
   },
   {
-    name: 'Merchants', icon: 'bxs-store-alt',
+    name: 'Toko (Merchant)', icon: 'bxs-store-alt',
     children: [
-      { name: 'All Merchants', path: '/admin/merchants' },
-      { name: 'Restock Requests', path: '/admin/merchants/restock' },
+      { name: 'Semua Toko', path: '/admin/merchants' },
+      { name: 'Permintaan Stok', path: '/admin/merchants/restock' },
     ]
   },
   {
-    name: 'Catalog', icon: 'bxs-package',
+    name: 'Katalog Produk', icon: 'bxs-package',
     children: [
       { name: 'Gudang Pusat (Stok)', path: '/admin/inventory/pusat' },
-      { name: 'All Products', path: '/admin/products' },
-      { name: 'Categories', path: '/admin/categories' },
-      { name: 'Brands', path: '/admin/brands' },
-      { name: 'Moderation', path: '/admin/moderation' },
+      { name: 'Semua Produk', path: '/admin/products' },
+      { name: 'Kategori Produk', path: '/admin/categories' },
+      { name: 'Brand / Merek', path: '/admin/brands' },
+      { name: 'Ulasan Produk', path: '/admin/reviews' },
+      { name: 'Moderasi Konten', path: '/admin/moderation' },
     ]
   },
   {
-    name: 'Orders', icon: 'bxs-receipt',
+    name: 'Pesanan', icon: 'bxs-receipt',
     children: [
-      { name: 'All Orders', path: '/admin/orders' },
-      { name: 'Disputes', path: '/admin/disputes' },
+      { name: 'Semua Pesanan', path: '/admin/orders' },
+      { name: 'Komplain & Sengketa', path: '/admin/disputes' },
     ]
   },
-  { name: 'Vouchers', icon: 'bxs-coupon', path: '/admin/vouchers' },
+  { name: 'Voucher & Promo', icon: 'bxs-coupon', path: '/admin/vouchers' },
   {
-    name: 'Finance', icon: 'bxs-wallet',
+    name: 'Keuangan', icon: 'bxs-wallet',
     children: [
-      { name: 'Ledger', path: '/admin/finance' },
-      { name: 'Commissions', path: '/admin/commissions' },
-      { name: 'Payouts', path: '/admin/payouts' },
+      { name: 'Buku Besar (Ledger)', path: '/admin/finance' },
+      { name: 'Aturan Komisi', path: '/admin/commissions' },
+      { name: 'Preset Komisi', path: '/admin/commission-presets' },
+      { name: 'Pencairan Dana', path: '/admin/payouts' },
     ]
   },
   {
-    name: 'CMS & Layout', icon: 'bxs-layout',
+    name: 'Konten & Tampilan', icon: 'bxs-layout',
     children: [
-      { name: 'Blog Posts', path: '/admin/blogs' },
-      { name: 'Banner Hero', path: '/admin/banners' },
-      { name: 'Affiliate Education', path: '/admin/education' },
-      { name: 'Affiliate Events', path: '/admin/events' },
-      { name: 'Promo Materials', path: '/admin/promo' },
+      { name: 'Artikel Blog', path: '/admin/blogs' },
+      { name: 'Banner Promo', path: '/admin/banners' },
+      { name: 'Edukasi Afiliasi', path: '/admin/education' },
+      { name: 'Event Afiliasi', path: '/admin/events' },
+      { name: 'Bahan Promosi', path: '/admin/promo' },
     ]
   },
   {
     name: 'Skin Journey', icon: 'bx-leaf',
     children: [
-      { name: 'Journey Monitoring', path: '/admin/skin-journey' },
+      { name: 'Monitoring Jurnal', path: '/admin/skin-journey' },
     ]
   },
-  { name: 'Audit Log', icon: 'bxs-file-find', path: '/admin/audit' },
-  { name: 'Security', icon: 'bxs-shield-alt-2', path: '/admin/security' },
-  { name: 'Inbox', icon: 'bxs-inbox', path: '/admin/inbox' },
-  { name: 'RBAC Access', icon: 'bxs-key', path: '/admin/rbac' },
-  { name: 'Platform Settings', icon: 'bxs-cog', path: '/admin/settings' },
+  { name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit' },
+  { name: 'Logistik & Kurir', icon: 'bxs-truck', path: '/admin/logistics' },
+  { name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security' },
+  { name: 'Pesan Masuk', icon: 'bxs-inbox', path: '/admin/inbox' },
+  { name: 'Hak Akses (RBAC)', icon: 'bxs-key', path: '/admin/rbac' },
+  { name: 'Pengaturan Sistem', icon: 'bxs-cog', path: '/admin/settings' },
 ];
 
 // ─── SIDEBAR ITEM ──────────────────────────────────────
@@ -139,6 +142,7 @@ const NavItem = ({ item }) => {
             <NavLink
               key={child.path}
               to={child.path}
+              end
               style={({ isActive }) => ({
                 display: 'block', padding: '7px 10px', borderRadius: 8, marginBottom: 1,
                 textDecoration: 'none', fontSize: 13, transition: 'all 0.15s',
@@ -171,6 +175,9 @@ const AdminLayout = () => {
   const [notifs, setNotifs] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [openNotif, setOpenNotif] = useState(false);
+  const [openProfile, setOpenProfile] = useState(false);
+  const profileRef = React.useRef(null);
+  const notifRef = React.useRef(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -178,16 +185,19 @@ const AdminLayout = () => {
     }
   }, []);
 
-  // Close notif when click outside
+  // Close dropdowns when click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (openNotif && !e.target.closest('.notif-wrapper')) {
+      if (openNotif && notifRef.current && !notifRef.current.contains(e.target)) {
         setOpenNotif(false);
+      }
+      if (openProfile && profileRef.current && !profileRef.current.contains(e.target)) {
+        setOpenProfile(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openNotif]);
+  }, [openNotif, openProfile]);
 
   const fetchNotifs = async () => {
     try {
@@ -264,25 +274,27 @@ const AdminLayout = () => {
           {!collapsed ? (
             <>
               <NavItem item={menu[0]} />
-              <Label text="People" />
+              <Label text="Anggota & Pengguna" />
               <NavItem item={menu[3]} />
               <NavItem item={menu[4]} />
-              <Label text="Commerce" />
+              <Label text="Penjualan & Katalog" />
               <NavItem item={menu[1]} />
               <NavItem item={menu[2]} />
               <NavItem item={menu[5]} />
               <NavItem item={menu[6]} />
               <NavItem item={menu[7]} />
-              <Label text="Finance" />
+              <Label text="Laporan Keuangan" />
               <NavItem item={menu[8]} />
-              <Label text="Content & CMS" />
+              <Label text="Manajemen Konten" />
               <NavItem item={menu[9]} />
-              <Label text="System" />
+              <Label text="Sistem & Keamanan" />
               <NavItem item={menu[10]} />
               <NavItem item={menu[11]} />
               <NavItem item={menu[12]} />
               <NavItem item={menu[13]} />
               <NavItem item={menu[14]} />
+              <NavItem item={menu[15]} />
+              <NavItem item={menu[16]} />
             </>
           ) : (
             menu.map(item => (
@@ -301,43 +313,6 @@ const AdminLayout = () => {
         {/* Bottom: User */}
         {!collapsed && (
           <div style={{ padding: '12px 10px', borderTop: `1px solid ${C.border}` }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 12,
-              background: 'rgba(255,255,255,0.03)',
-              border: `1px solid ${C.border}`, marginBottom: 8,
-            }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, fontWeight: 800, color: '#fff',
-              }}>
-                {user.profile?.full_name?.charAt(0) || 'A'}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user.profile?.full_name || 'Super Admin'}
-                </div>
-                <div style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>superadmin</div>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => navigate('/admin/inventory/pusat')}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)',
-                background: 'rgba(99,102,241,0.05)', cursor: 'pointer', color: '#6366f1',
-                fontSize: 13, fontWeight: 700, marginBottom: 8, transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.05)'; }}
-            >
-              <i className="bx bx-buildings" style={{ fontSize: 18 }} />
-              Manajemen Gudang Pusat
-            </button>
-
             <button
               onClick={handleLogout}
               style={{
@@ -350,7 +325,7 @@ const AdminLayout = () => {
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.muted; }}
             >
               <i className="bx bx-log-out" style={{ fontSize: 18 }} />
-              Logout
+              Keluar (Logout)
             </button>
           </div>
         )}
@@ -408,7 +383,7 @@ const AdminLayout = () => {
           {/* Right */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Notification Dropdown */}
-            <div style={{ position: 'relative' }} className="notif-wrapper">
+            <div style={{ position: 'relative' }} ref={notifRef}>
               <button
                 id="notif-bell"
                 onClick={() => setOpenNotif(!openNotif)}
@@ -439,7 +414,7 @@ const AdminLayout = () => {
                   zIndex: 20, overflow: 'hidden'
                 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Notifications</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Notifikasi</span>
                     {unreadCount > 0 && (
                       <button 
                         onClick={async () => {
@@ -450,7 +425,7 @@ const AdminLayout = () => {
                         }}
                         style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                       >
-                        Mark all as read
+                        Tandai semua dibaca
                       </button>
                     )}
                   </div>
@@ -458,7 +433,7 @@ const AdminLayout = () => {
                     {notifs.length === 0 ? (
                       <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8' }}>
                         <i className="bx bx-bell-off" style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
-                        <span style={{ fontSize: 12 }}>No new notifications</span>
+                        <span style={{ fontSize: 12 }}>Tidak ada notifikasi baru</span>
                       </div>
                     ) : (
                       notifs.map(n => (
@@ -473,8 +448,6 @@ const AdminLayout = () => {
                             cursor: 'pointer', transition: 'all 0.1s',
                             background: n.is_read ? 'transparent' : '#f5f7ff',
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                          onMouseLeave={e => e.currentTarget.style.background = n.is_read ? 'transparent' : '#f5f7ff'}
                         >
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>{n.title}</div>
                           <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4, marginBottom: 4 }}>{n.message}</div>
@@ -483,37 +456,85 @@ const AdminLayout = () => {
                       ))
                     )}
                   </div>
-                  <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
-                    <button style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                      View all activities
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
 
-            {/* Avatar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '6px 12px 6px 6px', borderRadius: 12,
-              border: '1px solid #e2e8f0', background: '#fff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              cursor: 'pointer',
-            }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: 8,
-                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0,
-              }}>
-                {user.profile?.full_name?.charAt(0) || 'A'}
-              </div>
-              <div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
-                  {user.profile?.full_name?.split(' ')[0] || 'Admin'}
+            {/* Avatar with Dropdown */}
+            <div style={{ position: 'relative' }} ref={profileRef}>
+              <div 
+                onClick={() => setOpenProfile(!openProfile)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '6px 12px 6px 6px', borderRadius: 12,
+                  border: '1px solid #e2e8f0', background: '#fff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  width: 30, height: 30, borderRadius: 8,
+                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0,
+                }}>
+                  {user.profile?.full_name?.charAt(0) || 'A'}
                 </div>
-                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>Superadmin</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div className="hidden sm:block">
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                      {user.profile?.full_name?.split(' ')[0] || 'Admin'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>Superadmin</div>
+                  </div>
+                  <i className={`bx bx-chevron-${openProfile ? 'up' : 'down'}`} style={{ color: '#94a3b8' }} />
+                </div>
               </div>
+
+              {openProfile && (
+                <div style={{
+                  position: 'absolute', top: 48, right: 0, width: 220,
+                  background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                  zIndex: 20, overflow: 'hidden'
+                }}>
+                  <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 2 }}>System Access</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
+                  </div>
+                  <div style={{ padding: '6px' }}>
+                    <button 
+                      onClick={() => navigate('/admin/settings')}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 12px', borderRadius: 8, border: 'none',
+                        background: 'transparent', cursor: 'pointer', color: '#475569',
+                        fontSize: 13, fontWeight: 500, textAlign: 'left'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <i className="bx bx-cog" style={{ fontSize: 18 }} />
+                      Pengaturan Akun
+                    </button>
+                    <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
+                    <button 
+                      onClick={handleLogout}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 12px', borderRadius: 8, border: 'none',
+                        background: 'transparent', cursor: 'pointer', color: '#ef4444',
+                        fontSize: 13, fontWeight: 600, textAlign: 'left'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <i className="bx bx-log-out" style={{ fontSize: 18 }} />
+                      Keluar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

@@ -7,8 +7,8 @@ const API = ADMIN_API_BASE;
 
 const STATUS_TABS = [
   { val: '', label: 'Semua' },
-  { val: 'pending', label: 'Pending' },
-  { val: 'paid', label: 'Dibayar' },
+  { val: 'pending_payment', label: 'Belum Bayar' },
+  { val: 'paid', label: 'Sudah Bayar' },
   { val: 'processing', label: 'Diproses' },
   { val: 'shipped', label: 'Dikirim' },
   { val: 'completed', label: 'Selesai' },
@@ -50,21 +50,67 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
 
-  const load = () => {
+  const load = (targetPage = page) => {
     setLoading(true);
-    fetchJson(`${API}/orders?status=${tab}`)
-      .then(d => setOrders(Array.isArray(d) ? d : (d?.data || [])))
+    fetchJson(`${API}/orders?status=${tab}&search=${search}&from=${dateFrom}&to=${dateTo}&page=${targetPage}&limit=${limit}`)
+      .then(d => {
+        setOrders(Array.isArray(d) ? d : (d?.data || []));
+        if (d?.total) {
+          setTotalPages(Math.ceil(d.total / limit) || 1);
+        } else {
+          setTotalPages(1);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [tab]);
+  useEffect(() => { 
+    setPage(1);
+    load(1); 
+  }, [tab]);
+
+  const handlePageChange = (p) => {
+    if (p < 1 || p > totalPages) return;
+    setPage(p);
+    load(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Order Lifecycle" subtitle="Monitoring dan manajemen seluruh transaksi platform.">
-        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={A.searchWrap}>
+            <i className="bx bx-search" style={A.searchIcon} />
+            <input 
+              style={{ ...A.searchInput, width: 250 }} 
+              placeholder="Cari ID Pesanan, Pembeli, Merchant..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (setPage(1), load(1))}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="date" style={{ ...A.select, padding: '7px 10px' }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>s/d</span>
+            <input type="date" style={{ ...A.select, padding: '7px 10px' }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+          <button style={A.btnPrimary} onClick={() => { setPage(1); load(1); }}>Filter</button>
+          <button style={A.btnGhost} onClick={() => {
+            setSearch(''); setDateFrom(''); setDateTo(''); setTab('');
+            setPage(1);
+            setTimeout(() => load(1), 50);
+          }} title="Reset Filters"><i className="bx bx-reset" /></button>
+          <button style={A.btnGhost} onClick={() => load(page)}><i className="bx bx-refresh" /> Refresh</button>
+        </div>
       </PageHeader>
 
       <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }}>
@@ -79,7 +125,7 @@ export default function AdminOrders() {
           }
           toolbar={
             <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-              {orders.length} transaksi
+              {orders.length} dari total data terfilter
             </span>
           }
         >
@@ -96,7 +142,7 @@ export default function AdminOrders() {
                 {orders.length === 0 ? (
                   <tr><td colSpan={8} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
                     <i className="bx bx-receipt" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
-                    Belum ada pesanan.
+                    Tidak ada pesanan yang sesuai dengan filter.
                   </td></tr>
                 ) : orders.map((o, idx) => (
                   <tr key={`${o.order_id}-${o.merchant_id}`}
@@ -155,6 +201,45 @@ export default function AdminOrders() {
           </div>
         </TablePanel>
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 40, paddingBottom: 40 }}>
+          <button 
+            onClick={() => handlePageChange(page - 1)} 
+            disabled={page === 1}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1 }}
+          >
+            <i className="bx bx-chevron-left" /> Previous
+          </button>
+          
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => handlePageChange(i + 1)}
+                style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  fontSize: 13, fontWeight: 700, transition: 'all 0.2s',
+                  background: page === i + 1 ? '#6366f1' : '#fff',
+                  color: page === i + 1 ? '#fff' : '#64748b',
+                  border: page === i + 1 ? 'none' : '1px solid #e2e8f0',
+                  cursor: 'pointer'
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            onClick={() => handlePageChange(page + 1)} 
+            disabled={page === totalPages}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1 }}
+          >
+            Next <i className="bx bx-chevron-right" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

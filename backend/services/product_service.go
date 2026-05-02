@@ -31,8 +31,10 @@ func (s *ProductService) SyncProductRating(productID string) error {
 	}
 
 	return s.DB.Model(&models.Product{}).Where("id = ?", productID).Updates(map[string]interface{}{
-		"rating":  stats.AvgRating,
-		"reviews": stats.Count,
+		"rating":         stats.AvgRating,
+		"average_rating": stats.AvgRating,
+		"reviews":        stats.Count,
+		"total_reviews":  stats.Count,
 	}).Error
 }
 
@@ -85,8 +87,10 @@ func (s *ProductService) AddReview(review *models.Review) error {
 		
 		return tx.Model(&models.Product{}).Where("id = ?", review.ProductID).
 			Updates(map[string]interface{}{
-				"rating":  stats.Avg,
-				"reviews": stats.Cnt,
+				"rating":         stats.Avg,
+				"average_rating": stats.Avg,
+				"reviews":        stats.Cnt,
+				"total_reviews":  stats.Cnt,
 			}).Error
 	})
 }

@@ -58,6 +58,7 @@ type Order struct {
 	ShippingCity        string         `gorm:"type:varchar(100)" json:"shipping_city"`
 	ShippingProvince    string         `gorm:"type:varchar(100)" json:"shipping_province"`
 	ShippingPostalCode  string         `gorm:"type:varchar(10)" json:"shipping_postal_code"`
+	DestinationAreaID   string         `gorm:"type:varchar(100)" json:"destination_area_id"` // Biteship Area ID
 	
 	// Financials
 	Subtotal            float64        `gorm:"type:decimal(15,2);not null" json:"subtotal"`
@@ -74,7 +75,7 @@ type Order struct {
 	Status              OrderStatus    `gorm:"type:varchar(50);default:'pending_payment';not null" json:"status"`
 	Notes               string         `gorm:"type:text" json:"notes"`
 	CancelReason        string         `gorm:"type:text" json:"cancel_reason"`
-	CancelledBy         *string        `gorm:"type:uuid" json:"cancelled_by"`
+	CancelledBy         *string        `gorm:"type:varchar(100)" json:"cancelled_by"`
 	CancelledAt         *time.Time     `json:"cancelled_at"`
 
 	PaidAt              *time.Time     `json:"paid_at"`
@@ -111,6 +112,7 @@ type OrderMerchantGroup struct {
 	CourierCode     string              `gorm:"type:varchar(50)" json:"courier_code"`
 	ServiceCode     string              `gorm:"type:varchar(50)" json:"service_code"`
 	TrackingNumber  string              `gorm:"type:varchar(100)" json:"tracking_number"`
+	BiteshipOrderID string              `gorm:"type:varchar(100)" json:"biteship_order_id"` // External Reference
 	ShippedAt       *time.Time          `json:"shipped_at"`
 	DeliveredAt     *time.Time          `json:"delivered_at"`
 	
@@ -136,6 +138,7 @@ type OrderItem struct {
 
 	Quantity             int     `gorm:"not null" json:"quantity"`
 	UnitPrice            float64 `gorm:"type:decimal(15,2);not null" json:"unit_price"`
+	Weight               int     `gorm:"default:0" json:"weight"` // Snapshot weight in grams
 	Subtotal             float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
 	Metadata             string  `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
 	PlatformFeeAmount    float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee_amount"`

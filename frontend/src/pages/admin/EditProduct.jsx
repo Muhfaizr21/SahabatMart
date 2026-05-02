@@ -15,58 +15,82 @@ export default function AdminEditProduct() {
   const [brands, setBrands] = useState([]);
   const [attrs, setAttrs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   
   const [p, setP] = useState({
-    id: '', name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0,
+    id: '', name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0, weight: 0,
     category: '', brand: '', attributes: '{}', image: '',
     images: '[]', stock: 0, status: 'active',
     base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
-    base_distribution_fee: 0, base_distribution_fee_nominal: 0
+    base_distribution_fee: 0, base_distribution_fee_nominal: 0,
+    merchant_commission_percent: 0,
+    commission_preset_id: ''
   });
+
+  const [tiers, setTiers] = useState([]);
+  const [tierComms, setTierComms] = useState([]);
+  const [updatingTier, setUpdatingTier] = useState(null);
+  const [presets, setPresets] = useState([]);
 
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
 
   useEffect(() => {
+    console.log("DEBUG: Fetching Product ID:", productId);
     if (!productId) return;
     setLoading(true);
     Promise.all([
       fetchJson(`${API}/categories`),
       fetchJson(`${API}/brands`),
       fetchJson(`${API}/attributes`),
-      fetchJson(`${API}/products?search=${productId}`)
-    ]).then(([cats, brds, atts, prod]) => {
-      setCategories(Array.isArray(cats) ? cats : (cats.data || []));
-      setBrands(Array.isArray(brds) ? brds : (brds.data || []));
-      setAttrs(Array.isArray(atts) ? atts : (atts.data || []));
+      fetchJson(`${API}/membership-tiers`),
+      fetchJson(`${API}/products/tier-commissions?product_id=${productId}`),
+      fetchJson(`${API}/products/detail?id=${productId}`),
+      fetchJson(`${API}/commission-presets`),
+    ]).then(([cats, brds, atts, tiersData, tComms, prod, prs]) => {
+      setPresets(Array.isArray(prs) ? prs : (prs?.data || []));
+      setCategories(Array.isArray(cats) ? cats : (cats?.data || []));
+      setBrands(Array.isArray(brds) ? brds : (brds?.data || []));
+      setAttrs(Array.isArray(atts) ? atts : (atts?.data || []));
+      setTiers(Array.isArray(tiersData) ? tiersData : (tiersData?.data || []));
+      setTierComms(Array.isArray(tComms) ? tComms : (tComms?.data || []));
       
-      const items = Array.isArray(prod) ? prod : (prod.data || []);
-      const item = items.find(x => x.id === productId);
-      if (item) {
-            setP({
-                id: item.id, name: item.name, sku: item.sku || '', description: item.description || '',
-                price: item.price, old_price: item.old_price || 0,
-                cogs: item.cogs || 0,
-                category: item.category, brand: item.brand || '',
-                attributes: item.attributes || '{}', image: item.image,
-                images: item.images || '[]', stock: item.stock || 100,
-                status: item.status,
-                base_affiliate_fee: item.base_affiliate_fee || 0,
-                base_affiliate_fee_nominal: item.base_affiliate_fee_nominal || 0,
-                base_distribution_fee: item.base_distribution_fee || 0,
-                base_distribution_fee_nominal: item.base_distribution_fee_nominal || 0
-            });
+      const item = prod?.data || prod;
+      if (item && item.id) {
+        setP({
+          id: item.id, name: item.name || '', sku: item.sku || '', description: item.description || '',
+          price: item.price || 0, old_price: item.old_price || 0,
+          cogs: item.cogs || 0,
+          category: item.category || '', brand: item.brand || '',
+          image: item.image || '', images: item.images || '[]', stock: item.stock || 0,
+          weight: item.weight || 0,
+          status: item.status || 'active',
+          base_affiliate_fee: item.base_affiliate_fee || 0,
+          base_affiliate_fee_nominal: item.base_affiliate_fee_nominal || 0,
+          base_distribution_fee: item.base_distribution_fee || 0,
+          base_distribution_fee_nominal: item.base_distribution_fee_nominal || 0,
+          merchant_commission_percent: item.merchant_commission_percent || 0,
+          commission_preset_id: item.commission_preset_id || '',
+          attributes: item.attributes || '{}'
+        });
         try {
-           setSelectedAttrs(JSON.parse(item.attributes || '{}'));
-           setGallery(JSON.parse(item.images || '[]'));
+          setSelectedAttrs(JSON.parse(item.attributes || '{}'));
+          setGallery(JSON.parse(item.images || '[]'));
         } catch(e) { 
-           setSelectedAttrs({}); 
-           setGallery([]);
+          setSelectedAttrs({}); 
+          setGallery([]);
         }
+      } else {
+        setError("Produk tidak ditemukan atau data tidak lengkap");
       }
-    }).finally(() => setLoading(false));
+    })
+    .catch(err => {
+      console.error("Fetch error:", err);
+      setError(err.message || "Gagal mengambil data produk");
+    })
+    .finally(() => setLoading(false));
   }, [productId]);
 
   const handleAttrChange = (name, val, checked) => {
@@ -115,6 +139,31 @@ export default function AdminEditProduct() {
      });
   };
 
+  const handleTierCommUpdate = (tierId, rate) => {
+    setUpdatingTier(tierId);
+    fetchJson(`${API}/products/tier-commissions/update`, {
+        method: 'POST',
+        body: JSON.stringify({
+            product_id: productId,
+            membership_tier_id: parseInt(tierId),
+            commission_rate: parseFloat(rate) / 100
+        })
+    }).then(resp => {
+        const updated = resp.data || resp;
+        setTierComms(prev => {
+            const idx = prev.findIndex(x => x.membership_tier_id === updated.membership_tier_id);
+            if (idx > -1) {
+                const next = [...prev];
+                next[idx] = updated;
+                return next;
+            }
+            return [...prev, updated];
+        });
+        toast.success('Komisi tier diperbarui');
+    }).catch(e => toast.error(e.message))
+    .finally(() => setUpdatingTier(null));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setSaving(true);
@@ -136,7 +185,18 @@ export default function AdminEditProduct() {
   if (loading) return (
     <div style={{ padding: 100, textAlign: 'center' }}>
       <div style={{ width: 40, height: 40, border: '4px solid #f3f3f3', borderTop: '4px solid #4361ee', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
-      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  if (!p.id || error) return (
+    <div style={{ padding: 100, textAlign: 'center' }}>
+      <i className="bx bx-error-circle" style={{ fontSize: 64, color: '#ef4444', marginBottom: 16 }} />
+      <h2 style={{ fontWeight: 800, color: '#0f172a' }}>Gagal Memuat Produk</h2>
+      <p style={{ color: '#64748b', marginBottom: 24 }}>{error || "ID produk tidak valid atau sudah dihapus."}</p>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <Link to="/admin/products" style={{ ...A.btnSecondary, textDecoration: 'none', display: 'inline-flex' }}>Kembali ke Katalog</Link>
+        <button onClick={() => window.location.reload()} style={{ ...A.btnPrimary, cursor: 'pointer' }}>Coba Lagi</button>
+      </div>
     </div>
   );
 
@@ -187,15 +247,30 @@ export default function AdminEditProduct() {
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>SKU / Barcode</label>
-                <input 
-                  type="text" 
-                  value={p.sku} 
-                  onChange={e => setP({...p, sku: e.target.value})}
-                  placeholder="E.g. BC-12345678"
-                  style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none' }} 
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>SKU / Barcode</label>
+                  <input 
+                    type="text" 
+                    value={p.sku} 
+                    onChange={e => setP({...p, sku: e.target.value})}
+                    placeholder="E.g. BC-12345678"
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none' }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Weight (Grams) *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type="number" 
+                      value={p.weight} 
+                      onChange={e => setP({...p, weight: parseInt(e.target.value) || 0})}
+                      placeholder="500"
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 800, color: '#1e293b', outline: 'none' }} 
+                    />
+                    <span style={{ position: 'absolute', right: 16, top: 12, fontSize: 11, fontWeight: 800, color: '#94a3b8' }}>GR</span>
+                  </div>
+                </div>
               </div>
               
               <div>
@@ -246,6 +321,116 @@ export default function AdminEditProduct() {
               ))}
             </div>
           </div>
+
+          {/* Card 3: Tier Commission Matrix (Req 1 & 2) */}
+          <div style={{ ...A.card, padding: 25 }}>
+            <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="bx bx-sitemap" style={{ color: '#4361ee' }} /> Commission Matrix per Tier
+            </h5>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 15 }}>
+              Atur persentase komisi khusus untuk produk ini berdasarkan jenjang affiliate. Jika kosong, sistem akan menggunakan nilai default.
+            </p>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Membership Tier</th>
+                    <th style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Default Rate</th>
+                    <th style={{ textAlign: 'right', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Special Rate (%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tiers.sort((a,b) => a.level - b.level).map(tier => {
+                    const custom = tierComms.find(x => x.membership_tier_id === tier.id);
+                    const currentRate = custom ? (custom.commission_rate * 100).toFixed(1) : '';
+                    
+                    return (
+                      <tr key={tier.id}>
+                        <td style={{ padding: '12px 15px', borderBottom: '1px solid #f8fafc' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: tier.color }} />
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{tier.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '12px 15px', borderBottom: '1px solid #f8fafc', fontSize: 12, color: '#94a3b8' }}>
+                          {(tier.base_commission_rate * 100).toFixed(1)}%
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '12px 15px', borderBottom: '1px solid #f8fafc' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                            <input 
+                                type="number" 
+                                step="0.1"
+                                placeholder="Auto"
+                                defaultValue={currentRate}
+                                onBlur={(e) => {
+                                    if (e.target.value !== currentRate) {
+                                        handleTierCommUpdate(tier.id, e.target.value);
+                                    }
+                                }}
+                                disabled={updatingTier === tier.id}
+                                style={{ width: 80, padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', textAlign: 'right', fontSize: 13, fontWeight: 700 }}
+                            />
+                            {updatingTier === tier.id && <i className="bx bx-loader-alt bx-spin" style={{ color: '#4361ee' }} />}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Card 4: Commission Preset Selector */}
+          <div style={{ ...A.card, padding: 25 }}>
+            <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="bx bx-git-branch" style={{ color: '#7c3aed', transform: 'rotate(90deg)' }} /> Multi-Level Commission Preset
+            </h5>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+              Assign preset untuk mendistribusikan komisi secara otomatis ke seluruh jaringan upline affiliate saat produk ini terjual.
+              Jika tidak dipilih, sistem menggunakan komisi flat tier (tabel di atas).
+            </p>
+
+            <select
+              value={p.commission_preset_id || ''}
+              onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none', marginBottom: 16 }}
+            >
+              <option value="">-- Tidak Pakai Preset (Gunakan Tier Default) --</option>
+              {presets.filter(pr => pr.is_active).map(pr => (
+                <option key={pr.id} value={pr.id}>{pr.name}</option>
+              ))}
+            </select>
+
+            {/* Preview preset yang dipilih */}
+            {p.commission_preset_id && (() => {
+              const selected = presets.find(pr => pr.id === p.commission_preset_id);
+              if (!selected) return null;
+              return (
+                <div style={{ background: 'linear-gradient(135deg, #7c3aed08, #4361ee05)', border: '1px solid #7c3aed20', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.04em' }}>Preview Distribusi: {selected.name}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {(selected.levels || []).map((lv, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: `hsl(${260 + lv.level * 15}, 70%, 58%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', flexShrink: 0 }}>{lv.level}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>{lv.level === 1 ? 'Referrer Langsung' : `Upline Level ${lv.level}`}</div>
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#7c3aed' }}>{(lv.rate * 100).toFixed(1)}%</div>
+                        <div style={{ width: 50, height: 5, background: '#e2e8f0', borderRadius: 3 }}>
+                          <div style={{ height: '100%', width: `${Math.min(lv.rate * 100 * 5, 100)}%`, background: '#7c3aed', borderRadius: 3 }} />
+                        </div>
+                        {idx < (selected.levels.length - 1) && (
+                          <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', position: 'absolute', left: 22, marginTop: 28 }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Right Column: Organization & Media */}
@@ -254,7 +439,7 @@ export default function AdminEditProduct() {
           {/* Organization */}
           <div style={{ ...A.card, padding: 20 }}>
              <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Market Setup</h5>
-             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Category</label>
                   <select style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600 }} value={p.category} onChange={e => setP({...p, category: e.target.value})}>
@@ -275,58 +460,40 @@ export default function AdminEditProduct() {
                     <button type="button" onClick={() => setP({...p, status: 'taken_down'})} style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #e2e8f0', background: p.status === 'taken_down' ? '#fee2e2' : '#fff', color: p.status === 'taken_down' ? '#991b1b' : '#64748b' }}>Pulled</button>
                   </div>
                 </div>
-             </div>
-          </div>
+              </div>
+           </div>
 
-          {/* Pricing & Commissions */}
-          <div style={{ ...A.card, padding: 20, background: '#f5f7ff' }}>
-             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Financials & Commissions</h5>
-             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Main Price (IDR)</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 15, fontWeight: 800, color: '#4361ee' }} value={p.price} onChange={e => setP({...p, price: parseFloat(e.target.value)})} />
-                </div>
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Strike Price (Discount)</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#64748b' }} value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
-                </div>
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Modal Awal / COGS (IDR)</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#ef4444' }} value={p.cogs} onChange={e => setP({...p, cogs: parseFloat(e.target.value)})} />
-                </div>
+           {/* Pricing & Commissions */}
+           <div style={{ ...A.card, padding: 20, background: '#f5f7ff' }}>
+              <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Financials & Commissions</h5>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                 <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Main Price (IDR)</label>
+                    <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 15, fontWeight: 800, color: '#4361ee' }} value={p.price} onChange={e => setP({...p, price: parseFloat(e.target.value)})} />
+                 </div>
+                 <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Strike Price (Discount)</label>
+                    <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#64748b' }} value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
+                 </div>
+                 <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Modal Awal / COGS (IDR)</label>
+                    <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#ef4444' }} value={p.cogs} onChange={e => setP({...p, cogs: parseFloat(e.target.value)})} />
+                 </div>
 
-                <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
-                
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Affiliate Fee (%)</label>
-                   <input type="number" step="0.01" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_affiliate_fee} onChange={e => setP({...p, base_affiliate_fee: parseFloat(e.target.value) || 0})} />
-                </div>
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Affiliate Fee (Rp)</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_affiliate_fee_nominal} onChange={e => setP({...p, base_affiliate_fee_nominal: parseFloat(e.target.value) || 0})} />
-                </div>
+                 <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
+                  <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Merchant Cut (%)</label>
+                    <input type="number" step="0.01" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fffbeb', color: '#b45309', fontWeight: 700 }} value={p.merchant_commission_percent} onChange={e => setP({...p, merchant_commission_percent: parseFloat(e.target.value) || 0})} />
+                  </div>
 
-                <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
+                 <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
 
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Distribution Fee (%)</label>
-                   <input type="number" step="0.01" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_distribution_fee} onChange={e => setP({...p, base_distribution_fee: parseFloat(e.target.value) || 0})} />
-                </div>
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Distribution Fee (Rp)</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }} value={p.base_distribution_fee_nominal} onChange={e => setP({...p, base_distribution_fee_nominal: parseFloat(e.target.value) || 0})} />
-                </div>
-
-                <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
-
-                <div>
-                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Stock Count</label>
-                   <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 700 }} value={p.stock} onChange={e => setP({...p, stock: parseInt(e.target.value)})} />
-                </div>
-             </div>
-          </div>
-
-          {/* Media */}
+                 <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Stock Count</label>
+                    <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 700 }} value={p.stock} onChange={e => setP({...p, stock: parseInt(e.target.value)})} />
+                 </div>
+              </div>
+           </div>
           <div style={{ ...A.card, padding: 20 }}>
              <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Primary Media</h5>
              <div style={{ border: '2px dashed #f1f5f9', borderRadius: 12, padding: 10, textAlign: 'center', position: 'relative' }}>

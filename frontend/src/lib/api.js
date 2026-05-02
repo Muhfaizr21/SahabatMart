@@ -87,6 +87,30 @@ export async function deleteJson(url, options = {}) {
   });
 }
 
+export async function uploadFile(url, file, fieldName = 'image') {
+  const token = localStorage.getItem('token');
+  const formData = new FormData();
+  formData.append(fieldName, file);
+
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error('Gagal mengunggah file');
+  }
+
+  const data = await response.json();
+  return data;
+}
+
 // Fungsi yang hilang dan menyebabkan error
 export function formatImage(path) {
   const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; // Premium Placeholder

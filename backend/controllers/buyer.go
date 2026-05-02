@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -21,6 +22,7 @@ type BuyerController struct {
 	BuyerService *services.BuyerService
 	AuthService  *services.AuthService
 	TripayService *services.TripayService
+	ShippingService *services.ShippingService
 }
 func NewBuyerController(db *gorm.DB) *BuyerController {
 	return &BuyerController{
@@ -28,7 +30,8 @@ func NewBuyerController(db *gorm.DB) *BuyerController {
 		OrderService: services.NewOrderService(db),
 		BuyerService: services.NewBuyerService(db),
 		AuthService:  services.NewAuthService(db),
-		TripayService: services.NewTripayService(),
+		TripayService: services.NewTripayService(db),
+		ShippingService: services.NewShippingService(db),
 	}
 }
 
@@ -54,6 +57,171 @@ func (bc *BuyerController) GetCart(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[Cart] Found cart %s for buyer %s with %d items", cart.ID, buyerID, len(cart.Items))
 	utils.JSONResponse(w, http.StatusOK, cart)
+}
+
+// GET /api/shipping/areas?input=...
+func (bc *BuyerController) GetShippingAreas(w http.ResponseWriter, r *http.Request) {
+	input := r.URL.Query().Get("input")
+	if len(input) < 3 {
+		utils.JSONResponse(w, http.StatusOK, []interface{}{})
+		return
+	}
+
+	areas, err := bc.ShippingService.SearchArea(input)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mencari wilayah: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, areas)
+}
+
+// POST /api/shipping/rates
+func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Request) {
+	type ShippingItem struct {
+		ProductID   string  `json:"product_id"`
+		ProductName string  `json:"product_name"`
+		UnitPrice   float64 `json:"unit_price"`
+		Quantity    int     `json:"quantity"`
+		Weight      int     `json:"weight"`      // in grams
+		MerchantID  string  `json:"merchant_id"`
+	}
+	var req struct {
+		DestinationAreaID string         `json:"destination_area_id"`
+		Items             []ShippingItem `json:"items"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	if req.DestinationAreaID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Wilayah tujuan harus dipilih")
+		return
+	}
+
+	// Group items by merchant, converting to OrderItem for GetRates
+	merchantItems := make(map[string][]models.OrderItem)
+	for _, item := range req.Items {
+		mID := item.MerchantID
+		if mID == "" || mID == "pusat" {
+			mID = "00000000-0000-0000-0000-000000000000"
+		}
+		w := item.Weight
+		if w <= 0 {
+			w = 200 // default 200g
+		}
+		orderItem := models.OrderItem{
+			MerchantID:  mID,
+			ProductID:   item.ProductID,
+			ProductName: item.ProductName,
+			UnitPrice:   item.UnitPrice,
+			Quantity:    item.Quantity,
+			Weight:      w,
+		}
+		merchantItems[mID] = append(merchantItems[mID], orderItem)
+	}
+
+	// Combined rates: courier_key -> aggregated rate data
+	combinedRates := make(map[string]map[string]interface{})
+
+	for mID, items := range merchantItems {
+		var merchant models.Merchant
+		bc.DB.First(&merchant, "id = ?", mID)
+		
+		origin := merchant.BiteshipAreaID
+		couriers := merchant.EnabledCouriers
+		
+		if origin == "" {
+			// Fallback ke Jakarta Pusat (Gambir) agar ongkir tetap bisa muncul
+			log.Printf("[Shipping] Merchant %s belum punya BiteshipAreaID, fallback ke Jakarta Pusat", mID)
+			origin = "IDNP3CL10"
+		}
+
+		// --- GLOBAL LOGISTICS FILTER ---
+		var activeGlobalCouriers []string
+		bc.DB.Model(&models.LogisticChannel{}).Where("is_active = ?", true).Pluck("code", &activeGlobalCouriers)
+		
+		isGlobalActive := make(map[string]bool)
+		for _, code := range activeGlobalCouriers {
+			isGlobalActive[strings.ToLower(code)] = true
+		}
+
+		merchantCouriers := strings.Split(couriers, ",")
+		var filteredCouriers []string
+		for _, c := range merchantCouriers {
+			c = strings.TrimSpace(strings.ToLower(c))
+			if c != "" && isGlobalActive[c] {
+				filteredCouriers = append(filteredCouriers, c)
+			}
+		}
+		
+		finalCouriers := strings.Join(filteredCouriers, ",")
+		if finalCouriers == "" {
+			// FALLBACK: Use all globally active couriers if merchant has none specified
+			finalCouriers = strings.Join(activeGlobalCouriers, ",")
+		}
+
+		if finalCouriers == "" {
+			log.Printf("[Shipping] WARN: No couriers active globally, skipping merchant %s", mID)
+			continue
+		}
+
+		log.Printf("[Shipping] Fetching rates for merchant %s (Origin: %s) to Dest: %s with Couriers: %s", mID, origin, req.DestinationAreaID, finalCouriers)
+
+		rates, err := bc.ShippingService.GetRates(origin, req.DestinationAreaID, items, finalCouriers)
+		if err != nil {
+			log.Printf("[Shipping] ERROR getting rates for merchant %s: %v", mID, err)
+			continue
+		}
+
+		for _, rate := range rates {
+			code, _ := rate["courier_code"].(string)
+			service, _ := rate["courier_service"].(string)
+			key := code + "_" + service
+			priceRaw := rate["price"]
+			
+			var price int64
+			switch v := priceRaw.(type) {
+			case float64:
+				price = int64(v)
+			case int64:
+				price = v
+			case int:
+				price = int64(v)
+			}
+
+			if existing, ok := combinedRates[key]; ok {
+				existingPrice := existing["price"].(int64)
+				existing["price"] = existingPrice + price
+			} else {
+				// Clone to avoid mutation issues
+				newRate := make(map[string]interface{})
+				for k, v := range rate {
+					newRate[k] = v
+				}
+				newRate["price"] = price // ensure it's int64 for consistent addition
+				combinedRates[key] = newRate
+			}
+		}
+	}
+
+	// Convert map back to slice
+	finalRates := []map[string]interface{}{}
+	for _, rate := range combinedRates {
+		finalRates = append(finalRates, rate)
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"rates": finalRates,
+		"warning": func() string {
+			if len(finalRates) == 0 {
+				return "Kurir tidak tersedia saat ini. Pastikan saldo Biteship mencukupi dan area pengiriman valid."
+			}
+			return ""
+		}(),
+	})
 }
 
 // POST /api/buyer/cart/add
@@ -129,6 +297,22 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.ShippingInfo.VoucherCode = req.VoucherCode
+	
+	// Minimum Order Check
+	configSvc := services.NewConfigService(bc.DB)
+	minOrder := configSvc.GetFloat("platform_min_order", 0)
+	
+	// Calculate subtotal
+	var subtotal float64
+	for _, item := range req.Items {
+		subtotal += item.UnitPrice * float64(item.Quantity)
+	}
+	
+	if subtotal < minOrder {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Total belanja minimal adalah Rp %.0f", minOrder))
+		return
+	}
+
 	order, err := bc.OrderService.CreateOrder(buyerID, req.Items, req.AffiliateID, req.ShippingInfo)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat pesanan: "+err.Error())
@@ -168,6 +352,9 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 4. Clear Cart after successful order
+	_ = bc.BuyerService.ClearCart(buyerID)
+
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"order":   order,
 		"payment": paymentData,
@@ -200,7 +387,7 @@ func (bc *BuyerController) GetPaymentInstructions(w http.ResponseWriter, r *http
 
 // Helper to get TriPay Instructions (Optional, but good for UX)
 func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod string) (map[string]interface{}, error) {
-	tripay := services.NewTripayService()
+	tripay := services.NewTripayService(bc.DB)
 	
 	// ⚠️ PENTING: TriPay mewajibkan (Sum of Items == Amount)
 	// Kita hitung total Amount langsung dari sum item yang sudah dibulatkan
@@ -328,6 +515,22 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 
 	// 2. Process Order
 	req.ShippingInfo.VoucherCode = req.VoucherCode
+
+	// Minimum Order Check
+	configSvc := services.NewConfigService(bc.DB)
+	minOrder := configSvc.GetFloat("platform_min_order", 0)
+
+	// Calculate subtotal
+	var subtotal float64
+	for _, item := range req.Items {
+		subtotal += item.UnitPrice * float64(item.Quantity)
+	}
+
+	if subtotal < minOrder {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Total belanja minimal adalah Rp %.0f", minOrder))
+		return
+	}
+
 	order, err := bc.OrderService.CreateOrder(user.ID, req.Items, &req.UplineID, req.ShippingInfo)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat pesanan: "+err.Error())
@@ -364,6 +567,9 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 			}
 		}
 	}
+
+	// 4. Clear Cart after successful order
+	_ = bc.BuyerService.ClearCart(user.ID)
 
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"order":   order,
@@ -443,10 +649,10 @@ func (bc *BuyerController) CheckWishlist(w http.ResponseWriter, r *http.Request)
 	}
 
 	var exist models.Wishlist
-	err := bc.DB.Where("buyer_id = ? AND product_id = ?", buyerID, productID).First(&exist).Error
+	bc.DB.Where("buyer_id = ? AND product_id = ?", buyerID, productID).Limit(1).Find(&exist)
 	
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"is_wishlisted": err == nil,
+		"is_wishlisted": exist.ID != "",
 	})
 }
 
@@ -547,9 +753,12 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		DateOfBirth string `json:"date_of_birth"`
 		Phone       string `json:"phone"`
 		Address     string `json:"address"`
+		District    string `json:"district"`
 		City        string `json:"city"`
 		Province    string `json:"province"`
 		ZipCode     string `json:"zip_code"`
+		AreaID      string `json:"area_id"`
+		AvatarUrl   string `json:"avatar_url"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -558,8 +767,15 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	err := bc.DB.Transaction(func(tx *gorm.DB) error {
-		// Update User Phone
-		if err := tx.Model(&models.User{}).Where("id = ?", buyerID).Update("phone", req.Phone).Error; err != nil {
+		// Update User Phone (Handle empty as NULL to avoid unique constraint issues)
+		if req.Phone != "" {
+			var existing models.User
+			if err := tx.Where("phone = ? AND id != ?", req.Phone, buyerID).First(&existing).Error; err == nil {
+				return fmt.Errorf("nomor telepon %s sudah digunakan oleh akun lain", req.Phone)
+			}
+		}
+
+		if err := tx.Model(&models.User{}).Where("id = ?", buyerID).Update("phone", utils.ToStringPtr(req.Phone)).Error; err != nil {
 			return err
 		}
 
@@ -576,9 +792,15 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 			profile.Gender = nil
 		}
 		profile.Address = req.Address
+		profile.District = req.District
 		profile.City = req.City
 		profile.Province = req.Province
 		profile.ZipCode = req.ZipCode
+		profile.AreaID = req.AreaID
+		
+		if req.AvatarUrl != "" {
+			profile.AvatarUrl = &req.AvatarUrl
+		}
 
 		if req.DateOfBirth != "" {
 			profile.DateOfBirth = &req.DateOfBirth
@@ -599,6 +821,23 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Profil berhasil diperbarui",
 	})
+}
+
+// POST /api/shipping/webhook
+func (bc *BuyerController) ShippingWebhook(w http.ResponseWriter, r *http.Request) {
+	var payload map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if err := bc.ShippingService.HandleWebhook(payload); err != nil {
+		log.Printf("[ShippingWebhook] ERROR: %v", err)
+		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // GET /api/buyer/orders/detail?id=...
@@ -649,8 +888,62 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"order":   order,
+	// Fetch reviews for this order to mark items as reviewed
+	var reviews []models.Review
+	bc.DB.Where("order_id = ? AND buyer_id = ?", order.ID, buyerID).Find(&reviews)
+	
+	reviewedProducts := make(map[string]bool)
+	for _, r := range reviews {
+		reviewedProducts[r.ProductID] = true
+	}
+
+	// Prepare result with reviewed status
+	type OrderItemWithReview struct {
+		models.OrderItem
+		IsReviewed bool `json:"is_reviewed"`
+	}
+
+	type GroupWithReview struct {
+		models.OrderMerchantGroup
+		Items []OrderItemWithReview `json:"items"`
+	}
+
+	groups := make([]GroupWithReview, len(order.MerchantGroups))
+	for i, g := range order.MerchantGroups {
+		items := make([]OrderItemWithReview, len(g.Items))
+		for j, item := range g.Items {
+			items[j] = OrderItemWithReview{
+				OrderItem:  item,
+				IsReviewed: reviewedProducts[item.ProductID],
+			}
+		}
+		groups[i] = GroupWithReview{
+			OrderMerchantGroup: g,
+			Items:              items,
+		}
+	}
+
+	// Override groups in response
+	response := map[string]interface{}{
+		"order": map[string]interface{}{
+			"id":               order.ID,
+			"order_number":     order.OrderNumber,
+			"status":           order.Status,
+			"grand_total":      order.GrandTotal,
+			"subtotal":         order.Subtotal,
+			"total_shipping":   order.TotalShippingCost,
+			"total_discount":   order.TotalDiscount,
+			"shipping_name":    order.ShippingName,
+			"shipping_phone":   order.ShippingPhone,
+			"shipping_address": order.ShippingAddress,
+			"shipping_city":    order.ShippingCity,
+			"shipping_province": order.ShippingProvince,
+			"shipping_postal":  order.ShippingPostalCode,
+			"created_at":       order.CreatedAt,
+			"merchant_groups":  groups,
+		},
 		"payment": paymentMap,
-	})
+	}
+
+	utils.JSONResponse(w, http.StatusOK, response)
 }

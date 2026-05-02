@@ -69,9 +69,12 @@ type MembershipTier struct {
 	MinWithdrawalAmount  float64 `gorm:"type:decimal(15,2);default:100000" json:"min_withdrawal_amount"`
 	CommissionHoldDays   int     `gorm:"default:7" json:"commission_hold_days"`
 	CookieDurationDays   int     `gorm:"default:30" json:"cookie_duration_days"`
-	// Upgrade Requirements (configurable dari superadmin)
+	// Upgrade Requirements (fully configurable)
 	MinActiveMitra       int     `gorm:"default:0" json:"min_active_mitra"`
 	MinMonthlyTurnover   float64 `gorm:"type:decimal(15,2);default:0" json:"min_monthly_turnover"`
+	MinTotalTransactions int     `gorm:"default:0" json:"min_total_transactions"`
+	MinReferrals         int     `gorm:"default:0" json:"min_referrals"`
+	MinPerformancePoints int     `gorm:"default:0" json:"min_performance_points"`
 	// UI Display (configurable)
 	Color                string  `gorm:"type:varchar(20);default:'#a8a9ad'" json:"color"`
 	Icon                 string  `gorm:"type:varchar(50);default:'military_tech'" json:"icon"`

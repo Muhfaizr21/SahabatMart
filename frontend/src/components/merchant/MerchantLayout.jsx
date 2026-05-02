@@ -79,7 +79,6 @@ const MerchantLayout = () => {
     { name: 'Restock', icon: 'rebase_edit', path: '/merchant/restock' },
     { name: 'Orders', icon: 'shopping_cart', path: '/merchant/orders' },
     { name: 'Wallet', icon: 'account_balance_wallet', path: '/merchant/wallet' },
-    { name: 'Vouchers', icon: 'confirmation_number', path: '/merchant/vouchers' },
     { name: 'Settings', icon: 'settings', path: '/merchant/settings' },
   ];
 

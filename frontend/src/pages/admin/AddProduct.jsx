@@ -31,14 +31,16 @@ export default function AdminAddProduct() {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [attrs, setAttrs] = useState([]);
+  const [presets, setPresets] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const [p, setP] = useState({
-    name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0,
+    name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0, weight: 0,
     category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active',
     base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
-    base_distribution_fee: 0, base_distribution_fee_nominal: 0
+    base_distribution_fee: 0, base_distribution_fee_nominal: 0,
+    commission_preset_id: ''
   });
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
@@ -47,15 +49,18 @@ export default function AdminAddProduct() {
     Promise.all([
       fetchJson(`${API}/categories`),
       fetchJson(`${API}/brands`),
-      fetchJson(`${API}/attributes`)
-    ]).then(([c, b, a]) => {
-      const cats = Array.isArray(c) ? c : (c.data || []);
-      const brds = Array.isArray(b) ? b : (b.data || []);
-      const atts = Array.isArray(a) ? a : (a.data || []);
+      fetchJson(`${API}/attributes`),
+      fetchJson(`${API}/commission-presets`)
+    ]).then(([c, b, a, prs]) => {
+      const cats = Array.isArray(c) ? c : (c?.data || []);
+      const brds = Array.isArray(b) ? b : (b?.data || []);
+      const atts = Array.isArray(a) ? a : (a?.data || []);
+      const pData = Array.isArray(prs) ? prs : (prs?.data || []);
 
       setCategories(cats);
       setBrands(brds);
       setAttrs(atts);
+      setPresets(pData);
 
       if (cats.length > 0) setP(prev => ({ ...prev, category: cats[0].name }));
       if (brds.length > 0) setP(prev => ({ ...prev, brand: brds[0].name }));
@@ -204,6 +209,11 @@ export default function AdminAddProduct() {
                 onChange={e => setP(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
+            <FormField label="Berat Produk (Gram)">
+              <input style={S.input} type="number" min={0} value={p.weight}
+                onChange={e => setP(prev => ({ ...prev, weight: parseInt(e.target.value) || 0 }))}
+                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+            </FormField>
           </div>
 
           {/* Dynamic Attributes */}
@@ -313,10 +323,29 @@ export default function AdminAddProduct() {
                   <input style={S.input} type="number" step="0.01" placeholder="Contoh: 5" 
                     value={p.base_distribution_fee} onChange={e => setP(prev => ({ ...prev, base_distribution_fee: parseFloat(e.target.value) || 0 }))} />
                 </FormField>
-                <FormField label="Fee Distribusi Merchant (Rp)">
+                 <FormField label="Fee Distribusi Merchant (Rp)">
                   <input style={S.input} type="number" placeholder="Contoh: 15000" 
                     value={p.base_distribution_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_distribution_fee_nominal: parseFloat(e.target.value) || 0 }))} />
                 </FormField>
+             </div>
+
+             {/* Preset Selector */}
+             <div style={{ marginTop: 24 }}>
+                <FormField label="Multi-Level Commission Preset">
+                  <select
+                    value={p.commission_preset_id || ''}
+                    onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
+                    style={{ ...S.select, borderColor: '#7c3aed' }}
+                  >
+                    <option value="">-- Tidak Pakai Preset (Gunakan Tier Default) --</option>
+                    {presets.filter(pr => pr.is_active).map(pr => (
+                      <option key={pr.id} value={pr.id}>{pr.name}</option>
+                    ))}
+                  </select>
+                </FormField>
+                <p style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
+                  Assign preset untuk mendistribusikan komisi ke jaringan upline affiliate saat produk ini terjual.
+                </p>
              </div>
           </div>
 

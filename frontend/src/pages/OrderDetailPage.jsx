@@ -1,24 +1,76 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson } from '../lib/api';
+import { BUYER_API_BASE, fetchJson, postJson, uploadFile, API_BASE } from '../lib/api';
 
 export default function OrderDetailPage() {
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    async function loadDetail() {
-      try {
-        setLoading(true);
-        const res = await fetchJson(`${BUYER_API_BASE}/orders/detail?id=${id}`);
-        setData(res);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  // Review State
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedItemForReview, setSelectedItemForReview] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewImage, setReviewImage] = useState(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const handleOpenReview = (item) => {
+    setSelectedItemForReview(item);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewImage(null);
+    setReviewModalOpen(true);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewComment.trim()) {
+      alert("Komentar ulasan tidak boleh kosong");
+      return;
     }
+    setSubmittingReview(true);
+    try {
+      let imageUrl = "";
+      if (reviewImage) {
+        const uploadRes = await uploadFile(`${API_BASE}/api/buyer/upload`, reviewImage, 'image');
+        if (uploadRes && uploadRes.url) {
+          imageUrl = uploadRes.url;
+        }
+      }
+
+      await postJson(`${BUYER_API_BASE}/products/review`, {
+        product_id: selectedItemForReview.product_id,
+        merchant_id: selectedItemForReview.merchant_id || "00000000-0000-0000-0000-000000000000",
+        order_id: data.order.id,
+        order_item_id: selectedItemForReview.id || "00000000-0000-0000-0000-000000000000",
+        rating: reviewRating,
+        comment: reviewComment,
+        image_url: imageUrl
+      });
+
+      alert("Ulasan berhasil dikirim!");
+      setReviewModalOpen(false);
+      loadDetail(); // Refresh order data to update review buttons
+    } catch (err) {
+      alert(err.message || "Gagal mengirim ulasan, mungkin Anda sudah memberikan ulasan untuk produk ini.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const loadDetail = async () => {
+    try {
+      setLoading(true);
+      const res = await fetchJson(`${BUYER_API_BASE}/orders/detail?id=${id}`);
+      setData(res);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadDetail();
   }, [id]);
 
@@ -103,6 +155,23 @@ export default function OrderDetailPage() {
                           <p className="text-xs text-gray-500 font-bold">{item.quantity}x <span className="text-gray-900">Rp{item.unit_price?.toLocaleString('id')}</span></p>
                           <p className="font-black text-gray-900 text-sm">Rp{(item.unit_price * item.quantity).toLocaleString('id')}</p>
                         </div>
+                        {order.status === 'completed' && (
+                          <div className="mt-3">
+                            {item.is_reviewed ? (
+                              <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-4 py-2 rounded-xl border border-green-100 w-fit">
+                                <i className="bx bxs-check-circle text-lg"></i>
+                                <span className="text-[10px] font-black uppercase tracking-widest">Ulasan Terkirim</span>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => handleOpenReview(item)}
+                                className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-6 py-2.5 rounded-xl hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 shadow-sm"
+                              >
+                                Beri Ulasan
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -198,6 +267,78 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      {reviewModalOpen && selectedItemForReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl relative">
+            <button 
+              onClick={() => setReviewModalOpen(false)}
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-gray-900 transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+            <h2 className="text-xl font-black text-gray-900 mb-6">Beri Ulasan</h2>
+            
+            <div className="flex gap-4 items-center mb-6 bg-gray-50 p-4 rounded-2xl">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                 <span className="material-symbols-outlined text-gray-300">image</span>
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-900 text-sm line-clamp-1">{selectedItemForReview.product_name}</p>
+                <p className="text-xs text-gray-500">{selectedItemForReview.variant_name}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Rating</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      onClick={() => setReviewRating(star)}
+                      className={`material-symbols-outlined text-3xl transition-colors ${star <= reviewRating ? 'text-amber-400' : 'text-gray-200'}`}
+                      style={{ fontVariationSettings: star <= reviewRating ? "'FILL' 1" : "'FILL' 0" }}
+                    >
+                      star
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Komentar</label>
+                <textarea 
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+                  rows="3"
+                  placeholder="Bagaimana kualitas produk ini?"
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Foto (Opsional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setReviewImage(e.target.files[0])}
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-6 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer"
+                />
+              </div>
+
+              <button 
+                onClick={handleSubmitReview}
+                disabled={submittingReview}
+                className="w-full mt-4 bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+              >
+                {submittingReview ? 'Mengirim...' : 'Kirim Ulasan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

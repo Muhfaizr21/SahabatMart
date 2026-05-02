@@ -53,6 +53,7 @@ import ProfilePage from './pages/ProfilePage';
 import WishlistPage from './pages/WishlistPage';
 import ComparePage from './pages/ComparePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import CouponPage from './pages/CouponPage';
 import InvoicePage from './pages/InvoicePage';
 import AdminLayout from './components/admin/AdminLayout';
@@ -96,6 +97,8 @@ import SkinJourneyAdmin from './pages/admin/SkinJourneyAdmin';
 import PusatInventory from './pages/admin/PusatInventory';
 import SkinCommunity from './pages/SkinCommunity';
 import MembershipTiers from './pages/admin/MembershipTiers';
+import AdminReviews from './pages/admin/AdminReviews';
+import CommissionPresets from './pages/admin/CommissionPresets';
 
 
 // ── Penanganan Khusus Header/Footer ─────────
@@ -154,7 +157,6 @@ import MerchantOrders from './pages/merchant/OrderList';
 import MerchantWallet from './pages/merchant/Wallet';
 import MerchantSettings from './pages/merchant/Settings';
 import MerchantAnalytics from './pages/merchant/Analytics';
-import MerchantVouchers from './pages/merchant/Vouchers';
 
 // Affiliate Portal
 import AffiliateLayout from './components/affiliate/AffiliateLayout';
@@ -216,6 +218,7 @@ export default function App() {
           <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
           <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
 
@@ -247,6 +250,7 @@ export default function App() {
             <Route path="attributes" element={<AdminAttributes />} />
             <Route path="disputes" element={<AdminDisputes />} />
             <Route path="vouchers" element={<AdminVouchers />} />
+            <Route path="reviews" element={<AdminReviews />} />
             <Route path="logistics" element={<AdminLogistics />} />
             <Route path="regions" element={<AdminRegions />} />
             <Route path="security" element={<AdminSecurity />} />
@@ -260,6 +264,7 @@ export default function App() {
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
             <Route path="membership-tiers" element={<MembershipTiers />} />
+            <Route path="commission-presets" element={<CommissionPresets />} />
             <Route path="settings" element={<AdminSettings />} />
 
           </Route>
@@ -273,7 +278,6 @@ export default function App() {
              <Route path="wallet" element={<MerchantWallet />} />
              <Route path="settings" element={<MerchantSettings />} />
              <Route path="analytics" element={<MerchantAnalytics />} />
-             <Route path="vouchers" element={<MerchantVouchers />} />
           </Route>
 
           {/* Affiliate Routes */}

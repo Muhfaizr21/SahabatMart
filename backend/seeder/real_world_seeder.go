@@ -194,10 +194,57 @@ func SeedRealWorldData(db *gorm.DB) {
 				AffiliateID: affiliate.ID,
 				OrderID:     order.ID,
 				OrderItemID: item.ID,
+				ProductID:   product.ID,
+				MerchantID:  merchant.ID,
+				GrossAmount: subtotal,
 				Amount:      affComm,
 				Status:      models.CommissionApproved,
 			})
+
+			// --- [NEW] Generate Review for completed order ---
+			if rand.Float32() > 0.3 { // 70% chance to have a review
+				rating := rand.Intn(2) + 4 // 4 or 5 stars
+				comments := []string{
+					"Produknya bagus banget, cocok di kulit aku!",
+					"Pengiriman cepat, packing rapi. Recomended!",
+					"Sudah langganan di sini, selalu puas.",
+					"Kualitas premium, worth the price.",
+					"Mantap Akuglow, sukses terus!",
+				}
+				review := models.Review{
+					ID:          uuid.New().String(),
+					ProductID:   product.ID,
+					MerchantID:  merchant.ID,
+					OrderID:     order.ID,
+					OrderItemID: item.ID,
+					BuyerID:     user.ID,
+					Rating:      rating,
+					Comment:     comments[rand.Intn(len(comments))],
+					IsHidden:    false,
+				}
+				db.Create(&review)
+			}
 		}
+	}
+
+	// 2. Sync Ratings for all products after seeding reviews
+	fmt.Println("  -> Synchronizing Product Ratings...")
+	for _, p := range products {
+		var stats struct {
+			AvgRating float64
+			Count     int
+		}
+		db.Model(&models.Review{}).
+			Where("product_id = ? AND is_hidden = ?", p.ID, false).
+			Select("AVG(rating) as avg_rating, COUNT(id) as count").
+			Scan(&stats)
+
+		db.Model(&models.Product{}).Where("id = ?", p.ID).Updates(map[string]interface{}{
+			"rating":         stats.AvgRating,
+			"average_rating": stats.AvgRating,
+			"reviews":        stats.Count,
+			"total_reviews":  stats.Count,
+		})
 	}
 
 	// 2. Isi Stok Merchant (Distributor)

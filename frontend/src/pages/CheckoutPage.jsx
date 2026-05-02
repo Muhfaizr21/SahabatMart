@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BUYER_API_BASE, PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate } from '../lib/api';
 
 const steps = ['Keranjang', 'Checkout', 'Konfirmasi'];
-const provinces = ['DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten', 'Yogyakarta', 'Bali', 'Sumatera Utara', 'Sulawesi Selatan'];
 const paymentMethods = [
   { id: 'QRIS', label: 'QRIS (GOPAY/OVO/DANA)', icon: '📱', desc: 'Scan & Bayar Instan' },
   { id: 'MANDIRIVA', label: 'Mandiri Virtual Account', icon: '🏦', desc: 'Transfer via Mandiri' },
@@ -19,14 +18,36 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     address: '', city: '', province: '', postalCode: '', notes: '',
+    area_id: '', area_name: '', district: '',
   });
+  const [areaSearch, setAreaSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [checkingVoucher, setCheckingVoucher] = useState(false);
   const [shippingType, setShippingType] = useState('expedition');
   const [shippingCost, setShippingCost] = useState(0);
-  const [selectedShipping, setSelectedShipping] = useState({ id: 'jne-reg', price: 0 });
+  const [selectedShipping, setSelectedShipping] = useState(null);
+  const [areas, setAreas] = useState([]);
+  const [searchingArea, setSearchingArea] = useState(false);
+  const [shippingRates, setShippingRates] = useState([]);
+  const [shippingWarning, setShippingWarning] = useState("");
+  const [loadingRates, setLoadingRates] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) setUser(JSON.parse(userData));
+  }, []);
+
+  const getItemPrice = (item) => {
+    const isMitra = user?.role === 'mitra' || user?.role === 'affiliate';
+    if (isMitra) {
+      if (item.product_variant?.wholesale_price > 0) return item.product_variant.wholesale_price;
+      if (item.product?.wholesale_price > 0) return item.product.wholesale_price;
+    }
+    return item.product_variant?.price || item.product?.price || 0;
+  };
 
   useEffect(() => {
     const fetchCheckoutData = async () => {
@@ -47,27 +68,49 @@ export default function CheckoutPage() {
         if (cartData) setCart(cartData);
         if (profileData && profileData.user) {
           const u = profileData.user;
+          // [Sync Fix] Ensure user state is updated with role
+          setUser(u);
           const names = u.profile?.full_name?.split(' ') || ['', ''];
+          const profile = u.profile || {};
+          
           setForm(f => ({
             ...f,
             firstName: names[0],
-            lastName: names.slice(1).join(' ') || u.profile?.full_name,
+            lastName: names.slice(1).join(' ') || profile.full_name,
             email: u.email,
             phone: u.phone || '',
-            address: u.profile?.address || '',
-            city: u.profile?.city || '',
-            province: u.profile?.province || '',
-            postalCode: u.profile?.zip_code || ''
+            address: profile.address || '',
+            city: profile.city || '',
+            province: profile.province || '',
+            postalCode: profile.zip_code || '',
+            area_id: profile.area_id || '',
+            district: profile.district || ''
           }));
+
+          if (profile.area_id) {
+             if (profile.district && profile.city) {
+                setAreaSearch(`${profile.district}, ${profile.city}`);
+             } else if (profile.district || profile.city) {
+                setAreaSearch(profile.district || profile.city);
+             }
+             if (cartData?.items?.length > 0) {
+                fetchRates(profile.area_id, cartData.items);
+             }
+          } else {
+             // Wajib pilih ulang jika tidak ada area_id valid
+             setForm(f => ({ ...f, city: '', province: '', postalCode: '', district: '', area_id: '' }));
+             setAreaSearch('');
+          }
         }
       } catch (err) {
         console.error('Failed to pre-fill checkout:', err);
       }
     };
     fetchCheckoutData();
+    captureAffiliate(); // Track referral on checkout if not already
   }, [navigate]);
 
-  const subtotal = cart.items?.reduce((s, i) => s + (i.product_variant?.price || 0) * i.quantity, 0) || 0;
+  const subtotal = cart.items?.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0) || 0;
   const shipping = 0;
   
   // Calculate Discount
@@ -86,15 +129,85 @@ export default function CheckoutPage() {
     if (!voucherCode) return;
     setCheckingVoucher(true);
     try {
+      // fetchJson auto-strips the response, so 'res' IS the voucher object
       const res = await fetchJson(`${PUBLIC_API_BASE}/vouchers/check?code=${voucherCode}&subtotal=${subtotal}`);
-      if (res.status === 'success' && res.data) {
+      if (res && res.data) {
         setAppliedVoucher(res.data);
+        console.log("Voucher applied successfully:", res.data);
+      } else {
+        throw new Error("Format voucher tidak dikenali");
       }
     } catch (err) {
       alert(err.message);
       setAppliedVoucher(null);
     } finally {
       setCheckingVoucher(false);
+    }
+  };
+
+  const handleSearchArea = async (input) => {
+    if (input.length < 3) return;
+    setSearchingArea(true);
+    try {
+      const res = await fetchJson(`${API_BASE}/api/shipping/areas?input=${input}`);
+      setAreas(res || []);
+    } catch (err) {
+      console.error('Area search failed:', err);
+    } finally {
+      setSearchingArea(false);
+    }
+  };
+
+  const handleSelectArea = async (area) => {
+    const postalCode = area.name.split('.').pop().trim();
+    setForm(f => ({ 
+      ...f, 
+      city: area.administrative_division_level_2_name, 
+      province: area.administrative_division_level_1_name, 
+      postalCode: postalCode,
+      area_id: area.id,
+      area_name: area.name,
+      district: area.administrative_division_level_3_name,
+    }));
+    setAreaSearch(area.name);
+    setAreas([]);
+    fetchRates(area.id);
+  };
+
+  const fetchRates = async (areaId, overrideItems = null) => {
+    setLoadingRates(true);
+    try {
+      const sourceItems = overrideItems || cart.items;
+      if (!sourceItems || sourceItems.length === 0) {
+        setShippingRates([]);
+        return;
+      }
+      const items = sourceItems.map(i => ({
+        product_id: i.product_id,
+        product_name: i.product?.name || 'Produk',
+        unit_price: getItemPrice(i),
+        quantity: i.quantity,
+        // Berat dari variant > produk > default 200g (dalam gram)
+        weight: i.product_variant?.weight || i.product?.weight || 200,
+        // merchant_id langsung dari cart item, bukan dari nested product
+        merchant_id: i.merchant_id || '00000000-0000-0000-0000-000000000000'
+      }));
+      const res = await fetchJson(`${API_BASE}/api/shipping/rates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination_area_id: areaId, items })
+      });
+      console.log("[Shipping] Rates received:", res.rates);
+      setShippingRates(res.rates || []);
+      setShippingWarning(res.warning || "");
+      if (!res.rates || res.rates.length === 0) {
+        console.warn("[Shipping] No rates found for items:", items);
+      }
+    } catch (err) {
+      console.error('Fetch rates failed:', err);
+      setShippingRates([]);
+    } finally {
+      setLoadingRates(false);
     }
   };
 
@@ -105,15 +218,18 @@ export default function CheckoutPage() {
       const token = localStorage.getItem('token');
       
       const orderItems = cart.items.map(item => ({
-          merchant_id: (item.product?.merchant_id && item.product?.merchant_id !== 'pusat') ? item.product.merchant_id : '00000000-0000-0000-0000-000000000000',
+          merchant_id: item.merchant_id || '00000000-0000-0000-0000-000000000000',
           product_id: item.product_id,
-          product_variant_id: item.product_variant_id,
-          product_name: item.product?.name,
-          variant_name: item.product_variant?.name,
-          sku: item.product_variant?.sku,
-          unit_price: item.product_variant?.price,
+          product_variant_id: item.product_variant_id || null,
+          product_name: item.product?.name || '',
+          variant_name: item.product_variant?.name || '',
+          sku: item.product_variant?.sku || '',
+          // Prioritas: harga variant > harga produk (wajib ada agar total benar)
+          unit_price: getItemPrice(item),
           quantity: item.quantity,
-          product_image_url: item.product?.image
+          // Berat wajib ada untuk kalkulasi ongkir backend
+          weight: item.product_variant?.weight || item.product?.weight || 200,
+          product_image_url: item.product?.image || item.product?.image_url || ''
       }));
 
         // [Sync Fix] Ambil upline dari localStorage dengan prioritas:
@@ -136,12 +252,54 @@ export default function CheckoutPage() {
             shipping_city: form.city,
             shipping_province: form.province,
             shipping_postal_code: form.postalCode,
+            destination_area_id: form.area_id,
+            total_shipping_cost: shippingCost,
             notes: form.notes,
+            merchant_groups: (() => {
+              // Group cart items by merchant_id to build per-merchant groups
+              const grouped = {};
+              cart.items.forEach(i => {
+                const mId = i.merchant_id || '00000000-0000-0000-0000-000000000000';
+                if (!grouped[mId]) grouped[mId] = [];
+                grouped[mId].push(i);
+              });
+              return Object.keys(grouped).map(mId => ({
+                merchant_id: mId,
+                courier_code: selectedShipping?.courier_code || '',
+                service_code: selectedShipping?.courier_service || '',
+                // shipping cost dibagi merata jika multi-merchant, atau penuh jika single
+                shipping_cost: Object.keys(grouped).length > 1
+                  ? Math.round(shippingCost / Object.keys(grouped).length)
+                  : shippingCost
+              }));
+            })()
           },
           upline_id: uplineRef,
           voucher_code: appliedVoucher?.code || '',
           payment_method: paymentMethod,
+          total_weight: cart.items?.reduce((w, i) => w + ((i.product_variant?.weight || i.product?.weight || 200) * i.quantity), 0) || 0,
         };
+
+      // [Sync Fix] Update profile address automatically if logged in
+      if (token) {
+        fetchJson(`${BUYER_API_BASE}/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            full_name: `${form.firstName} ${form.lastName}`,
+            phone: form.phone,
+            address: form.address,
+            district: form.district,
+            city: form.city,
+            province: form.province,
+            zip_code: form.postalCode,
+            area_id: form.area_id
+          })
+        }).catch(e => console.warn('Failed to sync profile address:', e));
+      }
 
       const res = await fetchJson(`${PUBLIC_API_BASE}/checkout`, {
         method: 'POST',
@@ -157,6 +315,9 @@ export default function CheckoutPage() {
         localStorage.setItem('user', JSON.stringify(res.user));
       }
 
+      // Clear local cart
+      setCart({ items: [] });
+      
       navigate('/order-success', { 
         state: { 
           order: res.order, 
@@ -259,23 +420,73 @@ export default function CheckoutPage() {
                     <input required type="text" placeholder="Jl. Nama Jalan No. XX, RT/RW, Kelurahan" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors" />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Kota/Kabupaten *</label>
-                    <input required type="text" placeholder="Jakarta Pusat" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors" />
+                  <div className="sm:col-span-2 relative">
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Kecamatan / Kota *</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ketik min. 3 huruf, misal: 'Kebayoran'"
+                      value={areaSearch}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors"
+                      onChange={(e) => { 
+                        setAreaSearch(e.target.value); 
+                        setForm(f => ({ ...f, area_id: '', city: '', province: '', postalCode: '' }));
+                        handleSearchArea(e.target.value); 
+                      }}
+                    />
+                    {searchingArea && <div className="absolute right-4 top-9 text-[10px] text-blue-500 animate-pulse">Mencari...</div>}
+                    {areas.length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                        {areas.map(a => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => handleSelectArea(a)}
+                            className="w-full text-left px-4 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0"
+                          >
+                            <div className="font-bold">{a.name}</div>
+                            <div className="text-gray-500">{a.administrative_division_level_2_name}, {a.administrative_division_level_1_name}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {form.area_id ? (
+                      <div className="mt-2 text-[10px] text-green-600 font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-full w-fit">
+                        <span className="text-green-500">✓</span> Lokasi berhasil dipilih
+                      </div>
+                    ) : areaSearch.length >= 3 && !searchingArea && areas.length === 0 ? (
+                      <div className="mt-2 text-[10px] text-red-500 font-bold flex items-center gap-1">
+                        <span>⚠️</span> Lokasi tidak ditemukan. Coba kata kunci lain.
+                      </div>
+                    ) : areaSearch.length > 0 && !form.area_id ? (
+                      <div className="mt-2 text-[10px] text-orange-500 font-bold flex items-center gap-1">
+                        <span>⚠️</span> Pilih lokasi dari daftar yang muncul di atas
+                      </div>
+                    ) : null}
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">Provinsi *</label>
-                    <select required value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors bg-white">
-                      <option value="">Pilih Provinsi</option>
-                      {provinces.map(p => <option key={p}>{p}</option>)}
-                    </select>
+                  {/* Detail lokasi otomatis terisi dari pilihan area */}
+                  <div className="sm:col-span-2 flex flex-wrap gap-3 text-sm">
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="text-xs font-medium text-gray-500 block mb-1">Kota/Kabupaten</label>
+                      <div className={`bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 ${form.city ? 'text-gray-700 font-medium' : 'text-gray-400 text-xs italic'}`}>
+                        {form.city || 'Otomatis terisi...'}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="text-xs font-medium text-gray-500 block mb-1">Provinsi</label>
+                      <div className={`bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 ${form.province ? 'text-gray-700 font-medium' : 'text-gray-400 text-xs italic'}`}>
+                        {form.province || 'Otomatis terisi...'}
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700 block mb-1">Kode Pos</label>
-                    <input type="text" placeholder="10220" value={form.postalCode} onChange={e => setForm(f => ({ ...f, postalCode: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors" />
+                    {form.area_id ? (
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700">{form.postalCode}</div>
+                    ) : (
+                      <input type="text" placeholder="10220" value={form.postalCode}
+                        onChange={e => setForm({...form, postalCode: e.target.value})}
+                        className="w-full border border-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400" />
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <label className="text-sm font-medium text-gray-700 block mb-1">Catatan Pesanan</label>
@@ -297,37 +508,62 @@ export default function CheckoutPage() {
                     >Kirim Ekspedisi</button>
                     <button 
                       type="button"
-                      onClick={() => setShippingType('pickup')}
+                      onClick={() => {
+                        setShippingType('pickup');
+                        setShippingCost(0);
+                        setSelectedShipping({ courier_code: 'PICKUP', courier_name: 'AMBIL DI TOKO', courier_service: 'SELF' });
+                      }}
                       className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${shippingType === 'pickup' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
                     >Ambil di Toko</button>
                   </div>
                 </div>
 
+                {shippingWarning && (
+                  <div className="mb-4 p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <span className="text-xl">⚠️</span>
+                    <div className="text-sm text-orange-700 leading-relaxed font-medium">
+                      {shippingWarning}
+                    </div>
+                  </div>
+                )}
+
                 {shippingType === 'expedition' ? (
                   <div className="space-y-3">
-                    {[
-                      { id: 'jne-reg', label: 'JNE Reguler', days: '3-5 hari', price: 0, priceLabel: 'GRATIS' },
-                      { id: 'jne-yes', label: 'JNE YES', days: '1 hari', price: 25000, priceLabel: 'Rp25.000' },
-                      { id: 'sicepat', label: 'SiCepat BEST', days: '2-3 hari', price: 12000, priceLabel: 'Rp12.000' },
-                    ].map(method => (
-                      <label key={method.id} className="flex items-center gap-4 border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:border-blue-300 transition-all has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                        <input 
-                          type="radio" 
-                          name="shipping" 
-                          checked={selectedShipping?.id === method.id}
-                          onChange={() => {
-                            setSelectedShipping(method);
-                            setShippingCost(method.price);
-                          }}
-                          className="accent-blue-600 w-4 h-4" 
-                        />
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-800 text-sm">{method.label}</div>
-                          <div className="text-xs text-gray-500">{method.days}</div>
-                        </div>
-                        <div className={`text-sm font-bold ${method.price === 0 ? 'text-green-600' : 'text-gray-700'}`}>{method.priceLabel}</div>
-                      </label>
-                    ))}
+                    {loadingRates ? (
+                       <div className="py-10 text-center">
+                          <div className="animate-spin mb-2">🌀</div>
+                          <div className="text-xs text-gray-400">Mengambil ongkir terbaik...</div>
+                       </div>
+                    ) : shippingRates.length > 0 ? (
+                      shippingRates.map((method, idx) => (
+                        <label key={idx} className="flex items-center gap-4 border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:border-blue-300 transition-all has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                          <input 
+                            type="radio" 
+                            name="shipping" 
+                            checked={selectedShipping?.courier_code === method.courier_code && selectedShipping?.courier_service === method.courier_service}
+                            onChange={() => {
+                              setSelectedShipping(method);
+                              setShippingCost(method.price);
+                            }}
+                            className="accent-blue-600 w-4 h-4" 
+                          />
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800 text-sm uppercase">{method.courier_name} {method.courier_service}</div>
+                            <div className="text-xs text-gray-500">Estimasi {method.duration}</div>
+                          </div>
+                          <div className="text-sm font-bold text-gray-700">Rp{method.price.toLocaleString('id-ID')}</div>
+                        </label>
+                      ))
+                    ) : (
+                       <div className="py-10 px-6 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                         <div className="text-3xl mb-2 opacity-30">🚚</div>
+                         <p className="text-gray-500 text-[11px] font-medium leading-relaxed">
+                           {form.area_id 
+                             ? 'Maaf, tidak ada kurir ekspedisi yang mendukung rute ini atau kurir sedang non-aktif.' 
+                             : 'Pilih lokasi pengiriman (Kecamatan/Kota) pada kolom alamat di atas untuk melihat opsi kurir.'}
+                         </p>
+                       </div>
+                    )}
                   </div>
                 ) : (
                   <div className="p-6 rounded-2xl border-2 border-blue-500 bg-blue-50 flex flex-col items-center text-center">
@@ -371,13 +607,23 @@ export default function CheckoutPage() {
                   {cart.items?.map((item, i) => (
                     <div key={i} className="flex gap-3">
                       <div className="relative flex-shrink-0">
-                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-lg">📦</div>
+                        {item.product?.image_url || item.product?.image ? (
+                          <img
+                            src={item.product?.image_url || item.product?.image}
+                            alt={item.product?.name}
+                            className="w-12 h-12 rounded-xl object-cover border border-gray-100"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 text-sm font-bold">
+                            {item.product?.name?.charAt(0) || '?'}
+                          </div>
+                        )}
                         <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white">{item.quantity}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px] text-gray-900 font-bold leading-tight line-clamp-1 truncate">{item.product?.name}</div>
                         <div className="text-[10px] text-blue-600 font-medium leading-tight line-clamp-1">{item.product_variant?.name || 'Default Varian'}</div>
-                        <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{((item.product_variant?.price || 0) * item.quantity).toLocaleString('id-ID')}</div>
+                        <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id-ID')}</div>
                       </div>
                     </div>
                   ))}
@@ -413,10 +659,14 @@ export default function CheckoutPage() {
                     <span>Subtotal</span>
                     <span className="font-medium text-gray-900">Rp{subtotal.toLocaleString('id-ID')}</span>
                   </div>
+                  <div className="flex justify-between text-[10px] text-gray-400">
+                    <span>Total Berat</span>
+                    <span>{((cart.items?.reduce((w, i) => w + ((i.product_variant?.weight || i.product?.weight || 200) * i.quantity), 0) || 0) / 1000).toFixed(2)} kg</span>
+                  </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Pengiriman</span>
-                    <span className={shippingType === 'pickup' || shippingCost === 0 ? "text-green-600 font-bold" : "font-medium text-gray-900"}>
-                      {shippingType === 'pickup' || shippingCost === 0 ? 'GRATIS' : `Rp${shippingCost.toLocaleString('id-ID')}`}
+                    <span className={shippingType === 'pickup' || (shippingType === 'expedition' && selectedShipping) || shippingCost === 0 ? "text-green-600 font-bold" : "text-gray-400 font-medium italic"}>
+                      {shippingType === 'pickup' ? 'GRATIS' : (shippingType === 'expedition' && selectedShipping) ? `Rp${shippingCost.toLocaleString('id-ID')}` : 'Pilih Kurir'}
                     </span>
                   </div>
                   {discount > 0 && (

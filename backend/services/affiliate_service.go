@@ -2,9 +2,9 @@ package services
 
 import (
 	"SahabatMart/backend/models"
+	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 	"gorm.io/gorm"
 )
@@ -76,11 +76,10 @@ func (s *AffiliateService) GetDashboardStats(affiliateID string) (*models.Affili
 func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 	var affiliate models.AffiliateMember
 	if err := s.DB.Preload("Tier").First(&affiliate, "id = ?", affiliateMemberID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil // Record already gone, ignore
+		}
 		return err
-	}
-
-	if affiliate.Tier == nil {
-		return nil
 	}
 
 	// [Sync Fix] Re-hitung stats real-time dari DB, jangan pakai nilai stale di kolom
@@ -127,27 +126,87 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		"team_monthly_turnover":  teamMonthlyTurnover,
 	})
 
+	// 4. Check for Merchant Auto-Promotion
+	isEligible, _, _, _, _ := s.CheckMerchantEligibility(affiliateMemberID)
+	if isEligible {
+		var user models.User
+		err := s.DB.First(&user, "id = ?", affiliate.UserID).Error
+		if err == nil && user.Role != "merchant" {
+			// Auto-Promote to Merchant
+			err := s.DB.Transaction(func(tx *gorm.DB) error {
+				// Update user role
+				if err := tx.Model(&user).Update("role", "merchant").Error; err != nil {
+					return err
+				}
+
+				// Check if merchant record already exists
+				var existingMerchant models.Merchant
+				if err := tx.Where("user_id = ?", user.ID).First(&existingMerchant).Error; err == gorm.ErrRecordNotFound {
+					// Create new merchant record
+					var profile models.UserProfile
+					tx.Where("user_id = ?", user.ID).First(&profile)
+					storeName := profile.FullName + " Store"
+					if profile.FullName == "" {
+						storeName = "Merchant " + user.ID[:8]
+					}
+
+					newMerchant := models.Merchant{
+						UserID:     user.ID,
+						StoreName:  storeName,
+						Slug:       fmt.Sprintf("store-%s", user.ID[:8]),
+						Status:     "active",
+						IsVerified: true,
+						City:       profile.City,
+						JoinedAt:   time.Now(),
+						// Fallback: Default ke Jakarta Pusat agar shipping rate tidak error
+						BiteshipAreaID: "IDNP3CL10", 
+						EnabledCouriers: "jne,tiki,sicepat,jnt",
+					}
+					if err := tx.Create(&newMerchant).Error; err != nil {
+						return err
+					}
+				} else {
+					// Ensure status is active
+					tx.Model(&existingMerchant).Update("status", "active")
+				}
+				return nil
+			})
+
+			if err == nil && s.Notif != nil {
+				s.Notif.Push(affiliate.UserID, "merchant", "merchant_promoted", 
+					"🎉 Selamat! Anda Menjadi Merchant", 
+					"Karena performa tim yang luar biasa, Anda otomatis dipromosikan menjadi Merchant SahabatMart.", 
+					"/merchant")
+			}
+		}
+	}
+
+	if affiliate.Tier == nil {
+		return nil
+	}
+
 	// Cari tier berikutnya (Level > current level)
 	var nextTier models.MembershipTier
 	if err := s.DB.Order("level ASC").Where("level > ? AND is_active = true", affiliate.Tier.Level).First(&nextTier).Error; err != nil {
-		return nil // Sudah mencapai tier maksimal
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil // Sudah mencapai tier maksimal
+		}
+		return err
 	}
 
 	// Evaluasi syarat upgrade berdasarkan data real-time yang baru dihitung
-	isEligible := true
+	isTierEligible := true
 	if nextTier.MinActiveMitra > 0 && activeMitraCount < nextTier.MinActiveMitra {
-		isEligible = false
+		isTierEligible = false
 	}
 	if nextTier.MinMonthlyTurnover > 0 && teamMonthlyTurnover < nextTier.MinMonthlyTurnover {
-		isEligible = false
+		isTierEligible = false
 	}
 
-	if isEligible && (nextTier.MinActiveMitra > 0 || nextTier.MinMonthlyTurnover > 0) {
-		oldName := affiliate.Tier.Name
+	if isTierEligible && (nextTier.MinActiveMitra > 0 || nextTier.MinMonthlyTurnover > 0) {
 		if err := s.DB.Model(&affiliate).Update("membership_tier_id", nextTier.ID).Error; err != nil {
 			return err
 		}
-		_ = oldName
 		if s.Notif != nil {
 			s.Notif.Push(affiliateMemberID, "affiliate", "tier_upgrade",
 				"🎉 Selamat! Anda naik ke "+nextTier.Name,
@@ -158,6 +217,7 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 
 	return nil
 }
+
 
 // GetTeamStats: Menghitung total downline dan omset tim (seluruh keturunan/infinite depth)
 func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int64, teamTurnover float64, err error) {
@@ -226,11 +286,12 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 	}
 
 	// [SYNC FIX] Ambil syarat dari MembershipTier level TERTINGGI (tier Merchant/puncak)
-	// Ini sama sumber dengan TriggerTierUpgrade — tidak ada lagi 2 sumber berbeda
-	var merchantTier models.MembershipTier
-	reqMitra = 100      // default fallback
-	reqTurnover = 10000000.0
+	// Jika tidak ada tier, gunakan PlatformConfig
+	configSvc := NewConfigService(s.DB)
+	reqMitra = configSvc.GetInt("merchant_min_active_mitra", 100)
+	reqTurnover = configSvc.GetFloat("merchant_min_team_turnover", 10000000.0)
 
+	var merchantTier models.MembershipTier
 	if err := s.DB.Order("level DESC").Where("is_active = true").First(&merchantTier).Error; err == nil {
 		if merchantTier.MinActiveMitra > 0 {
 			reqMitra = merchantTier.MinActiveMitra
@@ -248,21 +309,9 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 // [Sync Fix] Sesuai dokumen bisnis: Merchant yang tidak memenuhi syarat 3 bulan berturut-turut → dicabut
 func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err error) {
 	// Ambil threshold dari config
-	minActiveMitra := 100
-	minTurnover := 10000000.0
-
-	var configActive models.PlatformConfig
-	if dbErr := s.DB.Where("key = ?", "merchant_min_active_mitra").First(&configActive).Error; dbErr == nil {
-		if val, dbErr := strconv.Atoi(configActive.Value); dbErr == nil {
-			minActiveMitra = val
-		}
-	}
-	var configTurnover models.PlatformConfig
-	if dbErr := s.DB.Where("key = ?", "merchant_min_team_turnover").First(&configTurnover).Error; dbErr == nil {
-		if val, dbErr := strconv.ParseFloat(configTurnover.Value, 64); dbErr == nil {
-			minTurnover = val
-		}
-	}
+	configSvc := NewConfigService(s.DB)
+	minActiveMitra := configSvc.GetInt("merchant_min_active_mitra", 100)
+	minTurnover := configSvc.GetFloat("merchant_min_team_turnover", 10000000.0)
 
 	// Ambil semua merchant aktif
 	var merchants []struct {

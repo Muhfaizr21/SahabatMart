@@ -91,7 +91,6 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		if group.MerchantID != pusatID {
 			// [Audit Fix] Intelligent Discount Burden Distribution
 			merchantDiscShare := group.Discount * 0.5 // Default: bagi dua untuk Voucher Platform
-			hqDiscShare := group.Discount * 0.5
 
 			// Jika voucher dimiliki spesifik oleh merchant ini, merchant tanggung 100%
 			if order.VoucherID != nil {
@@ -99,44 +98,44 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 				if err := tx.First(&v, *order.VoucherID).Error; err == nil {
 					if v.MerchantID != nil && *v.MerchantID == group.MerchantID {
 						merchantDiscShare = group.Discount
-						hqDiscShare = 0
 					}
 				}
 			}
 
-			// [Sync Fix] Sesuai Dokumen Bisnis Akuglow:
-			// Merchant sebagai DISTRIBUTOR mendapat KOMISI DISTRIBUSI saja.
-			// Ini beda dari model reseller biasa — Merchant tidak beli putus.
-			// Formula distribusi:
-			//   Merchant  = DistributionFee - BebanDiskon Merchant
-			//   HQ        = Subtotal - PlatformFee - AffiliateFee - DistributionFee - BebanDiskon HQ
-			//   Platform  = PlatformFee (dicatat terpisah)
-			//   Affiliate = TotalCommission (dicatat di step 3)
-
-			// 1. Bayar Merchant (Komisi Distribusi saja, sesuai peran distributor)
-			merchantPayout := group.DistributionCommission - merchantDiscShare
-			if merchantPayout < 0 { merchantPayout = 0 }
-
-			if merchantPayout > 0 {
-				if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, merchantPayout, order.ID, "order", fmt.Sprintf("Komisi Distribusi order %s", order.OrderNumber)); err != nil {
+			// [Financial Integrity Fix] Use the pre-calculated MerchantPayout from OrderService
+			// This ensures synchronization between what was promised at checkout and what is distributed.
+			
+			// 1. Ambil jatah Merchant (Revenue - Fees)
+			actualPayout := group.MerchantPayout - merchantDiscShare
+			if actualPayout < 0 { actualPayout = 0 }
+			
+			if actualPayout > 0 {
+				desc := fmt.Sprintf("Hasil Penjualan order %s", order.OrderNumber)
+				if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, actualPayout, order.ID, "order", desc); err != nil {
 					return err
 				}
 			}
 
-			// 2. HQ mendapat sisa: Subtotal - PlatformFee - AffiliateFee - DistributionFee - BebanDiskon HQ
-			hqRevenue := group.Subtotal - group.PlatformFee - group.AffiliateCommission - group.DistributionCommission - hqDiscShare
+			// 2. HQ (Pusat) mendapat Platform Fee jika merchant bukan pusat
+			// (Revenue HQ dalam model marketplace adalah Platform Fee)
+			// Jika ada subsidi karena diskon besar, akan tercatat otomatis.
+			
+			// HQ hanya dapat uang jika ada sisa setelah payout merchant, affiliate, dan platform fee
+			// Namun biasanya hqRevenue di sini adalah 0 karena Merchant sudah ambil sisa Subtotal.
+			hqRevenue := (group.Subtotal - group.Discount) - actualPayout - group.AffiliateCommission - group.PlatformFee
 			if hqRevenue < 0 { hqRevenue = 0 }
 			
 			if hqRevenue > 0 {
-				desc := fmt.Sprintf("Revenue HQ dari order %s (setelah distribusi)", order.OrderNumber)
+				desc := fmt.Sprintf("Revenue Tambahan HQ order %s", order.OrderNumber)
 				if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqRevenue, order.ID, "order", desc); err != nil {
 					return err
 				}
 			}
 
-			// Catat subsidi diskon HQ jika ada
-			if hqDiscShare > 0 {
-				if err := s.ProcessTransaction(tx, models.PusatID, models.WalletBuyer, models.TxPlatformFee, -hqDiscShare, order.ID, "order", fmt.Sprintf("Subsidi Diskon order %s", order.OrderNumber)); err != nil {
+			// 3. Catat record subsidi jika hqRevenue sampai 0 (HQ tekor karena diskon)
+			if hqRevenue == 0 && (group.Subtotal - group.Discount) < (actualPayout + group.AffiliateCommission + group.PlatformFee) {
+				loss := (actualPayout + group.AffiliateCommission + group.PlatformFee) - (group.Subtotal - group.Discount)
+				if err := s.ProcessTransaction(tx, models.PusatID, models.WalletBuyer, models.TxPlatformFee, -loss, order.ID, "order", fmt.Sprintf("Subsidi Kerugian Diskon order %s", order.OrderNumber)); err != nil {
 					return err
 				}
 			}
@@ -162,22 +161,81 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 
 	// 3. Distribute ke Affiliate (jika ada)
 	if order.AffiliateID != nil && *order.AffiliateID != "" {
-		desc := fmt.Sprintf("Komisi Affiliate: %s", order.OrderNumber)
-		if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, order.TotalCommission, order.ID, "order", desc); err != nil {
-			return err
+		// Cek apakah ada item produk yang pakai preset multi-level
+		var orderItems []models.OrderItem
+		tx.Where("order_id = ?", order.ID).Find(&orderItems)
+
+		orderSvc := NewOrderService(s.DB)
+		presetUsed := false
+		for _, item := range orderItems {
+			entries, err := orderSvc.DistributePresetCommissions(tx, order, item, *order.AffiliateID)
+			if err == nil && len(entries) > 0 {
+				presetUsed = true
+				// Distribute wallet credit untuk tiap level
+				for _, entry := range entries {
+					desc := fmt.Sprintf("Komisi Level %d (Preset): %s", entry.Level, order.OrderNumber)
+					if err := s.ProcessTransaction(tx, entry.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, entry.Amount, order.ID, "order", desc); err != nil {
+						return err
+					}
+					// Notifikasi per affiliate
+					_ = s.Notification.Push(entry.AffiliateID, "affiliate", "commission_earned",
+						fmt.Sprintf("Komisi Level %d Masuk! 🎉", entry.Level),
+						fmt.Sprintf("Anda mendapat komisi Rp%.0f (Level %d) dari pesanan %s", entry.Amount, entry.Level, order.OrderNumber),
+						"/affiliate/commissions")
+				}
+			}
 		}
 
-		// Notifikasi ke Affiliate
-		_ = s.Notification.Push(*order.AffiliateID, "affiliate", "commission_earned", "Komisi Baru!", 
-			fmt.Sprintf("Anda mendapatkan estimasi komisi Rp%.2f dari pesanan %s", order.TotalCommission, order.OrderNumber), 
-			fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
+		// Jika tidak ada item yang pakai preset, fallback ke komisi flat biasa
+		if !presetUsed && order.TotalCommission > 0 {
+			desc := fmt.Sprintf("Komisi Affiliate: %s", order.OrderNumber)
+			if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, order.TotalCommission, order.ID, "order", desc); err != nil {
+				return err
+			}
+			_ = s.Notification.Push(*order.AffiliateID, "affiliate", "commission_earned", "Komisi Baru!",
+				fmt.Sprintf("Anda mendapatkan estimasi komisi Rp%.2f dari pesanan %s", order.TotalCommission, order.OrderNumber),
+				fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
+		}
 	}
 	
-	// Notifikasi ke Merchant (dengan info komisi distribusi yang benar)
+	// Notifikasi ke Merchant (dengan info jatah yang benar)
 	for _, group := range order.MerchantGroups {
+		actualPayout := group.MerchantPayout // Gunakan field payout yang sinkron
 		_ = s.Notification.Push(group.MerchantID, "merchant", "order_paid", "Pesanan Dibayar", 
-			fmt.Sprintf("Pesanan %s telah dibayar. Komisi distribusi Rp%.2f masuk ke saldo tertunda.", order.OrderNumber, group.DistributionCommission), 
+			fmt.Sprintf("Pesanan %s telah dibayar. Hasil penjualan Rp%.2f masuk ke saldo tertunda.", order.OrderNumber, actualPayout), 
 			fmt.Sprintf("/merchant/orders/%s", order.ID))
+	}
+	return nil
+}
+
+// ReverseDistribution menarik kembali dana yang sudah dibagikan jika pesanan dibatalkan/refund
+func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error {
+	// Temukan semua transaksi wallet terkait order ini yang belum cair (pending)
+	var txs []models.WalletTransaction
+	if err := tx.Where("reference_id = ? AND reference_type = ? AND is_settled = ?", orderID, "order", false).Find(&txs).Error; err != nil {
+		return err
+	}
+
+	for _, txn := range txs {
+		// Jika transaksi ini adalah penambahan saldo (SaleRevenue atau CommissionEarned)
+		if txn.Type == models.TxSaleRevenue || txn.Type == models.TxCommissionEarned || txn.Type == models.TxPlatformFee {
+			var wallet models.Wallet
+			if err := tx.First(&wallet, txn.WalletID).Error; err != nil {
+				continue
+			}
+
+			// Tentukan tipe reversal-nya
+			revType := models.TxSaleRevenueReversed
+			if txn.Type == models.TxCommissionEarned {
+				revType = models.TxCommissionReversed
+			}
+
+			desc := fmt.Sprintf("Pembatalan Dana: %s (Ref: %s)", txn.Description, orderID)
+			// Tarik kembali dana menggunakan ProcessTransaction dengan nilai negatif (atau gunakan case deduksi)
+			if err := s.ProcessTransaction(tx, wallet.OwnerID, wallet.OwnerType, revType, txn.Amount, orderID, "order_reversal", desc); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

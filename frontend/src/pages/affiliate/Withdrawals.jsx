@@ -33,15 +33,19 @@ export default function AffiliateWithdrawals() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [config, setConfig] = useState({});
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [wRes, dRes] = await Promise.all([
+      const [wRes, dRes, cRes] = await Promise.all([
         fetchJson(`${AFFILIATE_API_BASE}/withdrawals`),
         fetchJson(`${AFFILIATE_API_BASE}/dashboard`),
+        fetchJson(`${API_BASE}/api/public/config`),
       ]);
       setWithdrawals(Array.isArray(wRes) ? wRes : []);
       setBalance(dRes?.stats?.balance || 0);
+      setConfig(cRes || {});
     } catch (err) {
       console.error(err);
     } finally {
@@ -58,8 +62,9 @@ export default function AffiliateWithdrawals() {
     setError('');
     setSuccess('');
     const amt = parseFloat(amount);
-    if (isNaN(amt) || amt < 50000) {
-      setError('Minimum penarikan adalah Rp 50.000');
+    const minWithdrawal = parseFloat(config.payout_min_amount || 50000);
+    if (isNaN(amt) || amt < minWithdrawal) {
+      setError(`Minimum penarikan adalah Rp ${Number(minWithdrawal).toLocaleString('id-ID')}`);
       return;
     }
     if (amt > balance) {
@@ -114,7 +119,7 @@ export default function AffiliateWithdrawals() {
           <p className="text-4xl font-black text-white font-['Plus_Jakarta_Sans']">
             {formatRp(balance)}
           </p>
-          <p className="text-slate-400 text-xs mt-2">Minimum penarikan: Rp 50.000</p>
+          <p className="text-slate-400 text-xs mt-2">Minimum penarikan: Rp {Number(config.payout_min_amount || 50000).toLocaleString('id-ID')}</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -159,8 +164,8 @@ export default function AffiliateWithdrawals() {
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder="50000"
-                  min={50000}
+                  placeholder={(config.payout_min_amount || 50000).toString()}
+                  min={config.payout_min_amount || 50000}
                   max={balance}
                   className="w-full pl-12 pr-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500"
                   style={{
@@ -185,7 +190,7 @@ export default function AffiliateWithdrawals() {
                 <button
                   type="button"
                   onClick={() => setAmount(Math.floor(balance).toString())}
-                  disabled={balance < 50000}
+                  disabled={balance < (config.payout_min_amount || 50000)}
                   className="px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-30"
                   style={{ background: 'rgba(124, 58, 237, 0.2)', color: '#ddb7ff' }}
                 >
@@ -301,7 +306,13 @@ export default function AffiliateWithdrawals() {
         <span className="material-symbols-outlined text-blue-400 text-lg mt-0.5">schedule</span>
         <div className="text-xs text-slate-400 leading-relaxed">
           <span className="font-bold text-blue-300 block mb-1">Proses Pembayaran</span>
-          Penarikan diproses setiap hari Senin dan Kamis. Pastikan data rekening bank Anda sudah benar di halaman Pengaturan sebelum mengajukan penarikan.
+          {config.payout_schedule === 'daily' ? (
+            'Penarikan diproses setiap hari.'
+          ) : config.payout_schedule === 'monthly' ? (
+            'Penarikan diproses setiap awal bulan.'
+          ) : (
+            `Penarikan diproses secara ${config.payout_schedule || 'mingguan'} setiap hari ${config.payout_day || 'Senin dan Kamis'}.`
+          )} Pastikan data rekening bank Anda sudah benar di halaman Pengaturan sebelum mengajukan penarikan.
         </div>
       </div>
     </div>

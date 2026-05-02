@@ -262,8 +262,9 @@ export default function ProductDetailPage() {
             
             <div className="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8 bg-white/50 w-fit p-2 rounded-2xl border border-white backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <StarRating rating={product.rating || 4.5} size={18} />
-                <span className="text-xs sm:text-sm font-black text-gray-900">{(product.rating || 4.5).toFixed(1)}</span>
+                <StarRating rating={product.rating || 0} size={18} />
+                <span className="text-xs sm:text-sm font-black text-gray-900">{(product.rating || 0).toFixed(1)}</span>
+                <span className="text-[10px] text-gray-400 font-bold">({product.reviews || 0} Ulasan)</span>
               </div>
               <div className="w-px h-4 bg-gray-200"></div>
               <span className="text-xs sm:text-sm font-bold text-gray-400">Sold {product.sold || '2.4k'}+</span>
@@ -271,7 +272,9 @@ export default function ProductDetailPage() {
 
             <div className="flex items-baseline gap-4 mb-2">
               <div className="text-4xl sm:text-5xl font-black text-blue-600">
-                Rp{(selectedVariant ? selectedVariant.price : product.price || 0).toLocaleString('id-ID')}
+                Rp{(user?.role === 'mitra' && product.wholesale_price > 0 
+                  ? product.wholesale_price 
+                  : (selectedVariant ? selectedVariant.price : product.price || 0)).toLocaleString('id-ID')}
               </div>
               {product.old_price > 0 && (
                 <div className="text-lg sm:text-xl text-gray-300 line-through font-bold">

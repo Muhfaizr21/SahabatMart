@@ -28,6 +28,7 @@ func SeedAll(db *gorm.DB) {
 		&models.User{}, &models.UserProfile{},
 		&models.Merchant{}, &models.AffiliateMember{}, &models.MembershipTier{},
 		&models.Category{}, &models.Product{}, &models.ProductVariant{},
+		&models.ProductTierCommission{},
 		&models.Inventory{}, &models.RestockRequest{}, &models.RestockItem{},
 		&models.Order{}, &models.OrderMerchantGroup{}, &models.OrderItem{},
 		&models.Cart{}, &models.CartItem{},
@@ -47,7 +48,7 @@ func SeedAll(db *gorm.DB) {
 		"skin_community_posts", "skin_community_comments", "skin_community_likes",
 		"skin_community_groups", "skin_educations",
 		"inventories", "restock_requests", "restock_items",
-		"product_variants", "products", "vouchers", "banners",
+		"product_tier_commissions", "product_variants", "products", "vouchers", "banners",
 		"affiliate_members", "membership_tiers", "categories", "brands",
 		"user_profiles", "users",
 		"roles", "permissions", "role_permissions",
@@ -77,7 +78,7 @@ func SeedAll(db *gorm.DB) {
 	// 6. Seed Marketing & RBAC
 	seedMarketing(db)
 	seedRBAC(db)
-	seedConfigs(db)
+	SeedConfigs(db)
 
 	// 7. Seed Network (Merchant & Affiliate relationship)
 	SeedNetwork(db)
@@ -355,8 +356,8 @@ func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Me
 			MerchantID:  PusatID, // Set Pusat as the official owner of Master Products
 			SupplierID:  suppliers[i%len(suppliers)].ID,
 			Stock:       100,     // Initial master stock
-			Rating:      4.5 + (0.1 * float64(i%5)),
-			Reviews:     int(10 + i*2),
+			Rating:      0,
+			Reviews:     0,
 		}
 		db.Create(&prod)
 
@@ -447,11 +448,28 @@ func seedRBAC(db *gorm.DB) {
 	}
 }
 
-func seedConfigs(db *gorm.DB) {
+func SeedConfigs(db *gorm.DB) {
 	fmt.Println("  -> Seeding Platform Configs...")
 	configs := []models.PlatformConfig{
+		{Key: "platform_name", Value: "SahabatMart", Description: "Nama Platform"},
+		{Key: "platform_maintenance", Value: "false", Description: "Mode Pemeliharaan"},
+		{Key: "platform_maint_msg", Value: "Maaf, SahabatMart sedang dalam pemeliharaan rutin.", Description: "Pesan Maintenance"},
+		{Key: "default_platform_fee", Value: "0.05", Description: "Fee Platform Default (%)"},
+		{Key: "platform_currency", Value: "IDR", Description: "Mata Uang"},
+		{Key: "platform_min_order", Value: "10000", Description: "Minimum Order (Rp)"},
 		{Key: "merchant_min_active_mitra", Value: "100", Description: "Minimal affiliate aktif untuk menjadi merchant"},
 		{Key: "merchant_min_team_turnover", Value: "10000000", Description: "Minimal omset tim (Rp) per bulan untuk menjadi merchant"},
+		{Key: "payout_min_amount", Value: "50000", Description: "Minimum Payout (Rp)"},
+		{Key: "payout_schedule", Value: "weekly", Description: "Jadwal Payout (daily/weekly/monthly)"},
+		{Key: "payout_day", Value: "friday", Description: "Hari Payout (jika weekly)"},
+		{Key: "payment_gateway", Value: "tripay", Description: "Payment Gateway Aktif (tripay/midtrans)"},
+		{Key: "payment_tripay_merchant", Value: "", Description: "Tripay Merchant Code"},
+		{Key: "payment_tripay_key", Value: "", Description: "Tripay API Key"},
+		{Key: "payment_tripay_private", Value: "", Description: "Tripay Private Key"},
+		{Key: "payment_tripay_url", Value: "https://tripay.co.id/api-sandbox", Description: "Tripay Base URL"},
+		{Key: "payment_sandbox_mode", Value: "true", Description: "Payment Sandbox Mode"},
+		{Key: "notif_email_enabled", Value: "true", Description: "Email Notifikasi Aktif"},
+		{Key: "notif_smtp_port", Value: "587", Description: "SMTP Port"},
 	}
 
 	for _, c := range configs {

@@ -62,6 +62,22 @@ const AffiliateLayout = () => {
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+  const profileRef = React.useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setNotifOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -319,7 +335,7 @@ const AffiliateLayout = () => {
 
           <div className="flex items-center gap-4">
             {/* Notification system */}
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setNotifOpen(!notifOpen)}
                 className={`p-2 rounded-xl transition-all ${notifOpen ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
@@ -333,7 +349,6 @@ const AffiliateLayout = () => {
               {/* Notification Dropdown */}
               {notifOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
                   <div className="absolute right-0 mt-3 w-80 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="px-5 py-4 border-bottom border-white/5 bg-white/5 flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -403,18 +418,68 @@ const AffiliateLayout = () => {
 
             <div className="h-6 w-px bg-white/10" />
 
-            {/* User info */}
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-white leading-tight">{displayName}</p>
-                <p className="text-[10px] text-purple-400 capitalize">{tierName} Partner</p>
-              </div>
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-lg"
-                style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)' }}
+            {/* User info with Dropdown */}
+            <div className="relative" ref={profileRef}>
+              <div 
+                onClick={() => setProfileOpen(!profileOpen)}
+                className={`flex items-center gap-3 p-1.5 pr-3 rounded-2xl transition-all cursor-pointer select-none ${profileOpen ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}
               >
-                {initial}
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-lg border border-white/10"
+                  style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)' }}
+                >
+                  {initial}
+                </div>
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs font-bold text-white leading-tight">{displayName}</p>
+                  <div className="flex items-center justify-end gap-1">
+                    <p className="text-[10px] text-purple-400 capitalize font-medium">{tierName} Partner</p>
+                    <span className={`material-symbols-outlined text-[12px] text-slate-500 transition-transform duration-300 ${profileOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                  </div>
+                </div>
               </div>
+
+              {/* Profile Dropdown */}
+              {profileOpen && (
+                <div className="absolute right-0 mt-3 w-56 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-4 bg-white/5 border-b border-white/5">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Akun Terhubung</p>
+                    <p className="text-xs font-bold text-white truncate">{user.email}</p>
+                  </div>
+                  <div className="p-2">
+                    <button 
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/affiliate/settings');
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all text-left"
+                    >
+                      <span className="material-symbols-outlined text-lg">account_circle</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Profil Saya</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/profile');
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all text-left"
+                    >
+                      <span className="material-symbols-outlined text-lg">shopping_basket</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Halaman Buyer</span>
+                    </button>
+                    
+                    <div className="h-[1px] bg-white/5 my-2 mx-3" />
+                    
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all text-left group"
+                    >
+                      <span className="material-symbols-outlined text-lg">logout</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Keluar Sesi</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

@@ -33,12 +33,19 @@ func NewMerchantController(db *gorm.DB) *MerchantController {
 // GET /api/merchant/products
 func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
-	products, err := mc.Service.GetProducts(merchantID)
+	
+	search := r.URL.Query().Get("search")
+	categoryID := r.URL.Query().Get("category_id")
+	stockStatus := r.URL.Query().Get("stock_status")
+	page := utils.QueryInt(r, "page", 1)
+	limit := utils.QueryInt(r, "limit", 10)
+
+	result, err := mc.Service.GetProducts(merchantID, search, categoryID, stockStatus, page, limit)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar produk")
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar produk: "+err.Error())
 		return
 	}
-	utils.JSONResponse(w, http.StatusOK, products)
+	utils.JSONResponse(w, http.StatusOK, result)
 }
 
 // GET /api/merchant/catalog
@@ -96,13 +103,16 @@ func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Requ
 func (mc *MerchantController) GetOrders(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
 	status := r.URL.Query().Get("status")
+	
+	page := utils.QueryInt(r, "page", 1)
+	limit := utils.QueryInt(r, "limit", 10)
 
-	groups, err := mc.Service.GetOrders(merchantID, status)
+	result, err := mc.Service.GetOrders(merchantID, status, page, limit)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil daftar pesanan")
 		return
 	}
-	utils.JSONResponse(w, http.StatusOK, groups)
+	utils.JSONResponse(w, http.StatusOK, result)
 }
 
 // POST /api/merchant/orders/status
@@ -343,10 +353,10 @@ func (mc *MerchantController) GetNotifications(w http.ResponseWriter, r *http.Re
 func (mc *MerchantController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.Context().Value("merchant_id").(string)
 	var req struct {
-		ID uint `json:"id"`
+		ID string `json:"id"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
-	if req.ID == 0 {
+	if req.ID == "" {
 		mc.Notif.MarkAllAsRead(merchantID, "merchant")
 	} else {
 		mc.Notif.MarkAsRead(req.ID)

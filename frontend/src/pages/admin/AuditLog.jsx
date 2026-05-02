@@ -36,7 +36,7 @@ export default function AdminAuditLog() {
   const load = () => {
     setLoading(true);
     fetchJson(`${API}/audit-logs?search=${search}&action=${actionFilter}`)
-      .then(d => setLogs(d || []))
+      .then(d => setLogs(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -113,7 +113,7 @@ export default function AdminAuditLog() {
                   <td style={A.td}>
                     <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 12px', borderRadius:20, background:ac+'14', color:ac, fontSize:11.5, fontWeight:700 }}>
                       <i className={`bx ${ai}`} style={{ fontSize:13 }} />
-                      {log.action.toUpperCase().replace(/_/g,' ')}
+                      {log.action?.toUpperCase().replace(/_/g,' ') || 'UNKNOWN'}
                     </span>
                   </td>
                   <td style={A.td}>

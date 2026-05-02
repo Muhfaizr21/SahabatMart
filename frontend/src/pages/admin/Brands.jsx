@@ -13,7 +13,15 @@ export default function AdminBrands() {
   const EMPTY = { name: '', logo_url: '', is_featured: false };
   const load = () => {
     setLoading(true);
-    fetchJson(`${API}/brands`).then(d => setBrands(Array.isArray(d) ? d : (d?.data || []))).catch(console.error).finally(() => setLoading(false));
+    fetchJson(`${API}/brands`)
+      .then(d => {
+        const dataArr = Array.isArray(d) ? d : (d?.data || []);
+        setBrands(dataArr);
+      })
+      .catch(err => {
+        window.toast?.error("Gagal memuat data brand");
+      })
+      .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
@@ -21,12 +29,23 @@ export default function AdminBrands() {
     e.preventDefault();
     setSaving(true);
     fetchJson(`${API}/brands/upsert`, { method: 'POST', body: JSON.stringify(modal) })
-      .then(() => { load(); setModal(null); }).catch(e => alert(e.message)).finally(() => setSaving(false));
+      .then(() => { 
+        window.toast?.success('Brand berhasil disimpan');
+        load(); 
+        setModal(null); 
+      })
+      .catch(e => window.toast?.error(e.message))
+      .finally(() => setSaving(false));
   };
 
   const del = (id) => {
     if (!window.confirm('Hapus brand ini?')) return;
-    fetchJson(`${API}/brands/delete?id=${id}`, { method: 'DELETE' }).then(load).catch(e => alert(e.message));
+    fetchJson(`${API}/brands/delete?id=${id}`, { method: 'DELETE' })
+      .then(() => {
+        window.toast?.success('Brand dihapus');
+        load();
+      })
+      .catch(e => window.toast?.error(e.message));
   };
 
   return (
@@ -77,7 +96,7 @@ export default function AdminBrands() {
                   </span>
                 </td>
                 <td style={{ ...A.td, textAlign: 'center' }}>
-                  <span style={{ fontWeight: 800, color: '#0f172a' }}>0</span>
+                  <span style={{ fontWeight: 800, color: '#0f172a' }}>{b.product_count || 0}</span>
                   <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>items</span>
                 </td>
                 <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>

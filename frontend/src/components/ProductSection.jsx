@@ -118,8 +118,8 @@ function ProductCard({ product }) {
         </Link>
         
         <div className="flex items-center gap-1.5 mb-4">
-          <StarRating rating={product.rating} />
-          <span className="text-[10px] text-gray-400">({product.reviews})</span>
+          <StarRating rating={product.rating || 0} />
+          <span className="text-[10px] text-gray-400">({product.reviews || 0})</span>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2">

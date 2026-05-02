@@ -260,3 +260,85 @@ func (s *AuthService) HandleSuccessfulLogin(user *models.User, clientIP string) 
 		"last_login_ip":         clientIP,
 	})
 }
+
+// RequestPasswordReset creates a reset token and returns it (in a real app, this would be emailed)
+func (s *AuthService) RequestPasswordReset(email string) (string, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	var user models.User
+	if err := s.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		return "", errors.New("email tidak ditemukan")
+	}
+
+	token := utils.GenerateRandomString(32)
+	expiry := time.Now().Add(1 * time.Hour)
+
+	reset := models.PasswordReset{
+		Email:     email,
+		Token:     token,
+		ExpiredAt: expiry,
+	}
+
+	if err := s.DB.Create(&reset).Error; err != nil {
+		return "", err
+	}
+
+	// In a real production app, send email here
+	// For now, we return it so the dev/user can see it or use it
+	return token, nil
+}
+
+// ResetPassword validates the token and updates the user's password
+func (s *AuthService) ResetPassword(token, newPassword string) error {
+	var reset models.PasswordReset
+	if err := s.DB.Where("token = ? AND expired_at > ? AND used_at IS NULL", token, time.Now()).First(&reset).Error; err != nil {
+		return errors.New("token tidak valid atau sudah kadaluarsa")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	hashedPasswordStr := string(hashedPassword)
+	
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
+		// Update password
+		if err := tx.Model(&models.User{}).Where("email = ?", reset.Email).Update("password_hash", &hashedPasswordStr).Error; err != nil {
+			return err
+		}
+
+		// Mark token as used
+		now := time.Now()
+		reset.UsedAt = &now
+		if err := tx.Save(&reset).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (s *AuthService) ChangePassword(userID string, oldPassword, newPassword string) error {
+	var user models.User
+	if err := s.DB.First(&user, "id = ?", userID).Error; err != nil {
+		return errors.New("pengguna tidak ditemukan")
+	}
+
+	// Verify old password
+	if user.PasswordHash != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(oldPassword)); err != nil {
+			return errors.New("kata sandi lama tidak sesuai")
+		}
+	}
+
+	// Hash new password
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	hashedStr := string(hashed)
+	return s.DB.Model(&user).Update("password_hash", hashedStr).Error
+}

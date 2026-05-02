@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"gorm.io/gorm"
 )
 
 type TripayService struct {
@@ -19,12 +21,28 @@ type TripayService struct {
 	BaseURL      string
 }
 
-func NewTripayService() *TripayService {
+func NewTripayService(db *gorm.DB) *TripayService {
+	// Priority: Database Config -> Environment Variable
+	configSvc := NewConfigService(db)
+	
+	merchantCode := configSvc.Get("payment_tripay_merchant", os.Getenv("TRIPAY_MERCHANT_CODE"))
+	apiKey := configSvc.Get("payment_tripay_key", os.Getenv("TRIPAY_API_KEY"))
+	privateKey := configSvc.Get("payment_tripay_private", os.Getenv("TRIPAY_PRIVATE_KEY"))
+	baseURL := configSvc.Get("payment_tripay_url", "")
+	if baseURL == "" {
+		sandbox := configSvc.Get("payment_sandbox_mode", "true") == "true"
+		if sandbox {
+			baseURL = "https://tripay.co.id/api-sandbox"
+		} else {
+			baseURL = "https://tripay.co.id/api"
+		}
+	}
+
 	return &TripayService{
-		MerchantCode: os.Getenv("TRIPAY_MERCHANT_CODE"),
-		ApiKey:       os.Getenv("TRIPAY_API_KEY"),
-		PrivateKey:   os.Getenv("TRIPAY_PRIVATE_KEY"),
-		BaseURL:      os.Getenv("TRIPAY_BASE_URL"),
+		MerchantCode: merchantCode,
+		ApiKey:       apiKey,
+		PrivateKey:   privateKey,
+		BaseURL:      baseURL,
 	}
 }
 

@@ -47,6 +47,10 @@ export default function PusatInventory() {
     }
   };
 
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
   // Modal States
   const [showInboundModal, setShowInboundModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -57,8 +61,41 @@ export default function PusatInventory() {
   });
 
   const [supplierForm, setSupplierForm] = useState({ 
-    name: '', contact_name: '', phone: '', email: '', address: '' 
+    id: null, name: '', contact: '', phone: '', email: '', address: '' 
   });
+
+  const handlePrintBarcode = () => {
+    if (products.length === 0) return toast.error('Belum ada produk master untuk dicetak');
+    
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Cetak Barcode Master</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+            .barcode-card { border: 1px dashed #ccc; padding: 15px; text-align: center; border-radius: 8px; }
+            .barcode-card img { max-width: 100%; height: auto; margin-bottom: 10px; }
+            .title { font-size: 12px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 5px; }
+            .sku { font-size: 10px; color: #666; }
+            @media print { body { padding: 0; } .barcode-card { break-inside: avoid; border: 1px solid #000; } }
+          </style>
+        </head>
+        <body onload="setTimeout(() => window.print(), 1000)">
+          ${products.map(p => `
+            <div class="barcode-card">
+              <div class="title">${p.name}</div>
+              <img src="https://barcode.tec-it.com/barcode.ashx?data=${p.sku}&code=Code128&dpi=96&translate-esc=on" alt="${p.sku}" />
+              <div class="sku">${p.sku}</div>
+            </div>
+          `).join('')}
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   const handleInboundSubmit = async (e) => {
     e.preventDefault();
@@ -79,13 +116,40 @@ export default function PusatInventory() {
   const handleSupplierSubmit = async (e) => {
     e.preventDefault();
     try {
-      await postJson(`${ADMIN_API_BASE}/warehouse/suppliers`, supplierForm);
-      toast.success('Supplier baru berhasil terdaftar!');
+      let url = `${ADMIN_API_BASE}/warehouse/suppliers/create`;
+      if (supplierForm.id) {
+        url = `${ADMIN_API_BASE}/warehouse/suppliers/update/${supplierForm.id}`;
+      }
+      await postJson(url, supplierForm);
+      toast.success(supplierForm.id ? 'Supplier berhasil diupdate!' : 'Supplier baru berhasil terdaftar!');
       setShowSupplierModal(false);
       loadAllData();
-      setSupplierForm({ name: '', contact_name: '', phone: '', email: '', address: '' });
+      setSupplierForm({ id: null, name: '', contact: '', phone: '', email: '', address: '' });
     } catch (err) {
       toast.error(err.message);
+    }
+  };
+
+  const handleEditSupplier = (s) => {
+    setSupplierForm({
+      id: s.id,
+      name: s.name,
+      contact: s.contact || '',
+      phone: s.phone || '',
+      email: s.email || '',
+      address: s.address || ''
+    });
+    setShowSupplierModal(true);
+  };
+
+  const handleDeleteSupplier = async (id) => {
+    if (!window.confirm('Yakin ingin menghapus supplier ini?')) return;
+    try {
+      await fetchJson(`${ADMIN_API_BASE}/warehouse/suppliers/delete/${id}`, { method: 'DELETE' });
+      toast.success('Supplier dihapus!');
+      loadAllData();
+    } catch (err) {
+      toast.error('Gagal menghapus supplier: ' + err.message);
     }
   };
 
@@ -117,7 +181,7 @@ export default function PusatInventory() {
       >
         <div style={{ display: 'flex', gap: 12 }}>
           <button style={A.btnGhost} onClick={loadAllData}><i className="bx bx-refresh" /> Sync Global</button>
-          <button style={A.btnPrimary} onClick={() => toast('Fitur Cetak Barcode Massal Siap!')}>
+          <button style={A.btnPrimary} onClick={handlePrintBarcode}>
             <i className="bx bx-barcode-reader" /> Cetak Barcode Master
           </button>
         </div>
@@ -138,10 +202,10 @@ export default function PusatInventory() {
             { label: 'SKU Kritis', val: stats.lowStock, icon: 'bxs-error-circle', color: '#ef4444' },
           ]} />
           
-          <TablePanel toolbar={
+          <TablePanel loading={loading} toolbar={
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 13 }}>Daftar Produk Master</span>
-              <Link to="/admin/products/add" style={{ ...A.btnPrimary, padding: '6px 12px', fontSize: 12, textDecoration: 'none' }}>+ Tambah SKU Induk</Link>
+              <Link to="/admin/products/add" style={{ ...A.btnPrimary, textDecoration: 'none' }}>+ Tambah SKU Induk</Link>
             </div>
           }>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -153,11 +217,13 @@ export default function PusatInventory() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((p, i) => (
+                {products.length === 0 ? (
+                  <tr><td colSpan="7" style={A.empty}>Belum ada data produk master.</td></tr>
+                ) : products.map((p, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ ...A.td, paddingLeft: 24 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <img src={formatImage(p.image)} style={{ width: 32, height: 32, borderRadius: 6 }} alt="" />
+                        <img src={formatImage(p.image)} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} alt="" />
                         <div style={{ fontWeight: 700 }}>{p.name}</div>
                       </div>
                     </td>
@@ -178,7 +244,7 @@ export default function PusatInventory() {
       )}
 
       {activeTab === 'inbound' && (
-        <TablePanel toolbar={<button style={A.btnPrimary} onClick={() => setShowInboundModal(true)}>+ Catat Barang Datang (Supplier)</button>}>
+        <TablePanel loading={loading} toolbar={<button style={A.btnPrimary} onClick={() => setShowInboundModal(true)}>+ Catat Barang Datang (Supplier)</button>}>
            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
               <i className="bx bx-receipt" style={{ fontSize: 48, marginBottom: 12, display: 'block' }} />
               Belum ada riwayat penerimaan barang hari ini.<br/>
@@ -188,7 +254,7 @@ export default function PusatInventory() {
       )}
 
       {activeTab === 'suppliers' && (
-        <TablePanel toolbar={<button style={A.btnPrimary} onClick={() => setShowSupplierModal(true)}>+ Tambah Supplier Baru</button>}>
+        <TablePanel loading={loading} toolbar={<button style={A.btnPrimary} onClick={() => setShowSupplierModal(true)}>+ Tambah Supplier Baru</button>}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>{['Nama Perusahaan', 'Kontak', 'Email', 'Alamat', ''].map(h => <th key={h} style={A.th}>{h}</th>)}</tr>
@@ -199,10 +265,15 @@ export default function PusatInventory() {
               ) : suppliers.map((s, i) => (
                 <tr key={i}>
                   <td style={A.td}><b>{s.name}</b></td>
-                  <td style={A.td}>{s.contact_name}</td>
+                  <td style={A.td}>{s.contact}</td>
                   <td style={A.td}>{s.email}</td>
                   <td style={A.td}>{s.address}</td>
-                  <td style={A.td}><i className="bx bx-edit-alt" style={{ cursor: 'pointer' }} /></td>
+                  <td style={A.td}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <i className="bx bx-edit-alt" style={{ cursor: 'pointer', fontSize: 18, color: '#6366f1' }} onClick={() => handleEditSupplier(s)} />
+                      <i className="bx bx-trash" style={{ cursor: 'pointer', fontSize: 18, color: '#ef4444' }} onClick={() => handleDeleteSupplier(s.id)} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -211,13 +282,15 @@ export default function PusatInventory() {
       )}
 
       {activeTab === 'audit' && (
-        <TablePanel toolbar={<div style={{ fontWeight: 700 }}>Stock Mutation Log (Global)</div>}>
+        <TablePanel loading={loading} toolbar={<div style={{ fontWeight: 700 }}>Stock Mutation Log (Global)</div>}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>{['Waktu', 'Tipe', 'Produk', 'Qty', 'Before', 'After', 'Keterangan'].map(h => <th key={h} style={A.th}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {mutations.map((m, i) => (
+              {mutations.length === 0 ? (
+                <tr><td colSpan="7" style={A.empty}>Belum ada riwayat mutasi stok.</td></tr>
+              ) : mutations.map((m, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
                   <td style={A.td}>{fmtDate(m.created_at)}</td>
                   <td style={A.td}>
@@ -303,7 +376,7 @@ export default function PusatInventory() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
           <div style={{ background: '#fff', width: '100%', maxWidth: 500, borderRadius: 20, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
             <div style={{ padding: '24px 32px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontWeight: 800 }}>🏭 Tambah Supplier Baru</h3>
+              <h3 style={{ margin: 0, fontWeight: 800 }}>{supplierForm.id ? '🏭 Edit Supplier' : '🏭 Tambah Supplier Baru'}</h3>
               <button onClick={() => setShowSupplierModal(false)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}>×</button>
             </div>
             <form onSubmit={handleSupplierSubmit} style={{ padding: 32 }}>
@@ -314,7 +387,7 @@ export default function PusatInventory() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                 <div>
                   <label style={fLabel}>Nama Kontak</label>
-                  <input type="text" style={fInput} value={supplierForm.contact_name} onChange={e => setSupplierForm({...supplierForm, contact_name: e.target.value})} />
+                  <input type="text" style={fInput} value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} />
                 </div>
                 <div>
                   <label style={fLabel}>No. Telepon</label>
@@ -331,7 +404,7 @@ export default function PusatInventory() {
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                 <button type="button" style={A.btnGhost} onClick={() => setShowSupplierModal(false)}>Batal</button>
-                <button type="submit" style={A.btnPrimary}>Daftarkan Supplier</button>
+                <button type="submit" style={A.btnPrimary}>{supplierForm.id ? 'Simpan Perubahan' : 'Daftarkan Supplier'}</button>
               </div>
             </form>
           </div>

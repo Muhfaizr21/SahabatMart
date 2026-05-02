@@ -410,9 +410,10 @@ export default function ShopPage() {
                         <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-black uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-lg">
                            {product.category}
                         </Link>
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-yellow-50">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-50">
                           <svg width="12" height="12" fill="#facc15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                          <span className="text-[10px] font-black text-yellow-700">{(product.rating || 4.5).toFixed(1)}</span>
+                          <span className="text-[10px] font-black text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
+                          <span className="text-[9px] text-gray-400 font-bold">({product.reviews || 0})</span>
                         </div>
                       </div>
                       
@@ -429,21 +430,27 @@ export default function ShopPage() {
                       </div>
 
                       {/* Price & Buy Section */}
-                      <div className="mt-auto pt-5 border-t border-gray-50 flex items-center justify-between">
-                        <div>
-                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</p>
-                           <h4 className="font-black text-gray-900 text-base sm:text-xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                      <div className="mt-auto pt-5 border-t border-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                           <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</p>
+                              <h4 className="font-black text-gray-900 text-base sm:text-xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                           </div>
+                           {isLoggedIn && (
+                             <button 
+                               onClick={() => handleAddToCart(product)}
+                               className="w-11 h-11 rounded-2xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
+                             >
+                               <span className="material-symbols-outlined font-black text-xl">shopping_cart</span>
+                             </button>
+                           )}
                         </div>
-                         {isLoggedIn ? (
-                           <button 
-                             onClick={() => handleAddToCart(product)}
-                             className="w-11 h-11 rounded-2xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center"
-                           >
-                             <span className="material-symbols-outlined font-black text-xl">shopping_cart</span>
-                           </button>
-                         ) : (
-                           <Link to="/login" className="text-[10px] font-black text-blue-600 hover:underline">Login untuk beli</Link>
-                         )}
+                        
+                        {!isLoggedIn && (
+                           <Link to="/login" className="block w-full py-2.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all text-center">
+                             Login untuk beli
+                           </Link>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -470,8 +477,9 @@ export default function ShopPage() {
                           {product.category}
                         </Link>
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-50">
-                          <StarRating rating={product.rating || 4.5} />
-                          <span className="text-[10px] font-black text-yellow-700">{(product.rating || 4.5).toFixed(1)}</span>
+                          <StarRating rating={product.rating || 0} />
+                          <span className="text-[10px] font-black text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
+                          <span className="text-[10px] text-gray-400 font-bold">({product.reviews || 0} Ulasan)</span>
                         </div>
                       </div>
 

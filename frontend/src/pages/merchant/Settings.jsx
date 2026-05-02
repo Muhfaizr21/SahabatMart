@@ -7,6 +7,8 @@ const MerchantSettings = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState('');
+    const [searchingArea, setSearchingArea] = useState(false);
+    const [areas, setAreas] = useState([]);
 
     useEffect(() => {
         fetchJson(`${MERCHANT_API_BASE}/store`)
@@ -34,6 +36,29 @@ const MerchantSettings = () => {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSearchArea = async (input) => {
+        if (input.length < 3) return;
+        setSearchingArea(true);
+        try {
+            const res = await fetchJson(`/api/shipping/areas?input=${input}`);
+            setAreas(res.areas || []);
+        } catch (err) {
+            console.error('Area search failed:', err);
+        } finally {
+            setSearchingArea(true);
+            setTimeout(() => setSearchingArea(false), 500);
+        }
+    };
+
+    const handleSelectArea = (area) => {
+        setStore({ 
+            ...store, 
+            biteship_area_id: area.id,
+            area_name: area.name
+        });
+        setAreas([]);
     };
 
     if (loading) return (
@@ -147,6 +172,52 @@ const MerchantSettings = () => {
                                     {store?.joined_at ? new Date(store.joined_at).getFullYear() : '2026'}
                                 </div>
                             </div>
+                        </div>
+
+                        <div style={{ marginTop: 24, padding: 24, background: '#f8fafc', borderRadius: 20, border: '1px solid #e2e8f0' }}>
+                            <h4 style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <i className="bx bx-map-pin" style={{ color: '#6366f1' }} /> Lokasi Gudang / Pengiriman
+                            </h4>
+                            <p style={{ fontSize: 11, color: '#64748b', marginBottom: 16 }}>Digunakan untuk menghitung ongkos kirim real-time bagi pelanggan Anda.</p>
+                            
+                            <div style={{ position: 'relative' }}>
+                                <FieldLabel>Cari Wilayah (Kecamatan/Kota)</FieldLabel>
+                                <input 
+                                    type="text" 
+                                    placeholder="Ketik min. 3 huruf..." 
+                                    style={A.input} 
+                                    onChange={(e) => handleSearchArea(e.target.value)}
+                                />
+                                {searchingArea && <div style={{ position: 'absolute', right: 12, top: 40, fontSize: 10, color: '#6366f1', animation: 'pulse 1s infinite' }}>Mencari...</div>}
+                                
+                                {areas.length > 0 && (
+                                    <div style={{ position: 'absolute', zIndex: 50, left: 0, right: 0, mt: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', maxH: 240, overflowY: 'auto' }}>
+                                        {areas.map(a => (
+                                            <div 
+                                                key={a.id} 
+                                                onClick={() => handleSelectArea(a)}
+                                                style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                                onMouseOut={(e) => e.currentTarget.style.background = '#fff'}
+                                            >
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{a.name}</div>
+                                                <div style={{ fontSize: 11, color: '#64748b' }}>{a.city_name}, {a.province_name} ({a.postal_code})</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {store?.biteship_area_id && (
+                                <div style={{ marginTop: 16, padding: '12px 16px', background: '#ecfdf5', borderRadius: 12, border: '1px solid #d1fae5', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <i className="bx bxs-check-circle" style={{ color: '#10b981', fontSize: 18 }} />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 800, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Biteship Area ID Terhubung</div>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: '#065f46' }}>{store.biteship_area_id}</div>
+                                        {store.area_name && <div style={{ fontSize: 11, color: '#059669' }}>{store.area_name}</div>}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

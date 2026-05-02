@@ -9,6 +9,8 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
+	"math"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -422,10 +424,16 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 
 	availableBalance := totalApproved - totalInFlight
 
-	// Minimum withdrawal amount (from tier or default 50000)
-	minWithdrawal := 50000.0
+	// Minimum withdrawal amount (from config, tier or default 50000)
+	configSvc := services.NewConfigService(ac.DB)
+	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
+	
 	if affiliate.Tier != nil && affiliate.Tier.MinWithdrawalAmount > 0 {
-		minWithdrawal = affiliate.Tier.MinWithdrawalAmount
+		// Tier setting takes precedence if it's stricter? 
+		// Actually usually config is global, let's take the higher one.
+		if affiliate.Tier.MinWithdrawalAmount > minWithdrawal {
+			minWithdrawal = affiliate.Tier.MinWithdrawalAmount
+		}
 	}
 
 	if req.Amount < minWithdrawal {
@@ -637,13 +645,29 @@ func (ac *AffiliateController) GetLeaderboard(w http.ResponseWriter, r *http.Req
 
 // GET /api/affiliate/events
 func (ac *AffiliateController) GetEvents(w http.ResponseWriter, r *http.Request) {
+	page := utils.QueryInt(r, "page", 1)
+	limit := utils.QueryInt(r, "limit", 6) // Default 6 events per page
+	offset := (page - 1) * limit
+
 	var events []models.AffiliateEvent
-	ac.DB.Where("is_active = ? AND status != ?", true, "cancelled").
-		Order("start_time ASC").Find(&events)
-	
+	var total int64
+
+	query := ac.DB.Model(&models.AffiliateEvent{}).Where("is_active = ? AND status != ?", true, "cancelled")
+	query.Count(&total)
+
+	err := query.Order("start_time ASC").Offset(offset).Limit(limit).Find(&events).Error
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data event")
+		return
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"data":   events,
+		"status":      "success",
+		"data":        events,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": int(math.Ceil(float64(total) / float64(limit))),
 	})
 }
 
@@ -660,19 +684,34 @@ func (ac *AffiliateController) GetEducations(w http.ResponseWriter, r *http.Requ
 
 // GET /api/affiliate/promo-materials
 func (ac *AffiliateController) GetPromoMaterials(w http.ResponseWriter, r *http.Request) {
+	page := utils.QueryInt(r, "page", 1)
+	limit := utils.QueryInt(r, "limit", 9) // Default 9 materials per page
+	offset := (page - 1) * limit
 	category := r.URL.Query().Get("category")
-	
+
 	var materials []models.PromoMaterial
-	query := ac.DB.Where("is_active = ?", true)
+	var total int64
+
+	query := ac.DB.Model(&models.PromoMaterial{}).Where("is_active = ?", true)
 	if category != "" {
-		query = query.Where("LOWER(category) = ?", category)
+		query = query.Where("LOWER(category) = ?", strings.ToLower(category))
 	}
-	
-	query.Order("created_at DESC").Find(&materials)
-	
+
+	query.Count(&total)
+
+	err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&materials).Error
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil materi promo")
+		return
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"data":   materials,
+		"status":      "success",
+		"data":        materials,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": int(math.Ceil(float64(total) / float64(limit))),
 	})
 }
 
@@ -820,14 +859,11 @@ func (ac *AffiliateController) GetNotifications(w http.ResponseWriter, r *http.R
 }
 
 func (ac *AffiliateController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
-	notifIDStr := r.URL.Query().Get("id")
-	if notifIDStr == "" {
+	notifID := r.URL.Query().Get("id")
+	if notifID == "" {
 		utils.JSONError(w, http.StatusBadRequest, "ID notifikasi diperlukan")
 		return
 	}
-
-	var notifID uint
-	fmt.Sscanf(notifIDStr, "%d", &notifID)
 
 	if err := ac.Notif.MarkAsRead(notifID); err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui status notifikasi")

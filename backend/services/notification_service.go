@@ -8,11 +8,15 @@ import (
 )
 
 type NotificationService struct {
-	DB *gorm.DB
+	DB    *gorm.DB
+	Email *EmailService
 }
 
 func NewNotificationService(db *gorm.DB) *NotificationService {
-	return &NotificationService{DB: db}
+	return &NotificationService{
+		DB:    db,
+		Email: NewEmailService(db),
+	}
 }
 
 // Push mengirim notifikasi ke user/merchant/admin tertentu
@@ -32,12 +36,19 @@ func (ns *NotificationService) Push(receiverID, receiverType, notifType, title, 
 		Type:         notifType,
 		Title:        title,
 		Message:      message,
+		Body:         message,
 		Link:         link,
 		IsRead:       false,
 		CreatedAt:    time.Now(),
 	}
 	if err := ns.DB.Create(&notif).Error; err != nil {
 		return err
+	}
+
+	// Try to send email
+	var receiver models.User
+	if err := ns.DB.Select("email").First(&receiver, "id = ?", userID).Error; err == nil && receiver.Email != "" {
+		go ns.Email.SendEmail(receiver.Email, title, message)
 	}
 
 	// Real-time broadcast via SSE
@@ -66,7 +77,7 @@ func (ns *NotificationService) GetNotifications(receiverID, receiverType string,
 }
 
 // MarkAsRead menandai notifikasi telah dibaca
-func (ns *NotificationService) MarkAsRead(notifID uint) error {
+func (ns *NotificationService) MarkAsRead(notifID string) error {
 	return ns.DB.Model(&models.Notification{}).Where("id = ?", notifID).Update("is_read", true).Error
 }
 

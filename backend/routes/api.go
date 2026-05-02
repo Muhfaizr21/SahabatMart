@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"SahabatMart/backend/middleware"
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
@@ -14,7 +15,12 @@ import (
 )
 
 func SetupRoutes(db *gorm.DB) http.Handler {
+	log.Println("🔥 [API-INIT] Registering routes... version 3")
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("/ping-test", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("PONG - Server is reading latest api.go"))
+	})
 
 	notifService := services.NewNotificationService(db)
 
@@ -144,12 +150,16 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/auth/login", authCtrl.Login)
 	mux.HandleFunc("/api/auth/google/login", authCtrl.GoogleLogin)
 	mux.HandleFunc("/api/auth/google/callback", authCtrl.GoogleCallback)
+	mux.HandleFunc("/api/auth/forgot-password", authCtrl.ForgotPassword)
+	mux.HandleFunc("/api/auth/reset-password", authCtrl.ResetPassword)
+	mux.HandleFunc("/api/auth/impersonate", actorOnly("superadmin")(authCtrl.Impersonate))
 	
 	// Middleware actor check
 	anyUser := actorOnly("merchant", "affiliate", "admin", "superadmin")
 	adminOnly := actorOnly("admin", "superadmin")
 	superAdminOnly := actorOnly("superadmin")
 	mux.HandleFunc("/api/auth/me", anyUser(authCtrl.GetMe))
+	mux.HandleFunc("/api/auth/change-password", anyUser(authCtrl.ChangePassword))
 
 	mux.HandleFunc("/api/tripay/webhook", paymentCtrl.TriPayCallback)
 	mux.HandleFunc("/api/callback/tripay", paymentCtrl.TriPayCallback)
@@ -173,6 +183,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/wishlist/remove", buyerOnly(buyerCtrl.RemoveFromWishlist))
 	mux.HandleFunc("/api/buyer/products/can-review", buyerOnly(productCtrl.CheckCanReview))
 	mux.HandleFunc("/api/buyer/products/review", buyerOnly(productCtrl.SubmitReview))
+	mux.HandleFunc("/api/buyer/upload", buyerOnly(adminCtrl.UploadImage))
+
+	// --- Shipping Routes (Biteship) ---
+	mux.HandleFunc("/api/shipping/areas", buyerOnly(buyerCtrl.GetShippingAreas))
+	mux.HandleFunc("/api/shipping/rates", buyerOnly(buyerCtrl.GetShippingRates))
+	mux.HandleFunc("/api/shipping/webhook", buyerCtrl.ShippingWebhook) // Public for Biteship
 
 	// --- Merchant Routes ---
 	merchantOnly := actorOnly("merchant", "admin", "superadmin")
@@ -192,10 +208,10 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/wallet/withdraw", merchantOnly(merchantCtrl.RequestPayout))
 	mux.HandleFunc("/api/merchant/wallet/history", merchantOnly(merchantCtrl.GetPayoutHistory))
 	
-	// Vouchers
-	mux.HandleFunc("/api/merchant/vouchers", merchantOnly(merchantCtrl.GetVouchers))
-	mux.HandleFunc("/api/merchant/vouchers/upsert", merchantOnly(merchantCtrl.UpsertVoucher))
-	mux.HandleFunc("/api/merchant/vouchers/delete", merchantOnly(merchantCtrl.DeleteVoucher))
+	// Vouchers (Disabled: Managed by Admin Only)
+	// mux.HandleFunc("/api/merchant/vouchers", merchantOnly(merchantCtrl.GetVouchers))
+	// mux.HandleFunc("/api/merchant/vouchers/upsert", merchantOnly(merchantCtrl.UpsertVoucher))
+	// mux.HandleFunc("/api/merchant/vouchers/delete", merchantOnly(merchantCtrl.DeleteVoucher))
 	
 	// Disputes
 	mux.HandleFunc("/api/merchant/disputes", merchantOnly(merchantCtrl.GetDisputes))
@@ -281,10 +297,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/users/create", can("manage_users")(adminCtrl.CreateUser))
 	mux.HandleFunc("/api/admin/users/update", can("manage_users")(adminCtrl.UpdateUser))
 	mux.HandleFunc("/api/admin/users/delete", can("manage_users")(adminCtrl.DeleteUser))
+	mux.HandleFunc("/api/admin/users/reset-password", adminOnly(adminCtrl.ResetUserPassword))
 
 	// Merchant Management
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))
 	mux.HandleFunc("/api/admin/merchants/status", adminOnly(adminCtrl.UpdateMerchantStatus))
+	mux.HandleFunc("/api/admin/merchants/update", adminOnly(adminCtrl.UpdateMerchant))
 	mux.HandleFunc("/api/admin/merchants/verify", adminOnly(adminCtrl.VerifyMerchant))
 	mux.HandleFunc("/api/admin/merchants/restock", adminOnly(adminCtrl.GetRestockRequests))
 	mux.HandleFunc("/api/admin/merchants/restock/moderate", adminOnly(adminCtrl.ModerateRestockRequest))
@@ -293,8 +311,14 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/products", can("manage_products")(adminCtrl.GetProducts))
 	mux.HandleFunc("/api/admin/products/moderate", can("manage_products")(adminCtrl.ModerateProduct))
 	mux.HandleFunc("/api/admin/products/delete", can("manage_products")(adminCtrl.DeleteProduct))
+	mux.HandleFunc("/api/admin/products/bulk-delete", can("manage_products")(adminCtrl.BulkDeleteProducts))
 	mux.HandleFunc("/api/admin/products/add", can("manage_products")(adminCtrl.AddProduct))
 	mux.HandleFunc("/api/admin/products/update", can("manage_products")(adminCtrl.UpdateProduct))
+	mux.HandleFunc("/api/admin/products/detail", adminOnly(adminCtrl.GetProductDetail))
+	mux.HandleFunc("/api/admin/products/tier-commissions", adminOnly(adminCtrl.GetProductTierCommissions))
+	mux.HandleFunc("/api/admin/products/tier-commissions/update", adminOnly(adminCtrl.UpdateProductTierCommission))
+	mux.HandleFunc("/api/admin/reviews", adminOnly(adminCtrl.GetAllReviews))
+	mux.HandleFunc("/api/admin/reviews/delete", adminOnly(adminCtrl.DeleteReview))
 	mux.HandleFunc("/api/admin/categories", adminOnly(adminCtrl.GetCategories))
 	mux.HandleFunc("/api/admin/categories/add", adminOnly(adminCtrl.AddCategory))
 	mux.HandleFunc("/api/admin/categories/delete", adminOnly(adminCtrl.DeleteCategory))
@@ -330,6 +354,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliates/clicks", adminOnly(adminCtrl.GetAffiliateClicks))
 	mux.HandleFunc("/api/admin/affiliates/withdrawals", adminOnly(adminCtrl.GetAffiliateWithdrawals))
 	mux.HandleFunc("/api/admin/affiliates/withdrawals/process", adminOnly(adminCtrl.ProcessAffiliateWithdrawal))
+	mux.HandleFunc("/api/admin/affiliates/configs/delete", adminOnly(adminCtrl.DeleteAffiliateTier))
 	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
 	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
 	mux.HandleFunc("/api/admin/commissions/category", adminOnly(adminCtrl.ManageCommissions))
@@ -344,6 +369,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// Finance & Payouts
 	mux.HandleFunc("/api/admin/finance", adminOnly(adminCtrl.GetFinance))
+	mux.HandleFunc("/api/admin/finance/cashflow", adminOnly(adminCtrl.GetCashFlow))
+	mux.HandleFunc("/api/admin/finance/cashflow/config", adminOnly(adminCtrl.UpdateCashFlowConfig))
 	mux.HandleFunc("/api/admin/transactions", adminOnly(adminCtrl.GetTransactions))
 	mux.HandleFunc("/api/admin/finance/ledger", adminOnly(adminCtrl.GetFinanceLedger))
 	mux.HandleFunc("/api/admin/payouts", adminOnly(adminCtrl.GetPayouts))
@@ -387,14 +414,23 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/configs/upsert", adminOnly(adminCtrl.UpsertSettings))
 	mux.HandleFunc("/api/admin/logistics", adminOnly(adminCtrl.GetLogistics))
 	mux.HandleFunc("/api/admin/logistics/toggle", adminOnly(adminCtrl.ToggleLogistic))
+	mux.HandleFunc("/api/admin/logistics/sync", adminOnly(adminCtrl.SyncCouriers))
 	mux.HandleFunc("/api/admin/regions", adminOnly(adminCtrl.GetRegions))
 	mux.HandleFunc("/api/admin/regions/upsert", adminOnly(adminCtrl.UpsertRegion))
 	mux.HandleFunc("/api/admin/audit-logs", adminOnly(adminCtrl.GetAuditLogs))
+	mux.HandleFunc("/api/admin/affiliate-clicks", adminOnly(adminCtrl.GetAffiliateClicks))
 	mux.HandleFunc("/api/admin/upload", adminOnly(adminCtrl.UploadImage))
+
+	// Commission Presets (Multi-Level Upline Distribution)
+	mux.HandleFunc("/api/admin/commission-presets", adminOnly(adminCtrl.GetCommissionPresets))
+	mux.HandleFunc("/api/admin/commission-presets/upsert", adminOnly(adminCtrl.UpsertCommissionPreset))
+	mux.HandleFunc("/api/admin/commission-presets/delete", adminOnly(adminCtrl.DeleteCommissionPreset))
 
 	// --- Warehouse (Master Gudang) Routes ---
 	mux.HandleFunc("/api/admin/warehouse/suppliers", adminOnly(warehouseCtrl.GetSuppliers))
 	mux.HandleFunc("/api/admin/warehouse/suppliers/create", adminOnly(warehouseCtrl.CreateSupplier))
+	mux.HandleFunc("/api/admin/warehouse/suppliers/update/", adminOnly(warehouseCtrl.UpdateSupplier))
+	mux.HandleFunc("/api/admin/warehouse/suppliers/delete/", adminOnly(warehouseCtrl.DeleteSupplier))
 	mux.HandleFunc("/api/admin/warehouse/inbound", adminOnly(warehouseCtrl.CreateInbound))
 	mux.HandleFunc("/api/admin/warehouse/stock-history", adminOnly(warehouseCtrl.GetStockHistory))
 	mux.HandleFunc("/api/admin/warehouse/restock/approve/", adminOnly(warehouseCtrl.ApproveRestock))
@@ -419,7 +455,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)
 
-	return recover(cors(mux))
+	return recover(cors(middleware.MaintenanceMiddleware(db)(mux)))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -440,6 +476,7 @@ func recoverMiddleware(next http.Handler) http.Handler {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🌐 [%s] %s", r.Method, r.URL.Path)
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")

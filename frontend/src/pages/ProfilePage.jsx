@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson } from '../lib/api';
+import { BUYER_API_BASE, fetchJson, uploadFile, formatImage } from '../lib/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -10,6 +10,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [orders, setOrders] = useState([]);
+  const fileInputRef = useRef(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Sync tab with URL parameter if it changes
   useEffect(() => {
@@ -24,9 +26,17 @@ export default function ProfilePage() {
     address: '',
     city: '',
     province: '',
-    zip_code: ''
+    zip_code: '',
+    avatar_url: '',
+    area_id: '',
+    district: ''
   });
   const [saving, setSaving] = useState(false);
+
+  // Biteship Area States
+  const [areaSearch, setAreaSearch] = useState('');
+  const [areas, setAreas] = useState([]);
+  const [searchingArea, setSearchingArea] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -57,8 +67,18 @@ export default function ProfilePage() {
         address: userData.profile.address || '',
         city: userData.profile.city || '',
         province: userData.profile.province || '',
-        zip_code: userData.profile.zip_code || ''
+        zip_code: userData.profile.zip_code || '',
+        avatar_url: userData.profile.avatar_url || '',
+        area_id: userData.profile.area_id || '',
+        district: userData.profile.district || ''
       });
+      if (userData.profile.area_id) {
+         if (userData.profile.district && userData.profile.city) {
+            setAreaSearch(`${userData.profile.district}, ${userData.profile.city}`);
+         } else if (userData.profile.district || userData.profile.city) {
+            setAreaSearch(userData.profile.district || userData.profile.city);
+         }
+      }
     }
   }, [userData]);
 
@@ -102,6 +122,64 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    try {
+      const res = await uploadFile(`${BUYER_API_BASE}/upload`, file);
+      const imageUrl = res.url || (res.data && res.data.url);
+      if (imageUrl) {
+        const updatedFormData = { ...formData, avatar_url: imageUrl };
+        setFormData(updatedFormData);
+        setUserData(prev => ({
+          ...prev,
+          profile: {
+            ...prev.profile,
+            avatar_url: imageUrl
+          }
+        }));
+        
+        // Auto save profile after upload so it persists immediately
+        await fetchJson(`${BUYER_API_BASE}/profile/update`, {
+          method: 'POST',
+          body: JSON.stringify(updatedFormData)
+        });
+      }
+    } catch (err) {
+      alert("Gagal mengupload foto: " + err.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleSearchArea = async (input) => {
+    if (input.length < 3) return;
+    setSearchingArea(true);
+    try {
+      const res = await fetchJson(`${BUYER_API_BASE}/shipping/areas?input=${input}`);
+      setAreas(res.areas || []);
+    } catch (err) {
+      console.error('Area search failed:', err);
+    } finally {
+      setSearchingArea(false);
+    }
+  };
+
+  const handleSelectArea = async (area) => {
+    setFormData(f => ({ 
+      ...f, 
+      city: area.city_name, 
+      province: area.province_name, 
+      zip_code: area.postal_code,
+      area_id: area.id,
+      district: area.name,
+    }));
+    setAreaSearch(area.name + ', ' + area.city_name);
+    setAreas([]);
+  };
+
   const profile = userData.profile || {};
 
   return (
@@ -112,8 +190,21 @@ export default function ProfilePage() {
           {/* Sidebar */}
           <aside className="lg:w-72 flex-shrink-0">
             <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm mb-6 text-center">
-              <div className="w-32 h-32 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-4xl font-black mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative group cursor-pointer">
-                <img src={profile.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop"} alt={profile.full_name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleAvatarUpload} 
+                className="hidden" 
+                accept="image/*" 
+              />
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-32 h-32 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-4xl font-black mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative group cursor-pointer"
+              >
+                <img src={formatImage(formData.avatar_url || profile.avatar_url) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop"} alt={profile.full_name} className={`w-full h-full object-cover transition-transform ${uploadingAvatar ? 'opacity-50' : 'group-hover:scale-110'}`} />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <i className={`bx ${uploadingAvatar ? 'bx-loader-alt animate-spin' : 'bx-camera'} text-white text-3xl`}></i>
+                </div>
               </div>
               <h2 className="text-xl font-black text-gray-900 leading-tight mb-1">{profile.full_name || 'User AkuGrow'}</h2>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full mt-2 border border-yellow-200">
@@ -139,6 +230,12 @@ export default function ProfilePage() {
                 className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'address' ? 'bg-blue-50/50 text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
               >
                 <i className="bx bx-map-pin text-lg"></i> Alamat & Info
+              </button>
+              <button 
+                onClick={() => setActiveTab('security')}
+                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'security' ? 'bg-blue-50/50 text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
+              >
+                <i className="bx bx-lock-alt text-lg"></i> Keamanan
               </button>
               <div className="my-2 border-t border-gray-50"></div>
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-6 py-4 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors">
@@ -180,6 +277,28 @@ export default function ProfilePage() {
                        />
                     </div>
 
+                    <div>
+                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Tanggal Lahir</label>
+                       <input 
+                         type="date" 
+                         value={formData.date_of_birth} 
+                         onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
+                         className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                       />
+                    </div>
+                    <div>
+                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Jenis Kelamin</label>
+                       <select 
+                         value={formData.gender} 
+                         onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                         className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors bg-white" 
+                       >
+                         <option value="">Pilih Jenis Kelamin</option>
+                         <option value="male">Laki-Laki</option>
+                         <option value="female">Perempuan</option>
+                       </select>
+                    </div>
+
                     <div className="md:col-span-2">
                        <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Alamat Lengkap</label>
                        <textarea 
@@ -190,25 +309,62 @@ export default function ProfilePage() {
                        ></textarea>
                     </div>
 
-                    <div>
-                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kota</label>
+                    <div className="md:col-span-2 relative">
+                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kecamatan / Kota *</label>
                        <input 
                          type="text" 
-                         value={formData.city} 
-                         onChange={(e) => setFormData({...formData, city: e.target.value})}
+                         value={areaSearch} 
+                         onChange={(e) => { 
+                           setAreaSearch(e.target.value); 
+                           setFormData(f => ({ ...f, area_id: '', city: '', province: '', zip_code: '' }));
+                           handleSearchArea(e.target.value); 
+                         }}
+                         placeholder="Cari kecamatan atau kota Anda..."
                          className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
                        />
+                       {searchingArea && <div className="absolute right-4 top-12 text-[10px] text-blue-500 animate-pulse">Mencari...</div>}
+                       {areas.length > 0 && (
+                          <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                            {areas.map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => handleSelectArea(a)}
+                                className="w-full text-left px-4 py-3 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0"
+                              >
+                                <div className="font-bold text-gray-900">{a.name}</div>
+                                <div className="text-gray-500">{a.city_name}, {a.province_name} ({a.postal_code})</div>
+                              </button>
+                            ))}
+                          </div>
+                       )}
+                       {formData.area_id ? (
+                          <div className="mt-2 text-[10px] text-green-600 font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-full w-fit">
+                            <span>✓</span> Lokasi terverifikasi
+                          </div>
+                       ) : areaSearch.length > 0 && (
+                          <div className="mt-2 text-[10px] text-orange-500 font-bold flex items-center gap-1">
+                            <span>⚠️</span> Silakan pilih lokasi dari daftar yang muncul
+                          </div>
+                       )}
                     </div>
 
-                    <div>
-                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kode Pos</label>
-                       <input 
-                         type="text" 
-                         value={formData.zip_code} 
-                         onChange={(e) => setFormData({...formData, zip_code: e.target.value})}
-                         className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
-                       />
-                    </div>
+                    {formData.area_id && (
+                      <>
+                        <div>
+                           <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kota</label>
+                           <div className="w-full border border-gray-100 bg-gray-50 text-gray-700 rounded-xl px-4 py-3.5 text-sm font-semibold">{formData.city}</div>
+                        </div>
+                        <div>
+                           <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Provinsi</label>
+                           <div className="w-full border border-gray-100 bg-gray-50 text-gray-700 rounded-xl px-4 py-3.5 text-sm font-semibold">{formData.province}</div>
+                        </div>
+                        <div>
+                           <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kode Pos</label>
+                           <div className="w-full border border-gray-100 bg-gray-50 text-gray-700 rounded-xl px-4 py-3.5 text-sm font-semibold">{formData.zip_code}</div>
+                        </div>
+                      </>
+                    )}
 
                     <div className="md:col-span-2 flex justify-end pt-4">
                       <button 
@@ -329,6 +485,76 @@ export default function ProfilePage() {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {activeTab === 'security' && (
+                <div className="animate-fade-in">
+                  <div className="mb-8 border-b border-gray-100 pb-6">
+                    <h3 className="text-2xl font-black text-gray-900">Keamanan Akun</h3>
+                    <p className="text-sm text-gray-400 mt-1">Ubah kata sandi Anda secara berkala untuk menjaga keamanan akun.</p>
+                  </div>
+                  
+                  <form 
+                    className="max-w-md space-y-6"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const oldPass = e.target.old_password.value;
+                      const newPass = e.target.new_password.value;
+                      const confirmPass = e.target.confirm_password.value;
+
+                      if (newPass !== confirmPass) return alert('Konfirmasi password tidak cocok');
+                      
+                      try {
+                        await fetchJson(`${AUTH_API_BASE}/change-password`, {
+                          method: 'POST',
+                          body: JSON.stringify({ old_password: oldPass, new_password: newPass })
+                        });
+                        alert('Password berhasil diubah!');
+                        e.target.reset();
+                      } catch (err) {
+                        alert(err.message);
+                      }
+                    }}
+                  >
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kata Sandi Lama</label>
+                      <input 
+                        type="password" 
+                        name="old_password"
+                        required
+                        className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kata Sandi Baru</label>
+                      <input 
+                        type="password" 
+                        name="new_password"
+                        required
+                        minLength={6}
+                        className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Konfirmasi Kata Sandi Baru</label>
+                      <input 
+                        type="password" 
+                        name="confirm_password"
+                        required
+                        className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                      />
+                    </div>
+                    
+                    <div className="pt-4">
+                      <button 
+                        type="submit" 
+                        className="w-full bg-gray-900 hover:bg-blue-600 text-white font-black py-4 rounded-xl transition-all shadow-xl shadow-gray-200 active:scale-95 text-sm"
+                      >
+                        Perbarui Kata Sandi
+                      </button>
+                    </div>
+                  </form>
                 </div>
               )}
 

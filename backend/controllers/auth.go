@@ -225,3 +225,81 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	// Redirect balik ke frontend dengan token di URL
 	http.Redirect(w, r, fmt.Sprintf("%s/login?token=%s&user_id=%s", frontendURL, jwtToken, user.ID), http.StatusTemporaryRedirect)
 }
+
+func (ac *AuthController) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	token, err := ac.Service.RequestPasswordReset(req.Email)
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// In production, token is sent via email. 
+	// For SahabatMart, we return it in response for debugging/demonstration if needed, 
+	// but ideally it should be hidden.
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": "Instruksi reset password telah dikirim ke email Anda",
+		"debug_token": token, // REMOVE THIS IN PRODUCTION
+	})
+}
+
+func (ac *AuthController) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	if err := ac.Service.ResetPassword(req.Token, req.NewPassword); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": "Kata sandi berhasil diperbarui. Silakan login kembali.",
+	})
+}
+
+func (ac *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok {
+		utils.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if len(req.NewPassword) < 6 {
+		utils.JSONError(w, http.StatusBadRequest, "Password minimal 6 karakter")
+		return
+	}
+
+	if err := ac.Service.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Password berhasil diubah"})
+}

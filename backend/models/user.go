@@ -45,9 +45,11 @@ type UserProfile struct {
 	DateOfBirth *string   `gorm:"type:date" json:"date_of_birth"`
 	Bio         *string   `gorm:"type:text" json:"bio"`
 	Address     string    `gorm:"type:text" json:"address"`
+	District    string    `gorm:"type:varchar(100)" json:"district"`
 	City        string    `gorm:"type:varchar(100)" json:"city"`
 	Province    string    `gorm:"type:varchar(100)" json:"province"`
-	ZipCode      string    `gorm:"type:varchar(10)" json:"zip_code"`
+	ZipCode     string    `gorm:"type:varchar(10)" json:"zip_code"`
+	AreaID      string    `gorm:"type:varchar(100)" json:"area_id"`
 	RewardPoints int64     `gorm:"default:0" json:"reward_points"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
