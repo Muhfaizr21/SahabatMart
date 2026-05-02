@@ -192,20 +192,16 @@ export default function AdminFinance() {
           </div>
 
           <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', padding: 24 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, color: '#0f172a' }}>Alokasi Uang Bulanan (Kas Internal)</h3>
-            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Pantau saldo di berbagai lokasi penyimpanan.</p>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, color: '#0f172a' }}>Status Kas Platform (Live Audit)</h3>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Saldo riil yang tersedia di akun kas pusat setelah dikurangi payout yang sudah dibayar.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-              <div style={{ padding: 20, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Tunai / Cash</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{idr(0)}</div>
+              <div style={{ padding: 20, borderRadius: 12, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: 13, color: '#0369a1', marginBottom: 4, fontWeight: 700 }}>SALDO KAS PUSAT (HQ)</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#0c4a6e' }}>{idr(cashflow.cash_balance)}</div>
               </div>
               <div style={{ padding: 20, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Rekening Bank</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{idr(0)}</div>
-              </div>
-              <div style={{ padding: 20, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>E-Wallet</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{idr(0)}</div>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Dana Escrow (Liabilitas)</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{idr(cashflow.total_escrow_liability)}</div>
               </div>
             </div>
           </div>

@@ -58,9 +58,9 @@ export default function MerchantInventory() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Stock & Inventory" subtitle="Monitor your vault and request replenishment from Pusat.">
+      <PageHeader title="Stok & Inventori" subtitle="Pantau stok Anda dan ajukan penambahan stok ke Pusat.">
         <Link to="/merchant/restock" style={A.btnPrimary}>
-           <i className="bx bx-repost" /> Request Restock
+           <i className="bx bx-repost" /> Ajukan Restok
         </Link>
       </PageHeader>
 
@@ -71,7 +71,7 @@ export default function MerchantInventory() {
            <input 
              type="text" 
              style={{ ...A.input, paddingLeft: 48 }} 
-             placeholder="Search product name..." 
+             placeholder="Cari nama produk..." 
              value={search}
              onChange={e => setSearch(e.target.value)}
            />
@@ -83,7 +83,7 @@ export default function MerchantInventory() {
              value={category}
              onChange={e => setCategory(e.target.value)}
            >
-             <option value="">All Categories</option>
+             <option value="">Semua Kategori</option>
              {categories.map(c => (
                <option key={c.id} value={c.id}>{c.name}</option>
              ))}
@@ -96,10 +96,10 @@ export default function MerchantInventory() {
              value={stockStatus}
              onChange={e => setStockStatus(e.target.value)}
            >
-             <option value="">All Stock Status</option>
-             <option value="ready">Ready Stock {'>'} 5</option>
-             <option value="low">Low Stock (1-5)</option>
-             <option value="out">Out of Stock</option>
+             <option value="">Semua Status Stok</option>
+             <option value="ready">Stok Tersedia {'>'} 5</option>
+             <option value="low">Stok Menipis (1-5)</option>
+             <option value="out">Stok Habis</option>
            </select>
          </div>
       </div>
@@ -109,16 +109,16 @@ export default function MerchantInventory() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
               <tr>
-                 <th style={{ ...A.th, paddingLeft: 24, width: '40%' }}>PRODUCT DETAIL</th>
-                 <th style={A.th}>CATEGORY</th>
-                 <th style={A.th}>RETAIL PRICE</th>
-                 <th style={A.th}>MY STOCK</th>
+                 <th style={{ ...A.th, paddingLeft: 24, width: '40%' }}>DETAIL PRODUK</th>
+                 <th style={A.th}>KATEGORI</th>
+                 <th style={A.th}>HARGA RETAIL</th>
+                 <th style={A.th}>STOK SAYA</th>
                  <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>STATUS</th>
                </tr>
              </thead>
              <tbody>
                {products.length === 0 && !loading ? (
-                  <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>No products found. Adjust filters or request restock.</td></tr>
+                  <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Produk tidak ditemukan. Sesuaikan filter atau ajukan restok.</td></tr>
                ) : products.map((p, i) => (
                   <tr key={p.id} style={{ borderBottom: i === products.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
                     <td style={{ ...A.td, paddingLeft: 24 }}>
@@ -146,7 +146,7 @@ export default function MerchantInventory() {
                           width: 8, height: 8, borderRadius: '50%', 
                           background: p.stock > 5 ? '#10b981' : p.stock > 0 ? '#f59e0b' : '#ef4444' 
                         }} />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>{p.stock} Units</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>{p.stock} Unit</span>
                       </div>
                     </td>
                     <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
@@ -169,7 +169,7 @@ export default function MerchantInventory() {
             disabled={page === 1}
             style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1 }}
           >
-            <i className="bx bx-chevron-left" /> Previous
+            <i className="bx bx-chevron-left" /> Sebelumnya
           </button>
           
           <div style={{ display: 'flex', gap: 6 }}>
@@ -200,7 +200,7 @@ export default function MerchantInventory() {
             disabled={page === totalPages}
             style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1 }}
           >
-            Next <i className="bx bx-chevron-right" />
+            Berikutnya <i className="bx bx-chevron-right" />
           </button>
         </div>
       )}

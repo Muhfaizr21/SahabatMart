@@ -1061,6 +1061,9 @@ func (ac *AdminController) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 
 		SplitAplikasiDagang float64 `json:"split_aplikasi_dagang"`
 		SplitAkuglow        float64 `json:"split_akuglow"`
+		
+		CashBalance          float64 `json:"cash_balance"`
+		TotalEscrowLiability float64 `json:"total_escrow_liability"`
 	}
 
 	// Load all allocation configs from DB
@@ -1144,6 +1147,14 @@ func (ac *AdminController) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 
 	netProfit := grossProfit - totalAllocValue
 
+	var cashBalance, totalEscrow float64
+	ac.DB.Model(&models.Wallet{}).Where("owner_id = ?", models.PusatID).Select("COALESCE(balance, 0)").Scan(&cashBalance)
+	
+	// Global Escrow Liability (All wallets' balance + pending)
+	ac.DB.Model(&models.Wallet{}).
+		Where("owner_type IN (?, ?)", models.WalletMerchant, models.WalletAffiliate).
+		Select("COALESCE(SUM(balance + pending_balance), 0)").Scan(&totalEscrow)
+
 	data := CashFlowData{
 		TotalRevenue:        totalRevenue,
 		TotalCOGS:           totalCOGS,
@@ -1156,12 +1167,11 @@ func (ac *AdminController) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 		NetAkuglow:          netProfit * splitAkuglow,
 		SplitAplikasiDagang: splitAppDagang,
 		SplitAkuglow:        splitAkuglow,
+		CashBalance:         cashBalance,
+		TotalEscrowLiability: totalEscrow,
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"data":   data,
-	})
+	utils.JSONResponse(w, http.StatusOK, data)
 }
 
 // POST /api/admin/finance/cashflow/config — Update alokasi rates
@@ -1526,25 +1536,34 @@ func (ac *AdminController) UpdateProductTierCommission(w http.ResponseWriter, r 
 
 // GET /api/admin/finance  → overview revenue platform
 func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
-	var totalRevenue, totalPlatformFee, pendingPayout float64
+	var totalRevenue, totalPlatformFee, pendingPayout, cashBalance float64
 	var totalCOGS, totalNetProfit float64
 	var totalOrders, completedOrders int64
 
-	// [Financial Audit Fix] Calculate Historical Profit (Cumulative)
-	// We sum all revenue transactions to system wallets, ignoring withdrawals.
-	// This ensures "Total Profit" doesn't drop when you withdraw money to your bank.
+	// [Financial Audit Fix] Centralized Cash Model
+	// 1. Gross Revenue (Total Money received from buyers)
 	ac.DB.Model(&models.WalletTransaction{}).
 		Joins("JOIN wallets ON wallets.id = wallet_transactions.wallet_id").
-		Where("wallets.owner_id IN ('system-hq', 'system-platform')").
-		Where("wallet_transactions.type IN (?, ?)", models.TxSaleRevenue, models.TxPlatformFee).
+		Where("wallets.owner_id IN (?, ?)", models.PusatID, models.AdminID).
+		Where("wallet_transactions.type = ?", models.TxSaleRevenue).
 		Select("COALESCE(SUM(wallet_transactions.amount), 0)").Scan(&totalRevenue)
 
-	// Platform Fee separately
+	// 2. Cash on Hand (Actual balance in HQ wallet after Payouts)
+	ac.DB.Model(&models.Wallet{}).
+		Where("owner_id = ?", models.PusatID).
+		Select("COALESCE(balance, 0)").Scan(&cashBalance)
+
+	// 3. Platform Fee Profit
 	ac.DB.Model(&models.WalletTransaction{}).
 		Joins("JOIN wallets ON wallets.id = wallet_transactions.wallet_id").
-		Where("wallets.owner_id = ?", "system-platform").
+		Where("wallets.owner_id = ?", models.AdminID).
 		Where("wallet_transactions.type = ?", models.TxPlatformFee).
 		Select("COALESCE(SUM(wallet_transactions.amount), 0)").Scan(&totalPlatformFee)
+
+	// 4. Distribution Liabilities (Money promised to others)
+	var merchantLiability, affiliateLiability float64
+	ac.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletMerchant).Select("SUM(balance + pending_balance)").Scan(&merchantLiability)
+	ac.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletAffiliate).Select("SUM(balance + pending_balance)").Scan(&affiliateLiability)
 
 	if ac.hasTable("order_items") {
 		// Calculate total COGS from completed/paid sales
@@ -1553,14 +1572,14 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 			Where("orders.status IN ('paid', 'shipped', 'delivered', 'completed')").
 			Select("COALESCE(SUM(order_items.cogs * order_items.quantity), 0)").Scan(&totalCOGS)
 		
-		// Net Profit = Historical Revenue - Historical COGS
-		totalNetProfit = totalRevenue - totalCOGS
+		// Net Profit = Gross Revenue - COGS - Distributions
+		totalNetProfit = totalRevenue - totalCOGS - merchantLiability - affiliateLiability
 	}
 
 	if ac.hasTable("wallets") {
 		// Other wallets' pending balance represents obligations to merchants/affiliates
 		ac.DB.Table("wallets").
-			Where("owner_id NOT LIKE 'system-%'").
+			Where("owner_id NOT IN (?, ?)", models.PusatID, models.AdminID).
 			Select("COALESCE(SUM(pending_balance), 0)").Scan(&pendingPayout)
 	}
 
@@ -1574,6 +1593,7 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 		"total_platform_fee": totalPlatformFee,
 		"total_cogs":         totalCOGS,
 		"net_profit":         totalNetProfit,
+		"cash_balance":       cashBalance,
 		"pending_payout":     pendingPayout,
 		"total_orders":       totalOrders,
 		"completed_orders":   completedOrders,
@@ -2048,21 +2068,70 @@ func (ac *AdminController) BulkUpdateCommissions(w http.ResponseWriter, r *http.
 // ─────────────────────────────────────────────────────────────────────────────
 // PAYOUT MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
+// PAYOUT MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/admin/payouts
 func (ac *AdminController) GetPayouts(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
-	query := ac.DB.Model(&models.PayoutRequest{})
-	if status != "" {
-		query = query.Where("status = ?", status)
+
+	type PayoutRow struct {
+		ID          string     `json:"id"`
+		TargetID    string     `json:"target_id"` // merchant_id or affiliate_id
+		Type        string     `json:"type"`      // 'merchant' or 'affiliate'
+		Name        string     `json:"name"`      // store_name or full_name
+		SubName     string     `json:"sub_name"`  // owner_name or email/ref_code
+		Amount      float64    `json:"amount"`
+		Status      string     `json:"status"`
+		Note        string     `json:"note"`
+		RequestedAt time.Time  `json:"requested_at"`
+		ProcessedAt *time.Time `json:"processed_at"`
+		ProcessedBy *string    `json:"processed_by"`
 	}
 
-	var payouts []models.PayoutRequest
-	query.Order("requested_at DESC").Find(&payouts)
+	query := `
+		SELECT * FROM (
+			-- Merchant Payouts
+			SELECT pr.id, pr.merchant_id as target_id, 'merchant' as type, 
+			       m.store_name as name, up.full_name as sub_name,
+			       pr.amount, pr.status, pr.note, pr.requested_at, pr.processed_at, pr.processed_by
+			FROM payout_requests pr
+			LEFT JOIN merchants m ON m.id = pr.merchant_id
+			LEFT JOIN user_profiles up ON up.user_id = m.user_id
+			
+			UNION ALL
+			
+			-- Affiliate Payouts
+			SELECT aw.id, aw.affiliate_id as target_id, 'affiliate' as type,
+			       up_aff.full_name as name, u.email as sub_name,
+			       aw.amount, aw.status, aw.note, aw.created_at as requested_at, aw.processed_at, NULL as processed_by
+			FROM affiliate_withdrawals aw
+			LEFT JOIN affiliate_members am ON am.id = aw.affiliate_id
+			LEFT JOIN users u ON u.id = am.user_id
+			LEFT JOIN user_profiles up_aff ON up_aff.user_id = u.id
+		) AS unified_payouts
+	`
+	
+	args := []interface{}{}
+	if status != "" {
+		if status == "approved" {
+			query += " WHERE status IN ('approved', 'processed')"
+		} else if status == "paid" {
+			query += " WHERE status IN ('paid', 'completed')"
+		} else {
+			query += " WHERE status = ?"
+			args = append(args, status)
+		}
+	}
+	query += " ORDER BY requested_at DESC"
+
+	var results []PayoutRow
+	ac.DB.Raw(query, args...).Scan(&results)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
-		"total":  len(payouts),
-		"data":   payouts,
+		"total":  len(results),
+		"data":   results,
 	})
 }
 
@@ -2073,54 +2142,104 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var req struct {
-		PayoutID    string `json:"payout_id"`
-		Status      string `json:"status"` // approved, rejected, paid
-		Note        string `json:"note"`
-		ProcessedBy string `json:"processed_by"`
+		PayoutID string `json:"payout_id"`
+		Type     string `json:"type"` // merchant or affiliate
+		Status   string `json:"status"`
+		Note     string `json:"note"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
-	var payout models.PayoutRequest
-	if err := ac.DB.First(&payout, "id = ?", req.PayoutID).Error; err != nil {
-		utils.JSONError(w, http.StatusNotFound, "Payout request not found")
-		return
-	}
-
-	if payout.Status != "pending" {
-		utils.JSONError(w, http.StatusBadRequest, "Payout is already processed")
-		return
+	adminID, _ := r.Context().Value("user_id").(string)
+	if adminID == "" {
+		adminID = models.AdminID
 	}
 
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
-		payout.Status = req.Status
-		payout.Note = req.Note
-		payout.ProcessedAt = &now
-		payout.ProcessedBy = req.ProcessedBy
-
-		if err := tx.Save(&payout).Error; err != nil {
-			return err
-		}
-
 		financeSvc := services.NewFinanceService(tx)
-		
-		if req.Status == "paid" || req.Status == "approved" {
-			desc := fmt.Sprintf("Penarikan Berhasil (Admin: %s)", req.ProcessedBy)
-			return financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalCompleted, payout.Amount, payout.ID, "payout_request", desc)
-		} else if req.Status == "rejected" {
-			desc := fmt.Sprintf("Penarikan Ditolak, Dana Dikembalikan: %s", req.Note)
-			return financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalRejected, payout.Amount, payout.ID, "payout_request", desc)
-		}
 
+		if req.Type == "affiliate" {
+			var wd models.AffiliateWithdrawal
+			if err := tx.First(&wd, "id = ?", req.PayoutID).Error; err != nil {
+				return fmt.Errorf("affiliate withdrawal not found")
+			}
+
+			// Map status
+			newStatus := req.Status
+			if newStatus == "paid" {
+				newStatus = "completed"
+			} else if newStatus == "approved" {
+				newStatus = "processed"
+			}
+
+			wd.Status = newStatus
+			wd.Note = req.Note
+			wd.ProcessedAt = &now
+			if err := tx.Save(&wd).Error; err != nil {
+				return err
+			}
+
+			if newStatus == "completed" {
+				desc := fmt.Sprintf("Penarikan Komisi Berhasil: %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, wd.AffiliateID, models.WalletAffiliate, models.TxWithdrawalCompleted, wd.Amount, wd.ID, "affiliate_withdrawal", desc); err != nil {
+					return err
+				}
+				tx.Model(&models.AffiliateMember{}).Where("id = ?", wd.AffiliateID).
+					Update("total_withdrawn", gorm.Expr("total_withdrawn + ?", wd.Amount))
+				
+				// [Financial Sync] Deduct from Platform (HQ) Wallet
+				platformDesc := fmt.Sprintf("Pembayaran Payout Affiliate %s: %s", wd.AffiliateID, wd.ID)
+				if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -wd.Amount, wd.ID, "payout_outflow", platformDesc); err != nil {
+					return err
+				}
+			} else if newStatus == "rejected" {
+				desc := fmt.Sprintf("Penarikan Komisi Ditolak: %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, wd.AffiliateID, models.WalletAffiliate, models.TxWithdrawalRejected, wd.Amount, wd.ID, "affiliate_withdrawal", desc); err != nil {
+					return err
+				}
+			}
+		} else {
+			var payout models.PayoutRequest
+			if err := tx.First(&payout, "id = ?", req.PayoutID).Error; err != nil {
+				return fmt.Errorf("payout request not found")
+			}
+			payout.Status = req.Status
+			payout.Note = req.Note
+			payout.ProcessedAt = &now
+			payout.ProcessedBy = &adminID
+			if err := tx.Save(&payout).Error; err != nil {
+				return err
+			}
+
+			if req.Status == "paid" {
+				desc := fmt.Sprintf("Penarikan Merchant Berhasil: %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalCompleted, payout.Amount, payout.ID, "payout_request", desc); err != nil {
+					return err
+				}
+				
+				// [Financial Sync] Deduct from Platform (HQ) Wallet
+				platformDesc := fmt.Sprintf("Pembayaran Payout Merchant %s: %s", payout.MerchantID, payout.ID)
+				if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -payout.Amount, payout.ID, "payout_outflow", platformDesc); err != nil {
+					return err
+				}
+			} else if req.Status == "approved" {
+				// Approved only changes status in DB, no movement because it's already in PendingBalance
+			} else if req.Status == "rejected" {
+				desc := fmt.Sprintf("Penarikan Merchant Ditolak: %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalRejected, payout.Amount, payout.ID, "payout_request", desc); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	})
 
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal memproses payout: "+err.Error())
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	ac.Audit.Log(req.ProcessedBy, "process_payout", "payout", req.PayoutID, fmt.Sprintf("status=%s", req.Status), r.RemoteAddr)
+	ac.Audit.Log(adminID, "process_payout", "payout", req.PayoutID, fmt.Sprintf("type=%s, status=%s", req.Type, req.Status), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 

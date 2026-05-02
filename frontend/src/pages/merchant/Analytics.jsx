@@ -3,61 +3,63 @@ import { fetchJson, MERCHANT_API_BASE } from '../../lib/api';
 import { PageHeader, StatRow, A, idr } from '../../lib/adminStyles.jsx';
 
 export default function MerchantAnalytics() {
+  const [year, setYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      fetchJson(`${MERCHANT_API_BASE}/affiliate-stats`),
-      fetchJson(`${MERCHANT_API_BASE}/orders`)
-    ])
-      .then(([statsRes, ordersRes]) => {
-        const data = statsRes?.data || statsRes || {};
-        const orders = Array.isArray(ordersRes?.data) ? ordersRes.data : (Array.isArray(ordersRes) ? ordersRes : []);
+    setLoading(true);
+    fetchJson(`${MERCHANT_API_BASE}/affiliate-stats?year=${year}`)
+      .then(res => {
+        const data = res?.data || res || {};
+        const rawChart = data.chart_data || [];
         
-        // Calculate true monthly volume (Jan - Dec)
-        const currentYear = new Date().getFullYear();
-        const monthly = new Array(12).fill(0);
-        orders.forEach(o => {
-          if (!o.created_at) return;
-          const d = new Date(o.created_at);
-          if (d.getFullYear() === currentYear) {
-             monthly[d.getMonth()] += 1; // You can also switch this to += o.total_amount if you prefer GMV
-          }
-        });
-
-        const maxMonthly = Math.max(1, ...monthly);
-        const chartData = monthly.map(val => ({
-           count: val,
-           heightPct: Math.max(5, (val / maxMonthly) * 100) // minimum 5% height to be visible
+        const maxMonthly = Math.max(1, ...rawChart.map(d => d.count));
+        const chartData = rawChart.map(val => ({
+           count: val.count,
+           sales: val.sales,
+           heightPct: Math.max(5, (val.count / maxMonthly) * 100)
         }));
 
         setStats({ ...data, chartData });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [year]);
 
   return (
     <div style={A.page} className="fade-in">
       <PageHeader 
-        title="Performance Analytics" 
-        subtitle="Deep insights into your shop's growth and affiliate conversions."
+        title="Analisis Performa" 
+        subtitle="Wawasan mendalam tentang pertumbuhan toko dan konversi afiliasi Anda."
       />
 
       <StatRow stats={[
-        { label: 'Affiliate Attribution', val: loading ? '...' : `${stats?.affiliate_orders || 0} Orders`, icon: 'bx-network-chart', color: '#6366f1' },
-        { label: 'Partner Revenue', val: loading ? '...' : idr(stats?.affiliate_sales || 0), icon: 'bx-diamond', color: '#10b981' },
-        { label: 'Network Commission', val: loading ? '...' : idr(stats?.affiliate_commissions || 0), icon: 'bx-transfer', color: '#f59e0b' },
+        { label: 'Total Omzet (Gross)', val: loading ? '...' : idr(stats?.total_sales || 0), icon: 'bx-stats', color: '#1e293b' },
+        { label: 'Pendapatan Bersih', val: loading ? '...' : idr(stats?.total_net_sales || 0), icon: 'bx-wallet', color: '#10b981' },
+        { label: 'Total Pesanan', val: loading ? '...' : `${stats?.total_orders || 0} Trx`, icon: 'bx-shopping-bag', color: '#334155' },
+        { label: 'Konversi Afiliasi', val: loading ? '...' : `${stats?.affiliate_orders || 0} Pesanan`, icon: 'bx-network-chart', color: '#6366f1' },
+        { label: 'Komisi Jaringan', val: loading ? '...' : idr(stats?.affiliate_commissions || 0), icon: 'bx-transfer', color: '#f59e0b' },
       ]} />
 
       <div style={{ ...A.card, padding: 32 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
           <div>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>Sales Trajectory ({new Date().getFullYear()})</h3>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, margin: 0 }}>Monthly conversion interaction volume.</p>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>Trajektori Penjualan ({year})</h3>
+            <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, margin: 0 }}>Volume interaksi konversi bulanan.</p>
           </div>
-          <button style={A.btnGhost}>Export PDF</button>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <select 
+              value={year} 
+              onChange={(e) => setYear(parseInt(e.target.value))}
+              style={{ ...A.input, width: 140, height: 40, padding: '0 12px', cursor: 'pointer' }}
+            >
+              {Array.from({ length: (new Date().getFullYear() - 2023) + 2 }, (_, i) => 2023 + i).reverse().map(y => (
+                <option key={y} value={y}>Tahun {y}</option>
+              ))}
+            </select>
+            <button style={A.btnGhost}>Ekspor PDF</button>
+          </div>
         </div>
         
         <div style={{ height: 260, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
@@ -72,7 +74,7 @@ export default function MerchantAnalytics() {
           })}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>
-          <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+          <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>Mei</span><span>Jun</span><span>Jul</span><span>Agu</span><span>Sep</span><span>Okt</span><span>Nov</span><span>Des</span>
         </div>
       </div>
     </div>

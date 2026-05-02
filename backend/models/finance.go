@@ -10,6 +10,7 @@ const (
 	WalletMerchant  WalletOwnerType = "merchant"
 	WalletAffiliate WalletOwnerType = "affiliate"
 	WalletBuyer     WalletOwnerType = "buyer"
+	WalletAdmin     WalletOwnerType = "admin"
 )
 
 type WalletTransactionType string
@@ -28,6 +29,7 @@ const (
 	TxAdjustment          WalletTransactionType = "adjustment"
 	TxRestockPayment      WalletTransactionType = "restock_payment" // Merchant pays HQ
 	TxRestockRevenue      WalletTransactionType = "restock_revenue" // HQ receives money
+	TxPayoutOutflow       WalletTransactionType = "payout_outflow"  // HQ pays out to Merchant/Affiliate
 )
 
 type Wallet struct {
@@ -53,7 +55,7 @@ type WalletTransaction struct {
 	PendingBefore  float64               `gorm:"type:decimal(15,2)" json:"pending_before"`
 	PendingAfter   float64               `gorm:"type:decimal(15,2)" json:"pending_after"`
 	Description    string                `gorm:"type:text" json:"description"`
-	ReferenceID    string                `gorm:"type:uuid" json:"reference_id"`
+	ReferenceID    *string               `gorm:"type:uuid" json:"reference_id"`
 	ReferenceType  string                `gorm:"type:varchar(50)" json:"reference_type"` // order, commission, withdrawal, refund
 	IsSettled      bool                  `gorm:"default:false;index" json:"is_settled"`
 	SettledAt      *time.Time            `json:"settled_at"`

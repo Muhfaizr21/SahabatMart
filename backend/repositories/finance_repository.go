@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"SahabatMart/backend/models"
+	"fmt"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -15,6 +17,9 @@ func NewFinanceRepository(db *gorm.DB) *FinanceRepository {
 }
 
 func (r *FinanceRepository) GetWalletWithLock(ownerID string, ownerType models.WalletOwnerType) (*models.Wallet, error) {
+	if _, err := uuid.Parse(ownerID); err != nil {
+		return nil, fmt.Errorf("invalid owner id: %s", ownerID)
+	}
 	var wallet models.Wallet
 	err := r.DB.Clauses(clause.Locking{Strength: "UPDATE"}).
 		FirstOrCreate(&wallet, models.Wallet{OwnerID: ownerID, OwnerType: ownerType}).Error

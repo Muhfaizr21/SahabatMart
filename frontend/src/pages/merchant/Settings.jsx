@@ -12,7 +12,7 @@ const MerchantSettings = () => {
 
     useEffect(() => {
         fetchJson(`${MERCHANT_API_BASE}/store`)
-            .then(res => setStore(res || {}))
+            .then(res => setStore(res.data || res))
             .finally(() => setLoading(false));
     }, []);
 
@@ -29,7 +29,7 @@ const MerchantSettings = () => {
                 body: JSON.stringify(store)
             });
             setStore(res.data || res);
-            setToast('Identity profiles successfully committed to the blockchain ledger.');
+            setToast('Profil identitas berhasil diperbarui.');
             setTimeout(() => setToast(''), 4000);
         } catch (err) {
             alert('Update failed: ' + err.message);
@@ -56,7 +56,8 @@ const MerchantSettings = () => {
         setStore({ 
             ...store, 
             biteship_area_id: area.id,
-            area_name: area.name
+            area_name: area.name,
+            city: area.city_name
         });
         setAreas([]);
     };
@@ -69,13 +70,13 @@ const MerchantSettings = () => {
 
     return (
         <div style={A.page} className="fade-in">
-            <PageHeader title="Identity & Branding" subtitle="Define your legacy. Customize how your brand appears to millions of customers.">
+            <PageHeader title="Identitas & Branding" subtitle="Tentukan identitas Anda. Atur bagaimana merek Anda tampil di hadapan pelanggan.">
                 <button 
                    onClick={handleSubmit} 
                    disabled={saving} 
                    style={{ ...A.btnPrimary, background: 'linear-gradient(135deg, #0f172a, #334155)', padding: '12px 24px' }}
                 >
-                   {saving ? <i className="bx bx-loader-alt bx-spin" /> : <i className="bx bx-save" />} Commit Changes
+                   {saving ? <i className="bx bx-loader-alt bx-spin" /> : <i className="bx bx-save" />} Simpan Perubahan
                 </button>
             </PageHeader>
 
@@ -89,7 +90,7 @@ const MerchantSettings = () => {
                 {/* Visual Identity Section */}
                 <div style={{ ...A.card, padding: 32 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', marginBottom: 24, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <i className="bx bx-palette" style={{ color: '#6366f1' }} /> Visual Assets
+                        <i className="bx bx-palette" style={{ color: '#6366f1' }} /> Aset Visual
                     </h3>
                     
                     <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginBottom: 32 }}>
@@ -104,25 +105,25 @@ const MerchantSettings = () => {
 
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
                             <div>
-                                <FieldLabel>Brand Logo URL</FieldLabel>
+                                <FieldLabel>URL Logo Brand</FieldLabel>
                                 <input name="logo_url" value={store?.logo_url || ''} onChange={handleChange} style={A.input} placeholder="https://..." />
                             </div>
                             <div>
-                                <FieldLabel>Store Banner URL</FieldLabel>
+                                <FieldLabel>URL Banner Toko</FieldLabel>
                                 <input name="banner_url" value={store?.banner_url || ''} onChange={handleChange} style={A.input} placeholder="https://..." />
                             </div>
                         </div>
                     </div>
 
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 24 }}>
-                        <FieldLabel>Store Description & Manifesto</FieldLabel>
+                        <FieldLabel>Deskripsi Toko & Manifesto</FieldLabel>
                         <textarea 
                             name="description" 
                             value={store?.description || ''} 
                             onChange={handleChange} 
                             rows="6" 
                             style={{ ...A.input, resize: 'none', lineHeight: 1.6 }} 
-                            placeholder="Tell the world about your commitment to quality and service..."
+                            placeholder="Ceritakan pada dunia tentang komitmen Anda terhadap kualitas dan layanan..."
                         />
                     </div>
                 </div>
@@ -130,46 +131,46 @@ const MerchantSettings = () => {
                 {/* Metadata Section */}
                 <div style={{ ...A.card, padding: 32 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', marginBottom: 24, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <i className="bx bx-cog" style={{ color: '#6366f1' }} /> Store Configuration
+                        <i className="bx bx-cog" style={{ color: '#6366f1' }} /> Konfigurasi Toko
                     </h3>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                         <div>
-                            <FieldLabel>Official Establishment Name</FieldLabel>
+                            <FieldLabel>Nama Resmi Toko</FieldLabel>
                             <input name="store_name" value={store?.store_name || ''} onChange={handleChange} style={{ ...A.input, fontSize: 16, fontWeight: 800 }} required />
                         </div>
 
                         <div>
-                            <FieldLabel>Digital Storefront Slug (Permanent URL)</FieldLabel>
+                            <FieldLabel>Slug Toko Digital (URL Permanen)</FieldLabel>
                             <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                                <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', height: '100%', display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>akuglow.id/shop/</span>
+                                <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', height: '100%', display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>sahabatmart.id/shop/</span>
                                 <input name="slug" value={store?.slug || ''} onChange={handleChange} style={{ ...A.input, border: 'none', background: 'transparent', flex: 1, padding: 14, fontFamily: 'monospace', color: '#6366f1', fontWeight: 800 }} required />
                             </div>
-                            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>* Changing your slug may affect existing indexed links and SEO rankings.</p>
+                            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>* Mengubah slug dapat mempengaruhi link yang sudah terindeks dan peringkat SEO.</p>
                         </div>
 
                         <div style={{ marginTop: 20, padding: 20, background: '#f0f4ff', borderRadius: 16, border: '1px solid #e0e7ff' }}>
                              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <i className="bx bxs-info-circle" style={{ color: '#4f46e5', fontSize: 20 }} />
-                                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3730a3' }}>Store Verification Status</div>
+                                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3730a3' }}>Status Verifikasi Toko</div>
                              </div>
                              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: store?.is_verified ? '#10b981' : '#f59e0b' }} />
                                 <span style={{ fontSize: 13, fontWeight: 800, color: store?.is_verified ? '#059669' : '#b45309' }}>
-                                    {store?.is_verified ? 'OFFICIALLY VERIFIED TENANT' : 'PENDING VERIFICATION'}
+                                    {store?.is_verified ? 'MITRA TERVERIFIKASI RESMI' : 'MENUNGGU VERIFIKASI'}
                                 </span>
                              </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 10 }}>
                             <div style={{ background: '#f8fafc', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                                <FieldLabel>Total Legacy Sales</FieldLabel>
+                                <FieldLabel>Total Penjualan</FieldLabel>
                                 <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a' }}>{idr(store?.total_sales)}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                                <FieldLabel>Tenure (Joined)</FieldLabel>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a' }}>
-                                    {store?.joined_at ? new Date(store.joined_at).getFullYear() : '2026'}
+                                <FieldLabel>Bergabung Sejak</FieldLabel>
+                                <div style={{ fontSize: 15, fontWeight: 900, color: '#0f172a' }}>
+                                    {store?.joined_at ? new Date(store.joined_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
                                 </div>
                             </div>
                         </div>

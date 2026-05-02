@@ -10,6 +10,9 @@ export default function RestockRequest() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [cart, setCart] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('wallet'); // 'wallet' or 'transfer'
+  const [wallet, setWallet] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCat, setSelectedCat] = useState('');
 
   useEffect(() => {
@@ -31,9 +34,13 @@ export default function RestockRequest() {
   const openModal = async () => {
     setShowModal(true);
     try {
-      const prodRaw = await fetchJson(`${MERCHANT_API_BASE}/catalog`);
+      const [prodRaw, walletRaw] = await Promise.all([
+        fetchJson(`${MERCHANT_API_BASE}/catalog`),
+        fetchJson(`${MERCHANT_API_BASE}/wallet`)
+      ]);
       setMasterProducts(prodRaw || []);
       setFilteredProducts(prodRaw || []);
+      setWallet(walletRaw?.data || walletRaw);
     } catch (err) {}
   };
 
@@ -50,18 +57,34 @@ export default function RestockRequest() {
     else setCart([...cart, { product_id: p.id, qty: 1, name: p.name, price: buyPrice, image: p.image }]);
   };
 
+  const updateQty = (id, val) => {
+    const q = parseInt(val);
+    if (isNaN(q) || q < 0) return; // Allow empty or 0 temporarily while typing
+    if (q === 0) {
+      setCart(cart.filter(i => i.product_id !== id));
+      return;
+    }
+    setCart(cart.map(i => i.product_id === id ? { ...i, qty: q } : i));
+  };
+
   const submitRestock = async () => {
     if (cart.length === 0) return;
+    setIsSubmitting(true);
     try {
       await fetchJson(`${MERCHANT_API_BASE}/restock/request`, {
         method: 'POST',
-        body: JSON.stringify({ items: cart.map(i => ({ product_id: i.product_id, quantity: i.qty })) })
+        body: JSON.stringify({ 
+          items: cart.map(i => ({ product_id: i.product_id, quantity: i.qty })),
+          payment_method: paymentMethod
+        })
       });
       setCart([]);
       setShowModal(false);
       loadRequests();
     } catch (err) {
       alert(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -94,7 +117,7 @@ export default function RestockRequest() {
       <div className="artisan-header">
          <div className="header-left">
             <div className="breadcrumb">SahabatMart &bull; Merchant</div>
-            <h1>Stock Overview</h1>
+            <h1>Ringkasan Stok</h1>
             <p className="subtitle">Kelola inventori toko Anda dengan sinkronisasi langsung dari pusat.</p>
          </div>
          <div className="header-right">
@@ -108,17 +131,17 @@ export default function RestockRequest() {
       {/* STATS BENTO */}
       <div className="artisan-bento">
          <div className="bento-card main">
-            <div className="card-lbl">PENDING REQUESTS</div>
+            <div className="card-lbl">PERMINTAAN TERTUNDA</div>
             <div className="card-val">{requests.filter(r => r.status === 'requested').length}</div>
             <div className="card-trend text-amber-500">Menunggu Verifikasi</div>
          </div>
          <div className="bento-card">
-            <div className="card-lbl">IN-TRANSIT</div>
+            <div className="card-lbl">DALAM PENGIRIMAN</div>
             <div className="card-val">{requests.filter(r => r.status === 'shipped').length}</div>
             <div className="card-trend text-indigo-500">Barang Sedang Dikirim</div>
          </div>
          <div className="bento-card">
-            <div className="card-lbl">TOTAL RESTOCKED</div>
+            <div className="card-lbl">TOTAL RESTOK SELESAI</div>
             <div className="card-val">{requests.filter(r => r.status === 'received').length}</div>
             <div className="card-trend text-emerald-500">Permintaan Selesai</div>
          </div>
@@ -128,13 +151,13 @@ export default function RestockRequest() {
       <div className="artisan-list-container">
          <div className="list-title">Riwayat Aktivitas</div>
          {loading ? (
-           <div className="shimmer-list">Memuat database restock...</div>
+           <div className="shimmer-list">Memuat database restok...</div>
          ) : (
            <div className="requests-grid">
               {requests.length === 0 ? (
                 <div className="empty-state">
                    <span className="material-symbols-outlined">inbox</span>
-                   <p>Belum ada riwayat permintaan restock.</p>
+                   <p>Belum ada riwayat permintaan restok.</p>
                 </div>
               ) : requests.map(req => (
                 <div key={req.id} className="req-card">
@@ -144,7 +167,7 @@ export default function RestockRequest() {
                    </div>
                    <div className="req-date">{new Date(req.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
                    <div className="req-body">
-                      <div className="req-item-count">{req.items?.length || 0} Products</div>
+                      <div className="req-item-count">{req.items?.length || 0} Produk</div>
                       <div className="req-qty-total">{req.total_items || 0} pcs Total</div>
                    </div>
                     <div className="req-footer">
@@ -207,12 +230,20 @@ export default function RestockRequest() {
 
                  <div className="cart-list-elite custom-scroll">
                     {cart.length === 0 ? (
-                      <div className="cart-empty-elite">Pilih produk di samping untuk mengisi list restock toko Anda.</div>
+                      <div className="cart-empty-elite">Pilih produk di samping untuk mengisi daftar kulakan toko Anda.</div>
                     ) : cart.map(item => (
                       <div key={item.product_id} className="cart-item-elite">
                          <div className="ce-info">
                             <div className="ce-name">{item.name}</div>
-                            <div className="ce-qty">Qty: {item.qty}</div>
+                            <div className="ce-qty-input">
+                               <span>Qty</span>
+                               <input 
+                                 type="number" 
+                                 min="0" 
+                                 value={item.qty} 
+                                 onChange={e => updateQty(item.product_id, e.target.value)}
+                               />
+                            </div>
                          </div>
                          <div className="ce-actions">
                             <button onClick={() => setCart(cart.filter(i => i.product_id !== item.product_id))} className="ce-del">
@@ -224,13 +255,57 @@ export default function RestockRequest() {
                     ))}
                  </div>
 
+                 <div style={{ padding: '0 40px', marginBottom: 20 }}>
+                    <div style={{ fontSize:11, fontWeight:900, color:'#94a3b8', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Metode Pembayaran</div>
+                    <div style={{ display:'flex', gap:10 }}>
+                       <button 
+                         onClick={() => setPaymentMethod('wallet')}
+                         style={{ 
+                           flex:1, padding:'12px', borderRadius:10, border:'1px solid '+(paymentMethod==='wallet'?'#4f46e5':'#e2e8f0'),
+                           background: paymentMethod==='wallet'?'#eef2ff':'white', color: paymentMethod==='wallet'?'#4f46e5':'#64748b',
+                           fontSize:12, fontWeight:800, cursor:'pointer'
+                         }}
+                       >
+                          Saldo Dompet
+                       </button>
+                       <button 
+                         onClick={() => setPaymentMethod('transfer')}
+                         style={{ 
+                           flex:1, padding:'12px', borderRadius:10, border:'1px solid '+(paymentMethod==='transfer'?'#4f46e5':'#e2e8f0'),
+                           background: paymentMethod==='transfer'?'#eef2ff':'white', color: paymentMethod==='transfer'?'#4f46e5':'#64748b',
+                           fontSize:12, fontWeight:800, cursor:'pointer'
+                         }}
+                       >
+                          Transfer Manual
+                       </button>
+                    </div>
+                    {paymentMethod === 'wallet' && wallet && (
+                      <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Saldo Tersedia:</span>
+                         <span style={{ fontSize: 12, fontWeight: 800, color: (wallet.available_balance < cart.reduce((s, i) => s + (i.price * i.qty), 0)) ? '#ef4444' : '#10b981' }}>
+                            {idr(wallet.available_balance)}
+                         </span>
+                      </div>
+                    )}
+                    {paymentMethod === 'wallet' && wallet && (wallet.available_balance < cart.reduce((s, i) => s + (i.price * i.qty), 0)) && (
+                      <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700, marginTop: 4 }}>
+                         <i className="bx bx-error-circle" /> Saldo tidak mencukupi untuk kulakan ini.
+                      </div>
+                    )}
+                 </div>
+
                  <div className="cart-footer-elite">
                     <div className="total-box">
                        <span>ESTIMASI BIAYA</span>
                        <h4>{idr(cart.reduce((s, i) => s + (i.price * i.qty), 0))}</h4>
                     </div>
-                    <button className="submit-elite-btn" disabled={cart.length === 0} onClick={submitRestock}>
-                       KIRIM PERMINTAAN <span className="material-symbols-outlined">send</span>
+                    <button 
+                       className="submit-elite-btn" 
+                       disabled={isSubmitting || cart.length === 0 || (paymentMethod === 'wallet' && wallet && wallet.available_balance < cart.reduce((s, i) => s + (i.price * i.qty), 0))} 
+                       onClick={submitRestock}
+                    >
+                       {isSubmitting ? 'MEMPROSES...' : 'KIRIM PERMINTAAN'} 
+                       {!isSubmitting && <span className="material-symbols-outlined">send</span>}
                     </button>
                  </div>
               </div>
@@ -321,6 +396,12 @@ export default function RestockRequest() {
         .ce-del { border: none; background: #fee2e2; color: #ef4444; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; transition: 0.2s; }
         .ce-del:hover { background: #ef4444; color: white; transform: scale(1.1); }
         .ce-price { font-size: 16px; font-weight: 900; color: #0f172a; }
+
+        .ce-qty-input { display: flex; align-items: center; gap: 8px; margin-bottom: 15px; }
+        .ce-qty-input span { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; }
+        .ce-qty-input input { width: 80px; border: 1px solid #e2e8f0; background: white; padding: 6px 12px; border-radius: 10px; font-weight: 900; color: #0f172a; outline: none; transition: 0.2s; }
+        .ce-qty-input input:focus { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.05); }
+        .ce-qty-input input::-webkit-inner-spin-button { opacity: 1; }
 
         .cart-footer-elite { padding: 40px; border-top: 1px solid #f1f5f9; }
         .total-box { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; }

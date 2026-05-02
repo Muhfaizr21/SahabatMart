@@ -60,6 +60,50 @@ const MerchantLayout = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const handleClearAllNotifs = async () => {
+    try {
+      await fetchJson(`${MERCHANT_API_BASE}/notifications/read`, {
+        method: 'PUT',
+        body: JSON.stringify({ id: "" })
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error("Failed to clear notifs", err);
+    }
+  };
+
+  const handleDeleteAllNotifs = async () => {
+    if(!window.confirm("Hapus semua notifikasi?")) return;
+    try {
+      await fetchJson(`${MERCHANT_API_BASE}/notifications/delete-all`, { method: 'DELETE' });
+      setNotifications([]);
+    } catch (err) {
+      console.error("Failed to delete all notifs", err);
+    }
+  };
+
+  const handleReadNotif = async (id) => {
+    try {
+      await fetchJson(`${MERCHANT_API_BASE}/notifications/read`, {
+        method: 'PUT',
+        body: JSON.stringify({ id })
+      });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (err) {
+      console.error("Failed to read notif", err);
+    }
+  };
+
+  const handleDeleteNotif = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await fetchJson(`${MERCHANT_API_BASE}/notifications/delete?id=${id}`, { method: 'DELETE' });
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error("Failed to delete notif", err);
+    }
+  };
+
   // [SahabatMart] Allow both merchants and superadmins (for Pusat warehouse management)
   if (!user || (user.role !== 'merchant' && user.role !== 'superadmin')) {
     return <Navigate to="/login" replace />;
@@ -74,12 +118,12 @@ const MerchantLayout = () => {
   const menuItems = [
     { name: 'Dashboard', icon: 'dashboard', path: '/merchant', end: true },
     { name: 'Mitra Area', icon: 'stars', path: '/affiliate' },
-    { name: 'Analytics', icon: 'insights', path: '/merchant/analytics' },
-    { name: 'Inventory', icon: 'inventory_2', path: '/merchant/products' },
-    { name: 'Restock', icon: 'rebase_edit', path: '/merchant/restock' },
-    { name: 'Orders', icon: 'shopping_cart', path: '/merchant/orders' },
-    { name: 'Wallet', icon: 'account_balance_wallet', path: '/merchant/wallet' },
-    { name: 'Settings', icon: 'settings', path: '/merchant/settings' },
+    { name: 'Analitik', icon: 'insights', path: '/merchant/analytics' },
+    { name: 'Inventori', icon: 'inventory_2', path: '/merchant/products' },
+    { name: 'Restok', icon: 'rebase_edit', path: '/merchant/restock' },
+    { name: 'Pesanan', icon: 'shopping_cart', path: '/merchant/orders' },
+    { name: 'Dompet', icon: 'account_balance_wallet', path: '/merchant/wallet' },
+    { name: 'Pengaturan', icon: 'settings', path: '/merchant/settings' },
   ];
 
   return (
@@ -94,7 +138,7 @@ const MerchantLayout = () => {
                </div>
                <div>
                   <span className="text-xl font-black bg-gradient-to-br from-violet-600 to-indigo-800 bg-clip-text text-transparent tracking-tight">AkuGrow</span>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mt-0.5">Partner Elite</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mt-0.5">Mitra Elit</p>
                </div>
             </div>
         </div>
@@ -106,7 +150,7 @@ const MerchantLayout = () => {
         <div className="mt-auto pt-10 space-y-6">
             <div className="bg-gradient-to-br from-violet-50 to-indigo-50 p-5 rounded-2xl border border-violet-100 relative overflow-hidden group hover:scale-[1.02] transition-all cursor-pointer">
                 <div className="relative z-10">
-                    <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">Elite Benefits</p>
+                    <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">Keuntungan Elit</p>
                     <p className="text-xs text-slate-500 font-medium leading-relaxed">Nikmati akses prioritas dukungan teknis 24/7.</p>
                 </div>
                 <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-violet-200/40 rounded-full blur-2xl group-hover:bg-violet-200/60 transition-all"></div>
@@ -115,11 +159,11 @@ const MerchantLayout = () => {
             <div className="space-y-1 border-t border-slate-100 pt-6">
                 <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-500 hover:text-slate-900 transition-all font-bold text-[11px] tracking-widest uppercase">
                     <span className="material-symbols-outlined text-xl">help</span>
-                    Support Center
+                    Pusat Bantuan
                 </button>
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-rose-600 font-bold transition-all text-left uppercase text-[11px] tracking-widest">
                     <span className="material-symbols-outlined text-xl">logout</span>
-                    Logout
+                    Keluar
                 </button>
             </div>
         </div>
@@ -136,10 +180,10 @@ const MerchantLayout = () => {
                 </button>
                 <div className="h-6 w-[1px] bg-slate-200"></div>
                 <div className="hidden lg:flex items-center gap-2 text-slate-400">
-                   <span className="text-[11px] font-black uppercase tracking-widest">Global Escrow Status:</span>
+                   <span className="text-[11px] font-black uppercase tracking-widest">Status Escrow Global:</span>
                    <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black border border-emerald-100">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      OPERATIONAL
+                      BEROPERASI
                    </span>
                 </div>
             </div>
@@ -161,37 +205,60 @@ const MerchantLayout = () => {
                     </button>
 
                     {showNotifMenu && (
-                        <div className="absolute top-14 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                                <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Notifications</span>
-                                <span className="text-[10px] font-bold text-violet-600 cursor-pointer hover:underline">Clear all</span>
+                        <div className="absolute top-14 right-0 w-[350px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[9999]">
+                            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Notifikasi</span>
+                                <div className="flex gap-3">
+                                   <button onClick={handleClearAllNotifs} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">Tandai Baca Semua</button>
+                                   <button onClick={handleDeleteAllNotifs} className="text-[10px] font-bold text-rose-600 hover:text-rose-700 transition-colors">Hapus Semua</button>
+                                </div>
                             </div>
-                            <div className="max-h-96 overflow-y-auto">
+                            <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
                                 {notifications.length === 0 ? (
                                     <div className="p-10 text-center">
-                                        <p className="text-xs text-slate-400 font-medium">No new notifications</p>
+                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <span className="material-symbols-outlined text-slate-300 text-3xl">notifications_off</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 font-medium">Tidak ada notifikasi baru</p>
                                     </div>
                                 ) : (
                                     notifications.map(n => (
-                                        <div key={n.id} className={`p-4 hover:bg-slate-50 border-b border-slate-50 cursor-pointer transition-colors ${!n.is_read ? 'bg-indigo-50/30' : ''}`}>
+                                        <div 
+                                          key={n.id} 
+                                          onClick={() => {
+                                            if(!n.is_read) handleReadNotif(n.id);
+                                            if(n.link) navigate(n.link);
+                                          }}
+                                          className={`p-4 hover:bg-slate-50 border-b border-slate-50 cursor-pointer transition-colors group relative ${!n.is_read ? 'bg-indigo-50/30' : ''}`}
+                                        >
                                             <div className="flex gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${n.type === 'order' ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${n.type === 'order' ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                                                     <span className="material-symbols-outlined text-sm">{n.type === 'order' ? 'payments' : 'info'}</span>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[11px] font-bold text-slate-900 leading-tight">{n.title}</p>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">{n.message}</p>
-                                                    <p className="text-[9px] text-slate-400 mt-2 font-bold uppercase tracking-tighter">
-                                                        {new Date(n.created_at).toLocaleTimeString()}
-                                                    </p>
+                                                <div className="flex-1 min-w-0 pr-6">
+                                                    <p className="text-[11px] font-bold text-slate-900 leading-tight mb-1 line-clamp-1">{n.title}</p>
+                                                    <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-2">{n.message}</p>
+                                                    <p className="text-[9px] text-slate-400 mt-1.5 font-medium">{new Date(n.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
                                                 </div>
+                                                {/* Actions */}
+                                                <div className="absolute right-3 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                   <button 
+                                                      onClick={(e) => handleDeleteNotif(e, n.id)}
+                                                      className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-all shadow-sm"
+                                                   >
+                                                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                   </button>
+                                                </div>
+                                                {!n.is_read && (
+                                                   <span className="absolute right-3 top-4 w-2 h-2 bg-indigo-500 rounded-full group-hover:hidden"></span>
+                                                )}
                                             </div>
                                         </div>
                                     ))
                                 )}
                             </div>
-                            <div className="p-3 bg-slate-50 text-center border-t border-slate-100">
-                                <span className="text-[10px] font-black text-slate-400 hover:text-slate-600 cursor-pointer uppercase tracking-widest">See all alerts</span>
+                            <div className="p-3 bg-slate-50 border-t border-slate-100 text-center">
+                               <button onClick={() => navigate('/merchant/settings')} className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-indigo-600 transition-colors">Lihat Semua Peringatan</button>
                             </div>
                         </div>
                     )}
@@ -207,9 +274,9 @@ const MerchantLayout = () => {
                     >
                         <div className="text-right hidden sm:block">
                             <h4 className={`text-xs font-black uppercase tracking-tighter transition-colors ${showProfileMenu ? 'text-white' : 'text-slate-900'}`}>
-                                {(user.profile?.full_name?.split(' ')[0] || 'Partner').toUpperCase()}
+                                {(user.profile?.full_name?.split(' ')[0] || 'Mitra').toUpperCase()}
                             </h4>
-                            <p className={`text-[10px] font-bold transition-colors ${showProfileMenu ? 'text-slate-400' : 'text-slate-400'}`}>Official Store</p>
+                            <p className={`text-[10px] font-bold transition-colors ${showProfileMenu ? 'text-slate-400' : 'text-slate-400'}`}>Toko Resmi</p>
                         </div>
                         <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-black text-xs shadow-lg border-2 transition-all ${showProfileMenu ? 'bg-white text-slate-900 border-slate-800' : 'bg-gradient-to-br from-violet-600 to-indigo-800 text-white border-white'}`}>
                             {user.profile?.full_name?.charAt(0) || 'M'}
@@ -219,22 +286,22 @@ const MerchantLayout = () => {
                     {showProfileMenu && (
                         <div className="absolute top-16 right-0 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[100]">
                             <div className="p-4 bg-slate-50/50 border-b border-slate-100">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Authenticated Account</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Akun Terotentikasi</p>
                                 <p className="text-xs font-black text-slate-900 truncate">{user.email}</p>
                             </div>
                             <div className="p-2">
                                 <button className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-all text-left">
                                     <span className="material-symbols-outlined text-xl">account_circle</span>
-                                    <span className="text-[11px] font-bold uppercase tracking-wider">Public Storefront</span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Halaman Toko Publik</span>
                                 </button>
                                 <button onClick={() => navigate('/merchant/settings')} className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-all text-left">
                                     <span className="material-symbols-outlined text-xl">tune</span>
-                                    <span className="text-[11px] font-bold uppercase tracking-wider">Account Settings</span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Pengaturan Akun</span>
                                 </button>
                                 <div className="h-[1px] bg-slate-100 my-2 px-3"></div>
                                 <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl text-rose-500 hover:bg-rose-50 transition-all text-left">
                                     <span className="material-symbols-outlined text-xl">logout</span>
-                                    <span className="text-[11px] font-bold uppercase tracking-wider">Sign Out</span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">Keluar</span>
                                 </button>
                             </div>
                         </div>

@@ -12,6 +12,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -51,9 +52,9 @@ func (ac *AffiliateController) TrackClick(w http.ResponseWriter, r *http.Request
 
 // GET /api/affiliate/dashboard
 func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -182,9 +183,9 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 
 // GET /api/affiliate/commissions
 func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -225,9 +226,9 @@ func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Req
 
 // GET /api/affiliate/links
 func (ac *AffiliateController) GetLinks(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -244,9 +245,9 @@ func (ac *AffiliateController) GetLinks(w http.ResponseWriter, r *http.Request) 
 
 // POST /api/affiliate/links/create
 func (ac *AffiliateController) CreateLink(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -294,9 +295,9 @@ func (ac *AffiliateController) CreateLink(w http.ResponseWriter, r *http.Request
 
 // DELETE /api/affiliate/links/delete?id=xxx
 func (ac *AffiliateController) DeleteLink(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -311,9 +312,9 @@ func (ac *AffiliateController) DeleteLink(w http.ResponseWriter, r *http.Request
 
 // GET /api/affiliate/products - Top products for affiliate to promote
 func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 	_ = affiliateID
@@ -352,9 +353,9 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 
 // GET /api/affiliate/withdrawals
 func (ac *AffiliateController) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -388,9 +389,9 @@ func (ac *AffiliateController) GetWithdrawals(w http.ResponseWriter, r *http.Req
 
 // POST /api/affiliate/withdrawals/request
 func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -476,9 +477,9 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 
 // GET /api/affiliate/profile
 func (ac *AffiliateController) GetProfile(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 	userID, _ := r.Context().Value("user_id").(string)
@@ -501,9 +502,9 @@ func (ac *AffiliateController) GetProfile(w http.ResponseWriter, r *http.Request
 
 // PUT /api/affiliate/profile/update
 func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 	userID, _ := r.Context().Value("user_id").(string)
@@ -547,9 +548,9 @@ func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Requ
 
 // GET /api/affiliate/team-stats
 func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -588,9 +589,9 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 
 // GET /api/affiliate/merchant-eligibility
 func (ac *AffiliateController) CheckMerchantEligibility(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 
@@ -718,9 +719,9 @@ func (ac *AffiliateController) GetPromoMaterials(w http.ResponseWriter, r *http.
 // POST /api/affiliate/apply-merchant
 // Alur: Mitra eligible → submit aplikasi → Admin menerima notif → Admin approve/reject via /api/admin/merchants/verify
 func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.Request) {
-	affiliateID, ok := r.Context().Value("affiliate_id").(string)
-	if !ok || affiliateID == "" {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi tidak valid")
+	affiliateID, _ := r.Context().Value("affiliate_id").(string)
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
 		return
 	}
 	userID, _ := r.Context().Value("user_id").(string)

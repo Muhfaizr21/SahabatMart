@@ -88,3 +88,15 @@ func (ns *NotificationService) MarkAllAsRead(receiverID, receiverType string) er
 	}
 	return query.Update("is_read", true).Error
 }
+
+func (ns *NotificationService) Delete(notifID string) error {
+	return ns.DB.Delete(&models.Notification{}, "id = ?", notifID).Error
+}
+
+func (ns *NotificationService) DeleteAll(receiverID, receiverType string) error {
+	query := ns.DB.Where("receiver_type = ?", receiverType)
+	if receiverType != "admin" {
+		query = query.Where("receiver_id = ?", receiverID)
+	}
+	return query.Delete(&models.Notification{}).Error
+}

@@ -161,12 +161,13 @@ export default function AffiliateWithdrawals() {
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">Rp</span>
                 <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder={(config.payout_min_amount || 50000).toString()}
-                  min={config.payout_min_amount || 50000}
-                  max={balance}
+                  type="text"
+                  value={amount ? Number(amount).toLocaleString('id-ID') : ''}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setAmount(val);
+                  }}
+                  placeholder={(config.payout_min_amount || 50000).toLocaleString('id-ID')}
                   className="w-full pl-12 pr-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500"
                   style={{
                     background: 'rgba(12, 19, 36, 0.6)',

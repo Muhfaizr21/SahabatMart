@@ -77,7 +77,7 @@ type PayoutRequest struct {
 	Note        string     `gorm:"type:text" json:"note"`
 	RequestedAt time.Time  `json:"requested_at"`
 	ProcessedAt *time.Time `json:"processed_at"`
-	ProcessedBy string     `gorm:"type:uuid" json:"processed_by"`
+	ProcessedBy *string    `gorm:"type:uuid" json:"processed_by"`
 }
 
 // Merchant menyimpan data toko merchant
@@ -136,6 +136,8 @@ type RestockRequest struct {
 	Items       []RestockItem `gorm:"foreignKey:RestockID" json:"items"`
 	Merchant    Merchant      `gorm:"foreignKey:MerchantID;references:ID" json:"merchant"`
 	TrackingNumber string    `gorm:"type:varchar(100)" json:"tracking_number"` // Resi pengiriman B2B ke merchant
+	PaymentMethod  string    `gorm:"type:varchar(50);default:'transfer'" json:"payment_method"` // wallet, transfer
+	IsPaid         bool      `gorm:"default:false" json:"is_paid"`
 }
 
 // Supplier pabrik/penyedia barang ke pusat

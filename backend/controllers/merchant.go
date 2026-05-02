@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -32,7 +34,12 @@ func NewMerchantController(db *gorm.DB) *MerchantController {
 
 // GET /api/merchant/products
 func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	
 	search := r.URL.Query().Get("search")
 	categoryID := r.URL.Query().Get("category_id")
@@ -61,7 +68,12 @@ func (mc *MerchantController) GetCatalog(w http.ResponseWriter, r *http.Request)
 
 // GET /api/merchant/restock
 func (mc *MerchantController) GetRestockRequests(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	requests, err := mc.Service.GetRestockRequests(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data restock")
@@ -72,17 +84,27 @@ func (mc *MerchantController) GetRestockRequests(w http.ResponseWriter, r *http.
 
 // POST /api/merchant/restock/request
 func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	
 	var req struct {
-		Items []models.RestockItem `json:"items"`
+		Items         []models.RestockItem `json:"items"`
+		PaymentMethod string               `json:"payment_method"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
 
-	request, err := mc.Service.CreateRestockRequest(merchantID, req.Items)
+	if req.PaymentMethod == "" {
+		req.PaymentMethod = "transfer"
+	}
+
+	request, err := mc.Service.CreateRestockRequest(merchantID, req.Items, req.PaymentMethod)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat permintaan restock: "+err.Error())
 		return
@@ -101,7 +123,12 @@ func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Requ
 
 // GET /api/merchant/orders
 func (mc *MerchantController) GetOrders(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	status := r.URL.Query().Get("status")
 	
 	page := utils.QueryInt(r, "page", 1)
@@ -117,7 +144,12 @@ func (mc *MerchantController) GetOrders(w http.ResponseWriter, r *http.Request) 
 
 // POST /api/merchant/orders/status
 func (mc *MerchantController) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 
 	var req struct {
 		GroupID       string `json:"group_id"`
@@ -144,7 +176,12 @@ func (mc *MerchantController) UpdateOrderStatus(w http.ResponseWriter, r *http.R
 
 // GET /api/merchant/wallet
 func (mc *MerchantController) GetWallet(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	wallet, err := mc.Service.GetWallet(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data wallet")
@@ -155,7 +192,12 @@ func (mc *MerchantController) GetWallet(w http.ResponseWriter, r *http.Request) 
 
 // POST /api/merchant/wallet/withdraw
 func (mc *MerchantController) RequestPayout(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if _, err := uuid.Parse(merchantID); err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid atau ID merchant tidak dikenali")
+		return
+	}
 
 	var req struct {
 		Amount      float64 `json:"amount"`
@@ -189,7 +231,12 @@ func (mc *MerchantController) RequestPayout(w http.ResponseWriter, r *http.Reque
 
 // GET /api/merchant/wallet/history
 func (mc *MerchantController) GetPayoutHistory(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	history, err := mc.Service.GetPayoutHistory(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil riwayat penarikan")
@@ -198,13 +245,35 @@ func (mc *MerchantController) GetPayoutHistory(w http.ResponseWriter, r *http.Re
 	utils.JSONResponse(w, http.StatusOK, history)
 }
 
+// GET /api/merchant/wallet/transactions
+func (mc *MerchantController) GetWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+	limit := utils.QueryInt(r, "limit", 50)
+	txs, err := mc.Service.GetWalletTransactions(merchantID, limit)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil riwayat transaksi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, txs)
+}
+
 // ─────────────────────────────────────────
 // VOUCHER MANAGEMENT
 // ─────────────────────────────────────────
 
 // GET /api/merchant/vouchers
 func (mc *MerchantController) GetVouchers(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	vouchers, err := mc.Service.GetVouchers(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil voucher")
@@ -215,7 +284,12 @@ func (mc *MerchantController) GetVouchers(w http.ResponseWriter, r *http.Request
 
 // POST /api/merchant/vouchers/upsert
 func (mc *MerchantController) UpsertVoucher(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 
 	var voucher models.Voucher
 	if err := json.NewDecoder(r.Body).Decode(&voucher); err != nil {
@@ -234,7 +308,12 @@ func (mc *MerchantController) UpsertVoucher(w http.ResponseWriter, r *http.Reque
 
 // DELETE /api/merchant/vouchers/delete?id=...
 func (mc *MerchantController) DeleteVoucher(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
 		utils.JSONError(w, http.StatusBadRequest, "Voucher ID dibutuhkan")
@@ -253,7 +332,12 @@ func (mc *MerchantController) DeleteVoucher(w http.ResponseWriter, r *http.Reque
 
 // GET /api/merchant/disputes
 func (mc *MerchantController) GetDisputes(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	disputes, err := mc.Service.GetDisputes(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil sengketa")
@@ -264,7 +348,12 @@ func (mc *MerchantController) GetDisputes(w http.ResponseWriter, r *http.Request
 
 // POST /api/merchant/disputes/respond
 func (mc *MerchantController) RespondDispute(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 
 	var req struct {
 		DisputeID uint   `json:"dispute_id"`
@@ -290,7 +379,12 @@ func (mc *MerchantController) RespondDispute(w http.ResponseWriter, r *http.Requ
 
 // GET /api/merchant/store
 func (mc *MerchantController) GetStoreProfile(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	store, err := mc.Service.GetStoreProfile(merchantID)
 	if err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Data toko tidak ditemukan")
@@ -304,7 +398,12 @@ func (mc *MerchantController) GetStoreProfile(w http.ResponseWriter, r *http.Req
 
 // POST /api/merchant/store/update
 func (mc *MerchantController) UpdateStoreProfile(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 
 	var updates map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
@@ -329,10 +428,17 @@ func (mc *MerchantController) UpdateStoreProfile(w http.ResponseWriter, r *http.
 
 // GET /api/merchant/affiliate-stats
 func (mc *MerchantController) GetAffiliateStats(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
-	stats, err := mc.Service.GetAffiliateStats(merchantID)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+	year := utils.QueryInt(r, "year", time.Now().Year())
+
+	stats, err := mc.Service.GetDetailedAnalytics(merchantID, year)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil statistik afiliasi")
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil statistik")
 		return
 	}
 	utils.JSONResponse(w, http.StatusOK, stats)
@@ -340,7 +446,12 @@ func (mc *MerchantController) GetAffiliateStats(w http.ResponseWriter, r *http.R
 
 // GET /api/merchant/notifications
 func (mc *MerchantController) GetNotifications(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	notifs, err := mc.Notif.GetNotifications(merchantID, "merchant", 20)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
@@ -351,11 +462,22 @@ func (mc *MerchantController) GetNotifications(w http.ResponseWriter, r *http.Re
 
 // PUT /api/merchant/notifications/read
 func (mc *MerchantController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	var req struct {
 		ID string `json:"id"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// If body is empty, mark all as read
+		mc.Notif.MarkAllAsRead(merchantID, "merchant")
+		utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+		return
+	}
+
 	if req.ID == "" {
 		mc.Notif.MarkAllAsRead(merchantID, "merchant")
 	} else {
@@ -364,9 +486,43 @@ func (mc *MerchantController) MarkNotificationRead(w http.ResponseWriter, r *htt
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+// DELETE /api/merchant/notifications
+func (mc *MerchantController) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Notification ID required")
+		return
+	}
+	if err := mc.Notif.Delete(id); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/merchant/notifications/all
+func (mc *MerchantController) DeleteAllNotifications(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+	if err := mc.Notif.DeleteAll(merchantID, "merchant"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus semua notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
 // POST /api/merchant/restock/receive
 func (mc *MerchantController) ReceiveRestock(w http.ResponseWriter, r *http.Request) {
-	merchantID := r.Context().Value("merchant_id").(string)
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
 	var req struct {
 		RequestID string `json:"request_id"`
 	}

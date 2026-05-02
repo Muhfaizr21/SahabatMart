@@ -69,11 +69,14 @@ func SeedAll(db *gorm.DB) {
 	// 3. Seed Users & Merchants
 	merchants := seedUsers(db)
 
-	// 4. Seed Warehouse (Suppliers)
-	suppliers := seedWarehouse(db)
+	// 4. Seed Suppliers
+	suppliers := seedSuppliers(db)
 
 	// 5. Seed 40 Products
 	seedProducts(db, categories, merchants, suppliers)
+
+	// 6. Finalize Warehouse (Master Inventory & Stock Mutations)
+	finalizeWarehouse(db, suppliers)
 
 	// 6. Seed Marketing & RBAC
 	seedMarketing(db)
@@ -89,10 +92,9 @@ func SeedAll(db *gorm.DB) {
 	fmt.Println("✅ Seeding Completed! 200+ Users created with full ecosystem activity.")
 }
 
-func seedWarehouse(db *gorm.DB) []models.Supplier {
-	fmt.Println("  -> Seeding Warehouse Operations (Mata Elang)...")
+func seedSuppliers(db *gorm.DB) []models.Supplier {
+	fmt.Println("  -> Seeding Suppliers (Mata Elang)...")
 	
-	// 1. Seed Suppliers
 	suppliers := []models.Supplier{
 		{ID: uuid.New().String(), Name: "PT. Kimia Farma (Skincare Div)", Contact: "Bp. Ahmad", Phone: "08123456789", Email: "supply@kimiafarma.co.id", Address: "Jakarta Industrial Estate"},
 		{ID: uuid.New().String(), Name: "Cosmax Indonesia (Global Supply)", Contact: "Ms. Kim", Phone: "08998877665", Email: "production@cosmax.id", Address: "Jababeka Cikarang"},
@@ -101,8 +103,13 @@ func seedWarehouse(db *gorm.DB) []models.Supplier {
 	for i := range suppliers { 
 		db.FirstOrCreate(&suppliers[i], models.Supplier{Name: suppliers[i].Name}) 
 	}
+	return suppliers
+}
 
-	// 2. Mark Master Products & Set Wholesale Prices
+func finalizeWarehouse(db *gorm.DB, suppliers []models.Supplier) {
+	fmt.Println("  -> Finalizing Warehouse (Master Products & Stock)...")
+
+	// 1. Mark Master Products & Set Wholesale Prices
 	var products []models.Product
 	db.Find(&products).Limit(10)
 	for i, p := range products {
@@ -112,7 +119,7 @@ func seedWarehouse(db *gorm.DB) []models.Supplier {
 			"cogs":            p.Price * 0.50, // Harga modal pusat 50%
 		})
 
-		// 3. Create Initial Inbound for Master Products
+		// 2. Create Initial Inbound for Master Products
 		if i < 3 { // Just for the first 3 products
 			inbound := models.InboundStock{
 				SupplierID:  suppliers[0].ID,
@@ -160,7 +167,6 @@ func seedWarehouse(db *gorm.DB) []models.Supplier {
 			})
 		}
 	}
-	return suppliers
 }
 
 func seedCategories(db *gorm.DB) map[string]uint {
@@ -217,6 +223,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 		Slug: "pusat", 
 		Status: "active", 
 		IsVerified: true,
+		JoinedAt: time.Now(),
 	}
 	db.Create(&pusatMerch)
 
@@ -267,7 +274,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 		u := models.User{Email: m.email, PasswordHash: &pwHash, Role: "merchant", Status: "active"}
 		db.Create(&u)
 		db.Create(&models.UserProfile{UserID: u.ID, FullName: m.name, City: m.city})
-		merch := models.Merchant{UserID: u.ID, StoreName: m.name, Slug: m.slug, Status: "active", IsVerified: true, City: m.city}
+		merch := models.Merchant{UserID: u.ID, StoreName: m.name, Slug: m.slug, Status: "active", IsVerified: true, City: m.city, JoinedAt: time.Now()}
 		db.Create(&merch)
 
 		// [Akuglow] Every distributor is also a top-tier affiliate
@@ -353,6 +360,7 @@ func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Me
 			Brand:       t.brand,
 			Image:       t.img,
 			Status:      "active",
+			IsMaster:    true,    // SEMUA produk yang dibuat di pusat adalah Master Product
 			MerchantID:  PusatID, // Set Pusat as the official owner of Master Products
 			SupplierID:  suppliers[i%len(suppliers)].ID,
 			Stock:       100,     // Initial master stock

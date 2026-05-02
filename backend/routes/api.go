@@ -207,6 +207,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
 	mux.HandleFunc("/api/merchant/wallet/withdraw", merchantOnly(merchantCtrl.RequestPayout))
 	mux.HandleFunc("/api/merchant/wallet/history", merchantOnly(merchantCtrl.GetPayoutHistory))
+	mux.HandleFunc("/api/merchant/wallet/transactions", merchantOnly(merchantCtrl.GetWalletTransactions))
 	
 	// Vouchers (Disabled: Managed by Admin Only)
 	// mux.HandleFunc("/api/merchant/vouchers", merchantOnly(merchantCtrl.GetVouchers))
@@ -223,6 +224,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	
 	mux.HandleFunc("/api/merchant/notifications", merchantOnly(merchantCtrl.GetNotifications))
 	mux.HandleFunc("/api/merchant/notifications/read", merchantOnly(merchantCtrl.MarkNotificationRead))
+	mux.HandleFunc("/api/merchant/notifications/delete", merchantOnly(merchantCtrl.DeleteNotification))
+	mux.HandleFunc("/api/merchant/notifications/delete-all", merchantOnly(merchantCtrl.DeleteAllNotifications))
 	mux.HandleFunc("/api/merchant/affiliate-stats", merchantOnly(merchantCtrl.GetAffiliateStats))
 
 	// --- Affiliate Routes ---

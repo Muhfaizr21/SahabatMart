@@ -41,9 +41,16 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 			return fmt.Errorf("saldo tidak mencukupi")
 		}
 		wallet.Balance -= amount
+		wallet.PendingBalance += amount // Pindahkan ke pending (escrow penarikan)
 	case models.TxWithdrawalCompleted:
+		if wallet.PendingBalance >= amount {
+			wallet.PendingBalance -= amount
+		}
 		wallet.TotalWithdrawn += amount
 	case models.TxWithdrawalRejected:
+		if wallet.PendingBalance >= amount {
+			wallet.PendingBalance -= amount
+		}
 		wallet.Balance += amount
 	case models.TxRefundDeduction, models.TxCommissionReversed, models.TxSaleRevenueReversed:
 		if wallet.PendingBalance >= amount {
@@ -60,6 +67,11 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 		return err
 	}
 
+	var refPtr *string
+	if refID != "" {
+		refPtr = &refID
+	}
+
 	txn := &models.WalletTransaction{
 		WalletID:      wallet.ID,
 		Type:          txType,
@@ -69,7 +81,7 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 		PendingBefore: pendingBefore,
 		PendingAfter:  wallet.PendingBalance,
 		Description:   description,
-		ReferenceID:   refID,
+		ReferenceID:   refPtr,
 		ReferenceType: refType,
 	}
 
@@ -80,6 +92,14 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 	var order models.Order
 	if err := tx.Preload("MerchantGroups").First(&order, "id = ?", orderID).Error; err != nil {
+		return err
+	}
+
+	// 0. [Financial Audit] Record TOTAL Inflow to HQ Cash Account
+	// Every cent paid by the buyer enters the platform's bank account first.
+	totalInflow := order.GrandTotal
+	inflowDesc := fmt.Sprintf("Pembayaran Pesanan %s (Total Inflow)", order.OrderNumber)
+	if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, totalInflow, order.ID, "order", inflowDesc); err != nil {
 		return err
 	}
 
@@ -116,36 +136,20 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 				}
 			}
 
-			// 2. HQ (Pusat) mendapat Platform Fee jika merchant bukan pusat
-			// (Revenue HQ dalam model marketplace adalah Platform Fee)
-			// Jika ada subsidi karena diskon besar, akan tercatat otomatis.
+			// 2. HQ (Pusat) - Tidak perlu mencatat TxSaleRevenue tambahan untuk HQ di sini
+			// karena kita sudah mencatat TOTAL INFLOW di langkah (0) ke system-hq.
+			// Keuntungan bersih HQ secara otomatis tersisa di saldo system-hq 
+			// setelah semua payout merchant & affiliate dibayarkan nanti.
 			
-			// HQ hanya dapat uang jika ada sisa setelah payout merchant, affiliate, dan platform fee
-			// Namun biasanya hqRevenue di sini adalah 0 karena Merchant sudah ambil sisa Subtotal.
-			hqRevenue := (group.Subtotal - group.Discount) - actualPayout - group.AffiliateCommission - group.PlatformFee
-			if hqRevenue < 0 { hqRevenue = 0 }
-			
-			if hqRevenue > 0 {
-				desc := fmt.Sprintf("Revenue Tambahan HQ order %s", order.OrderNumber)
-				if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqRevenue, order.ID, "order", desc); err != nil {
-					return err
-				}
-			}
-
-			// 3. Catat record subsidi jika hqRevenue sampai 0 (HQ tekor karena diskon)
-			if hqRevenue == 0 && (group.Subtotal - group.Discount) < (actualPayout + group.AffiliateCommission + group.PlatformFee) {
-				loss := (actualPayout + group.AffiliateCommission + group.PlatformFee) - (group.Subtotal - group.Discount)
-				if err := s.ProcessTransaction(tx, models.PusatID, models.WalletBuyer, models.TxPlatformFee, -loss, order.ID, "order", fmt.Sprintf("Subsidi Kerugian Diskon order %s", order.OrderNumber)); err != nil {
-					return err
-				}
-			}
+			// 3. Catat record subsidi jika terjadi kerugian diskon untuk keperluan audit (opsional)
+			// Namun jangan menambah/mengurangi saldo pusat lagi agar tidak double count inflow.
 		} else {
 			// [MODEL PUSAT] HQ menanggung 100% diskon karena mereka pemilik stok
 			hqPayout := (group.Subtotal - group.PlatformFee - group.AffiliateCommission) - group.Discount
 			if hqPayout < 0 { hqPayout = 0 }
 
 			desc := fmt.Sprintf("Penjualan Langsung Pusat: %s (Potong diskon 100%%)", order.OrderNumber)
-			if err := s.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxSaleRevenue, hqPayout, order.ID, "order", desc); err != nil {
+			if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, hqPayout, order.ID, "order", desc); err != nil {
 				return err
 			}
 		}
@@ -153,7 +157,7 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		// Platform Fee tetap ditarik ke wallet platform
 		if group.PlatformFee > 0 {
 			pfDesc := fmt.Sprintf("Platform Fee: %s", order.OrderNumber)
-			if err := s.ProcessTransaction(tx, "system-platform", models.WalletBuyer, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc); err != nil {
+			if err := s.ProcessTransaction(tx, models.AdminID, models.WalletAdmin, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc); err != nil {
 				return err
 			}
 		}
@@ -342,6 +346,11 @@ func (s *FinanceService) ReleaseEscrow(tx *gorm.DB, ownerID string, ownerType mo
 		return err
 	}
 
+	var refPtr *string
+	if refID != "" {
+		refPtr = &refID
+	}
+
 	txn := &models.WalletTransaction{
 		WalletID:      wallet.ID,
 		Type:          models.TxAdjustment,
@@ -351,7 +360,7 @@ func (s *FinanceService) ReleaseEscrow(tx *gorm.DB, ownerID string, ownerType mo
 		PendingBefore: pendingBefore,
 		PendingAfter:  wallet.PendingBalance,
 		Description:   desc,
-		ReferenceID:   refID,
+		ReferenceID:   refPtr,
 		ReferenceType: "order_escrow",
 	}
 

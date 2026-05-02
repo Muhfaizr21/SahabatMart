@@ -179,15 +179,15 @@ export default function AddEditProduct() {
     }
   };
 
-  if (loading) return <div style={{ padding: 100, textAlign: 'center', color: '#94a3b8' }}>Authenticating asset data...</div>;
+  if (loading) return <div style={{ padding: 100, textAlign: 'center', color: '#94a3b8' }}>Memuat data produk...</div>;
 
   return (
     <div style={{ ...A.page, maxWidth: 1000 }} className="fade-in">
       <PageHeader 
-        title={isEdit ? 'Refine Masterpiece' : 'Create New Asset'} 
-        subtitle="Define your luxury product's core identity."
+        title={isEdit ? 'Perbarui Produk' : 'Tambah Produk Baru'} 
+        subtitle="Tentukan identitas inti produk Anda."
       >
-        <button style={A.btnGhost} onClick={() => navigate('/merchant/products')}>Discard Changes</button>
+        <button style={A.btnGhost} onClick={() => navigate('/merchant/products')}>Batalkan Perubahan</button>
       </PageHeader>
 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 32, paddingBottom: 40, alignItems: 'start' }}>
@@ -197,13 +197,13 @@ export default function AddEditProduct() {
            
            <div style={{ ...A.card, padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
              <div>
-               <FieldLabel>Product Title</FieldLabel>
+               <FieldLabel>Nama Produk</FieldLabel>
                <input name="name" value={formData.name} onChange={handleChange} style={A.input} placeholder="Nama produk unggulan Anda..." required />
              </div>
 
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                <div>
-                 <FieldLabel>Category</FieldLabel>
+                 <FieldLabel>Kategori</FieldLabel>
                  <CustomComboBox 
                    name="category"
                    value={formData.category}
@@ -213,7 +213,7 @@ export default function AddEditProduct() {
                  />
                </div>
                <div>
-                 <FieldLabel>Brand</FieldLabel>
+                 <FieldLabel>Merek</FieldLabel>
                  <CustomComboBox 
                    name="brand"
                    value={formData.brand}
@@ -225,7 +225,7 @@ export default function AddEditProduct() {
              </div>
 
              <div>
-               <FieldLabel>Description</FieldLabel>
+               <FieldLabel>Deskripsi</FieldLabel>
                <textarea name="description" value={formData.description} onChange={handleChange} style={{ ...A.input, minHeight: 120, resize: 'none' }} placeholder="Ceritakan kisah di balik produk ini..." />
              </div>
            </div>
@@ -233,7 +233,7 @@ export default function AddEditProduct() {
            {/* Global Attributes Section */}
            {attrs.length > 0 && (
              <div style={{ ...A.card, padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin:0 }}>Global Specifications</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin:0 }}>Spesifikasi Produk</h3>
                 <div style={{ display: 'grid', gap: 16 }}>
                   {attrs.map(a => (
                     <div key={a.id}>
@@ -265,21 +265,21 @@ export default function AddEditProduct() {
 
            <div style={{ ...A.card, padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin:0 }}>Product Variants (Manual)</h3>
+               <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin:0 }}>Varian Produk</h3>
                <button type="button" style={{ ...A.btnGhost, color:'#4f46e5' }} onClick={addVariant}>
-                 <i className="bx bx-plus" /> Add Variation
+                 <i className="bx bx-plus" /> Tambah Varian
                </button>
              </div>
 
              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                {variants.length === 0 ? (
-                 <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No variations currently defined.</div>
+                 <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Belum ada varian yang ditentukan.</div>
                ) : variants.map((v, i) => (
                  <div key={v.id || i} style={{ display: 'flex', gap: 12, padding: 16, background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9' }}>
-                   <div style={{ flex: 2 }}><input placeholder="Name (e.g. Red, XL)" value={v.name} onChange={e => handleVariantChange(i, 'name', e.target.value)} style={A.input} /></div>
-                   <div style={{ flex: 1 }}><input type="number" placeholder="Price" value={v.price} onChange={e => handleVariantChange(i, 'price', e.target.value)} style={A.input} /></div>
-                   <div style={{ flex: 1 }}><input type="number" placeholder="Weight (g)" value={v.weight} onChange={e => handleVariantChange(i, 'weight', e.target.value)} style={A.input} /></div>
-                   <div style={{ flex: 1 }}><input type="number" placeholder="Stock" value={v.stock} onChange={e => handleVariantChange(i, 'stock', e.target.value)} style={A.input} /></div>
+                   <div style={{ flex: 2 }}><input placeholder="Nama (cth: Merah, XL)" value={v.name} onChange={e => handleVariantChange(i, 'name', e.target.value)} style={A.input} /></div>
+                   <div style={{ flex: 1 }}><input type="number" placeholder="Harga" value={v.price} onChange={e => handleVariantChange(i, 'price', e.target.value)} style={A.input} /></div>
+                   <div style={{ flex: 1 }}><input type="number" placeholder="Berat (g)" value={v.weight} onChange={e => handleVariantChange(i, 'weight', e.target.value)} style={A.input} /></div>
+                   <div style={{ flex: 1 }}><input type="number" placeholder="Stok" value={v.stock} onChange={e => handleVariantChange(i, 'stock', e.target.value)} style={A.input} /></div>
                    <button type="button" style={{ ...A.btnGhost, padding: '0 12px', color: '#ef4444' }} onClick={() => removeVariant(i)}><i className="bx bx-trash" /></button>
                  </div>
                ))}
@@ -292,7 +292,7 @@ export default function AddEditProduct() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
            
            <div style={{ ...A.card, padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
-             <FieldLabel>Visual Assets</FieldLabel>
+             <FieldLabel>Visual Aset</FieldLabel>
              
              {/* Main Image */}
              <div style={{ 
@@ -316,7 +316,7 @@ export default function AddEditProduct() {
 
              {/* Gallery */}
              <div>
-                <FieldLabel style={{ marginBottom: 12 }}>Product Gallery (Slides)</FieldLabel>
+                <FieldLabel style={{ marginBottom: 12 }}>Galeri Produk (Slides)</FieldLabel>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                   {gallery.map((img, idx) => (
                     <div key={idx} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: '#f1f5f9' }}>
@@ -339,19 +339,19 @@ export default function AddEditProduct() {
            <div style={{ ...A.card, padding: 32, background: '#0f172a', color: '#fff', border: 'none' }}>
              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>LUXURY PRICE (Rp)</label>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>HARGA (Rp)</label>
                   <input name="price" type="number" value={formData.price} onChange={handleChange} required style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 22, fontWeight: 800, color: '#fff', outline: 'none' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>STRKETHROUGH PRICE (Optional)</label>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>HARGA CORET (Opsional)</label>
                   <input name="old_price" type="number" value={formData.old_price} onChange={handleChange} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.6)', outline: 'none' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>ON-HAND STOCK</label>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>STOK TERSEDIA</label>
                   <input name="stock" type="number" value={formData.stock} onChange={handleChange} required style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 18, fontWeight: 800, color: '#fff', outline: 'none' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>WEIGHT (GRAMS)</label>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, display: 'block' }}>BERAT (GRAM)</label>
                   <input name="weight" type="number" value={formData.weight} onChange={handleChange} required style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 18, fontWeight: 800, color: '#fff', outline: 'none' }} />
                 </div>
                 
@@ -360,7 +360,7 @@ export default function AddEditProduct() {
                   borderRadius: 14, fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, border: 'none',
                   cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, marginTop: 10
                 }}>
-                  {saving ? 'Processing...' : isEdit ? 'Finalize Updates' : 'Publish Asset'}
+                  {saving ? 'Memproses...' : isEdit ? 'Simpan Perubahan' : 'Tambah Produk'}
                 </button>
              </div>
            </div>

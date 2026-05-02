@@ -48,7 +48,7 @@ export default function MerchantDashboard() {
         });
 
         // Find the peak day of the week
-        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const daysOfWeek = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         let peakDayIdx = 0;
         let maxDayCount = 0;
         Object.keys(dayCounts).forEach(dayIdx => {
@@ -104,8 +104,8 @@ export default function MerchantDashboard() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader 
-        title={`Hello, ${user.profile?.full_name?.split(' ')[0] || 'Partner'}!`} 
-        subtitle="Welcome back to your luxury command center."
+        title={`Halo, ${user.profile?.full_name?.split(' ')[0] || 'Mitra'}!`} 
+        subtitle="Selamat datang kembali di pusat kendali bisnis Anda."
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, overflow: 'hidden', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -115,18 +115,16 @@ export default function MerchantDashboard() {
               alt="Avatar"
             />
           </div>
-          <div>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{user.profile?.full_name}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>VERIFIED CURATOR</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>MITRA TERVERIFIKASI</div>
           </div>
-        </div>
       </PageHeader>
 
       <StatRow stats={[
-        { label: 'Total Gross Sales', val: loading ? '...' : idr(stats.revenue), icon: 'bx-cart', color: '#6366f1' },
-        { label: 'Platform Fee', val: loading ? '...' : idr(stats.platformFee), icon: 'bx-shield-quarter', color: '#f59e0b' },
-        { label: 'Affiliate Comm', val: loading ? '...' : idr(stats.commission), icon: 'bx-share-alt', color: '#ef4444' },
-        { label: 'Net Merchant Yield', val: loading ? '...' : idr(stats.netRevenue), icon: 'bx-diamond', color: '#10b981' },
+        { label: 'Total Penjualan Kotor', val: loading ? '...' : idr(stats.revenue), icon: 'bx-cart', color: '#6366f1' },
+        { label: 'Biaya Platform', val: loading ? '...' : idr(stats.platformFee), icon: 'bx-shield-quarter', color: '#f59e0b' },
+        { label: 'Komisi Afiliasi', val: loading ? '...' : idr(stats.commission), icon: 'bx-share-alt', color: '#ef4444' },
+        { label: 'Pendapatan Bersih', val: loading ? '...' : idr(stats.netRevenue), icon: 'bx-diamond', color: '#10b981' },
       ]} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 24, paddingBottom: 40, alignItems: 'start' }}>
@@ -134,8 +132,8 @@ export default function MerchantDashboard() {
         <div style={{ ...A.card, padding: 30, display: 'flex', flexDirection: 'column', gap: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin:0 }}>Activity & Yield Heatmap</h3>
-              <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, margin:0 }}>Sales frequency mapping across the quarter</p>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin:0 }}>Peta Aktivitas & Pendapatan</h3>
+              <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, margin:0 }}>Pemetaan frekuensi penjualan selama kuartal ini</p>
             </div>
             <div style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#6366f1', border: '1px solid #e2e8f0' }}>2026</div>
           </div>
@@ -161,11 +159,11 @@ export default function MerchantDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: 24, marginTop: 10 }}>
             <div style={{ display: 'flex', gap: 24 }}>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Peak Day</div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Hari Puncak</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{stats.peakDay || '-'}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Yield Growth</div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Pertumbuhan</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#10b981' }}>{stats.growthRate || '0.0%'}</div>
               </div>
             </div>
@@ -174,12 +172,12 @@ export default function MerchantDashboard() {
 
         {/* Top Products Showcase */}
         <div style={{ ...A.card, padding: 30 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>Showcase</h3>
-          <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 24px 0' }}>Glimpse of your luxury offerings</p>
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>Produk Unggulan</h3>
+          <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 24px 0' }}>Sekilas produk-produk terbaik Anda</p>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {loading ? (
-              <div style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: 20 }}>Loading products...</div>
+              <div style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: 20 }}>Memuat produk...</div>
             ) : products.length === 0 ? (
               <div style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: 20 }}>Belum ada produk.</div>
             ) : products.map(p => (

@@ -8,6 +8,7 @@ import (
 	"log"
 	"gorm.io/gorm"
 	"time"
+	"github.com/google/uuid"
 )
 
 type MerchantService struct {
@@ -109,7 +110,7 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 
 // [Akuglow Refactor] Merchants can no longer add/delete products directly.
 // They "add" products to their storefront by requesting restock or being assigned by admin.
-func (s *MerchantService) CreateRestockRequest(merchantID string, items []models.RestockItem) (*models.RestockRequest, error) {
+func (s *MerchantService) CreateRestockRequest(merchantID string, items []models.RestockItem, paymentMethod string) (*models.RestockRequest, error) {
 	if len(items) == 0 {
 		return nil, errors.New("daftar kulakan tidak boleh kosong")
 	}
@@ -118,9 +119,10 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 	var totalAmount float64
 	
 	req := &models.RestockRequest{
-		MerchantID: merchantID,
-		Status:     "requested",
-		CreatedAt:  time.Now(),
+		MerchantID:    merchantID,
+		Status:        "requested",
+		PaymentMethod: paymentMethod,
+		CreatedAt:     time.Now(),
 	}
 
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
@@ -157,10 +159,36 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 		}
 
 		// 3. Update Header with Totals
-		return tx.Model(req).Updates(map[string]interface{}{
+		if err := tx.Model(req).Updates(map[string]interface{}{
 			"total_items": totalQty,
 			"total_price": totalAmount,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+
+		// 4. Handle Wallet Payment
+		if paymentMethod == "wallet" {
+			financeSvc := NewFinanceService(s.DB)
+			// Deduct balance
+			desc := fmt.Sprintf("Pembayaran Restock / Kulakan: %s", req.ID)
+			err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -totalAmount, req.ID, "restock_request", desc)
+			if err != nil {
+				return fmt.Errorf("saldo tidak mencukupi untuk pembayaran wallet: %v", err)
+			}
+			
+			// HQ receives money (system-hq)
+			err = financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, totalAmount, req.ID, "restock_request", "Penerimaan Kulakan Merchant: "+merchantID)
+			if err != nil {
+				return err
+			}
+
+			// Update request as paid
+			if err := tx.Model(req).Update("is_paid", true).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 	
 	var finalReq models.RestockRequest
@@ -285,6 +313,7 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 	}
 
 	payout := &models.PayoutRequest{
+		ID:          uuid.New().String(),
 		MerchantID:  merchantID,
 		Amount:      amount,
 		Status:      "pending",
@@ -323,6 +352,17 @@ func (s *MerchantService) GetPayoutHistory(merchantID string) ([]models.PayoutRe
 	var history []models.PayoutRequest
 	err := s.DB.Where("merchant_id = ?", merchantID).Order("requested_at desc").Find(&history).Error
 	return history, err
+}
+
+func (s *MerchantService) GetWalletTransactions(merchantID string, limit int) ([]models.WalletTransaction, error) {
+	var wallet models.Wallet
+	if err := s.DB.Where("owner_id = ? AND owner_type = ?", merchantID, models.WalletMerchant).First(&wallet).Error; err != nil {
+		return nil, err
+	}
+
+	var txs []models.WalletTransaction
+	err := s.DB.Where("wallet_id = ?", wallet.ID).Order("created_at desc").Limit(limit).Find(&txs).Error
+	return txs, err
 }
 
 // ── VOUCHERS ───────────────────────────────
@@ -371,8 +411,32 @@ func (s *MerchantService) RespondDispute(merchantID string, disputeID uint, resp
 
 func (s *MerchantService) GetStoreProfile(merchantID string) (*models.Merchant, error) {
 	var m models.Merchant
-	err := s.DB.Where("id = ?", merchantID).First(&m).Error
-	return &m, err
+	if err := s.DB.Where("id = ?", merchantID).First(&m).Error; err != nil {
+		return nil, err
+	}
+
+	// Fallback JoinedAt jika masih kosong/zero (0001-01-01)
+	if m.JoinedAt.IsZero() {
+		m.JoinedAt = m.CreatedAt
+	}
+
+	// 1. Sinkronisasi Total Sales dari OrderMerchantGroup (Live Calculation)
+	var totalSales float64
+	s.DB.Model(&models.OrderMerchantGroup{}).
+		Where("merchant_id = ? AND status IN ?", merchantID, []string{"completed", "confirmed", "shipped", "paid"}).
+		Select("COALESCE(SUM(subtotal), 0)").
+		Scan(&totalSales)
+	m.TotalSales = totalSales
+
+	// 2. Sinkronisasi Balance dari Wallet (Source of Truth)
+	var balance float64
+	s.DB.Table("wallets").
+		Where("owner_id = ? AND owner_type = ?", merchantID, models.WalletMerchant).
+		Select("COALESCE(balance, 0)").
+		Scan(&balance)
+	m.Balance = balance
+
+	return &m, nil
 }
 
 func (s *MerchantService) UpdateStoreProfile(merchantID string, updates map[string]interface{}) (*models.Merchant, error) {
@@ -381,27 +445,81 @@ func (s *MerchantService) UpdateStoreProfile(merchantID string, updates map[stri
 		return nil, err
 	}
 
+	// Proteksi field finansial agar tidak bisa diubah via update profil
+	delete(updates, "balance")
+	delete(updates, "total_sales")
+	delete(updates, "user_id")
+	delete(updates, "id")
+
 	err := s.DB.Model(&m).Updates(updates).Error
 	return &m, err
 }
 
 // ── AFFILIATE STATS ────────────────────────
 
-func (s *MerchantService) GetAffiliateStats(merchantID string) (map[string]interface{}, error) {
+func (s *MerchantService) GetDetailedAnalytics(merchantID string, year int) (map[string]interface{}, error) {
 	var totalOrders int64
-	var totalComm float64
 	var totalSales float64
+	var totalNet float64
+	
+	var affOrders int64
+	var affComm float64
+	var affSales float64
+	var affNet float64
 
+	// 1. General Stats
+	s.DB.Model(&models.OrderMerchantGroup{}).
+		Where("merchant_id = ?", merchantID).
+		Count(&totalOrders).
+		Select("SUM(subtotal), SUM(merchant_payout)").
+		Row().Scan(&totalSales, &totalNet)
+
+	// 2. Affiliate Specific
 	s.DB.Model(&models.OrderMerchantGroup{}).
 		Where("merchant_id = ? AND commission > 0", merchantID).
-		Count(&totalOrders).
-		Select("SUM(commission), SUM(subtotal)").
-		Row().Scan(&totalComm, &totalSales)
+		Count(&affOrders).
+		Select("SUM(commission), SUM(subtotal), SUM(merchant_payout)").
+		Row().Scan(&affComm, &affSales, &affNet)
+
+	// 3. Monthly Chart Data
+	type MonthlyData struct {
+		Month int
+		Count int64
+		Sales float64
+	}
+	var monthlyResults []MonthlyData
+	
+	s.DB.Model(&models.OrderMerchantGroup{}).
+		Select("EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count, SUM(subtotal) as sales").
+		Where("merchant_id = ? AND EXTRACT(YEAR FROM created_at) = ?", merchantID, year).
+		Group("month").
+		Order("month").
+		Scan(&monthlyResults)
+
+	chartData := make([]map[string]interface{}, 12)
+	for i := 0; i < 12; i++ {
+		chartData[i] = map[string]interface{}{
+			"month": i + 1,
+			"count": 0,
+			"sales": 0,
+		}
+	}
+	for _, res := range monthlyResults {
+		if res.Month >= 1 && res.Month <= 12 {
+			chartData[res.Month-1]["count"] = res.Count
+			chartData[res.Month-1]["sales"] = res.Sales
+		}
+	}
 
 	return map[string]interface{}{
-		"affiliate_orders":      totalOrders,
-		"affiliate_commissions": totalComm,
-		"affiliate_sales":       totalSales,
+		"total_orders":          totalOrders,
+		"total_sales":           totalSales,
+		"total_net_sales":       totalNet,
+		"affiliate_orders":      affOrders,
+		"affiliate_commissions": affComm,
+		"affiliate_sales":       affSales,
+		"affiliate_net_sales":   affNet,
+		"chart_data":            chartData,
 	}, nil
 }
 
@@ -471,7 +589,7 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 
 		// Credit HQ
 		descRev := fmt.Sprintf("Pendapatan Kulakan Merchant: %s", req.ID)
-		if err := financeSvc.ProcessTransaction(tx, "system-hq", models.WalletBuyer, models.TxRestockRevenue, req.TotalPrice, req.ID, "restock", descRev); err != nil {
+		if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, req.TotalPrice, req.ID, "restock", descRev); err != nil {
 			return err
 		}
 
