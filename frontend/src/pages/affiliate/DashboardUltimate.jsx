@@ -116,7 +116,7 @@ export default function AffiliateDashboard() {
   );
 
   const stats = data?.stats || {};
-  const tierName = data?.affiliate?.tier?.name || user?.affiliate?.membership_tier?.name || 'Bronze';
+  const tierName = data?.affiliate?.tier?.name || user?.affiliate?.membership_tier?.name || 'Mitra Dasar';
   const activeMitraCount = stats.active_mitra_count || 0;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/skin/journey?token=' + journeyData?.pretest?.barcode_token)}`;
 
@@ -327,7 +327,7 @@ export default function AffiliateDashboard() {
               <div className="p-6 bg-slate-800/40 border border-white/5 rounded-3xl flex flex-col justify-center text-center">
                 <h4 className="text-white font-bold mb-2">Skin Warrior</h4>
                 <p className="text-[10px] text-slate-500 tracking-widest uppercase mb-4">Level Anda</p>
-                <p className="text-3xl font-black text-indigo-400">{journeyData?.stats?.level_name || 'Novice'}</p>
+                <p className="text-3xl font-black text-indigo-400">{journeyData?.stats?.level_name || 'Mitra'}</p>
               </div>
             </div>
           </div>

@@ -3,17 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate } from '../lib/api';
 
 const steps = ['Keranjang', 'Checkout', 'Konfirmasi'];
-const paymentMethods = [
-  { id: 'QRIS', label: 'QRIS (GOPAY/OVO/DANA)', icon: '📱', desc: 'Scan & Bayar Instan' },
-  { id: 'MANDIRIVA', label: 'Mandiri Virtual Account', icon: '🏦', desc: 'Transfer via Mandiri' },
-  { id: 'BRIVA', label: 'BRI Virtual Account', icon: '🏦', desc: 'Transfer via BRI' },
-  { id: 'BCAVA', label: 'BCA Virtual Account', icon: '🏦', desc: 'Transfer via BCA' },
-  { id: 'ALFAMART', label: 'Alfamart', icon: '🏪', desc: 'Bayar via Kasir Alfamart' },
-];
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const [paymentMethod, setPaymentMethod] = useState('QRIS');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [loadingChannels, setLoadingChannels] = useState(true);
   const [cart, setCart] = useState({ items: [] });
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
@@ -60,10 +55,30 @@ export default function CheckoutPage() {
         }
 
         // Parallel fetch for speed
-        const [cartData, profileData] = await Promise.all([
+        const [cartData, profileData, channelsData] = await Promise.all([
           fetchJson(`${BUYER_API_BASE}/cart`),
-          fetchJson(`${BUYER_API_BASE}/profile`)
+          fetchJson(`${BUYER_API_BASE}/profile`),
+          fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels err:", e); return null; })
         ]);
+
+        if (channelsData && channelsData.data) {
+          // Backend sudah filter active=true — langsung map
+          const mapped = channelsData.data.map(c => ({
+            id: c.code,
+            label: c.name,
+            icon: c.icon_url,
+            desc: c.group,
+            type: c.type, // "direct" | "redirect"
+            fee_customer: c.fee_customer?.flat || 0,
+            fee_customer_pct: c.fee_customer?.percent || 0,
+            fee_merchant: c.fee_merchant?.flat || 0,
+            min_amount: c.minimum_amount || 0,
+            max_amount: c.maximum_amount || 0,
+          }));
+          setPaymentMethods(mapped);
+          if (mapped.length > 0) setPaymentMethod(mapped[0].id);
+        }
+        setLoadingChannels(false);
 
         if (cartData) setCart(cartData);
         if (profileData && profileData.user) {
@@ -578,24 +593,46 @@ export default function CheckoutPage() {
               {/* Payment Method */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                 <h2 className="font-bold text-gray-900 text-lg mb-5">Metode Pembayaran</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {paymentMethods.map(method => (
-                    <button
-                      key={method.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(method.id)}
-                      className={`flex items-center gap-3 border-2 rounded-xl p-4 text-left transition-all ${
-                        paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="text-2xl">{method.icon}</span>
-                      <div>
-                        <div className="font-semibold text-gray-800 text-sm">{method.label}</div>
-                        <div className="text-xs text-gray-500">{method.desc}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                
+                {loadingChannels ? (
+                   <div className="py-6 text-center">
+                      <div className="animate-spin mb-2">🌀</div>
+                      <div className="text-xs text-gray-400">Memuat metode pembayaran...</div>
+                   </div>
+                ) : paymentMethods.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {paymentMethods.map(method => (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`flex items-center gap-3 border-2 rounded-xl p-4 text-left transition-all relative overflow-hidden ${
+                          paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-300'
+                        }`}
+                      >
+                        {paymentMethod === method.id && (
+                          <div className="absolute top-0 right-0 bg-blue-500 text-white px-2 py-0.5 rounded-bl-lg text-[10px] font-bold">
+                            Terpilih
+                          </div>
+                        )}
+                        <img src={method.icon} alt={method.label} className="w-12 h-12 object-contain bg-white rounded border border-gray-100 p-1" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-800 text-sm truncate leading-tight">{method.label}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">{method.desc}</div>
+                          {method.fee_customer > 0 && (
+                            <div className="text-[10px] font-bold text-orange-500 mt-1">
+                              + Biaya Layanan: Rp{method.fee_customer.toLocaleString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                   <div className="py-6 px-4 text-center bg-red-50 rounded-xl border border-red-100">
+                     <p className="text-red-600 text-xs font-bold">Tidak ada metode pembayaran aktif.</p>
+                   </div>
+                )}
               </div>
             </div>
 
@@ -675,9 +712,15 @@ export default function CheckoutPage() {
                       <span className="font-medium">-Rp{discount.toLocaleString('id-ID')}</span>
                     </div>
                   )}
+                  {paymentMethods.find(m => m.id === paymentMethod)?.fee_customer > 0 && (
+                    <div className="flex justify-between text-orange-600">
+                      <span>Biaya Layanan (Payment)</span>
+                      <span className="font-medium">Rp{paymentMethods.find(m => m.id === paymentMethod).fee_customer.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
-                    <span>Total</span>
-                    <span>Rp{total.toLocaleString('id-ID')}</span>
+                    <span>Total Tagihan</span>
+                    <span>Rp{(total + (paymentMethods.find(m => m.id === paymentMethod)?.fee_customer || 0)).toLocaleString('id-ID')}</span>
                   </div>
                 </div>
                 <button

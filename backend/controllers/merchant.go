@@ -215,7 +215,7 @@ func (mc *MerchantController) RequestPayout(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	payout, err := mc.Service.RequestPayout(merchantID, req.Amount, req.Note)
+	payout, err := mc.Service.RequestPayout(merchantID, req.Amount, req.Note, req.BankName, req.AccountNo, req.AccountName)
 	if err != nil {
 		utils.JSONError(w, http.StatusBadRequest, err.Error())
 		return

@@ -10,6 +10,7 @@ import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 // (* Merchant Area muncul dinamis hanya jika role = merchant)
 const menuItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/affiliate', end: true },
+  { name: 'Dompet & Penarikan', icon: 'account_balance_wallet', path: '/affiliate/withdrawals' },
   // Merchant Area: injected dynamically for merchant role users (line ~137)
   { name: 'Profil Saya', icon: 'person_outline', path: '/affiliate/settings' },
   { name: 'Omset Tim', icon: 'monitoring', path: '/affiliate/stats' },
@@ -172,7 +173,7 @@ const AffiliateLayout = () => {
   };
 
   const affiliateRefCode = user.affiliate_ref_code || user.affiliate?.ref_code || 'AG-REF';
-  const tierName = user.affiliate?.membership_tier?.name || 'Bronze';
+  const tierName = user.affiliate?.membership_tier?.name || 'Mitra Dasar';
   const displayName = user.profile?.full_name || user.email || 'Affiliate';
   const initial = displayName.charAt(0).toUpperCase();
 

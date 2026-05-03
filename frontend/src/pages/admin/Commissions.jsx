@@ -223,7 +223,7 @@ export default function AdminCommissions() {
                   </td>
                   <td style={A.td}>
                     <span style={{ padding: '4px 10px', borderRadius: 8, background: isCustom ? '#eef2ff' : '#f8fafc', color: isCustom ? '#4361ee' : '#94a3b8', fontWeight: 800, fontSize: 12 }}>
-                      {((displayData.fee_percent || displayData.base_affiliate_fee || 0) * (tab === 'presets' || isProd ? 1 : 100)).toFixed(1)}%
+                      {parseFloat(displayData.fee_percent || displayData.base_affiliate_fee || 0).toFixed(1)}%
                     </span>
                   </td>
                   <td style={A.td}>{displayData.affiliate_fee || displayData.base_affiliate_fee || 0}%</td>
@@ -276,8 +276,8 @@ export default function AdminCommissions() {
                 <input 
                   type="number" step="0.1"
                   style={{ ...A.select, width: '100%', fontSize: 18, fontWeight: 800, color: '#4361ee' }}
-                  value={(modal.fee_percent || 0) * (tab === 'presets' ? 1 : 100)}
-                  onChange={e => setModal(m => ({ ...m, fee_percent: parseFloat(e.target.value) / (tab === 'presets' ? 1 : 100) }))}
+                  value={modal.fee_percent || 0}
+                  onChange={e => setModal(m => ({ ...m, fee_percent: parseFloat(e.target.value) }))}
                 />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

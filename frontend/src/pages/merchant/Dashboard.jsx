@@ -88,7 +88,7 @@ export default function MerchantDashboard() {
           netRevenue: validOrders.reduce((acc, o) => acc + (o.merchant_payout || 0), 0),
           heatmap: heatmapData,
           peakDay: peakDayName,
-          growthRate: validOrders.length > 0 ? '+12.4%' : '0.0%'
+          growthRate: validOrders.length > 0 ? 'Normal' : '0.0%'
         });
 
         setProducts(prodList.slice(0, 4));

@@ -10,6 +10,8 @@ backend/*.exe
 backend/.env
 backend/scratch/
 backend/tmp/
+backend/tmp_server
+backend/uploads/
 
 # Frontend
 frontend/node_modules/

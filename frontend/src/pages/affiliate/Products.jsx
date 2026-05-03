@@ -127,7 +127,7 @@ export default function AffiliateProducts() {
           {filtered.map((product) => {
             const imgSrc = formatImage(product.image);
             const isCopied = copiedId === product.id;
-            const commRate = product.comm_rate ? `${(product.comm_rate * 100).toFixed(1)}%` : '5%';
+            const commRate = product.comm_rate ? `${(product.comm_rate * 100).toFixed(1)}%` : '0%';
 
             return (
               <div

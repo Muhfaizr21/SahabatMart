@@ -73,6 +73,9 @@ type PayoutRequest struct {
 	ID          string     `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	MerchantID  string     `gorm:"type:uuid;not null" json:"merchant_id"`
 	Amount      float64    `gorm:"type:decimal(15,2);not null" json:"amount"`
+	BankName          string     `gorm:"type:varchar(100)" json:"bank_name"`
+	BankAccountNumber string     `gorm:"type:text" json:"bank_account_number"`
+	BankAccountName   string     `gorm:"type:varchar(200)" json:"bank_account_name"`
 	Status      string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, approved, rejected, paid
 	Note        string     `gorm:"type:text" json:"note"`
 	RequestedAt time.Time  `json:"requested_at"`

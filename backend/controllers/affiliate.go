@@ -125,13 +125,13 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		LIMIT 5
 	`, affiliateID).Scan(&recentCommissions)
 
-	// [Sync Fix] Available balance = approved - in-flight withdrawals
-	var inFlightWithdrawals float64
-	ac.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM affiliate_withdrawals WHERE affiliate_id = ? AND status IN ('pending','processed')`, affiliateID).Scan(&inFlightWithdrawals)
-	availableBalance := approvedCommission - inFlightWithdrawals
-	if availableBalance < 0 {
-		availableBalance = 0
-	}
+	// [Sync Fix] Use Wallet as Single Source of Truth
+	var wallet models.Wallet
+	ac.DB.Where("owner_id = ? AND owner_type = ?", affiliateID, models.WalletAffiliate).First(&wallet)
+
+	// Available balance is now directly from Wallet
+	availableBalance := wallet.Balance
+	pendingCommission = wallet.PendingBalance
 
 	// [Sync Fix] Total downline — cari by id, bukan user_id
 	var totalDownline int64
@@ -162,12 +162,11 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 			"total_orders":         totalOrders,
 			"total_orders_pending": totalOrdersPending,
 			// Komisi
-			"total_commission":     approvedCommission + pendingCommission + paidCommission, // semua waktu
-			"approved_commission":  approvedCommission,  // siap tarik
-			"pending_commission":   pendingCommission,   // masih hold
-			"paid_commission":      paidCommission,      // sudah cair ke bank
-			"balance":              availableBalance,    // = approved - in-flight WD
-			"inflight_withdrawals": inFlightWithdrawals,
+			"total_commission":     approvedCommission + pendingCommission + paidCommission,
+			"approved_commission":  approvedCommission,
+			"pending_commission":   pendingCommission,
+			"paid_commission":      paidCommission,
+			"balance":              availableBalance,
 			// Tim
 			"total_downline":       totalDownline,
 			"active_mitra_count":   affiliate.ActiveMitraCount,
@@ -334,7 +333,7 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 	ac.DB.Raw(`
 		SELECT p.id, p.name, p.price, p.image, p.category, 
 		       'Official Store' as store_name,
-		       COALESCE(cc.fee_percent, 0.05) AS comm_rate,
+		       COALESCE(cc.fee_percent, 0.00) AS comm_rate,
 		       COALESCE(SUM(oi.quantity), 0) AS total_sold
 		FROM products p
 		LEFT JOIN category_commissions cc ON LOWER(cc.category_name) = LOWER(p.category)
@@ -574,7 +573,7 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		       COALESCE(SUM(o.subtotal), 0) as turnover
 		FROM affiliate_members am
 		LEFT JOIN user_profiles up ON up.user_id = am.user_id
-		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid', 'shipped', 'completed')
+		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
 		WHERE am.upline_id = ?
 		GROUP BY am.user_id, up.full_name, am.status, am.created_at
 		ORDER BY am.created_at DESC
@@ -624,8 +623,9 @@ func (ac *AffiliateController) GetLeaderboard(w http.ResponseWriter, r *http.Req
 		SELECT
 			ROW_NUMBER() OVER (ORDER BY am.total_earned DESC) AS rank,
 			am.ref_code,
-			COALESCE(up.full_name, 'Mitra Akuglow') AS full_name,
-			COALESCE(mt.name, 'Bronze') AS tier_name,
+			COALESCE(up.full_name, 'Mitra SahabatMart') AS full_name,
+			COALESCE(mt.name, 'Mitra') AS tier_name,
+			COALESCE(mt.color, '#94a3b8') AS tier_color,
 			am.total_earned,
 			COUNT(DISTINCT o.id) AS total_sales
 		FROM affiliate_members am

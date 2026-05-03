@@ -312,7 +312,7 @@ export default function AffiliateWithdrawals() {
           ) : config.payout_schedule === 'monthly' ? (
             'Penarikan diproses setiap awal bulan.'
           ) : (
-            `Penarikan diproses secara ${config.payout_schedule || 'mingguan'} setiap hari ${config.payout_day || 'Senin dan Kamis'}.`
+            `Penarikan diproses sesuai jadwal yang ditentukan oleh admin.`
           )} Pastikan data rekening bank Anda sudah benar di halaman Pengaturan sebelum mengajukan penarikan.
         </div>
       </div>

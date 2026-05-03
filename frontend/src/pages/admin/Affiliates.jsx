@@ -4,13 +4,6 @@ import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, statusBadge, idr, f
 
 const API = ADMIN_API_BASE;
 
-const TIER_COLORS = {
-  Bronze:   '#cd7f32',
-  Silver:   '#94a3b8',
-  Gold:     '#f59e0b',
-  Platinum: '#6366f1',
-};
-
 const STATUS_BADGE = {
   active:   { bg: '#dcfce7', color: '#16a34a' },
   pending_verification: { bg: '#fef9c3', color: '#ca8a04' },
@@ -162,7 +155,7 @@ export default function AdminAffiliates() {
                     Belum ada member affiliate yang sesuai filter.
                   </td></tr>
                 ) : affiliates.map((a, idx) => {
-                  const tc = TIER_COLORS[a.tier_name] || '#94a3b8';
+                  const tc = a.tier_color || '#94a3b8';
                   return (
                     <tr key={a.id}
                       style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
@@ -185,7 +178,7 @@ export default function AdminAffiliates() {
                       </td>
                       <td style={A.td}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 800, background: `${tc}18`, color: tc }}>
-                          {a.tier_name || 'Bronze'}
+                          {a.tier_name || 'Mitra Dasar'}
                         </span>
                       </td>
                       <td style={A.td}><span style={{ fontWeight: 700, color: '#10b981' }}>{idr(a.total_earned || 0)}</span></td>
@@ -236,7 +229,7 @@ export default function AdminAffiliates() {
             </div>
           )}
           {tiers.map(t => {
-            const tc = TIER_COLORS[t.name] || '#94a3b8';
+            const tc = t.color || '#94a3b8';
             return (
               <div key={t.id} style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <div style={{ height: 5, background: tc }} />
@@ -339,11 +332,8 @@ export default function AdminAffiliates() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div style={{ gridColumn: '1/-1' }}>
               <FieldLabel>Nama Tier</FieldLabel>
-              <select style={{ ...A.select, width: '100%' }} value={editTier.tier_name}
-                onChange={e => setEditTier(p => ({ ...p, tier_name: e.target.value }))}>
-                <option value="">— Pilih Tier —</option>
-                {['Bronze', 'Silver', 'Gold', 'Platinum'].map(t => <option key={t}>{t}</option>)}
-              </select>
+              <input type="text" style={{ ...A.select, width: '100%' }} value={editTier.tier_name}
+                onChange={e => setEditTier(p => ({ ...p, tier_name: e.target.value }))} placeholder="Contoh: Mitra Emas" />
             </div>
             <div>
               <FieldLabel>Level (urutan)</FieldLabel>

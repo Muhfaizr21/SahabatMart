@@ -98,11 +98,11 @@ export default function AffiliateSettings() {
     border: '1px solid rgba(77, 67, 84, 0.15)',
   };
 
-  const tierName = profile?.affiliate?.tier?.name || 'Bronze';
+  const tierName = profile?.affiliate?.tier?.name || 'Mitra Dasar';
   const tierLevel = profile?.affiliate?.tier?.level || 1;
   const tierRate = profile?.affiliate?.tier?.base_commission_rate
     ? `${(profile.affiliate.tier.base_commission_rate * 100).toFixed(1)}%`
-    : '5%';
+    : '0%';
   const refCode = profile?.affiliate?.ref_code || storedUser?.affiliate_ref_code || 'SM-REF';
   const status = profile?.affiliate?.status || 'active';
 
@@ -149,8 +149,8 @@ export default function AffiliateSettings() {
                   <span className="text-xs font-black text-white tracking-wider">{refCode}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-xl" style={{ background: 'rgba(12, 19, 36, 0.4)' }}>
-                  <span className="text-xs text-slate-400">Level Tier</span>
-                  <span className="text-xs font-bold text-purple-300">Level {tierLevel}</span>
+                  <span className="text-xs text-slate-400">Tier Saat Ini</span>
+                  <span className="text-xs font-bold text-purple-300">{tierName} (Lv.{tierLevel})</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-xl" style={{ background: 'rgba(12, 19, 36, 0.4)' }}>
                   <span className="text-xs text-slate-400">Rate Komisi</span>
@@ -248,21 +248,7 @@ export default function AffiliateSettings() {
                 </div>
               </div>
 
-              {/* Advanced */}
-              <div className="rounded-2xl p-6" style={baseStyle}>
-                <h3 className="text-white font-bold font-['Plus_Jakarta_Sans'] mb-2">Pengaturan Lanjutan</h3>
-                <p className="text-slate-400 text-xs mb-5">
-                  Postback URL untuk integrasi server-to-server tracking (opsional)
-                </p>
-                <InputField
-                  label="Postback URL (S2S)"
-                  name="postback_url"
-                  type="url"
-                  value={form.postback_url}
-                  onChange={handleChange}
-                  placeholder="https://yourserver.com/postback?clickid={click_id}"
-                />
-              </div>
+
 
               {/* Save Button */}
               <button

@@ -330,24 +330,36 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 			log.Printf("⚠️ TriPay Request Error: %v", err)
 			// Tetap lanjut, biarkan user melihat order tapi mungkin bayar manual nanti
 		} else {
-			paymentData = tripayResult["data"].(map[string]interface{})
-			
-			// Save Payment Record to Database
-			payment := models.Payment{
-				OrderID:              order.ID,
-				PaymentMethod:        req.PaymentMethod,
-				Status:               models.PaymentPending,
-				Gateway:              "tripay",
-				GatewayTransactionID: paymentData["reference"].(string),
-				GatewayOrderID:      paymentData["merchant_ref"].(string),
-				Amount:               order.GrandTotal,
-			}
-			
-			respJson, _ := json.Marshal(paymentData)
-			payment.GatewayResponse = string(respJson)
-			
-			if err := bc.DB.Create(&payment).Error; err != nil {
-				log.Printf("⚠️ Failed to save payment record: %v", err)
+			if data, ok := tripayResult["data"].(map[string]interface{}); ok {
+				paymentData = data
+				
+				// Gunakan amount dari Tripay (sudah termasuk fee customer)
+				var finalAmount float64
+				if amt, ok := paymentData["amount"].(float64); ok {
+					finalAmount = amt
+				} else {
+					finalAmount = order.GrandTotal
+				}
+				
+				// Save Payment Record to Database
+				payment := models.Payment{
+					OrderID:              order.ID,
+					PaymentMethod:        req.PaymentMethod,
+					Status:               models.PaymentPending,
+					Gateway:              "tripay",
+					GatewayTransactionID: paymentData["reference"].(string),
+					GatewayOrderID:       paymentData["merchant_ref"].(string),
+					Amount:               finalAmount,
+				}
+				
+				respJson, _ := json.Marshal(paymentData)
+				payment.GatewayResponse = string(respJson)
+				
+				if err := bc.DB.Create(&payment).Error; err != nil {
+					log.Printf("⚠️ Failed to save payment record: %v", err)
+				}
+			} else {
+				log.Printf("⚠️ TriPay Response Invalid: missing data field")
 			}
 		}
 	}
@@ -375,8 +387,18 @@ func (bc *BuyerController) GetPaymentInstructions(w http.ResponseWriter, r *http
 		return
 	}
 
+	var payCode string
+	if payment.GatewayResponse != "" {
+		var gatewayData map[string]interface{}
+		if err := json.Unmarshal([]byte(payment.GatewayResponse), &gatewayData); err == nil {
+			if pc, ok := gatewayData["pay_code"].(string); ok {
+				payCode = pc
+			}
+		}
+	}
+
 	// Fetch fresh instructions from TriPay
-	result, err := bc.TripayService.GetInstructions(payment.PaymentMethod, payment.GatewayTransactionID, payment.Amount)
+	result, err := bc.TripayService.GetInstructions(payment.PaymentMethod, payCode, payment.Amount)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Failed to fetch instructions: "+err.Error())
 		return
@@ -453,7 +475,14 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 	returnUrl := appURL + "/order-success"
 
 	result, err := tripay.CreateTransaction(paymentMethod, order.OrderNumber, totalAmount, customerName, buyer.Email, customerPhone, tripayItems, callbackUrl, returnUrl, order.ExpiredAt.Unix())
-	return result, err
+	if err != nil {
+		return nil, err
+	}
+	// Konversi ke map agar kompatibel dengan caller yang sudah ada
+	raw, _ := json.Marshal(result)
+	var resultMap map[string]interface{}
+	json.Unmarshal(raw, &resultMap)
+	return resultMap, nil
 }
 
 // POST /api/public/checkout
@@ -547,23 +576,34 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			log.Printf("⚠️ TriPay Request Error: %v", err)
 		} else {
-			paymentData = tripayResult["data"].(map[string]interface{})
-			
-			// Save Payment Record
-			payment := models.Payment{
-				OrderID:              order.ID,
-				PaymentMethod:        req.PaymentMethod,
-				Status:               models.PaymentPending,
-				Gateway:              "tripay",
-				GatewayTransactionID: paymentData["reference"].(string),
-				GatewayOrderID:       paymentData["merchant_ref"].(string),
-				Amount:               order.GrandTotal,
-			}
-			respJson, _ := json.Marshal(paymentData)
-			payment.GatewayResponse = string(respJson)
-			
-			if err := bc.DB.Create(&payment).Error; err != nil {
-				log.Printf("⚠️ Failed to save payment record: %v", err)
+			if data, ok := tripayResult["data"].(map[string]interface{}); ok {
+				paymentData = data
+				
+				var finalAmount float64
+				if amt, ok := paymentData["amount"].(float64); ok {
+					finalAmount = amt
+				} else {
+					finalAmount = order.GrandTotal
+				}
+				
+				// Save Payment Record
+				payment := models.Payment{
+					OrderID:              order.ID,
+					PaymentMethod:        req.PaymentMethod,
+					Status:               models.PaymentPending,
+					Gateway:              "tripay",
+					GatewayTransactionID: paymentData["reference"].(string),
+					GatewayOrderID:       paymentData["merchant_ref"].(string),
+					Amount:               finalAmount,
+				}
+				respJson, _ := json.Marshal(paymentData)
+				payment.GatewayResponse = string(respJson)
+				
+				if err := bc.DB.Create(&payment).Error; err != nil {
+					log.Printf("⚠️ Failed to save payment record: %v", err)
+				}
+			} else {
+				log.Printf("⚠️ TriPay Response Invalid: missing data field")
 			}
 		}
 	}

@@ -230,7 +230,11 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		order.TotalCommission = totalCommission
 		order.TotalWeight = totalWeight
 		order.VoucherCode = shippingInfo.VoucherCode
-		order.GrandTotal = order.Subtotal + order.TotalShippingCost
+		order.TotalDiscount = shippingInfo.TotalDiscount
+		order.GrandTotal = order.Subtotal + order.TotalShippingCost - order.TotalDiscount
+		if order.GrandTotal < 0 {
+			order.GrandTotal = 0
+		}
 		
 		if err := tx.Save(order).Error; err != nil {
 			return err
@@ -250,16 +254,15 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 }
 
 
-func (s *OrderService) CompletePayment(orderID string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		var order models.Order
-		if err := tx.First(&order, "id = ?", orderID).Error; err != nil {
-			return err
-		}
+func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
+	var order models.Order
+	if err := tx.First(&order, "id = ?", orderID).Error; err != nil {
+		return err
+	}
 
-		if order.Status != models.OrderPendingPayment {
-			return fmt.Errorf("pesanan tidak dalam status menunggu pembayaran")
-		}
+	if order.Status != models.OrderPendingPayment && order.Status != models.OrderCancelled {
+		return fmt.Errorf("pesanan tidak dalam status menunggu pembayaran atau sudah dibatalkan/expired")
+	}
 
 		now := time.Now()
 		order.Status = models.OrderPaid
@@ -316,7 +319,6 @@ func (s *OrderService) CompletePayment(orderID string) error {
 		}
 
 		return nil
-	})
 }
 
 // PresetCommissionEntry: Hasil kalkulasi komisi untuk 1 affiliate di 1 level jaringan
@@ -341,11 +343,16 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	db.Where("id = ?", item.ProductID).First(&product)
 
 	if err := db.Where("merchant_id = ?", merchantID).First(&merchComm).Error; err == nil {
-		platRate = merchComm.FeePercent
+		platRate = merchComm.FeePercent / 100.0
 	} else if err := db.Where("category_name = ?", product.Category).First(&catComm).Error; err == nil {
-		platRate = catComm.FeePercent
+		platRate = catComm.FeePercent / 100.0
 	} else {
-		platRate = s.ConfigService.GetFloat("default_platform_fee", 0.05)
+		rawFee := s.ConfigService.GetFloat("default_platform_fee", 5.0)
+		if rawFee < 1 && rawFee > 0 {
+			platRate = rawFee
+		} else {
+			platRate = rawFee / 100.0
+		}
 	}
 	platAmt = subtotal * platRate
 
@@ -408,7 +415,15 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 					if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
 						affAmt = subtotal * tier.BaseCommissionRate
 					} else {
-						affAmt = subtotal * 0.03
+						// Final fallback from Admin Config with normalization
+						rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
+						var affRate float64
+						if rawComm < 1 && rawComm > 0 {
+							affRate = rawComm
+						} else {
+							affRate = rawComm / 100.0
+						}
+						affAmt = subtotal * affRate
 					}
 				}
 			}

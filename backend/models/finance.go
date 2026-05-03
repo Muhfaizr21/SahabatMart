@@ -57,9 +57,10 @@ type WalletTransaction struct {
 	Description    string                `gorm:"type:text" json:"description"`
 	ReferenceID    *string               `gorm:"type:uuid" json:"reference_id"`
 	ReferenceType  string                `gorm:"type:varchar(50)" json:"reference_type"` // order, commission, withdrawal, refund
-	IsSettled      bool                  `gorm:"default:false;index" json:"is_settled"`
-	SettledAt      *time.Time            `json:"settled_at"`
-	CreatedAt      time.Time             `gorm:"autoCreateTime" json:"created_at"`
+	IsSettled            bool                  `gorm:"default:false;index" json:"is_settled"`
+	SettledAt            *time.Time            `json:"settled_at"`
+	TargetSettlementDate *time.Time            `gorm:"index" json:"target_settlement_date"` // Target date for moving pending to balance
+	CreatedAt            time.Time             `gorm:"autoCreateTime" json:"created_at"`
 }
 
 type PayoutStatus string

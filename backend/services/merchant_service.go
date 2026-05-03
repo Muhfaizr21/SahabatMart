@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"gorm.io/gorm"
 	"time"
 	"github.com/google/uuid"
@@ -171,13 +172,13 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 			financeSvc := NewFinanceService(s.DB)
 			// Deduct balance
 			desc := fmt.Sprintf("Pembayaran Restock / Kulakan: %s", req.ID)
-			err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -totalAmount, req.ID, "restock_request", desc)
+			err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -totalAmount, req.ID, "restock_request", desc, nil)
 			if err != nil {
 				return fmt.Errorf("saldo tidak mencukupi untuk pembayaran wallet: %v", err)
 			}
 			
 			// HQ receives money (system-hq)
-			err = financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, totalAmount, req.ID, "restock_request", "Penerimaan Kulakan Merchant: "+merchantID)
+			err = financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, totalAmount, req.ID, "restock_request", "Penerimaan Kulakan Merchant: "+merchantID, nil)
 			if err != nil {
 				return err
 			}
@@ -290,18 +291,31 @@ func (s *MerchantService) GetWallet(merchantID string) (map[string]interface{}, 
 	s.DB.Where("merchant_id = ?", merchantID).First(&comm)
 	fee := comm.FeePercent
 	if fee == 0 {
-		fee = 0.05 // Default platform fee
+		var config models.PlatformConfig
+		if err := s.DB.Where("key = ?", "default_platform_fee").First(&config).Error; err == nil {
+			val, _ := strconv.ParseFloat(config.Value, 64)
+			fee = val
+		} else {
+			fee = 0.05 // Ultimate fallback
+		}
+	}
+
+	// If fee is from config (e.g. "5"), it's already a percentage. 
+	// If it was stored as "0.05", we normalize it.
+	displayFee := fee
+	if displayFee < 1 && displayFee > 0 {
+		displayFee = displayFee * 100
 	}
 
 	return map[string]interface{}{
 		"available_balance": wallet.Balance,
 		"pending_balance":   wallet.PendingBalance,
 		"total_sales":       wallet.TotalEarned,
-		"service_fee":       fee * 100,
+		"service_fee":       displayFee,
 	}, nil
 }
 
-func (s *MerchantService) RequestPayout(merchantID string, amount float64, note string) (*models.PayoutRequest, error) {
+func (s *MerchantService) RequestPayout(merchantID string, amount float64, note string, bankName, accNo, accName string) (*models.PayoutRequest, error) {
 	financeSvc := NewFinanceService(s.DB)
 	wallet, err := financeSvc.Repo.GetWalletWithLock(merchantID, models.WalletMerchant)
 	if err != nil {
@@ -312,13 +326,23 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 		return nil, errors.New("saldo tidak mencukupi")
 	}
 
+	// [Financial Integrity] Min withdrawal check from config
+	configSvc := NewConfigService(s.DB)
+	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
+	if amount < minWithdrawal {
+		return nil, fmt.Errorf("minimum penarikan adalah Rp %.0f", minWithdrawal)
+	}
+
 	payout := &models.PayoutRequest{
-		ID:          uuid.New().String(),
-		MerchantID:  merchantID,
-		Amount:      amount,
-		Status:      "pending",
-		Note:        note,
-		RequestedAt: time.Now(),
+		ID:                uuid.New().String(),
+		MerchantID:        merchantID,
+		Amount:            amount,
+		BankName:          bankName,
+		BankAccountNumber: accNo,
+		BankAccountName:   accName,
+		Status:            "pending",
+		Note:              note,
+		RequestedAt:       time.Now(),
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
@@ -331,7 +355,7 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 			desc = "Penarikan Dana / Payout"
 		}
 
-		err = financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxWithdrawalRequest, amount, payout.ID, "payout_request", desc)
+		err = financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxWithdrawalRequest, amount, payout.ID, "payout_request", desc, nil)
 		if err != nil {
 			return err
 		}
@@ -583,13 +607,13 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 		
 		// Debit Merchant
 		descPay := fmt.Sprintf("Pembayaran Kulakan: %s", req.ID)
-		if err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -req.TotalPrice, req.ID, "restock", descPay); err != nil {
+		if err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -req.TotalPrice, req.ID, "restock", descPay, nil); err != nil {
 			return err
 		}
 
 		// Credit HQ
 		descRev := fmt.Sprintf("Pendapatan Kulakan Merchant: %s", req.ID)
-		if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, req.TotalPrice, req.ID, "restock", descRev); err != nil {
+		if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, req.TotalPrice, req.ID, "restock", descRev, nil); err != nil {
 			return err
 		}
 

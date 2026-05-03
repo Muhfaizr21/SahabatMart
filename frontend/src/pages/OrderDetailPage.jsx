@@ -208,7 +208,18 @@ export default function OrderDetailPage() {
               
                 <div className="space-y-3">
                   {order.status === 'pending_payment' && (
-                    <button 
+                    <>
+                      {order.expired_at && (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 rounded-2xl border border-red-100 text-red-600 mb-2">
+                          <span className="material-symbols-outlined text-sm">schedule</span>
+                          <p className="text-[11px] font-bold">
+                            Batas Bayar: {new Date(order.expired_at).toLocaleString('id-ID', {
+                              day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                            })} WIB
+                          </p>
+                        </div>
+                      )}
+                      <button 
                       onClick={() => {
                         if (payment?.checkout_url) {
                           window.location.href = payment.checkout_url;
@@ -219,7 +230,8 @@ export default function OrderDetailPage() {
                       className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
                     >
                       Bayar Sekarang
-                    </button>
+                      </button>
+                    </>
                   )}
                   
                   <Link 

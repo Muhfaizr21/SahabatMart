@@ -146,7 +146,29 @@ export default function AdminPayouts() {
           <div style={{ background:'#0f172a', borderRadius:16, padding:'24px', marginBottom:20, color: '#fff', boxShadow: '0 20px 40px rgba(15,23,42,0.2)' }}>
             <div style={{ fontSize:10, fontWeight:800, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6 }}>Withdrawal Amount</div>
             <div style={{ fontSize:32, fontWeight:900, color:'#fff', letterSpacing:'-0.05em' }}>{idr(selected.amount)}</div>
-            <div style={{ fontSize:11, color:'#64748b', fontFamily:'monospace', marginTop:8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>Merchant Reference: {selected.merchant_id}</div>
+            <div style={{ fontSize:11, color:'#64748b', fontFamily:'monospace', marginTop:8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>Transaction Ref: {selected.id?.slice(0,8).toUpperCase()}</div>
+          </div>
+
+          <div style={{ background:'#f8fafc', borderRadius:16, padding:'20px', marginBottom:20, border:'1.5px solid #e2e8f0' }}>
+            <div style={{ fontSize:11, fontWeight:800, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+              <i className="bx bxs-bank" style={{ fontSize:16, color:'#6366f1' }} /> Tujuan Transfer (Rekening)
+            </div>
+            <div style={{ display:'grid', gap:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between' }}>
+                <span style={{ fontSize:12, color:'#94a3b8' }}>Bank</span>
+                <span style={{ fontSize:13, fontWeight:800, color:'#0f172a' }}>{selected.bank_name || '—'}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:12, color:'#94a3b8' }}>Nomor Rekening</span>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                   <span style={{ fontSize:15, fontWeight:900, color:'#4361ee', fontFamily:'monospace' }}>{selected.account_number || '—'}</span>
+                </div>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between' }}>
+                <span style={{ fontSize:12, color:'#94a3b8' }}>Atas Nama</span>
+                <span style={{ fontSize:13, fontWeight:800, color:'#0f172a' }}>{selected.account_name || '—'}</span>
+              </div>
+            </div>
           </div>
 
           <div style={{ marginBottom:20 }}>

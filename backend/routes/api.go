@@ -163,6 +163,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	mux.HandleFunc("/api/tripay/webhook", paymentCtrl.TriPayCallback)
 	mux.HandleFunc("/api/callback/tripay", paymentCtrl.TriPayCallback)
+	mux.HandleFunc("/api/payment/channels", paymentCtrl.GetChannels)
+	mux.HandleFunc("/api/payment/fee", paymentCtrl.GetFee)
 
 
 	// --- Buyer Routes (Now mapped to all authenticated users) ---

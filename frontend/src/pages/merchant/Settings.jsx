@@ -143,7 +143,7 @@ const MerchantSettings = () => {
                         <div>
                             <FieldLabel>Slug Toko Digital (URL Permanen)</FieldLabel>
                             <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                                <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', height: '100%', display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>sahabatmart.id/shop/</span>
+                                <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#94a3b8', background: '#f1f5f9', height: '100%', display: 'flex', alignItems: 'center', fontFamily: 'monospace' }}>{window.location.host}/shop/</span>
                                 <input name="slug" value={store?.slug || ''} onChange={handleChange} style={{ ...A.input, border: 'none', background: 'transparent', flex: 1, padding: 14, fontFamily: 'monospace', color: '#6366f1', fontWeight: 800 }} required />
                             </div>
                             <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>* Mengubah slug dapat mempengaruhi link yang sudah terindeks dan peringkat SEO.</p>
@@ -152,13 +152,18 @@ const MerchantSettings = () => {
                         <div style={{ marginTop: 20, padding: 20, background: '#f0f4ff', borderRadius: 16, border: '1px solid #e0e7ff' }}>
                              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <i className="bx bxs-info-circle" style={{ color: '#4f46e5', fontSize: 20 }} />
-                                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3730a3' }}>Status Verifikasi Toko</div>
+                                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3730a3' }}>Status Verifikasi & Biaya Layanan</div>
                              </div>
-                             <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: store?.is_verified ? '#10b981' : '#f59e0b' }} />
-                                <span style={{ fontSize: 13, fontWeight: 800, color: store?.is_verified ? '#059669' : '#b45309' }}>
-                                    {store?.is_verified ? 'MITRA TERVERIFIKASI RESMI' : 'MENUNGGU VERIFIKASI'}
-                                </span>
+                             <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: store?.is_verified ? '#10b981' : '#f59e0b' }} />
+                                    <span style={{ fontSize: 13, fontWeight: 800, color: store?.is_verified ? '#059669' : '#b45309' }}>
+                                        {store?.is_verified ? 'MITRA TERVERIFIKASI RESMI' : 'MENUNGGU VERIFIKASI'}
+                                    </span>
+                                </div>
+                                <div style={{ background: '#4f46e5', color: '#fff', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>
+                                    FEE: {store?.service_fee || 5}%
+                                </div>
                              </div>
                         </div>
 

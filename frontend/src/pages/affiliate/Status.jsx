@@ -11,15 +11,6 @@ const cardStyle = {
   border: '1px solid rgba(77, 67, 84, 0.15)',
 };
 
-// Fallback default jika API belum punya data
-const DEFAULT_TIERS = [
-  { id: 1, name: 'Bronze',   level: 1, color: '#cd7f32', min_active_mitra: 0,   min_monthly_turnover: 0,        icon: 'military_tech', description: 'Jenjang awal semua mitra Akuglow' },
-  { id: 2, name: 'Silver',   level: 2, color: '#a8a9ad', min_active_mitra: 10,  min_monthly_turnover: 1000000,  icon: 'military_tech', description: 'Min 10 mitra aktif & omset Rp 1jt/bln' },
-  { id: 3, name: 'Gold',     level: 3, color: '#ffd700', min_active_mitra: 30,  min_monthly_turnover: 5000000,  icon: 'emoji_events',  description: 'Min 30 mitra aktif & omset Rp 5jt/bln' },
-  { id: 4, name: 'Platinum', level: 4, color: '#e5e4e2', min_active_mitra: 50,  min_monthly_turnover: 7500000,  icon: 'diamond',       description: 'Min 50 mitra aktif & omset Rp 7.5jt/bln' },
-  { id: 5, name: 'Merchant', level: 5, color: '#b76dff', min_active_mitra: 100, min_monthly_turnover: 10000000, icon: 'storefront',    description: 'Jenjang tertinggi: Distributor resmi Akuglow' },
-];
-
 export default function AffiliateStatus() {
   const user = getStoredUser();
   const [tiers, setTiers] = useState([]);
@@ -34,12 +25,12 @@ export default function AffiliateStatus() {
       setLoading(true);
       try {
         const [tierData, elig, teamStats] = await Promise.all([
-          fetch(`${API_BASE}/api/public/membership-tiers`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`${API_BASE}/api/public/membership-tiers`).then(r => r.ok ? r.json() : []),
           fetchJson(`${AFFILIATE_API_BASE}/merchant-eligibility`).catch(() => null),
           fetchJson(`${AFFILIATE_API_BASE}/team-stats`).catch(() => null),
         ]);
-        // Gunakan data dari API, fallback ke default jika kosong
-        setTiers(Array.isArray(tierData) && tierData.length > 0 ? tierData : DEFAULT_TIERS);
+        
+        setTiers(Array.isArray(tierData) ? tierData : []);
         setEligibility(elig);
         setStats(teamStats);
       } finally {
@@ -62,10 +53,10 @@ export default function AffiliateStatus() {
     }
   };
 
-  const currentTierName = user?.affiliate?.membership_tier?.name?.toLowerCase() || 'bronze';
+  const currentTierName = user?.affiliate?.membership_tier?.name?.toLowerCase() || '';
   const currentTierIdx = tiers.findIndex(t => t.name?.toLowerCase() === currentTierName);
-  const currentTier = tiers[currentTierIdx >= 0 ? currentTierIdx : 0] || DEFAULT_TIERS[0];
-  const nextTier = tiers[currentTierIdx + 1] || null;
+  const currentTier = tiers[currentTierIdx >= 0 ? currentTierIdx : 0] || (tiers.length > 0 ? tiers[0] : { name: 'Mitra Dasar', level: 1 });
+  const nextTier = (currentTierIdx >= 0 && currentTierIdx + 1 < tiers.length) ? tiers[currentTierIdx + 1] : null;
 
   const activeMitra = eligibility?.active_mitra || 0;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
