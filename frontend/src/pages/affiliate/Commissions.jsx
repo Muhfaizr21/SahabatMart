@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import toast from 'react-hot-toast';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
@@ -37,20 +38,17 @@ export default function AffiliateCommissions() {
         ? `${AFFILIATE_API_BASE}/commissions`
         : `${AFFILIATE_API_BASE}/commissions?status=${filter}`;
       const res = await fetchJson(url);
-      const data = Array.isArray(res) ? res : [];
-      setCommissions(data);
+      
+      // Update data based on new response structure { data: [], summary: {} }
+      const list = Array.isArray(res.data) ? res.data : [];
+      setCommissions(list);
 
-      // Calculate summary
-      const s = { total: 0, pending: 0, approved: 0, paid: 0 };
-      data.forEach((c) => {
-        s.total += c.amount || 0;
-        if (c.status === 'pending') s.pending += c.amount || 0;
-        if (c.status === 'approved') s.approved += c.amount || 0;
-        if (c.status === 'paid') s.paid += c.amount || 0;
-      });
-      setSummary(s);
+      if (res.summary) {
+        setSummary(res.summary);
+      }
     } catch (err) {
       console.error(err);
+      toast.error('Gagal mengambil data komisi');
     } finally {
       setLoading(false);
     }

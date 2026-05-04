@@ -216,10 +216,31 @@ func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Req
 	var rows []CommRow
 	query.Order("ac.created_at DESC").Limit(200).Scan(&rows)
 
+	// [Sync Fix] Calculate Summary for UI
+	var summary struct {
+		Total    float64 `json:"total"`
+		Pending  float64 `json:"pending"`
+		Approved float64 `json:"approved"`
+		Paid     float64 `json:"paid"`
+	}
+	ac.DB.Table("affiliate_commissions").
+		Where("affiliate_id = ?", affiliateID).
+		Select("COALESCE(SUM(amount), 0) as total").Scan(&summary.Total)
+	ac.DB.Table("affiliate_commissions").
+		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
+		Select("COALESCE(SUM(amount), 0) as pending").Scan(&summary.Pending)
+	ac.DB.Table("affiliate_commissions").
+		Where("affiliate_id = ? AND status = 'approved'", affiliateID).
+		Select("COALESCE(SUM(amount), 0) as approved").Scan(&summary.Approved)
+	ac.DB.Table("affiliate_commissions").
+		Where("affiliate_id = ? AND status = 'paid'", affiliateID).
+		Select("COALESCE(SUM(amount), 0) as paid").Scan(&summary.Paid)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"total":  len(rows),
-		"data":   rows,
+		"status":  "success",
+		"total":   len(rows),
+		"data":    rows,
+		"summary": summary,
 	})
 }
 

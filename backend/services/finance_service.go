@@ -168,20 +168,19 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 
 	// 3. Distribute ke Affiliate (jika ada)
 	if order.AffiliateID != nil && *order.AffiliateID != "" {
-		// Cek apakah ada item produk yang pakai preset multi-level
 		var orderItems []models.OrderItem
 		tx.Where("order_id = ?", order.ID).Find(&orderItems)
 
 		orderSvc := NewOrderService(tx)
-		presetUsed := false
+		
 		for _, item := range orderItems {
+			// A. Coba distribusi via Preset (Multi-Level)
 			entries, err := orderSvc.DistributePresetCommissions(tx, order, item, *order.AffiliateID)
+			
 			if err == nil && len(entries) > 0 {
-				presetUsed = true
-				// Distribute wallet credit untuk tiap level
+				// Distribute wallet credit untuk tiap level preset
 				for _, entry := range entries {
 					desc := fmt.Sprintf("Komisi Level %d (Preset): %s", entry.Level, order.OrderNumber)
-					// Ambil hold days dari tier affiliate
 					holdDays := 7
 					var aff models.AffiliateMember
 					if err := tx.Preload("Tier").Where("id = ?", entry.AffiliateID).First(&aff).Error; err == nil && aff.Tier != nil {
@@ -192,32 +191,31 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 					if err := s.ProcessTransaction(tx, entry.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, entry.Amount, order.ID, "order", desc, &settleDate); err != nil {
 						return err
 					}
-					// Notifikasi per affiliate
 					_ = s.Notification.Push(entry.AffiliateID, "affiliate", "commission_earned",
 						fmt.Sprintf("Komisi Level %d Masuk! 🎉", entry.Level),
 						fmt.Sprintf("Anda mendapat komisi Rp%.0f (Level %d) dari pesanan %s", entry.Amount, entry.Level, order.OrderNumber),
 						"/affiliate/commissions")
 				}
-			}
-		}
+			} else {
+				// B. Fallback ke Komisi Standar / Tier Matrix untuk item ini
+				affAmt, _, _, _, err := orderSvc.CalculateCommissions(tx, item, order.AffiliateID, item.MerchantID)
+				if err == nil && affAmt > 0 {
+					desc := fmt.Sprintf("Komisi Affiliate (Standard): %s", order.OrderNumber)
+					holdDays := 7
+					var aff models.AffiliateMember
+					if err := tx.Preload("Tier").Where("id = ?", *order.AffiliateID).First(&aff).Error; err == nil && aff.Tier != nil {
+						holdDays = aff.Tier.CommissionHoldDays
+					}
+					settleDate := time.Now().AddDate(0, 0, holdDays)
 
-		// Jika tidak ada item yang pakai preset, fallback ke komisi flat biasa
-		if !presetUsed && order.TotalCommission > 0 {
-			desc := fmt.Sprintf("Komisi Affiliate: %s", order.OrderNumber)
-			// Ambil hold days dari tier affiliate
-			holdDays := 7
-			var aff models.AffiliateMember
-			if err := tx.Preload("Tier").Where("id = ?", *order.AffiliateID).First(&aff).Error; err == nil && aff.Tier != nil {
-				holdDays = aff.Tier.CommissionHoldDays
+					if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, affAmt, order.ID, "order", desc, &settleDate); err != nil {
+						return err
+					}
+					_ = s.Notification.Push(*order.AffiliateID, "affiliate", "commission_earned", "Komisi Baru!",
+						fmt.Sprintf("Anda mendapatkan komisi Rp%.0f dari pesanan %s", affAmt, order.OrderNumber),
+						fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
+				}
 			}
-			settleDate := time.Now().AddDate(0, 0, holdDays)
-
-			if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, order.TotalCommission, order.ID, "order", desc, &settleDate); err != nil {
-				return err
-			}
-			_ = s.Notification.Push(*order.AffiliateID, "affiliate", "commission_earned", "Komisi Baru!",
-				fmt.Sprintf("Anda mendapatkan estimasi komisi Rp%.2f dari pesanan %s", order.TotalCommission, order.OrderNumber),
-				fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
 		}
 	}
 	

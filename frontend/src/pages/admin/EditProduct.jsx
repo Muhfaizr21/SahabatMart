@@ -76,8 +76,8 @@ export default function AdminEditProduct() {
           base_distribution_fee: item.base_distribution_fee || 0,
           base_distribution_fee_nominal: item.base_distribution_fee_nominal || 0,
           merchant_commission_percent: item.merchant_commission_percent || 0,
-          commission_preset_id: item.commission_preset_id || '',
-          tier_commission_preset_id: item.tier_commission_preset_id || '',
+          commission_preset_id: item.commission_preset_id || null,
+          tier_commission_preset_id: item.tier_commission_preset_id || null,
           attributes: item.attributes || '{}'
         });
         try {
@@ -213,18 +213,18 @@ export default function AdminEditProduct() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b', marginBottom: 6 }}>
             <Link to="/admin" style={{ color: 'inherit', textDecoration: 'none' }}>Dashboard</Link>
             <i className="bx bx-chevron-right" />
-            <Link to="/admin/products" style={{ color: 'inherit', textDecoration: 'none' }}>Products</Link>
+            <Link to="/admin/products" style={{ color: 'inherit', textDecoration: 'none' }}>Produk</Link>
             <i className="bx bx-chevron-right" />
-            <span style={{ fontWeight: 600, color: '#1e293b' }}>Edit SKU</span>
+            <span style={{ fontWeight: 600, color: '#1e293b' }}>Ubah SKU</span>
           </div>
           <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
-            Modifier: {p.name || 'Loading SKU...'}
+            Ubah: {p.name || 'Memuat SKU...'}
           </h2>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => navigate('/admin/products')} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => navigate('/admin/products')} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>Batal</button>
           <button onClick={handleSubmit} disabled={saving} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: '#4361ee', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: '0 4px 12px rgba(67, 97, 238, 0.25)' }}>
-            {saving ? 'Saving...' : 'Commit Changes'}
+            {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
           </button>
         </div>
       </div>
@@ -237,17 +237,17 @@ export default function AdminEditProduct() {
           {/* Card 1: Core Info */}
           <div style={{ ...A.card, padding: 25 }}>
             <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="bx bx-info-circle" style={{ color: '#4361ee' }} /> Basic Information
+              <i className="bx bx-info-circle" style={{ color: '#4361ee' }} /> Informasi Dasar
             </h5>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Product Name</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Nama Produk</label>
                 <input 
                   type="text" 
                   value={p.name} 
                   onChange={e => setP({...p, name: e.target.value})}
-                  placeholder="E.g. Professional Wireless Headset"
+                  placeholder="Contoh: MacBook Pro M3"
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none' }} 
                 />
               </div>
@@ -264,7 +264,7 @@ export default function AdminEditProduct() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Weight (Grams) *</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Berat (Gram) *</label>
                   <div style={{ position: 'relative' }}>
                     <input 
                       type="number" 
@@ -279,12 +279,12 @@ export default function AdminEditProduct() {
               </div>
               
               <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Description (Long Format)</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.02em' }}>Deskripsi (Format Panjang)</label>
                 <textarea 
                   value={p.description} 
                   onChange={e => setP({...p, description: e.target.value})}
                   rows={8}
-                  placeholder="Enrich your product detail here..."
+                  placeholder="Jelaskan detail produk di sini..."
                   style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 13, color: '#475569', outline: 'none', lineHeight: 1.6, resize: 'vertical' }}
                 />
               </div>
@@ -295,9 +295,9 @@ export default function AdminEditProduct() {
           <div style={{ ...A.card, padding: 25 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <i className="bx bx-list-check" style={{ color: '#4361ee' }} /> Global Attributes
+                <i className="bx bx-list-check" style={{ color: '#4361ee' }} /> Atribut Produk
               </h5>
-              <Link to="/admin/attributes" style={{ fontSize: 11, fontWeight: 700, color: '#4361ee', textDecoration: 'none' }}>Manage Options <i className="bx bx-right-arrow-alt" /></Link>
+              <Link to="/admin/attributes" style={{ fontSize: 11, fontWeight: 700, color: '#4361ee', textDecoration: 'none' }}>Kelola Pilihan <i className="bx bx-right-arrow-alt" /></Link>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -330,7 +330,7 @@ export default function AdminEditProduct() {
           {/* Card 3: Tier Commission Matrix (Req 1 & 2) */}
           <div style={{ ...A.card, padding: 25 }}>
             <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="bx bx-sitemap" style={{ color: '#4361ee' }} /> Commission Matrix per Tier
+              <i className="bx bx-sitemap" style={{ color: '#4361ee' }} /> Matriks Komisi per Tier
             </h5>
             <p style={{ fontSize: 12, color: '#64748b', marginBottom: 15 }}>
               Atur persentase komisi khusus untuk produk ini berdasarkan jenjang affiliate. Jika kosong, sistem akan menggunakan nilai default.
@@ -340,9 +340,9 @@ export default function AdminEditProduct() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Membership Tier</th>
-                    <th style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Default Rate</th>
-                    <th style={{ textAlign: 'right', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Special Rate (%)</th>
+                    <th style={{ textAlign: 'left', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Jenjang Membership</th>
+                    <th style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Rate Default</th>
+                    <th style={{ textAlign: 'right', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', padding: '10px 15px', borderBottom: '1px solid #f1f5f9' }}>Rate Khusus (%)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -390,7 +390,7 @@ export default function AdminEditProduct() {
           {/* Card 4: Commission Preset Selector */}
           <div style={{ ...A.card, padding: 25 }}>
             <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="bx bx-git-branch" style={{ color: '#7c3aed', transform: 'rotate(90deg)' }} /> Multi-Level Commission Preset (Upline)
+              <i className="bx bx-git-branch" style={{ color: '#7c3aed', transform: 'rotate(90deg)' }} /> Preset Komisi Multi-Level (Upline)
             </h5>
             <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
               Assign preset untuk mendistribusikan komisi secara otomatis ke seluruh jaringan upline affiliate.
@@ -410,7 +410,7 @@ export default function AdminEditProduct() {
             <div style={{ height: 1, background: '#f1f5f9', margin: '16px 0' }} />
 
             <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="bx bx-matrix" style={{ color: '#10b981' }} /> Tier Commission Preset (Matrix)
+              <i className="bx bx-matrix" style={{ color: '#10b981' }} /> Preset Komisi Tier (Matrix)
             </h5>
             <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
               Pilih preset matriks komisi untuk menetapkan rate khusus per jenjang membership.
@@ -480,26 +480,26 @@ export default function AdminEditProduct() {
           
           {/* Organization */}
           <div style={{ ...A.card, padding: 20 }}>
-             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Market Setup</h5>
+             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Pengaturan Pasar</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Category</label>
+                  <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Kategori</label>
                   <select style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600 }} value={p.category} onChange={e => setP({...p, category: e.target.value})}>
                     {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Brand</label>
+                  <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Merek / Brand</label>
                   <select style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600 }} value={p.brand} onChange={e => setP({...p, brand: e.target.value})}>
-                    <option value="">-- No Specific Brand --</option>
+                    <option value="">-- Tanpa Brand Spesifik --</option>
                     {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Status</label>
                   <div style={{ display: 'flex', gap: 10 }}>
-                    <button type="button" onClick={() => setP({...p, status: 'active'})} style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #e2e8f0', background: p.status === 'active' ? '#dcfce7' : '#fff', color: p.status === 'active' ? '#166534' : '#64748b' }}>Active</button>
-                    <button type="button" onClick={() => setP({...p, status: 'taken_down'})} style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #e2e8f0', background: p.status === 'taken_down' ? '#fee2e2' : '#fff', color: p.status === 'taken_down' ? '#991b1b' : '#64748b' }}>Pulled</button>
+                    <button type="button" onClick={() => setP({...p, status: 'active'})} style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #e2e8f0', background: p.status === 'active' ? '#dcfce7' : '#fff', color: p.status === 'active' ? '#166534' : '#64748b' }}>Aktif</button>
+                    <button type="button" onClick={() => setP({...p, status: 'taken_down'})} style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: '1px solid #e2e8f0', background: p.status === 'taken_down' ? '#fee2e2' : '#fff', color: p.status === 'taken_down' ? '#991b1b' : '#64748b' }}>Ditarik</button>
                   </div>
                 </div>
               </div>
@@ -507,37 +507,37 @@ export default function AdminEditProduct() {
 
            {/* Pricing & Commissions */}
            <div style={{ ...A.card, padding: 20, background: '#f5f7ff' }}>
-              <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Financials & Commissions</h5>
+              <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Keuangan & Komisi</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                  <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Main Price (IDR)</label>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Harga Utama (Rp)</label>
                     <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 15, fontWeight: 800, color: '#4361ee' }} value={p.price} onChange={e => setP({...p, price: parseFloat(e.target.value)})} />
                  </div>
                  <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Strike Price (Discount)</label>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Harga Coret (Diskon)</label>
                     <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#64748b' }} value={p.old_price} onChange={e => setP({...p, old_price: parseFloat(e.target.value)})} />
                  </div>
                  <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Modal Awal / COGS (IDR)</label>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Modal Awal / COGS (Rp)</label>
                     <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, color: '#ef4444' }} value={p.cogs} onChange={e => setP({...p, cogs: parseFloat(e.target.value)})} />
                  </div>
 
                  <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
                   <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Merchant Cut (%)</label>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Potongan Merchant (%)</label>
                     <input type="number" step="0.01" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fffbeb', color: '#b45309', fontWeight: 700 }} value={p.merchant_commission_percent} onChange={e => setP({...p, merchant_commission_percent: parseFloat(e.target.value) || 0})} />
                   </div>
 
                  <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
 
                  <div>
-                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Stock Count</label>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>Jumlah Stok</label>
                     <input type="number" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 700 }} value={p.stock} onChange={e => setP({...p, stock: parseInt(e.target.value)})} />
                  </div>
               </div>
            </div>
           <div style={{ ...A.card, padding: 20 }}>
-             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Primary Media</h5>
+             <h5 style={{ fontSize: 13, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Media Utama</h5>
              <div style={{ border: '2px dashed #f1f5f9', borderRadius: 12, padding: 10, textAlign: 'center', position: 'relative' }}>
                 <img src={formatImage(p.image)} style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 8 }} alt="Main" />
                 <label style={{ position: 'absolute', bottom: 15, right: 15, width: 32, height: 32, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer' }}>
@@ -546,7 +546,7 @@ export default function AdminEditProduct() {
                 </label>
              </div>
              
-             <h5 style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginTop: 20, marginBottom: 10 }}>Gallery</h5>
+             <h5 style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginTop: 20, marginBottom: 10 }}>Galeri</h5>
              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {gallery.map((img, idx) => (
                   <div key={idx} style={{ position: 'relative', width: 64, height: 64 }}>

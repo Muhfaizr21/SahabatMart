@@ -41,8 +41,8 @@ export default function AdminAddProduct() {
     category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active',
     base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
     base_distribution_fee: 0, base_distribution_fee_nominal: 0,
-    commission_preset_id: '',
-    tier_commission_preset_id: ''
+    commission_preset_id: null,
+    tier_commission_preset_id: null
   });
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
@@ -151,7 +151,7 @@ export default function AdminAddProduct() {
     <div style={S.page} className="fade-in pb-5">
       {/* Breadcrumb */}
       <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
-        <Link to="/admin/products" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>Product Catalog</Link>
+        <Link to="/admin/products" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>Katalog Produk</Link>
         <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
         <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Tambah Produk Baru</span>
       </div>
@@ -164,7 +164,7 @@ export default function AdminAddProduct() {
           </div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Konfigurasi Produk Baru</div>
-            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>Direct storefront publishing · Isi semua detail dengan lengkap</div>
+            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>Publikasi langsung ke toko · Isi semua detail dengan lengkap</div>
           </div>
         </div>
 
@@ -198,7 +198,7 @@ export default function AdminAddProduct() {
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
             </FormField>
-            <FormField label="Brand / Merek">
+            <FormField label="Merek / Brand">
               <select style={S.select} value={p.brand} onChange={e => setP(prev => ({ ...prev, brand: e.target.value }))}>
                 <option value="">— Tanpa Brand —</option>
                 {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
@@ -279,9 +279,9 @@ export default function AdminAddProduct() {
                 onChange={e => setP(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
-            <FormField label="Harga Coret (Opsional)">
-              <input style={S.input} type="number" min={0} value={p.old_price}
-                onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))}
+            <FormField label="Harga Coret (Diskon/Opsional)">
+              <input style={S.input} type="text" placeholder="Contoh: 150000"
+                value={p.old_price} onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
             <FormField label="Modal Awal / COGS (IDR)">
@@ -289,7 +289,7 @@ export default function AdminAddProduct() {
                 onChange={e => setP(prev => ({ ...prev, cogs: parseFloat(e.target.value) || 0 }))}
                 onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
             </FormField>
-            <FormField label="Thumbnail Utama">
+            <FormField label="Foto Utama">
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ ...S.input, flex: 1 }} type="text" placeholder="https://..." value={p.image}
                   onChange={e => setP(prev => ({ ...prev, image: e.target.value }))}
@@ -321,7 +321,7 @@ export default function AdminAddProduct() {
                     value={p.base_affiliate_fee} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee: parseFloat(e.target.value) || 0 }))} />
                 </FormField>
                 <FormField label="Komisi Afiliasi (Nominal Rp)">
-                  <input style={S.input} type="number" placeholder="Contoh: Label 25000" 
+                  <input style={S.input} type="number" placeholder="Contoh: 25000" 
                     value={p.base_affiliate_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee_nominal: parseFloat(e.target.value) || 0 }))} />
                 </FormField>
                 <FormField label="Fee Distribusi Merchant (%)">
@@ -336,7 +336,7 @@ export default function AdminAddProduct() {
 
              {/* Preset Selector */}
              <div style={{ marginTop: 24 }}>
-                <FormField label="Multi-Level Commission Preset (Upline)">
+                <FormField label="Preset Komisi Multi-Level (Upline)">
                   <select
                     value={p.commission_preset_id || ''}
                     onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
@@ -354,7 +354,7 @@ export default function AdminAddProduct() {
 
                 <div style={{ height: 16 }} />
 
-                <FormField label="Tier Commission Preset (Matrix)">
+                <FormField label="Preset Komisi Tier (Matrix)">
                   <select
                     value={p.tier_commission_preset_id || ''}
                     onChange={e => setP(prev => ({ ...prev, tier_commission_preset_id: e.target.value || null }))}
@@ -380,7 +380,7 @@ export default function AdminAddProduct() {
               <i className={`bx ${p.status === 'active' ? 'bx-globe' : 'bx-hide'}`} style={{ fontSize: 22, color: p.status === 'active' ? '#16a34a' : '#94a3b8' }} />
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: p.status === 'active' ? '#166534' : '#475569' }}>
-                  {p.status === 'active' ? 'Aktif & Tampil di Storefront' : 'Disimpan sebagai Draft'}
+                  {p.status === 'active' ? 'Aktif & Tampil di Toko' : 'Simpan sebagai Draft'}
                 </div>
                 <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
                   {p.status === 'active' ? 'Produk akan langsung terlihat oleh pembeli' : 'Produk tidak akan ditampilkan ke publik'}

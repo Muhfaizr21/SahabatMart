@@ -191,12 +191,13 @@ export default function AffiliateDashboard() {
               </div>
               <button onClick={() => {navigator.clipboard.writeText(user?.affiliate_ref_code); toast.success('Disalin!')}} className="px-6 py-2 bg-indigo-600 rounded-xl text-xs font-bold text-white">SALIN KODE</button>
            </div>
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard icon="ads_click" label="Klik" value={formatNum(stats.total_clicks)} color="#ddb7ff" />
-              <StatCard icon="shopping_cart" label="Order" value={formatNum(stats.total_conversions)} color="#fabc4e" />
-              <StatCard icon="payments" label="Saldo" value={formatRp(stats.balance)} color="#4ade80" />
-              <StatCard icon="account_balance_wallet" label="Ditarik" value={formatRp(stats.total_withdrawn)} color="#60a5fa" />
-           </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+               <StatCard icon="ads_click" label="Klik" value={formatNum(stats.total_clicks)} color="#ddb7ff" />
+               <StatCard icon="shopping_cart" label="Order" value={formatNum(stats.total_orders)} color="#fabc4e" />
+               <StatCard icon="payments" label="Saldo (Siap)" value={formatRp(stats.balance)} color="#4ade80" />
+               <StatCard icon="schedule" label="Pending" value={formatRp(stats.pending_commission)} color="#ffcc33" />
+               <StatCard icon="account_balance_wallet" label="Ditarik" value={formatRp(stats.total_withdrawn)} color="#60a5fa" />
+            </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">

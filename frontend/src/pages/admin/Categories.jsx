@@ -36,7 +36,7 @@ export default function AdminCategories() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Product Categories" subtitle="Atur hirarki kategori produk untuk navigasi yang lebih baik.">
+      <PageHeader title="Kategori Produk" subtitle="Atur hirarki kategori produk untuk navigasi yang lebih baik.">
         <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY })}>
           <i className="bx bx-plus" /> Tambah Kategori
         </button>

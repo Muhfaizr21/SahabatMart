@@ -414,27 +414,28 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 					if err := db.Where("product_id = ? AND membership_tier_id = ?", item.ProductID, aff.MembershipTierID).First(&tierComm).Error; err == nil {
 						affAmt = subtotal * tierComm.CommissionRate
 					} else if product.BaseAffiliateFee > 0 {
-					affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
-				} else if product.BaseAffiliateFeeNominal > 0 {
-					affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
-				} else if merchComm.AffiliateFee > 0 {
-					affAmt = subtotal * (merchComm.AffiliateFee / 100.0)
-				} else if catComm.AffiliateFee > 0 {
-					affAmt = subtotal * (catComm.AffiliateFee / 100.0)
-				} else {
-					var tier models.MembershipTier
-					if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
-						affAmt = subtotal * tier.BaseCommissionRate
+						affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
+					} else if product.BaseAffiliateFeeNominal > 0 {
+						affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
+					} else if merchComm.AffiliateFee > 0 {
+						affAmt = subtotal * (merchComm.AffiliateFee / 100.0)
+					} else if catComm.AffiliateFee > 0 {
+						affAmt = subtotal * (catComm.AffiliateFee / 100.0)
 					} else {
-						// Final fallback from Admin Config with normalization
-						rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
-						var affRate float64
-						if rawComm < 1 && rawComm > 0 {
-							affRate = rawComm
+						var tier models.MembershipTier
+						if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
+							affAmt = subtotal * tier.BaseCommissionRate
 						} else {
-							affRate = rawComm / 100.0
+							// Final fallback from Admin Config with normalization
+							rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
+							var affRate float64
+							if rawComm < 1 && rawComm > 0 {
+								affRate = rawComm
+							} else {
+								affRate = rawComm / 100.0
+							}
+							affAmt = subtotal * affRate
 						}
-						affAmt = subtotal * affRate
 					}
 				}
 			}
