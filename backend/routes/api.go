@@ -440,6 +440,9 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/commission-presets", adminOnly(adminCtrl.GetCommissionPresets))
 	mux.HandleFunc("/api/admin/commission-presets/upsert", adminOnly(adminCtrl.UpsertCommissionPreset))
 	mux.HandleFunc("/api/admin/commission-presets/delete", adminOnly(adminCtrl.DeleteCommissionPreset))
+	mux.HandleFunc("/api/admin/tier-commission-presets", adminOnly(adminCtrl.GetTierCommissionPresets))
+	mux.HandleFunc("/api/admin/tier-commission-presets/upsert", adminOnly(adminCtrl.UpsertTierCommissionPreset))
+	mux.HandleFunc("/api/admin/tier-commission-presets/delete", adminOnly(adminCtrl.DeleteTierCommissionPreset))
 
 	// --- Warehouse (Master Gudang) Routes ---
 	mux.HandleFunc("/api/admin/warehouse/suppliers", adminOnly(warehouseCtrl.GetSuppliers))

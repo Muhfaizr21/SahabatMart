@@ -490,3 +490,24 @@ func (RestockItem) TableName() string    { return "restock_items" }
 func (Product) TableName() string             { return "products" }
 func (Banner) TableName() string              { return "banners" }
 func (Wishlist) TableName() string            { return "wishlists" }
+
+// TierCommissionPreset untuk preset Commission Matrix per Tier
+type TierCommissionPreset struct {
+	ID          string                     `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	Name        string                     `gorm:"type:varchar(100);not null" json:"name"`
+	Description string                     `gorm:"type:text" json:"description"`
+	IsActive    bool                       `gorm:"default:true" json:"is_active"`
+	Tiers       []TierCommissionPresetItem `gorm:"foreignKey:PresetID;constraint:OnDelete:CASCADE" json:"tiers"`
+	CreatedAt   time.Time                  `json:"created_at"`
+	UpdatedAt   time.Time                  `json:"updated_at"`
+}
+
+type TierCommissionPresetItem struct {
+	ID               uint    `gorm:"primaryKey;autoIncrement" json:"id"`
+	PresetID         string  `gorm:"type:uuid;not null;index" json:"preset_id"`
+	MembershipTierID uint    `gorm:"not null;index" json:"membership_tier_id"`
+	CommissionRate   float64 `gorm:"type:decimal(5,4);not null" json:"commission_rate"`
+}
+
+func (TierCommissionPreset) TableName() string     { return "tier_commission_presets" }
+func (TierCommissionPresetItem) TableName() string { return "tier_commission_preset_items" }

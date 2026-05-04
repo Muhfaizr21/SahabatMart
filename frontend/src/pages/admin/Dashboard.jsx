@@ -88,7 +88,7 @@ const BarChart = ({ data }) => {
         const h = (d.revenue / max) * 100;
         const isLast = i === data.length - 1;
         return (
-          <div key={d.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <div key={d.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 6 }}>
             <div title={idr(d.revenue)} style={{
               width: '100%', height: `${Math.max(h, 8)}%`,
               borderRadius: '8px 8px 0 0',
@@ -117,12 +117,16 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [year, setYear] = useState(new Date().getFullYear().toString());
+
+  const currentYear = new Date().getFullYear();
+  const availableYears = Array.from({length: 5}, (_, i) => (currentYear - i).toString());
 
   const loadData = () => {
     setLoading(true);
     Promise.all([
       fetchJson(API + '/overview'),
-      fetchJson(API + '/finance/monthly'),
+      fetchJson(`${API}/finance/monthly?year=${year}`),
     ]).then(([ov, mo]) => {
       setOverview(ov);
       const data = Array.isArray(mo) ? mo : (mo?.data || []);
@@ -130,7 +134,7 @@ export default function AdminDashboard() {
     }).catch(console.error).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [year]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
@@ -221,9 +225,17 @@ export default function AdminDashboard() {
                 Monthly GMV & platform fee breakdown
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 4, borderRadius: 10, border: '1px solid #f1f5f9' }}>
-              <button style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#fff', fontSize: 12, fontWeight: 700, color: '#6366f1', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer' }}>Monthly</button>
-              <button style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'transparent', fontSize: 12, fontWeight: 600, color: '#94a3b8', cursor: 'pointer' }}>Yearly</button>
+            <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: '4px 8px', borderRadius: 10, border: '1px solid #f1f5f9' }}>
+              <select 
+                value={year} 
+                onChange={(e) => setYear(e.target.value)}
+                style={{
+                  border: 'none', background: 'transparent', fontSize: 13, fontWeight: 700,
+                  color: '#6366f1', outline: 'none', cursor: 'pointer'
+                }}
+              >
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
             </div>
           </div>
 

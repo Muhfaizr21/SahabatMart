@@ -1736,6 +1736,11 @@ func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	yearStr := r.URL.Query().Get("year")
+	if yearStr == "" {
+		yearStr = time.Now().Format("2006")
+	}
+
 	type MonthRow struct {
 		Month   string  `json:"month"`
 		Revenue float64 `json:"revenue"`
@@ -1756,14 +1761,14 @@ func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Requ
 			       SUM(oi.cogs * oi.quantity) AS total_cogs
 			FROM order_merchant_groups omg
 			LEFT JOIN order_items oi ON oi.order_merchant_group_id = omg.id
-			WHERE omg.created_at >= NOW() - INTERVAL '12 months'
+			WHERE TO_CHAR(omg.created_at, 'YYYY') = ?
 			  AND omg.status IN ('completed', 'delivered', 'paid')
 			GROUP BY month
 		)
-		SELECT month, revenue, (gross_take - total_cogs) AS profit, fee, orders
+		SELECT month, revenue, COALESCE(gross_take, 0) - COALESCE(total_cogs, 0) AS profit, fee, orders
 		FROM monthly_stats
 		ORDER BY month ASC
-	`).Scan(&rows)
+	`, yearStr).Scan(&rows)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
