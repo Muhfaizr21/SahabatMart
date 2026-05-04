@@ -37,7 +37,7 @@ func SeedNetwork(db *gorm.DB) {
 	cities := []string{"Jakarta", "Bandung", "Surabaya", "Medan", "Makassar", "Semarang", "Yogyakarta", "Bali"}
 	
 	for i := 1; i <= 30; i++ {
-		email := fmt.Sprintf("leader%d@akugrow.com", i)
+		email := fmt.Sprintf("leader%d@akuglow.com", i)
 		name := fmt.Sprintf("Elite Leader %d", i)
 		city := cities[rand.Intn(len(cities))]
 		
@@ -78,7 +78,7 @@ func SeedNetwork(db *gorm.DB) {
 
 	// 4. Create 5 "Mitra + Merchant" (Users who have been approved)
 	for i := 1; i <= 5; i++ {
-		email := fmt.Sprintf("merchant_mitra%d@akugrow.com", i)
+		email := fmt.Sprintf("merchant_mitra%d@akuglow.com", i)
 		storeName := fmt.Sprintf("Toko Cantik %d", i)
 		slug := fmt.Sprintf("toko-cantik-%d", i)
 		
@@ -124,7 +124,7 @@ func SeedNetwork(db *gorm.DB) {
 
 	// 5. Create 3 "Pending Merchant Applications" (Users who meet requirements but not yet approved)
 	for i := 1; i <= 3; i++ {
-		email := fmt.Sprintf("waiting_merch%d@akugrow.com", i)
+		email := fmt.Sprintf("waiting_merch%d@akuglow.com", i)
 		
 		u := models.User{
 			ID: uuid.New().String(),
@@ -162,7 +162,7 @@ func SeedNetwork(db *gorm.DB) {
 	db.Find(&eliteAffiliates)
 
 	for i := 1; i <= 50; i++ {
-		email := fmt.Sprintf("mitra_reguler%d@akugrow.com", i)
+		email := fmt.Sprintf("mitra_reguler%d@akuglow.com", i)
 		u := models.User{ID: uuid.New().String(), Email: email, PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 		db.Create(&u)
 		db.Create(&models.UserProfile{UserID: u.ID, FullName: fmt.Sprintf("Mitra Reguler %d", i)})

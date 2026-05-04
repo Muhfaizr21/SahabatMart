@@ -216,7 +216,7 @@ export default function AdminCommissions() {
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                          {isMerch ? (r.owner_name || 'Merchant SahabatMart') : (isProd ? `SKU: ${r.sku || '-'}` : isCat ? 'Aturan Kategori' : r.note || 'Aturan Aktif')}
+                          {isMerch ? (r.owner_name || 'Merchant AkuGlow') : (isProd ? `SKU: ${r.sku || '-'}` : isCat ? 'Aturan Kategori' : r.note || 'Aturan Aktif')}
                         </div>
                       </div>
                     </div>

@@ -623,7 +623,7 @@ func (ac *AffiliateController) GetLeaderboard(w http.ResponseWriter, r *http.Req
 		SELECT
 			ROW_NUMBER() OVER (ORDER BY am.total_earned DESC) AS rank,
 			am.ref_code,
-			COALESCE(up.full_name, 'Mitra SahabatMart') AS full_name,
+			COALESCE(up.full_name, 'Mitra AkuGlow') AS full_name,
 			COALESCE(mt.name, 'Mitra') AS tier_name,
 			COALESCE(mt.color, '#94a3b8') AS tier_color,
 			am.total_earned,

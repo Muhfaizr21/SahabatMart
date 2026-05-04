@@ -177,7 +177,7 @@ export default function PusatInventory() {
     <div style={A.page} className="fade-in">
       <PageHeader 
         title="Gudang Pusat (Command Center)" 
-        subtitle="Otoritas tertinggi stok SahabatMart. Kelola amunisi barang dan pantau mutasi secara real-time."
+        subtitle="Otoritas tertinggi stok AkuGlow. Kelola amunisi barang dan pantau mutasi secara real-time."
       >
         <div style={{ display: 'flex', gap: 12 }}>
           <button style={A.btnGhost} onClick={loadAllData}><i className="bx bx-refresh" /> Sync Global</button>

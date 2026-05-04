@@ -115,6 +115,13 @@ func (c *PaymentController) TriPayCallback(w http.ResponseWriter, r *http.Reques
 			return nil
 		}
 
+		// Update Payment record with fees from Tripay for financial audit
+		tx.Model(&models.Payment{}).Where("order_id = ?", order.ID).Updates(map[string]interface{}{
+			"fee_gateway":      float64(payload.TotalFee),
+			"amount_received":  float64(payload.AmountReceived),
+			"gateway_response": string(body),
+		})
+
 		// Gunakan OrderService dengan DB transaction yang sama
 		orderSvc := services.OrderService{
 			DB:             tx,

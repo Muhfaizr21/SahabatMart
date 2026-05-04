@@ -58,7 +58,11 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 			}
 		}
 
-		// 5. Update or Add Item
+		// 5. Update or Add Item (Normalize metadata to prevent duplicates from different sources)
+		if metadata == "{}" {
+			metadata = ""
+		}
+
 		var item models.CartItem
 		// We include MerchantID in the search to allow buying same product from different merchants if needed
 		result := tx.Where("cart_id = ? AND product_variant_id = ? AND merchant_id = ? AND metadata = ?", cart.ID, variantID, merchantID, metadata).First(&item)

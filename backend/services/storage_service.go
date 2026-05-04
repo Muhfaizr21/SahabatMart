@@ -40,5 +40,14 @@ func (s *StorageService) SaveImage(file multipart.File, header *multipart.FileHe
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/%s/%s", s.BaseURL, s.UploadDir, filename), nil
+	// Clean base URL to prevent double slashes
+	baseUrl := strings.TrimSuffix(s.BaseURL, "/")
+	uploadDir := strings.TrimPrefix(s.UploadDir, "./")
+	uploadDir = strings.TrimPrefix(uploadDir, "/")
+
+	if baseUrl == "" {
+		return fmt.Sprintf("/%s/%s", uploadDir, filename), nil
+	}
+
+	return fmt.Sprintf("%s/%s/%s", baseUrl, uploadDir, filename), nil
 }

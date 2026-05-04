@@ -41,40 +41,46 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 		return nil, fmt.Errorf("merchant identity not found or invalid")
 	}
 
+	// ProductResult helps in combining product data with merchant-specific inventory stock
 	type ProductResult struct {
 		models.Product
-		InventoryStock int `json:"stock" gorm:"column:inventory_stock"`
+		Stock int `json:"stock" gorm:"column:inventory_stock"` // Override Product.Stock with Inventory Stock
 	}
 	var results []ProductResult
 	var total int64
 
-	// Build Base Query
-	query := s.DB.Table("products").
-		Select("products.*, inv.stock as inventory_stock").
+	// Use Session to ensure clean query state for multiple calls (Count & Find)
+	baseQuery := s.DB.Session(&gorm.Session{}).Table("products").
 		Joins("JOIN inventories inv ON inv.product_id = products.id").
 		Where("inv.merchant_id = ?", merchantID).
 		Where("products.deleted_at IS NULL")
 
-	// Filters
+	// Apply Filters to baseQuery
 	if search != "" {
-		query = query.Where("products.name ILIKE ?", "%"+search+"%")
+		baseQuery = baseQuery.Where("products.name ILIKE ?", "%"+search+"%")
 	}
-	if categoryID != "" {
+	
+	if categoryID != "" && categoryID != "0" && categoryID != "all" {
 		var cat models.Category
 		if err := s.DB.First(&cat, categoryID).Error; err == nil {
-			query = query.Where("products.category = ?", cat.Name)
+			// Filtering by category name because Product stores category as string
+			// Use ILIKE for case-insensitive matching (e.g. 'Eye Care' vs 'EYE CARE')
+			baseQuery = baseQuery.Where("products.category ILIKE ?", cat.Name)
 		}
 	}
-	if stockStatus == "low" {
-		query = query.Where("inv.stock > 0 AND inv.stock <= 5")
-	} else if stockStatus == "out" {
-		query = query.Where("inv.stock <= 0")
-	} else if stockStatus == "ready" {
-		query = query.Where("inv.stock > 5")
+
+	if stockStatus != "" && stockStatus != "all" {
+		if stockStatus == "low" {
+			baseQuery = baseQuery.Where("COALESCE(inv.stock, 0) > 0 AND COALESCE(inv.stock, 0) <= 5")
+		} else if stockStatus == "out" {
+			baseQuery = baseQuery.Where("COALESCE(inv.stock, 0) <= 0")
+		} else if stockStatus == "ready" {
+			baseQuery = baseQuery.Where("COALESCE(inv.stock, 0) > 5")
+		}
 	}
 
-	// Count Total
-	if err := query.Count(&total).Error; err != nil {
+	// Count Total (using a separate clone of the query)
+	if err := baseQuery.Count(&total).Error; err != nil {
 		return nil, err
 	}
 
@@ -83,30 +89,27 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 	if page <= 1 { page = 1 }
 	offset := (page - 1) * limit
 
-	err := query.Order("products.created_at desc").Limit(limit).Offset(offset).Find(&results).Error
+	// Execute Final Query
+	err := baseQuery.Select("products.*, inv.stock as inventory_stock").
+		Order("products.created_at desc").
+		Limit(limit).
+		Offset(offset).
+		Find(&results).Error
+
 	if err != nil {
 		log.Printf("[MerchantService] GetProducts Error: %v", err)
 		return nil, err
 	}
-	
-	if len(results) == 0 {
-		var count int64
-		s.DB.Table("inventories").Where("merchant_id = ?", merchantID).Count(&count)
-		log.Printf("[MerchantService] DEBUG: No results found for merchant %s. Total inventory records in DB: %d", merchantID, count)
-	}
 
-	log.Printf("[MerchantService] GetProducts: merchant=%s, found=%d, total=%d", merchantID, len(results), total)
+	log.Printf("[MerchantService] GetProducts: merchant=%s, found=%d, total=%d, filter(cat=%s, stock=%s)", 
+		merchantID, len(results), total, categoryID, stockStatus)
 
-	// Convert to interface slice for easy JSON response
-	final := make([]interface{}, len(results))
-	for i, v := range results { final[i] = v }
-	
 	return map[string]interface{}{
-		"data":  final,
+		"data":  results,
 		"total": total,
 		"page":  page,
 		"limit": limit,
-	}, err
+	}, nil
 }
 
 // [Akuglow Refactor] Merchants can no longer add/delete products directly.

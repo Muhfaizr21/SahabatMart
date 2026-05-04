@@ -40,8 +40,8 @@ func (bc *BuyerController) GetCart(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 
 	var cart models.Cart
-	// Deep Preload: Mengambil cart -> items -> product & variant sekaligus
-	err := bc.DB.Preload("Items.Product").Preload("Items.ProductVariant").Where("buyer_id = ?", buyerID).First(&cart).Error
+	// Deep Preload: Mengambil cart -> items -> product & variant & merchant sekaligus
+	err := bc.DB.Preload("Items.Product").Preload("Items.ProductVariant").Preload("Items.Merchant").Where("buyer_id = ?", buyerID).First(&cart).Error
 	
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -482,7 +482,11 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 	raw, _ := json.Marshal(result)
 	var resultMap map[string]interface{}
 	json.Unmarshal(raw, &resultMap)
-	return resultMap, nil
+	
+	// Balut dalam "data" agar sesuai ekspektasi Checkout() dan PublicCheckout()
+	return map[string]interface{}{
+		"data": resultMap,
+	}, nil
 }
 
 // POST /api/public/checkout

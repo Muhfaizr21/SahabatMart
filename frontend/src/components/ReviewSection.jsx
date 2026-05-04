@@ -148,7 +148,7 @@ export default function ReviewSection({ productID }) {
                             {r.buyer?.profile?.full_name?.charAt(0) || "U"}
                          </div>
                          <div>
-                             <div className="font-black text-gray-900 group-hover:text-blue-600 transition-colors uppercase text-sm tracking-tight">{r.buyer?.profile?.full_name || "User AkuGrow"}</div>
+                             <div className="font-black text-gray-900 group-hover:text-blue-600 transition-colors uppercase text-sm tracking-tight">{r.buyer?.profile?.full_name || "User AkuGlow"}</div>
                              <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5">
                                  <i className="bx bxs-check-circle text-green-500"></i> Verified Purchase • {new Date(r.created_at).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })}
                              </div>

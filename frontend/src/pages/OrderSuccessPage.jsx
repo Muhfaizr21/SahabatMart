@@ -29,7 +29,7 @@ export default function OrderSuccessPage() {
 
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Pesanan Berhasil!</h1>
           <p className="text-gray-500 mb-6">
-            Terima kasih telah berbelanja di AkuGrow. Pesanan kamu dengan nomor 
+            Terima kasih telah berbelanja di AkuGlow. Pesanan kamu dengan nomor 
             <span className="font-bold text-gray-800"> {order.order_number} </span> 
             sedang kami proses.
           </p>
@@ -47,15 +47,31 @@ export default function OrderSuccessPage() {
                 </div>
               </div>
 
-              {order.expired_at && (
-                <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-100 text-red-600">
-                  <span className="material-symbols-outlined text-sm">schedule</span>
-                  <p className="text-[11px] font-bold">
-                    Bayar sebelum: {new Date(order.expired_at).toLocaleString('id-ID', {
-                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                    })} WIB
-                  </p>
-                </div>
+              {(() => {
+                const expiry = payment.expired_time ? new Date(payment.expired_time * 1000) : (order.expired_at ? new Date(order.expired_at) : null);
+                if (!expiry) return null;
+                return (
+                  <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-100 text-red-600">
+                    <span className="material-symbols-outlined text-sm">schedule</span>
+                    <p className="text-[11px] font-bold">
+                      Bayar sebelum: {expiry.toLocaleString('id-ID', {
+                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                      })} WIB
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Pay URL for E-Wallets / Redirects */}
+              {payment.pay_url && (
+                <a 
+                  href={payment.pay_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block w-full bg-blue-500 hover:bg-blue-600 text-white text-center font-bold py-3 rounded-xl mb-4 transition-all"
+                >
+                  Bayar Sekarang (Buka Aplikasi)
+                </a>
               )}
 
               {/* QRIS Display */}

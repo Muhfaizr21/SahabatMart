@@ -172,7 +172,7 @@ const AffiliateLayout = () => {
     navigate('/login');
   };
 
-  const affiliateRefCode = user.affiliate_ref_code || user.affiliate?.ref_code || 'AG-REF';
+  const affiliateRefCode = user.affiliate_ref_code || user.affiliate?.ref_code || 'AGL-REF';
   const tierName = user.affiliate?.membership_tier?.name || 'Mitra Dasar';
   const displayName = user.profile?.full_name || user.email || 'Affiliate';
   const initial = displayName.charAt(0).toUpperCase();
@@ -182,17 +182,10 @@ const AffiliateLayout = () => {
       {/* Logo */}
       <div className={`px-6 py-8 flex items-center ${(!sidebarOpen && !isMobile) ? 'justify-center' : 'justify-between'} sticky top-0 bg-[#151b2d] z-10 whitespace-nowrap overflow-hidden transition-all duration-300`}>
         {(sidebarOpen || isMobile) ? (
-          <div>
-            <span className="text-xl font-extrabold tracking-[0.15em] text-white font-['Plus_Jakarta_Sans']">
-              AKU<span className="text-purple-400">GROW</span>
-            </span>
-            <p className="text-[9px] text-slate-500 font-bold tracking-[0.25em] uppercase mt-1">
-              Affiliate Portal
-            </p>
-          </div>
+          <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain" />
         ) : (
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0">
-            <span className="text-white font-black text-xs">AG</span>
+             <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />
           </div>
         )}
         {!isMobile && (

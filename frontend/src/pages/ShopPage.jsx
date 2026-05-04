@@ -35,6 +35,8 @@ export default function ShopPage() {
   const [priceRange, setPriceRange] = useState(0);
   const [viewMode, setViewMode] = useState('grid');
   const [liked, setLiked] = useState({});
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [minRating, setMinRating] = useState(0);
   const [allProducts, setAllProducts] = useState([]);
   const [allCategories, setAllCategories] = useState(['Semua']);
   const [loading, setLoading] = useState(true);
@@ -62,8 +64,9 @@ export default function ShopPage() {
       const categoryListData = Array.isArray(c) ? c : (c.data || []);
       
       setAllProducts(productListData);
-      const cats = ['Semua', ...categoryListData.map(cat => cat.name)];
-      setAllCategories(cats);
+      const categoriesFromProducts = Array.from(new Set(productListData.map(p => p.category).filter(Boolean)));
+      const uniqueCats = Array.from(new Set([...categoryListData.map(cat => cat.name), ...categoriesFromProducts])).sort();
+      setAllCategories(['Semua', ...uniqueCats]);
     }).catch(() => {
       setAllProducts([]);
       setAllCategories(['Semua']);
@@ -122,6 +125,7 @@ export default function ShopPage() {
         body: JSON.stringify({
           product_id: product.id,
           product_variant_id: variantId,
+          merchant_id: product.merchant_id || '00000000-0000-0000-0000-000000000000',
           quantity: 1
         })
       });
@@ -147,8 +151,17 @@ export default function ShopPage() {
     const price = p.price || 0;
     const range = priceRanges[priceRange];
     if (price < range.min || price > range.max) return false;
+
+    // Rating Filter Sync
+    if (minRating > 0 && (p.rating || 0) < minRating) return false;
+
+    // Brand Filter Sync
+    if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand)) return false;
+
     return true;
   });
+
+  const allBrands = Array.from(new Set(allProducts.map(p => p.brand).filter(b => b && b.trim() !== ""))).sort();
 
   if (sortBy === 'Harga Terendah') filtered = [...filtered].sort((a, b) => a.price - b.price);
   else if (sortBy === 'Harga Tertinggi') filtered = [...filtered].sort((a, b) => b.price - a.price);
@@ -163,7 +176,7 @@ export default function ShopPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeCategory, sortBy, priceRange, searchParam]);
+  }, [activeCategory, sortBy, priceRange, searchParam, selectedBrands, minRating]);
 
   const handleLocalSearch = (val) => {
     setSearchTerm(val);
@@ -191,7 +204,7 @@ export default function ShopPage() {
               <span className="text-white">Katalog Produk</span>
             </nav>
             <h1 className="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-              Toko <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">AkuGrow</span>
+              Toko <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">AkuGlow</span>
             </h1>
             <p className="text-gray-400 text-sm md:text-base max-w-lg leading-relaxed font-medium">
               Temukan koleksi produk kecantikan premium terbaik yang dikurasi khusus untuk kesehatan dan kemilau kulit Anda.
@@ -259,33 +272,98 @@ export default function ShopPage() {
               </div>
             </div>
 
+            {/* Category Filter (Sidebar Sync) */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+              <h3 className="font-bold text-gray-900 mb-4">Kategori</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                {allCategories.map(cat => (
+                  <label key={cat} className="flex items-center gap-3 cursor-pointer group">
+                    <div className="relative flex items-center justify-center">
+                      <input 
+                        type="radio" 
+                        name="category_filter"
+                        checked={activeCategory === cat}
+                        onChange={() => setActiveCategory(cat)}
+                        className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded-full checked:border-blue-600 transition-all"
+                      />
+                      <div className="absolute w-2.5 h-2.5 bg-blue-600 rounded-full scale-0 peer-checked:scale-100 transition-transform"></div>
+                    </div>
+                    <span className={`text-sm transition-colors ${activeCategory === cat ? 'text-blue-700 font-bold' : 'text-gray-600 group-hover:text-gray-900 font-medium'}`}>
+                      {cat}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {/* Rating Filter */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
               <h3 className="font-bold text-gray-900 mb-4">Rating</h3>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {[5,4,3,2,1].map(r => (
                   <label key={r} className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" className="accent-blue-600 w-4 h-4" />
+                    <div className="relative flex items-center justify-center">
+                      <input 
+                        type="radio" 
+                        name="rating_filter"
+                        checked={minRating === r}
+                        onChange={() => setMinRating(prev => prev === r ? 0 : r)}
+                        className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded-full checked:border-blue-600 transition-all"
+                      />
+                      <div className="absolute w-2.5 h-2.5 bg-blue-600 rounded-full scale-0 peer-checked:scale-100 transition-transform"></div>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <StarRating rating={r} />
-                      <span className="text-xs text-gray-500">& ke atas</span>
+                      <span className={`text-xs transition-colors ${minRating === r ? 'text-blue-700 font-bold' : 'text-gray-500 font-medium group-hover:text-gray-900'}`}>
+                        {r === 5 ? 'Hanya Bintang 5' : `Bintang ${r} & ke atas`}
+                      </span>
                     </div>
                   </label>
                 ))}
+                {minRating > 0 && (
+                  <button 
+                    onClick={() => setMinRating(0)}
+                    className="text-[10px] text-red-500 font-bold hover:underline mt-2 ml-8"
+                  >
+                    Reset Rating
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Brands */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
               <h3 className="font-bold text-gray-900 mb-4">Brand</h3>
-              <div className="space-y-2">
-                {['Wardah', 'Somethinc', 'Avoskin', 'Scarlett', 'BIOAQUA'].map(brand => (
-                  <label key={brand} className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" className="accent-blue-600 w-4 h-4" />
-                    <span className="text-sm text-gray-600 group-hover:text-gray-900">{brand}</span>
-                  </label>
-                ))}
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                {allBrands.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">Tidak ada brand tersedia</p>
+                ) : (
+                  allBrands.map(brand => (
+                    <label key={brand} className="flex items-center gap-3 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        className="accent-blue-600 w-4 h-4 rounded" 
+                        checked={selectedBrands.includes(brand)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedBrands(prev => [...prev, brand]);
+                          else setSelectedBrands(prev => prev.filter(b => b !== brand));
+                        }}
+                      />
+                      <span className={`text-sm transition-colors ${selectedBrands.includes(brand) ? 'text-blue-700 font-bold' : 'text-gray-600 group-hover:text-gray-900 font-medium'}`}>
+                        {brand}
+                      </span>
+                    </label>
+                  ))
+                )}
               </div>
+              {selectedBrands.length > 0 && (
+                <button 
+                  onClick={() => setSelectedBrands([])}
+                  className="text-[10px] text-red-500 font-bold hover:underline mt-4"
+                >
+                  Reset Brand
+                </button>
+              )}
             </div>
           </aside>
 
@@ -426,7 +504,7 @@ export default function ShopPage() {
                         <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] text-blue-600 font-black">
                              {product.store_name?.charAt(0) || "A"}
                         </div>
-                        <span className="text-[11px] font-bold text-gray-400 group-hover/store:text-blue-600 transition-colors truncate">{product.store_name || "AkuGrow Official"}</span>
+                        <span className="text-[11px] font-bold text-gray-400 group-hover/store:text-blue-600 transition-colors truncate">{product.store_name || "AkuGlow Official"}</span>
                       </div>
 
                       {/* Price & Buy Section */}
@@ -491,7 +569,7 @@ export default function ShopPage() {
                         <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 font-black">
                           {product.store_name?.charAt(0) || "A"}
                         </div>
-                        <span className="text-xs font-bold text-gray-400">{product.store_name || "AkuGrow Official"}</span>
+                        <span className="text-xs font-bold text-gray-400">{product.store_name || "AkuGlow Official"}</span>
                       </div>
 
                       <div className="mt-auto flex items-center justify-between pt-6 border-t border-gray-50">

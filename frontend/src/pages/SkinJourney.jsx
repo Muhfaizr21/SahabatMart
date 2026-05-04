@@ -3,9 +3,8 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE, fetchJson } from '../lib/api';
 
-// ── AI Skin Analyzer (client-side simulation + backend call) ──────────────
+// ── AI Skin Analyzer ──────────────────────────────────────────────────────
 async function analyzePhotoWithAI(file) {
-  // Kirim foto ke backend endpoint AI analyzer
   const formData = new FormData();
   formData.append('photo', file);
   const token = localStorage.getItem('token');
@@ -14,8 +13,12 @@ async function analyzePhotoWithAI(file) {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
-  if (!res.ok) throw new Error('Analisis gagal');
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.message || json?.error || 'Analisis gagal');
+  }
+  // Unwrap backend response wrapper {status, data} -> data
+  return json?.data ?? json;
 }
 
 export default function SkinJourney() {
@@ -41,7 +44,15 @@ export default function SkinJourney() {
 
   const loadData = async () => {
     try {
-      const res = await fetchJson(`${API_BASE}/api/skin/journey`);
+      const params = new URLSearchParams(window.location.search);
+      const tokenParam = params.get('token');
+      
+      let url = `${API_BASE}/api/skin/journey`;
+      if (tokenParam) {
+        url = `${API_BASE}/api/skin/journey?token=${tokenParam}`;
+      }
+
+      const res = await fetchJson(url);
       setData(res);
     } catch (err) {
       if (err.message.includes('404') || err.message.includes('Pre-test not found')) {
@@ -56,6 +67,18 @@ export default function SkinJourney() {
       setLoading(false);
     }
   };
+
+  // Derived State for Synchronization
+  const currentWeekNumber = (() => {
+    if (!data?.pretest?.created_at) return null;
+    const createdAt = new Date(data.pretest.created_at);
+    if (isNaN(createdAt.getTime()) || createdAt.getFullYear() < 2000) return null;
+    const daysSince = Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24));
+    return Math.min(52, Math.max(1, Math.floor(daysSince / 7) + 1));
+  })();
+
+  const alreadyUploadedThisWeek = currentWeekNumber != null &&
+    data?.progress_logs?.some(p => p.week_number === currentWeekNumber);
 
   useEffect(() => { loadData(); }, []);
 
@@ -78,6 +101,11 @@ export default function SkinJourney() {
     }
   };
   const saveProgress = async () => {
+    if (alreadyUploadedThisWeek) {
+      toast.error(`Kamu sudah upload progres minggu ke-${currentWeekNumber}! Tunggu minggu depan ya 💪`);
+      return;
+    }
+
     try {
       const res = await fetchJson(`${API_BASE}/api/skin/progress`, {
         method: 'POST',
@@ -87,7 +115,7 @@ export default function SkinJourney() {
       setShowTracker(false);
       loadData();
     } catch (err) {
-      toast.error('Gagal menyimpan progres.');
+      toast.error(err.message || 'Gagal menyimpan progres.');
     }
   };
 
@@ -103,26 +131,18 @@ export default function SkinJourney() {
   const handleAnalyze = async () => {
     if (!photoFile) return;
     setAnalyzing(true);
+    setAiResult(null);
     try {
       const result = await analyzePhotoWithAI(photoFile);
       setAiResult(result);
-      // Juga update tracker form dengan skor dari AI
+      // Sync skor dari AI ke tracker form
       if (result.skin_score) {
         setTrackerForm(f => ({ ...f, skin_score: result.skin_score }));
       }
-      toast.success('Analisis AI selesai!');
+      toast.success(result.is_mock ? 'Analisis selesai (Mode Demo)' : '🤖 Analisis AI selesai!');
     } catch (err) {
-      // Fallback: tampilkan analisis simulasi jika backend belum siap
-      const mockResult = {
-        skin_score: Math.floor(Math.random() * 4) + 5,
-        redness: Math.floor(Math.random() * 40) + 10,
-        acne_count: Math.floor(Math.random() * 8),
-        moisture: Math.floor(Math.random() * 30) + 40,
-        summary: 'Kulit terdeteksi dalam kondisi sedang. Pertahankan rutinitas perawatan dan konsumsi air yang cukup.',
-        recommendations: ['Gunakan moisturizer 2x sehari', 'Hindari produk berbahan alkohol tinggi', 'Perbanyak konsumsi vitamin C'],
-      };
-      setAiResult(mockResult);
-      toast('Analisis AI (mode demo)', { icon: '🤖' });
+      toast.error(err.message || 'Gagal menganalisis foto. Periksa koneksi.');
+      console.error('AI analyze error:', err);
     } finally {
       setAnalyzing(false);
     }
@@ -141,11 +161,13 @@ export default function SkinJourney() {
 
   if (loading) return <div style={{ textAlign: 'center', padding: '100px' }}>Menyiapkan Journey-mu...</div>;
 
+
   const currentAffirmation = data?.affirmations?.[data.day_count % data.affirmations.length] || data?.affirmations?.[0];
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + '/skin/journey?token=' + data?.pretest?.barcode_token)}`;
 
   return (
     <div style={STYLES.container}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       {/* Header & Barcode Toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div>
@@ -257,14 +279,51 @@ export default function SkinJourney() {
                 disabled={analyzing}
                 style={{ width: '100%', padding: '16px', borderRadius: '16px', border: 'none', background: analyzing ? '#94a3b8' : 'linear-gradient(135deg, #ff4d6d, #ff8fa3)', color: 'white', fontWeight: '700', fontSize: '16px', cursor: analyzing ? 'not-allowed' : 'pointer' }}
               >
-                {analyzing ? '⏳ Menganalisis...' : '🔍 Analisis dengan AI'}
+                {analyzing ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', border: '2px solid #fff', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+                    AI sedang menganalisis kulitmu...
+                  </span>
+                ) : '🔍 Analisis dengan AI'}
               </button>
             )}
 
             {/* AI Result */}
             {aiResult && (
               <div style={{ marginTop: '20px', background: '#f8fafc', borderRadius: '20px', padding: '24px' }}>
-                <h5 style={{ margin: '0 0 16px', color: '#1e293b', fontSize: '15px' }}>✨ Hasil Analisis AI</h5>
+                {/* Header + Provider badge */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                  <h5 style={{ margin: 0, color: '#1e293b', fontSize: '15px' }}>✨ Hasil Analisis AI</h5>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {aiResult.is_mock && (
+                      <span style={{ background: '#fef3c7', color: '#92400e', padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 800, border: '1px solid #fde68a' }}>DEMO MODE</span>
+                    )}
+                    {!aiResult.is_mock && (
+                      <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 800, border: '1px solid #bbf7d0' }}>🤖 {aiResult.ai_provider || 'openai'}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Skin Type + Tone Pills */}
+                {(aiResult.skin_type || aiResult.skin_tone) && (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                    {aiResult.skin_type && (
+                      <span style={{ background: '#ede9fe', color: '#5b21b6', padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                        Tipe: {aiResult.skin_type}
+                      </span>
+                    )}
+                    {aiResult.skin_tone && (
+                      <span style={{ background: '#fce7f3', color: '#9d174d', padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                        Warna: {aiResult.skin_tone}
+                      </span>
+                    )}
+                    {aiResult.primary_concern && (
+                      <span style={{ background: '#fee2e2', color: '#991b1b', padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                        ⚠️ {aiResult.primary_concern}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Metric Bars */}
                 {[
@@ -293,17 +352,35 @@ export default function SkinJourney() {
                 </div>
 
                 {/* Summary */}
-                <div style={{ background: 'white', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'white', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Ringkasan Kondisi</p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: 1.7 }}>{aiResult.summary}</p>
                 </div>
 
+                {/* Positive Notes */}
+                {aiResult.positive_notes && (
+                  <div style={{ background: '#f0fdf4', borderRadius: '12px', padding: '14px', marginBottom: '12px', border: '1px solid #bbf7d0' }}>
+                    <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>💚 Yang Positif dari Kulitmu</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#166534', lineHeight: 1.7 }}>{aiResult.positive_notes}</p>
+                  </div>
+                )}
+
+                {/* Healing Message */}
+                {aiResult.healing_message && (
+                  <div style={{ background: 'linear-gradient(135deg,#fdf2f8,#fce7f3)', borderRadius: '14px', padding: '16px', marginBottom: '16px', border: '1px solid #fbcfe8', textAlign: 'center' }}>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#831843', fontStyle: 'italic', fontWeight: 600, lineHeight: 1.7 }}>
+                      "💕 {aiResult.healing_message}"
+                    </p>
+                  </div>
+                )}
+
                 {/* Recommendations */}
                 {aiResult.recommendations?.length > 0 && (
-                  <div>
-                    <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Rekomendasi</p>
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Rekomendasi Perawatan</p>
                     {aiResult.recommendations.map((r, i) => (
-                      <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <span style={{ color: '#22c55e', fontWeight: '800', flexShrink: 0 }}>✓</span>
+                      <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '8px', background: 'white', padding: '10px 12px', borderRadius: 10, border: '1px solid #f1f5f9' }}>
+                        <span style={{ color: '#22c55e', fontWeight: '800', flexShrink: 0, marginTop: 1 }}>✓</span>
                         <span style={{ fontSize: '13px', color: '#475569' }}>{r}</span>
                       </div>
                     ))}
@@ -331,22 +408,43 @@ export default function SkinJourney() {
           </div>
         )}
 
-        {/* Grafik Progress */}
-        {data?.progress?.length > 0 && (
-          <div style={{ marginTop: '25px' }}>
-            <p style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '15px' }}>Grafik Perubahan</p>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '100px' }}>
-              {data.progress.map((p, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ height: `${p.skin_score * 10}%`, background: 'linear-gradient(180deg, #ff4d6d, #fda4af)', borderRadius: '4px', position: 'relative' }} title={`Skor: ${p.skin_score}`}>
-                    <span style={{ position: 'absolute', top: '-18px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', fontWeight: '700' }}>{p.skin_score}</span>
-                  </div>
-                  <div style={{ textAlign: 'center', fontSize: '10px', color: '#94a3b8' }}>W{p.week_number}</div>
-                </div>
-              ))}
+        {/* Grafik Progress - Synchronized Timeline */}
+        {(() => {
+          const weeksToShow = Math.max(currentWeekNumber || 0, (data?.progress_logs?.length || 0));
+          if (weeksToShow === 0) return null;
+
+          return (
+            <div style={{ marginTop: '25px' }}>
+              <p style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '15px' }}>Grafik Perubahan (W1 - W{weeksToShow})</p>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '100px' }}>
+                {Array.from({ length: weeksToShow }, (_, i) => {
+                  const wNum = i + 1;
+                  const log = data?.progress_logs?.find(p => Math.max(1, p.week_number) === wNum);
+                  const isCurrent = wNum === currentWeekNumber;
+
+                  return (
+                    <div key={wNum} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div 
+                        style={{ 
+                          height: log ? `${log.skin_score * 10}%` : '4px', 
+                          background: log 
+                            ? (isCurrent ? 'linear-gradient(180deg, #ff4d6d, #fb7185)' : 'linear-gradient(180deg, #94a3b8, #cbd5e1)') 
+                            : '#f1f5f9', 
+                          borderRadius: '4px', 
+                          position: 'relative' 
+                        }} 
+                        title={log ? `Minggu ${wNum}: Skor ${log.skin_score}` : `Minggu ${wNum}: Belum ada data`}
+                      >
+                        {log && <span style={{ position: 'absolute', top: '-18px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', fontWeight: '800', color: isCurrent ? '#ff4d6d' : '#64748b' }}>{log.skin_score}</span>}
+                      </div>
+                      <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: isCurrent ? '800' : '500', color: isCurrent ? '#ff4d6d' : '#94a3b8' }}>W{wNum}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
 

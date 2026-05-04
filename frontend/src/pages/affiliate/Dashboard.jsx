@@ -173,7 +173,7 @@ export default function AffiliateDashboard() {
             Halo, <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{user?.profile?.full_name || 'Mitra'}!</span>
             <span className="ml-3 text-[10px] bg-white/10 px-2 py-1 rounded text-white/50">VERSION ULTIMATE 1.0</span>
           </h1>
-          <p className="text-slate-400 mt-1 text-sm">Selamat datang di Pusat Kendali Mitra SahabatMart.</p>
+          <p className="text-slate-400 mt-1 text-sm">Selamat datang di Pusat Kendali Mitra AkuGlow.</p>
         </div>
 
         <div className="flex p-1 bg-slate-800/40 backdrop-blur-md rounded-2xl border border-white/5 w-fit">

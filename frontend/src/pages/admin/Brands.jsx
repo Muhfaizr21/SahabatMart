@@ -50,7 +50,7 @@ export default function AdminBrands() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Brand Portfolio" subtitle="Kelola daftar merk produk yang beredar di platform SahabatMart.">
+      <PageHeader title="Brand Portfolio" subtitle="Kelola daftar merk produk yang beredar di platform AkuGlow.">
         <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY })}>
           <i className="bx bx-plus" /> Tambah Brand
         </button>

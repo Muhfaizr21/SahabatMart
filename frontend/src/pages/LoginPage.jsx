@@ -111,7 +111,7 @@ export default function LoginPage() {
               ))}
               <div className="w-10 h-10 rounded-full border-2 border-blue-600 bg-blue-500 flex items-center justify-center text-xs font-bold text-white">9k+</div>
             </div>
-            <p className="text-xs text-blue-200 font-medium mt-3">Pelanggan setia AkuGrow</p>
+            <p className="text-xs text-blue-200 font-medium mt-3">Pelanggan setia AkuGlow</p>
           </div>
         </div>
 

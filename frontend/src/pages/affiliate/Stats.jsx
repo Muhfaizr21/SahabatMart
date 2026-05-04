@@ -62,7 +62,7 @@ export default function StatusMitra() {
           Status Mitra &amp; Omset Tim
         </h1>
         <p className="text-slate-400 mt-1 text-sm">
-          Pantau progres tim untuk naik level menjadi Merchant Akuglow.
+          Pantau progres tim untuk naik level menjadi Merchant AkuGlow.
         </p>
       </div>
 
@@ -184,7 +184,7 @@ export default function StatusMitra() {
             <div>
               <h3 className="text-lg font-black text-white font-['Plus_Jakarta_Sans']">Ajukan Upgrade ke Merchant</h3>
               <p className="text-slate-400 text-xs mt-1">
-                Pengajuan akan ditinjau tim Akuglow dalam 3–5 hari kerja.
+                Pengajuan akan ditinjau tim AkuGlow dalam 3–5 hari kerja.
               </p>
             </div>
             <div>

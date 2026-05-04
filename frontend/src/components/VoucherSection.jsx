@@ -43,7 +43,7 @@ export default function VoucherSection() {
                 Penawaran Terbatas
              </div>
              <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-none tracking-tight">Klaim <span className="text-blue-600">Kupon</span> Belanja Hari Ini!</h2>
-             <p className="text-gray-500 mt-4 text-lg font-medium">Jangan lewatkan potongan harga spesial khusus untuk pelanggan setia AkuGrow.</p>
+             <p className="text-gray-500 mt-4 text-lg font-medium">Jangan lewatkan potongan harga spesial khusus untuk pelanggan setia AkuGlow.</p>
           </div>
           <Link to="/coupons" className="group flex items-center gap-2 text-blue-600 font-bold hover:underline">
             Lihat Semua Kupon
@@ -72,7 +72,7 @@ export default function VoucherSection() {
                  </div>
 
                  <p className="text-gray-500 text-sm font-medium mb-8 line-clamp-2">
-                    {v.description || `Gunakan kode untuk belanja lebih hemat di AkuGrow.`}
+                    {v.description || `Gunakan kode untuk belanja lebih hemat di AkuGlow.`}
                  </p>
 
                  <div className="mt-auto w-full">

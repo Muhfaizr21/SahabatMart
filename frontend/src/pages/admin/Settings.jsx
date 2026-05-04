@@ -4,7 +4,7 @@ import { API_BASE, AUTH_API_BASE, ADMIN_API_BASE, fetchJson } from '../../lib/ap
 const API = ADMIN_API_BASE;
 
 const DEFAULT_CONFIGS = [
-  { key: 'platform_name',           value: 'AkuGrow',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
+  { key: 'platform_name',           value: 'AkuGlow',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
   { key: 'platform_maintenance',    value: 'false',            description: 'Mode Pemeliharaan',           group: 'platform',  type: 'bool' },
   { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
   { key: 'default_platform_fee',    value: '5',                description: 'Fee Layanan Merchant (Platform Fee) (%)',   group: 'platform',  type: 'number' },
@@ -31,6 +31,12 @@ const DEFAULT_CONFIGS = [
   { key: 'notif_smtp_port',         value: '587',              description: 'SMTP Port',                  group: 'notification', type: 'number' },
   { key: 'notif_smtp_user',         value: '',                 description: 'SMTP Username/Email',        group: 'notification', type: 'text' },
   { key: 'notif_smtp_pass',         value: '',                 description: 'SMTP Password',              group: 'notification', type: 'secret' },
+  // Skin AI Analyzer
+  { key: 'skin_ai_enabled',         value: 'false',            description: 'Aktifkan AI Skin Analyzer',  group: 'skin_ai',   type: 'bool' },
+  { key: 'skin_ai_openai_key',      value: '',                 description: 'OpenAI API Key',             group: 'skin_ai',   type: 'secret' },
+  { key: 'skin_ai_model',           value: 'gpt-4o',           description: 'Model AI yang digunakan',    group: 'skin_ai',   type: 'select', options: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'] },
+  { key: 'skin_ai_prompt',          value: '',                 description: 'Prompt Kustom (opsional, kosong = default)', group: 'skin_ai', type: 'textarea' },
+  { key: 'skin_journey_day25_voucher', value: 'AKUGLOW25',     description: 'Kode Voucher Reward Hari ke-25', group: 'skin_ai', type: 'text' },
 ];
 
 const GROUP_META = {
@@ -38,6 +44,7 @@ const GROUP_META = {
   payout:       { icon: 'bx-wallet',      label: 'Payout',        color: '#f59e0b' },
   payment:      { icon: 'bx-credit-card', label: 'Pembayaran',    color: '#10b981' },
   notification: { icon: 'bx-bell',        label: 'Notifikasi',    color: '#8b5cf6' },
+  skin_ai:      { icon: 'bx-brain',       label: 'AI Skin Analyzer', color: '#f43f5e' },
   security:     { icon: 'bx-lock-alt',    label: 'Keamanan',      color: '#ef4444' },
 };
 
@@ -127,6 +134,18 @@ export default function AdminSettings() {
         <input style={S.input} type="password" value={val} placeholder={`Masukkan ${cfg.description}...`}
           onChange={e => handleChange(cfg.key, e.target.value)}
           onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+      );
+    }
+    if (cfg.type === 'textarea') {
+      return (
+        <textarea
+          style={{ ...S.input, height: 120, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+          value={val}
+          placeholder={`Masukkan ${cfg.description}...`}
+          onChange={e => handleChange(cfg.key, e.target.value)}
+          onFocus={e => e.target.style.borderColor = '#818cf8'}
+          onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+        />
       );
     }
     return (
@@ -261,7 +280,18 @@ export default function AdminSettings() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: activeGroup === 'skin_ai' ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
+                  {activeGroup === 'skin_ai' && (
+                    <div style={{ padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,#fff1f2,#ffe4e6)', border: '1px solid #fecdd3', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <i className="bx bx-brain" style={{ fontSize: 22, color: '#f43f5e' }} />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: '#be123c' }}>AI Skin Analyzer (OpenAI Vision)</div>
+                          <div style={{ fontSize: 12, color: '#9f1239', marginTop: 2 }}>Masukkan API Key OpenAI dan aktifkan fitur untuk mulai menganalisis foto kulit pengguna secara real-time.</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {filtered.map(cfg => (
                     <div key={cfg.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <label style={S.label}>{cfg.description}</label>

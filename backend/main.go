@@ -66,6 +66,22 @@ func ConnectDB() {
 	DB.Exec("ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_cart_id_product_variant_id_key")
 	DB.Exec("DROP INDEX IF EXISTS idx_cart_items_cart_id_product_variant_id_key")
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_composite_v2 ON cart_items (cart_id, product_variant_id, merchant_id, COALESCE(metadata, ''))")
+	
+	// [Akuglow Rebranding] Auto-update platform strings in DB
+	DB.Model(&models.PlatformConfig{}).Where("key = ?", "platform_name").Update("value", "AkuGlow")
+	DB.Model(&models.PlatformConfig{}).Where("value LIKE ?", "%AkuGlow%").
+		Update("value", gorm.Expr("REPLACE(value, 'AkuGlow', 'AkuGlow')"))
+	DB.Model(&models.Merchant{}).Where("store_name LIKE ?", "%AkuGlow%").
+		Update("store_name", gorm.Expr("REPLACE(store_name, 'AkuGlow', 'AkuGlow')"))
+    DB.Model(&models.User{}).Where("email LIKE ?", "%akugrow.com%").
+		Update("email", gorm.Expr("REPLACE(email, 'akugrow.com', 'akuglow.com')"))
+		
+	// [Akuglow Rebranding] Auto-fix vouchers with zero expiry date to make them visible
+	DB.Model(&models.Voucher{}).Where("(status = ? OR status = ?) AND (expiry_date < ? OR expiry_date IS NULL)", "active", "expired", time.Now()).
+		Updates(map[string]interface{}{
+			"status":      "active",
+			"expiry_date": time.Now().Add(2160 * time.Hour), // Fix to 90 days from now
+		})
 
 	// Seed Sample Education for testing
 	var count int64
@@ -170,8 +186,8 @@ func autoSeedCriticalData(db *gorm.DB) {
 		}
 	}
 
-	// [Auto-Fix] Pastikan admin@akugrow.com selalu ACTIVE
-	db.Model(&models.User{}).Where("email = ?", "admin@akugrow.com").Update("status", "active")
+	// [Auto-Fix] Pastikan admin@akuglow.com selalu ACTIVE
+	db.Model(&models.User{}).Where("email = ?", "admin@akuglow.com").Update("status", "active")
 
 	// [Logistics] Seed default couriers if empty
 	var logCount int64

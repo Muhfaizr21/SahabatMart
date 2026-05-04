@@ -254,17 +254,15 @@ const AdminLayout = () => {
           borderBottom: `1px solid ${C.border}`,
           display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
         }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />
-          </div>
-          {!collapsed && (
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>AkuGrow</div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin Portal</div>
+          {!collapsed ? (
+            <img src="/akuglow.jpg" alt="AkuGlow" style={{ height: 36, width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          ) : (
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />
             </div>
           )}
         </div>

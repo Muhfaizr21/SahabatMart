@@ -210,7 +210,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 
 	// 1. Super Admin (Linked to Pusat for Stock Management)
 	admin := models.User{
-		ID: AdminID, Email: "admin@akugrow.com", PasswordHash: &pwHash, Role: "superadmin", Status: "active",
+		ID: AdminID, Email: "admin@akuglow.com", PasswordHash: &pwHash, Role: "superadmin", Status: "active",
 	}
 	db.Create(&admin)
 	db.Create(&models.UserProfile{UserID: admin.ID, FullName: "Super Admin (Pusat)"})
@@ -219,7 +219,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	pusatMerch := models.Merchant{
 		ID: PusatID, 
 		UserID: admin.ID, 
-		StoreName: "Gudang Pusat SahabatMart", 
+		StoreName: "Gudang Pusat AkuGlow", 
 		Slug: "pusat", 
 		Status: "active", 
 		IsVerified: true,
@@ -256,7 +256,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	})
 
 	// 2. Pusat Staff (Secondary access to same warehouse)
-	pusatUser := models.User{ID: uuid.New().String(), Email: "pusat@akugrow.com", PasswordHash: &pwHash, Role: "merchant", Status: "active"}
+	pusatUser := models.User{ID: uuid.New().String(), Email: "pusat@akuglow.com", PasswordHash: &pwHash, Role: "merchant", Status: "active"}
 	db.Create(&pusatUser)
 	db.Create(&models.UserProfile{UserID: pusatUser.ID, FullName: "Staf Gudang Pusat"})
 	
@@ -264,9 +264,9 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 
 	// Merchants (Distributors)
 	merchantLocs := []struct{ name, email, slug, city string }{
-		{"AkuGrow Jakarta Distro", "jakarta@akugrow.com", "jakarta-distro", "Jakarta Pusat"},
-		{"Surabaya Beauty Hub", "surabaya@akugrow.com", "surabaya-beauty", "Surabaya"},
-		{"Medan Glow Center", "medan@akugrow.com", "medan-glow", "Medan"},
+		{"AkuGlow Jakarta Distro", "jakarta@akuglow.com", "jakarta-distro", "Jakarta Pusat"},
+		{"Surabaya Beauty Hub", "surabaya@akuglow.com", "surabaya-beauty", "Surabaya"},
+		{"Medan Glow Center", "medan@akuglow.com", "medan-glow", "Medan"},
 	}
 
 	var mList []models.Merchant
@@ -408,11 +408,11 @@ func seedMarketing(db *gorm.DB) {
 	}
 
 	vouchers := []models.Voucher{
-		{Code: "RAMADANGLOW", Title: "Berkah Ramadan", DiscountType: "fixed", DiscountValue: 25000, MinOrder: 150000, Quota: 1000, Status: "active"},
-		{Code: "AKUGROWMEDAN", Title: "Grand Opening Medan", DiscountType: "percent", DiscountValue: 15, MinOrder: 200000, Quota: 500, Status: "active"},
+		{Code: "RAMADANGLOW", Title: "Berkah Ramadan", Description: "Diskon spesial di bulan suci untuk member AkuGlow.", DiscountType: "fixed", DiscountValue: 25000, MinOrder: 150000, Quota: 1000, Status: "active", ExpiryDate: time.Now().Add(720 * time.Hour), BgColor: "bg-emerald-600"},
+		{Code: "AKUGLOWMEDAN", Title: "Grand Opening Medan", Description: "Spesial untuk pembukaan cabang Medan Glow Center.", DiscountType: "percent", DiscountValue: 15, MinOrder: 200000, Quota: 500, Status: "active", ExpiryDate: time.Now().Add(1440 * time.Hour), BgColor: "bg-blue-600"},
 	}
 	for _, v := range vouchers {
-		db.Create(&v)
+		db.FirstOrCreate(&v, models.Voucher{Code: v.Code})
 	}
 
 	// [Akuglow] Seed Affiliate Materials
@@ -428,13 +428,13 @@ func seedMarketing(db *gorm.DB) {
 	}
 
 	events := []models.AffiliateEvent{
-		{Title: "Webinar: Rahasia Omset 10 JT/Bulan", Description: "Live coaching bersama CEO AkuGrow.", Type: "online", Location: "Zoom Meeting", StartTime: time.Now().Add(48 * time.Hour), EndTime: time.Now().Add(50 * time.Hour), Status: "upcoming", IsActive: true},
+		{Title: "Webinar: Rahasia Omset 10 JT/Bulan", Description: "Live coaching bersama CEO AkuGlow.", Type: "online", Location: "Zoom Meeting", StartTime: time.Now().Add(48 * time.Hour), EndTime: time.Now().Add(50 * time.Hour), Status: "upcoming", IsActive: true},
 		{Title: "Kopdar Akbar Jakarta", Description: "Temu kangen dan sharing session offline.", Type: "offline", Location: "Kuningan City, Jakarta", StartTime: time.Now().Add(168 * time.Hour), EndTime: time.Now().Add(172 * time.Hour), Status: "upcoming", IsActive: true},
 	}
 	for _, ev := range events { db.Create(&ev) }
 
 	promos := []models.PromoMaterial{
-		{Title: "Story Instagram: Brightening Series", Type: "image", Category: "Instagram", FileURL: "https://images.unsplash.com/photo-1590156221122-c746e753e50b?w=800", Caption: "Glow up bareng AkuGrow! 💎", IsActive: true},
+		{Title: "Story Instagram: Brightening Series", Type: "image", Category: "Instagram", FileURL: "https://images.unsplash.com/photo-1590156221122-c746e753e50b?w=800", Caption: "Glow up bareng AkuGlow! 💎", IsActive: true},
 		{Title: "Banner Facebook: Open Mitra", Type: "image", Category: "Facebook", FileURL: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800", Caption: "Join komunitas kecantikan terbesar!", IsActive: true},
 	}
 	for _, p := range promos { db.Create(&p) }
@@ -459,9 +459,9 @@ func seedRBAC(db *gorm.DB) {
 func SeedConfigs(db *gorm.DB) {
 	fmt.Println("  -> Seeding Platform Configs...")
 	configs := []models.PlatformConfig{
-		{Key: "platform_name", Value: "SahabatMart", Description: "Nama Platform"},
+		{Key: "platform_name", Value: "AkuGlow", Description: "Nama Platform"},
 		{Key: "platform_maintenance", Value: "false", Description: "Mode Pemeliharaan"},
-		{Key: "platform_maint_msg", Value: "Maaf, SahabatMart sedang dalam pemeliharaan rutin.", Description: "Pesan Maintenance"},
+		{Key: "platform_maint_msg", Value: "Maaf, AkuGlow sedang dalam pemeliharaan rutin.", Description: "Pesan Maintenance"},
 		{Key: "default_platform_fee", Value: "0.05", Description: "Fee Platform Default (%)"},
 		{Key: "platform_currency", Value: "IDR", Description: "Mata Uang"},
 		{Key: "platform_min_order", Value: "10000", Description: "Minimum Order (Rp)"},
@@ -477,10 +477,26 @@ func SeedConfigs(db *gorm.DB) {
 		{Key: "payment_tripay_url", Value: "https://tripay.co.id/api-sandbox", Description: "Tripay Base URL"},
 		{Key: "payment_sandbox_mode", Value: "true", Description: "Payment Sandbox Mode"},
 		{Key: "notif_email_enabled", Value: "true", Description: "Email Notifikasi Aktif"},
+		{Key: "notif_smtp_host", Value: "smtp.gmail.com", Description: "SMTP Host"},
 		{Key: "notif_smtp_port", Value: "587", Description: "SMTP Port"},
+		{Key: "notif_smtp_user", Value: "", Description: "SMTP User"},
+		{Key: "notif_smtp_pass", Value: "", Description: "SMTP Password"},
+		{Key: "notif_smtp_from", Value: "no-reply@akuglow.id", Description: "SMTP From Email"},
+		// Skin AI Analyzer (Configurable by Super Admin)
+		{Key: "skin_ai_enabled", Value: "true", Description: "Aktifkan AI Skin Analyzer (true/false)"},
+		{Key: "skin_ai_openai_key", Value: "", Description: "OpenAI API Key untuk Skin Analyzer"},
+		{Key: "skin_ai_tracking_id", Value: "key_7qb7uOIVQSpsB4C5", Description: "Tracking ID untuk monitoring AI"},
+		{Key: "skin_ai_model", Value: "gpt-4o", Description: "Model AI yang digunakan (gpt-4o / gpt-4o-mini)"},
+		{Key: "skin_ai_prompt", Value: "", Description: "Prompt khusus AI Skin Analyzer (kosong = gunakan default)"},
+		{Key: "skin_journey_day25_voucher", Value: "AKUGLOW25", Description: "Kode Voucher Reward Hari ke-25"},
+		{Key: "skin_journey_affirmations", Value: "", Description: "Affirmasi custom (JSON array, kosong = default)"},
 	}
 
 	for _, c := range configs {
-		db.Where("key = ?", c.Key).FirstOrCreate(&c)
+		var count int64
+		db.Model(&models.PlatformConfig{}).Where("key = ?", c.Key).Count(&count)
+		if count == 0 {
+			db.Create(&c)
+		}
 	}
 }

@@ -144,6 +144,88 @@ func (ac *AdminController) GetUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /api/admin/users/downlines?user_id=...
+func (ac *AdminController) GetUserDownlines(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "User ID is required")
+		return
+	}
+
+	// Get Affiliate Member ID for this user
+	var aff models.AffiliateMember
+	if err := ac.DB.Where("user_id = ?", userID).First(&aff).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User is not an affiliate member")
+		return
+	}
+
+	// Recursive fetch downlines
+	tree := ac.fetchDownlineTree(aff.ID, 1, 10) // Max 10 levels
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data":   tree,
+	})
+}
+
+func (ac *AdminController) fetchDownlineTree(uplineID string, currentLevel, maxLevel int) []map[string]interface{} {
+	if currentLevel > maxLevel {
+		return nil
+	}
+
+	type DownlineData struct {
+		ID        string    `json:"id"`
+		UserID    string    `json:"user_id"`
+		RefCode   string    `json:"ref_code"`
+		Status    string    `json:"status"`
+		FullName  string    `json:"full_name"`
+		Email     string    `json:"email"`
+		Avatar    *string   `json:"avatar_url"`
+		JoinedAt  time.Time `json:"joined_at"`
+		TierName  string    `json:"tier_name"`
+		Earnings  float64   `json:"total_earned"`
+	}
+	var downlines []DownlineData
+
+	ac.DB.Raw(`
+		SELECT am.id, am.user_id, am.ref_code, am.status, up.full_name, u.email, up.avatar_url, am.created_at as joined_at, mt.name as tier_name, am.total_earned as earnings
+		FROM affiliate_members am
+		JOIN users u ON u.id = am.user_id
+		JOIN user_profiles up ON up.user_id = u.id
+		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
+		WHERE am.upline_id = ?
+	`, uplineID).Scan(&downlines)
+
+	result := []map[string]interface{}{}
+	for _, d := range downlines {
+		node := map[string]interface{}{
+			"id":           d.ID,
+			"user_id":      d.UserID,
+			"ref_code":     d.RefCode,
+			"status":       d.Status,
+			"full_name":    d.FullName,
+			"email":        d.Email,
+			"avatar_url":   d.Avatar,
+			"joined_at":    d.JoinedAt,
+			"tier_name":    d.TierName,
+			"total_earned": d.Earnings,
+			"level":        currentLevel,
+		}
+
+		children := ac.fetchDownlineTree(d.ID, currentLevel+1, maxLevel)
+		if children != nil {
+			node["downlines"] = children
+			node["downline_count"] = len(children)
+		} else {
+			node["downline_count"] = 0
+		}
+		result = append(result, node)
+	}
+
+	return result
+}
+
+
 // PUT /api/admin/users/update
 func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -311,7 +393,7 @@ func (ac *AdminController) UpdateMerchantStatus(w http.ResponseWriter, r *http.R
 				return err
 			}
 			// Notifikasi ke user
-			msg := fmt.Sprintf("Selamat! Permohonan Merchant Anda untuk '%s' telah disetujui. Anda kini adalah Mitra + Merchant SahabatMart. 🎉", merchant.StoreName)
+			msg := fmt.Sprintf("Selamat! Permohonan Merchant Anda untuk '%s' telah disetujui. Anda kini adalah Mitra + Merchant AkuGlow. 🎉", merchant.StoreName)
 			ac.Notif.Push(merchant.UserID, "merchant", "merchant_approved", "Merchant Anda Aktif! 🏪", msg, "/merchant")
 		} else if req.Status == "suspended" {
 			msg := fmt.Sprintf("Maaf, status Merchant '%s' Anda ditangguhkan sementara. Alasan: %s", merchant.StoreName, req.SuspendNote)
@@ -575,7 +657,7 @@ func (ac *AdminController) GetAllOrders(w http.ResponseWriter, r *http.Request) 
 	query.Count(&total)
 
 	var orders []OrderRow
-	query.Select("o.id, o.id as order_id, o.order_number, o.order_type, omg.merchant_id, COALESCE(m.store_name, 'SahabatMart Pusat') as store_name, COALESCE(up.full_name, u.email, 'Pembeli Umum') as buyer_name, COALESCE(u.email, 'Guest') as buyer_email, o.status as payment_status, omg.status as shipping_status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
+	query.Select("o.id, o.id as order_id, o.order_number, o.order_type, omg.merchant_id, COALESCE(m.store_name, 'AkuGlow Pusat') as store_name, COALESCE(up.full_name, u.email, 'Pembeli Umum') as buyer_name, COALESCE(u.email, 'Guest') as buyer_email, o.status as payment_status, omg.status as shipping_status, omg.subtotal, (omg.subtotal + omg.shipping_cost - omg.discount) as total_amount, omg.tracking_number, omg.courier_code, omg.created_at").
 		Order("omg.created_at DESC").
 		Limit(limit).
 		Offset(offset).
@@ -2632,7 +2714,7 @@ func (ac *AdminController) GetAuditLogs(w http.ResponseWriter, r *http.Request) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC STOREFRONT APIs (SahabatMart Sync)
+// PUBLIC STOREFRONT APIs (AkuGlow Sync)
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Request) {
@@ -2913,6 +2995,20 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 	var product models.Product
 	err := ac.DB.Preload("Variants").Preload("Inventories").
 		Where("id = ? OR slug = ?", id, id).First(&product).Error
+	
+	if err == nil {
+		// Calculate real sold count
+		var totalSold int64
+		ac.DB.Table("order_items").
+			Joins("JOIN orders ON orders.id = order_items.order_id").
+			Where("order_items.product_id = ? AND orders.status = ?", product.ID, models.OrderCompleted).
+			Select("COALESCE(SUM(order_items.quantity), 0)").
+			Scan(&totalSold)
+		
+		// If real sold is 0, maybe we want a base offset to look better, but the user asked for sync.
+		// Let's provide the real count. If the user wants a fake offset, they can add it later.
+		product.SoldCount = totalSold
+	}
 
 	if err != nil {
 		utils.JSONResponse(w, http.StatusNotFound, map[string]interface{}{"message": "Product not found"})

@@ -113,10 +113,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-8">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-            <CartIcon />
-          </div>
-          <span className="text-2xl font-black text-gray-900 tracking-tight">AkuGrow</span>
+          <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain" />
         </Link>
 
         {/* Search Bar - Activated */}
@@ -220,7 +217,7 @@ export default function Navbar() {
 
           <div className="ml-auto hidden xl:flex items-center gap-2 text-sm">
             <span className="text-gray-400">Butuh bantuan?</span>
-            <span className="font-black text-gray-900 italic">AkuGrow Care</span>
+            <span className="font-black text-gray-900 italic">AkuGlow Care</span>
           </div>
         </div>
       </div>

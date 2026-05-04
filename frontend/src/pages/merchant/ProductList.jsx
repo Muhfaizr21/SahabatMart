@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
+import { fetchJson, MERCHANT_API_BASE, PUBLIC_API_BASE, formatImage } from '../../lib/api';
 import { PageHeader, TablePanel, A, idr, statusBadge } from '../../lib/adminStyles.jsx';
 
 export default function MerchantInventory() {
@@ -23,8 +23,9 @@ export default function MerchantInventory() {
 
   const loadCategories = async () => {
     try {
-      const data = await fetchJson('/api/public/categories');
-      setCategories(data || []);
+      const data = await fetchJson(`${PUBLIC_API_BASE}/categories`);
+      // API returns { data: [...] }
+      setCategories(data.data || data || []);
     } catch (err) { console.error('Failed to load categories'); }
   };
 
@@ -134,7 +135,7 @@ export default function MerchantInventory() {
                     </td>
                     <td style={A.td}>
                       <span style={{ background: '#eef2ff', color: '#4f46e5', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>
-                        {p.category_name || 'General'}
+                        {p.category || 'General'}
                       </span>
                     </td>
                     <td style={{ ...A.td, fontWeight: 800, color: '#0f172a' }}>

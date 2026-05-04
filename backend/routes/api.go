@@ -303,6 +303,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/users/update", can("manage_users")(adminCtrl.UpdateUser))
 	mux.HandleFunc("/api/admin/users/delete", can("manage_users")(adminCtrl.DeleteUser))
 	mux.HandleFunc("/api/admin/users/reset-password", adminOnly(adminCtrl.ResetUserPassword))
+	mux.HandleFunc("/api/admin/users/downlines", can("manage_users")(adminCtrl.GetUserDownlines))
 
 	// Merchant Management
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))

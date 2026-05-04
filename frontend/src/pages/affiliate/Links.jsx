@@ -31,7 +31,7 @@ export default function AffiliateLinks() {
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
 
-  const refCode = user?.affiliate_ref_code || 'AG-REF';
+  const refCode = user?.affiliate_ref_code || 'AGL-REF';
 
   const fetchLinks = useCallback(async () => {
     setLoading(true);
@@ -148,7 +148,7 @@ export default function AffiliateLinks() {
               <div>
                 <span className="material-symbols-outlined text-purple-400 mb-2">home</span>
                 <h4 className="text-white font-bold text-sm">Link Utama Website</h4>
-                <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda SahabatMart.</p>
+                <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda AkuGlow.</p>
               </div>
               <button 
                 onClick={() => copyURL(`${window.location.origin}?ref=${refCode}`)}

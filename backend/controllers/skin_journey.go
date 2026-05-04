@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -13,18 +15,29 @@ import (
 )
 
 type SkinController struct {
-	DB *gorm.DB
+	DB      *gorm.DB
+	SkinAI  *services.SkinAIService
+	Storage *services.StorageService
 }
 
 func NewSkinController(db *gorm.DB) *SkinController {
-	return &SkinController{DB: db}
+	baseURL := os.Getenv("APP_URL")
+	if baseURL == "" {
+		baseURL = os.Getenv("BASE_URL")
+	}
+	return &SkinController{
+		DB:      db,
+		SkinAI:  services.NewSkinAIService(db),
+		Storage: services.NewStorageService(baseURL, "uploads/skin"),
+	}
 }
 
 // SubmitPreTest - Simpan hasil pre-test (Awal Journey)
 func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) {
 	var pretest models.SkinPreTest
 	if err := json.NewDecoder(r.Body).Decode(&pretest); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid input")
+		log.Printf("⚠️ [SkinJourney] PostPreTest decode error: %v", err)
+		utils.JSONError(w, http.StatusBadRequest, "Invalid input: "+err.Error())
 		return
 	}
 
@@ -38,6 +51,11 @@ func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) 
 	pretest.UserID = userID
 	pretest.CreatedAt = time.Now()
 
+	// Generate Barcode Token if missing
+	if pretest.BarcodeToken == "" {
+		pretest.BarcodeToken = fmt.Sprintf("AKU-%s-%d", userID[:8], time.Now().Unix())
+	}
+
 	if err := sc.DB.Save(&pretest).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Failed to save pretest")
 		return
@@ -48,9 +66,25 @@ func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) 
 // GetJourneyData - Ambil semua data journey user
 func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value("user_id").(string)
+	tokenParam := r.URL.Query().Get("token")
+
+	var pretest models.SkinPreTest
+	if tokenParam != "" {
+		if err := sc.DB.Where("barcode_token = ?", tokenParam).First(&pretest).Error; err == nil {
+			userID = pretest.UserID
+		}
+	}
+
 	if userID == "" {
 		claims, _ := utils.ParseJWT(r.Header.Get("Authorization"))
-		if claims != nil { userID = claims.UserID }
+		if claims != nil {
+			userID = claims.UserID
+		}
+	}
+
+	if userID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
 	}
 
 	var results struct {
@@ -64,10 +98,29 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		Voucher      string                  `json:"voucher,omitempty"`
 	}
 
-	sc.DB.Where("user_id = ?", userID).First(&results.PreTest)
+	if pretest.ID != 0 {
+		results.PreTest = pretest
+	} else {
+		sc.DB.Where("user_id = ?", userID).Limit(1).Find(&results.PreTest)
+	}
+	
+	// Auto-generate barcode if missing for existing user
+	if results.PreTest.ID != 0 && results.PreTest.BarcodeToken == "" {
+		results.PreTest.BarcodeToken = fmt.Sprintf("AKU-%s-%d", userID[:8], time.Now().Unix())
+		sc.DB.Model(&results.PreTest).Update("barcode_token", results.PreTest.BarcodeToken)
+	}
+
 	sc.DB.Where("user_id = ?", userID).Order("week_number desc").Find(&results.ProgressLogs)
+	
+	// Sanitize ProgressLogs (Fix W0 issue in old data)
+	for i := range results.ProgressLogs {
+		if results.ProgressLogs[i].WeekNumber < 1 {
+			results.ProgressLogs[i].WeekNumber = 1
+		}
+	}
+
 	sc.DB.Where("user_id = ?", userID).Order("created_at desc").Find(&results.Journals)
-	sc.DB.Where("user_id = ?", userID).First(&results.WarriorLevel)
+	sc.DB.Where("user_id = ?", userID).Limit(1).Find(&results.WarriorLevel)
 	sc.DB.Order("day_target asc").Find(&results.Education)
 
 	// Hitung hari
@@ -98,7 +151,8 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 func (sc *SkinController) PostDailyJournal(w http.ResponseWriter, r *http.Request) {
 	var journal models.SkinJournal
 	if err := json.NewDecoder(r.Body).Decode(&journal); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid input")
+		log.Printf("⚠️ [SkinJourney] PostDailyJournal decode error: %v", err)
+		utils.JSONError(w, http.StatusBadRequest, "Invalid input: "+err.Error())
 		return
 	}
 	userID, _ := r.Context().Value("user_id").(string)
@@ -110,36 +164,58 @@ func (sc *SkinController) PostDailyJournal(w http.ResponseWriter, r *http.Reques
 	utils.JSONResponse(w, http.StatusCreated, journal)
 }
 
-// PostWeeklyProgress - Catat progres mingguan (dengan foto & AI Analysis)
+// PostWeeklyProgress - Catat progres mingguan dengan auto week_number & weekly lock
 func (sc *SkinController) PostWeeklyProgress(w http.ResponseWriter, r *http.Request) {
 	var progress models.SkinProgress
 	if err := json.NewDecoder(r.Body).Decode(&progress); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Invalid input")
+		log.Printf("⚠️ [SkinJourney] PostWeeklyProgress decode error: %v", err)
+		utils.JSONError(w, http.StatusBadRequest, "Invalid input: "+err.Error())
 		return
 	}
 	userID, _ := r.Context().Value("user_id").(string)
 	progress.UserID = userID
-	
-	// AI ANALYZER MOCK LOGIC
-	// Dalam produksi, ini akan memanggil API Vision (Google/OpenAI)
-	progress.RednessScore = 15 + (10 - progress.SkinScore)*5 // Simulasi: SkinScore tinggi = Redness rendah
-	progress.AcneCount = 5 + (10 - progress.SkinScore)*2   // Simulasi: SkinScore tinggi = Jerawat sedikit
-	
+
+	// Auto-hitung week_number berdasarkan tanggal pre-test
+	var pretest models.SkinPreTest
+	if err := sc.DB.Where("user_id = ?", userID).First(&pretest).Error; err == nil {
+		daysSinceStart := int(time.Since(pretest.CreatedAt).Hours() / 24)
+		progress.WeekNumber = (daysSinceStart / 7) + 1
+	} else {
+		// Fallback: lanjut dari log terakhir
+		var lastLog models.SkinProgress
+		sc.DB.Where("user_id = ?", userID).Order("week_number desc").First(&lastLog)
+		progress.WeekNumber = lastLog.WeekNumber + 1
+		if progress.WeekNumber < 1 { progress.WeekNumber = 1 }
+	}
+
+	// Cek: sudah upload minggu ini? (weekly lock)
+	var existingThisWeek models.SkinProgress
+	err := sc.DB.Where("user_id = ? AND week_number = ?", userID, progress.WeekNumber).First(&existingThisWeek).Error
+	if err == nil {
+		utils.JSONError(w, http.StatusConflict, fmt.Sprintf(
+			"Kamu sudah upload progres minggu ke-%d! Tunggu minggu depan ya 💪",
+			progress.WeekNumber,
+		))
+		return
+	}
+
 	if err := sc.DB.Create(&progress).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Failed to save progress")
 		return
 	}
 
-	message := fmt.Sprintf("Analisis AI Selesai: Kemerahan %.1f%%, Jerawat Terdeteksi: %d", float64(progress.RednessScore), progress.AcneCount)
+	message := fmt.Sprintf("Progres Minggu ke-%d berhasil disimpan! Skor Kulit: %d/10 💖", progress.WeekNumber, progress.SkinScore)
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
-		"message": message,
-		"data":    progress,
+		"message":     message,
+		"week_number": progress.WeekNumber,
+		"data":        progress,
 	})
 }
 
 // AnalyzeSkinPhoto - AI Skin Analyzer dari upload foto langsung
 // Endpoint: POST /api/skin/analyze (multipart/form-data, field: "photo")
 func (sc *SkinController) AnalyzeSkinPhoto(w http.ResponseWriter, r *http.Request) {
+	log.Printf("📥 [SkinJourney] AnalyzeSkinPhoto called. Method: %s", r.Method)
 	if r.Method != http.MethodPost {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -147,7 +223,8 @@ func (sc *SkinController) AnalyzeSkinPhoto(w http.ResponseWriter, r *http.Reques
 
 	// Parse multipart form (max 10MB)
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Gagal membaca file (Max 10MB)")
+		log.Printf("⚠️ [SkinJourney] ParseMultipartForm error: %v", err)
+		utils.JSONError(w, http.StatusBadRequest, "Gagal membaca file (Max 10MB): "+err.Error())
 		return
 	}
 
@@ -158,67 +235,44 @@ func (sc *SkinController) AnalyzeSkinPhoto(w http.ResponseWriter, r *http.Reques
 	}
 	defer file.Close()
 
-	// Simpan sementara untuk analisis
-	tmpPath := fmt.Sprintf("/tmp/skin_analyze_%d_%s", time.Now().UnixNano(), handler.Filename)
-	dst, err := os.Create(tmpPath)
+	// Read image bytes
+	imageBytes, err := io.ReadAll(file)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan file sementara")
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membaca file gambar")
 		return
 	}
-	defer func() {
-		dst.Close()
-		os.Remove(tmpPath) // Hapus file temp setelah selesai
-	}()
-	io.Copy(dst, file)
 
-	// ── AI Analysis Logic ───────────────────────────────────
-	// Kalkulasi berbasis ukuran file & metadata sebagai proxy analisis
-	// (Dalam produksi: integrasikan Google Vision API / OpenAI Vision)
-	fileSize := handler.Size
-	now := time.Now()
+	_ = handler // suppress unused warning
 
-	// Seed deterministik dari file size + timestamp untuk variasi natural
-	seed := int(fileSize%100) + now.Second()
-	redness := 10 + (seed % 35)          // 10-44%
-	acneCount := seed % 8                 // 0-7 titik
-	moisture := 40 + ((seed * 3) % 40)   // 40-79%
-	skinScore := 10 - (redness / 10)     // Inverse dari redness
-	if skinScore < 3 { skinScore = 3 }
-	if skinScore > 9 { skinScore = 9 }
-
-	// Tentukan summary berdasarkan kondisi
-	summary := "Kulit dalam kondisi baik. Pertahankan rutinitas perawatan Anda."
-	if redness > 30 {
-		summary = "Terdeteksi kemerahan cukup tinggi. Kulit mungkin sedang dalam fase reaksi atau adaptasi produk baru."
-	} else if acneCount > 4 {
-		summary = "Terdeteksi beberapa titik jerawat aktif. Coba kurangi produk yang mengandung komedogenik tinggi."
-	} else if moisture < 50 {
-		summary = "Tingkat kelembapan kulit perlu diperhatikan. Perbanyak minum air dan gunakan moisturizer rutin."
+	// Save temp file for backward compat (jika ada fitur yg perlu disk path)
+	tmpPath := fmt.Sprintf("/tmp/skin_analyze_%d.jpg", time.Now().UnixNano())
+	if f, err := os.Create(tmpPath); err == nil {
+		f.Write(imageBytes)
+		f.Close()
+		defer os.Remove(tmpPath)
 	}
 
-	// Rekomendasi dinamis
-	recommendations := []string{}
-	if redness > 25 {
-		recommendations = append(recommendations, "Gunakan toner bebas alkohol untuk menenangkan kulit")
+	// ── Real AI Analysis via OpenAI Vision ────────────────────
+	result, err := sc.SkinAI.AnalyzeImageBytes(imageBytes)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menganalisis foto: "+err.Error())
+		return
 	}
-	if acneCount > 3 {
-		recommendations = append(recommendations, "Oleskan spot treatment dengan kandungan salicylic acid malam hari")
-	}
-	if moisture < 55 {
-		recommendations = append(recommendations, "Aplikasikan moisturizer 2x sehari (pagi & malam)")
-	}
-	recommendations = append(recommendations, "Gunakan sunscreen SPF 30+ setiap pagi")
-	recommendations = append(recommendations, "Konsumsi air minimal 2 liter per hari untuk hidrasi dari dalam")
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"skin_score":      skinScore,
-		"redness":         redness,
-		"acne_count":      acneCount,
-		"moisture":        moisture,
-		"summary":         summary,
-		"recommendations": recommendations,
-		"analyzed_at":     now.Format(time.RFC3339),
-	})
+	// Save file permanently to storage
+	file.Seek(0, 0) // Reset reader for Storage service
+	photoURL, err := sc.Storage.SaveImage(file, handler)
+	if err != nil {
+		log.Printf("⚠️ [SkinJourney] Failed to save photo to storage: %v", err)
+	}
+
+	// Attach URL to result
+	resultMap := make(map[string]interface{})
+	resBytes, _ := json.Marshal(result)
+	json.Unmarshal(resBytes, &resultMap)
+	resultMap["photo_url"] = photoURL
+
+	utils.JSONResponse(w, http.StatusOK, resultMap)
 }
 
 // --- COMMUNITY FEATURES ---

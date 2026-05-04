@@ -137,7 +137,7 @@ export default function OrderDetailPage() {
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                   </div>
-                  <h3 className="font-black text-gray-900 text-sm uppercase tracking-wide">{group.merchant?.merchant_name || 'Toko SahabatMart'}</h3>
+                  <h3 className="font-black text-gray-900 text-sm uppercase tracking-wide">{group.merchant?.merchant_name || 'Toko AkuGlow'}</h3>
                 </div>
                 <div className="p-8 space-y-6">
                   {group.items?.map((item, iidx) => (

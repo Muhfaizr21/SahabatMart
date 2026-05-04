@@ -175,7 +175,7 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 			if err == nil && s.Notif != nil {
 				s.Notif.Push(affiliate.UserID, "merchant", "merchant_promoted", 
 					"🎉 Selamat! Anda Menjadi Merchant", 
-					"Karena performa tim yang luar biasa, Anda otomatis dipromosikan menjadi Merchant SahabatMart.", 
+					"Karena performa tim yang luar biasa, Anda otomatis dipromosikan menjadi Merchant AkuGlow.", 
 					"/merchant")
 			}
 		}

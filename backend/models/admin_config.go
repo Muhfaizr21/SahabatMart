@@ -327,7 +327,7 @@ type Notification struct {
 }
 
 
-// BlogPost untuk CMS SahabatMart
+// BlogPost untuk CMS AkuGlow
 type BlogPost struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Title     string    `gorm:"type:varchar(255);not null" json:"title"`
@@ -386,6 +386,7 @@ type Product struct {
 	AverageRating float64 `gorm:"type:decimal(2,1);default:0" json:"average_rating"` // Satisfy legacy triggers
 	TotalReviews  int     `gorm:"default:0" json:"total_reviews"`               // Satisfy legacy triggers
 	Reviews     int       `gorm:"default:0" json:"reviews"`
+	SoldCount   int64     `gorm:"-" json:"sold"`
 	Badge       string    `gorm:"type:varchar(50)" json:"badge"`
 	BadgeClass  string    `gorm:"type:varchar(50)" json:"badge_class"`
 	Status      string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, taken_down, draft
@@ -435,6 +436,7 @@ type CartItem struct {
 
 	Product          Product        `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 	ProductVariant   ProductVariant `gorm:"foreignKey:ProductVariantID" json:"product_variant,omitempty"`
+	Merchant         *Merchant      `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 }
 
 // Banner untuk Hero Slider Home Page

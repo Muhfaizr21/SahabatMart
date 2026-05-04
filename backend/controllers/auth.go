@@ -242,7 +242,7 @@ func (ac *AuthController) ForgotPassword(w http.ResponseWriter, r *http.Request)
 	}
 
 	// In production, token is sent via email. 
-	// For SahabatMart, we return it in response for debugging/demonstration if needed, 
+	// For AkuGlow, we return it in response for debugging/demonstration if needed, 
 	// but ideally it should be hidden.
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Instruksi reset password telah dikirim ke email Anda",

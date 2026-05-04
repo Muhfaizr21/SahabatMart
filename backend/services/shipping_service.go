@@ -102,7 +102,14 @@ func (s *ShippingService) FetchCouriers() ([]map[string]interface{}, error) {
 // GetRates mendapatkan estimasi harga ongkir dari Biteship
 func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items []models.OrderItem, couriers string) ([]map[string]interface{}, error) {
 	if couriers == "" {
-		couriers = "jne,sicepat,jnt,anteraja,tiki,pos"
+		var activeCodes []string
+		s.DB.Model(&models.LogisticChannel{}).Where("is_active = ?", true).Pluck("code", &activeCodes)
+		if len(activeCodes) > 0 {
+			couriers = strings.ToLower(strings.Join(activeCodes, ","))
+		} else {
+			// Fallback jika tabel masih kosong
+			couriers = "jne,sicepat,jnt,anteraja,tiki,pos"
+		}
 	}
 	url := fmt.Sprintf("%s/v1/rates/couriers", s.BaseURL)
 

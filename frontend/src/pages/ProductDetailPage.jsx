@@ -75,10 +75,18 @@ export default function ProductDetailPage() {
             const currentUser = isAuthenticated() ? JSON.parse(localStorage.getItem('user')) : null;
             
             sortedSellers = [...sellersData].sort((a, b) => {
+              // 1. Prioritas Pusat (AkuGlow Asli/Gudang Pusat)
+              const isAPusat = a.merchant_id === '00000000-0000-0000-0000-000000000000' || (a.city && a.city.toLowerCase() === 'pusat') || a.store_name?.toLowerCase().includes('pusat');
+              const isBPusat = b.merchant_id === '00000000-0000-0000-0000-000000000000' || (b.city && b.city.toLowerCase() === 'pusat') || b.store_name?.toLowerCase().includes('pusat');
+              if (isAPusat && !isBPusat) return -1;
+              if (!isAPusat && isBPusat) return 1;
+
+              // 2. Prioritas Terdekat (City Match)
               const isANear = currentUser?.profile?.city && a.city && a.city.toLowerCase() === currentUser.profile.city.toLowerCase();
               const isBNear = currentUser?.profile?.city && b.city && b.city.toLowerCase() === currentUser.profile.city.toLowerCase();
               if (isANear && !isBNear) return -1;
               if (!isANear && isBNear) return 1;
+              
               return 0;
             });
 
@@ -267,7 +275,7 @@ export default function ProductDetailPage() {
                 <span className="text-[10px] text-gray-400 font-bold">({product.reviews || 0} Ulasan)</span>
               </div>
               <div className="w-px h-4 bg-gray-200"></div>
-              <span className="text-xs sm:text-sm font-bold text-gray-400">Sold {product.sold || '2.4k'}+</span>
+              <span className="text-xs sm:text-sm font-bold text-gray-400">Sold {(product.sold || 0).toLocaleString('id-ID')}+</span>
             </div>
 
             <div className="flex items-baseline gap-4 mb-2">
@@ -284,7 +292,7 @@ export default function ProductDetailPage() {
             </div>
             
             <div className="text-sm font-bold text-gray-400 mb-10 flex items-center gap-2">
-               <i className="bx bx-package"></i> Stock: {selectedVariant ? selectedVariant.stock : product.stock} pcs
+               <i className="bx bx-package"></i> Stock: {selectedMerchant ? selectedMerchant.stock : (selectedVariant ? selectedVariant.stock : product.stock)} pcs
             </div>
 
             {/* GLOBAL ATTRIBUTES SELECTOR (Dynamic from Super Admin) */}
@@ -356,6 +364,7 @@ export default function ProductDetailPage() {
                 <div className="flex flex-col gap-3">
                   {sellers.slice((merchantPage - 1) * 3, merchantPage * 3).map((s) => {
                     const isNear = user?.profile?.city && s.city && s.city.toLowerCase() === user.profile.city.toLowerCase();
+                    const isPusat = s.merchant_id === '00000000-0000-0000-0000-000000000000' || (s.city && s.city.toLowerCase() === 'pusat') || s.store_name?.toLowerCase().includes('pusat');
                     
                     return (
                       <button
@@ -367,11 +376,15 @@ export default function ProductDetailPage() {
                             : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
                         }`}
                       >
-                        {isNear && (
+                        {isPusat ? (
+                          <div className="absolute top-0 right-0">
+                             <div className="bg-gradient-to-l from-blue-600 to-blue-400 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl shadow-sm uppercase tracking-tighter">Official Pusat</div>
+                          </div>
+                        ) : isNear ? (
                           <div className="absolute top-0 right-0">
                              <div className="bg-gradient-to-l from-orange-500 to-amber-400 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl shadow-sm uppercase tracking-tighter">Terdekat</div>
                           </div>
-                        )}
+                        ) : null}
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white transition-colors ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-blue-600' : 'bg-gray-300'}`}>
                             {s.store_name.charAt(0)}

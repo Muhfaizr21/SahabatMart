@@ -21,6 +21,10 @@ export default function AdminUsers() {
   const [modal, setModal] = useState(null);
   const [newUserData, setNewUserData] = useState({ email: '', password: '', fullName: '', role: 'buyer' });
   const [saving, setSaving] = useState(false);
+  
+  const [downlines, setDownlines] = useState([]);
+  const [loadingDownlines, setLoadingDownlines] = useState(false);
+  const [activeUserForDownline, setActiveUserForDownline] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -92,6 +96,19 @@ export default function AdminUsers() {
       localStorage.setItem('user', JSON.stringify(res.user));
       window.location.href = res.user.role === 'merchant' ? '/merchant' : '/';
     }).catch(e => alert(e.message));
+  };
+
+  const viewDownlines = (user) => {
+    setActiveUserForDownline(user);
+    setLoadingDownlines(true);
+    fetchJson(`${API}/users/downlines?user_id=${user.id}`)
+      .then(res => {
+        // fetchJson automatically unwraps { status: 'success', data: [...] }
+        setDownlines(res || []);
+        setModal('downlines');
+      })
+      .catch(e => alert(e.message))
+      .finally(() => setLoadingDownlines(false));
   };
 
   const filterBar = (
@@ -243,6 +260,9 @@ export default function AdminUsers() {
                   <div style={{ fontSize: 13, color: '#64748b' }}>{fmtDate(u.created_at)}</div>
                 </td>
                 <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                  <button style={A.iconBtn('#ea580c', '#fff7ed')} onClick={() => viewDownlines(u)} title="Lihat Downline" disabled={loadingDownlines}>
+                    <i className="bx bx-git-branch" style={{ fontSize: 18 }} />
+                  </button>
                   <button style={A.iconBtn('#6366f1', '#f5f7ff')} onClick={() => setModal(u)} title="Manage User">
                     <i className="bx bx-slider-alt" style={{ fontSize: 18 }} />
                   </button>
@@ -441,6 +461,97 @@ export default function AdminUsers() {
           </div>
         </Modal>
       )}
+      {modal && modal === 'downlines' && (
+        <Modal title={`Jaringan Downline: ${activeUserForDownline?.profile?.full_name}`} onClose={() => setModal(null)} width={600}>
+          <div style={{ maxHeight: '70vh', overflowY: 'auto', padding: '10px 4px' }}>
+            {downlines.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                <i className="bx bx-info-circle" style={{ fontSize: 40, marginBottom: 12 }} />
+                <div style={{ fontWeight: 600 }}>User ini belum memiliki downline (Direct Referral)</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {downlines.map(node => (
+                  <DownlineTreeNode key={node.id} node={node} level={0} />
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 20, padding: '12px 16px', background: '#f8fafc', borderRadius: 14, fontSize: 12, color: '#64748b', border: '1px solid #f1f5f9' }}>
+            <i className="bx bx-info-circle" style={{ marginRight: 6, color: '#6366f1' }} />
+            Menampilkan hingga 10 tingkat kedalaman jaringan afiliasi secara komplit.
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
+
+const DownlineTreeNode = ({ node, level = 0 }) => {
+  const [expanded, setExpanded] = useState(level < 1);
+
+  return (
+    <div style={{ marginLeft: level > 0 ? 20 : 0, marginBottom: 4 }}>
+      <div style={{ 
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', 
+        background: level === 0 ? '#fff' : '#fcfcfd', 
+        borderRadius: 14, 
+        border: '1px solid',
+        borderColor: level === 0 ? '#e2e8f0' : '#f1f5f9',
+        boxShadow: level === 0 ? '0 2px 8px rgba(0,0,0,0.04)' : 'none'
+      }}>
+        <div style={{ 
+          width: 32, height: 32, borderRadius: 10, 
+          background: node.status === 'active' ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : '#e2e8f0', 
+          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+          fontWeight: 800, fontSize: 13, flexShrink: 0
+        }}>
+            {node.full_name?.charAt(0) || '?'}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {node.full_name}
+            </div>
+            <div style={{ fontSize: 10.5, color: '#94a3b8', display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ 
+                background: '#eef2ff', color: '#6366f1', padding: '1px 6px', borderRadius: 6, 
+                fontSize: 9, fontWeight: 900, textTransform: 'uppercase'
+              }}>
+                Lvl {node.level}
+              </span>
+              <span style={{ color: '#6366f1', fontWeight: 700 }}>{node.ref_code}</span>
+              <span>•</span>
+              <span>{node.tier_name || 'No Tier'}</span>
+            </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: 12, color: '#059669' }}>Rp{node.total_earned.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>{node.downline_count} Mitra</div>
+        </div>
+        {node.downlines && node.downlines.length > 0 && (
+          <button 
+            onClick={() => setExpanded(!expanded)} 
+            style={{ 
+              background: expanded ? '#eef2ff' : '#f8fafc', 
+              border: 'none', 
+              color: '#6366f1', 
+              cursor: 'pointer',
+              width: 28, height: 28, borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+          >
+            <i className={`bx ${expanded ? 'bx-chevron-up' : 'bx-chevron-down'}`} style={{ fontSize: 18 }} />
+          </button>
+        )}
+      </div>
+      {expanded && node.downlines && (
+        <div style={{ marginTop: 8, borderLeft: '2px dashed #e2e8f0', marginLeft: 15, paddingLeft: 10 }}>
+          {node.downlines.map(child => (
+            <DownlineTreeNode key={child.id} node={child} level={level + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

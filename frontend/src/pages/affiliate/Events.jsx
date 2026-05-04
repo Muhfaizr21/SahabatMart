@@ -59,7 +59,7 @@ export default function Events() {
   return (
     <div className="space-y-6">
       <div className="bg-slate-800/40 backdrop-blur-md p-8 rounded-3xl shadow-xl shadow-black/20 border border-white/5">
-        <h2 className="text-2xl font-black text-white mb-6 italic tracking-tight">Event Terdekat Akuglow</h2>
+        <h2 className="text-2xl font-black text-white mb-6 italic tracking-tight">Event Terdekat AkuGlow</h2>
         
         {events.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">

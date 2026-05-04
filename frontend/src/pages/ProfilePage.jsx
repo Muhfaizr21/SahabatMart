@@ -206,7 +206,7 @@ export default function ProfilePage() {
                   <i className={`bx ${uploadingAvatar ? 'bx-loader-alt animate-spin' : 'bx-camera'} text-white text-3xl`}></i>
                 </div>
               </div>
-              <h2 className="text-xl font-black text-gray-900 leading-tight mb-1">{profile.full_name || 'User AkuGrow'}</h2>
+              <h2 className="text-xl font-black text-gray-900 leading-tight mb-1">{profile.full_name || 'User AkuGlow'}</h2>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full mt-2 border border-yellow-200">
                  <i className="bx bxs-crown"></i> <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Member Aktif</span>
               </div>

@@ -67,7 +67,7 @@ export default function MarketingMaterials() {
       <div className="flex items-center gap-6 mb-12 relative z-10">
         <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-purple-500/20">📸</div>
         <div>
-          <h2 className="text-2xl font-black text-white leading-tight italic tracking-tighter">Materi Promosi AkuGrow</h2>
+          <h2 className="text-2xl font-black text-white leading-tight italic tracking-tighter">Materi Promosi AkuGlow</h2>
           <p className="text-slate-400 text-xs font-medium mt-1">Aset profesional untuk konversi tinggi.</p>
         </div>
       </div>

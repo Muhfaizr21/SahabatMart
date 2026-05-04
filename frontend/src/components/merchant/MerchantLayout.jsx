@@ -104,7 +104,7 @@ const MerchantLayout = () => {
     }
   };
 
-  // [SahabatMart] Allow both merchants and superadmins (for Pusat warehouse management)
+  // [AkuGlow] Allow both merchants and superadmins (for Pusat warehouse management)
   if (!user || (user.role !== 'merchant' && user.role !== 'superadmin')) {
     return <Navigate to="/login" replace />;
   }
@@ -131,17 +131,9 @@ const MerchantLayout = () => {
       
       {/* Sidebar Navigation */}
       <aside className={`h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-50 border-r border-slate-200/60 flex flex-col py-8 px-6 space-y-2 z-50 transition-all duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="mb-10 px-2 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-800 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                  <span className="material-symbols-outlined text-white">bolt</span>
-               </div>
-               <div>
-                  <span className="text-xl font-black bg-gradient-to-br from-violet-600 to-indigo-800 bg-clip-text text-transparent tracking-tight">AkuGrow</span>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mt-0.5">Mitra Elit</p>
-               </div>
-            </div>
-        </div>
+          <div className="mb-10 px-2 flex items-center justify-between">
+            <img src="/akuglow.jpg" alt="AkuGlow" className="h-12 w-auto object-contain" />
+          </div>
 
         <nav className="flex-1 space-y-1">
           {menuItems.map((item) => <SidebarLink key={item.path} item={item} />)}

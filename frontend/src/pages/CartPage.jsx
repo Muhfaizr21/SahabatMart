@@ -36,7 +36,7 @@ export default function CartPage() {
 
   useEffect(() => { loadCart(); }, [loadCart]);
 
-  const updateQty = async (id, variantId, productId, currentQty, delta) => {
+  const updateQty = async (id, variantId, productId, merchantId, currentQty, delta) => {
     const newQty = Math.max(1, currentQty + delta);
     if (newQty === currentQty) return;
 
@@ -49,6 +49,7 @@ export default function CartPage() {
         body: JSON.stringify({
           product_id: productId,
           product_variant_id: variantId,
+          merchant_id: merchantId,
           quantity: delta
         })
       });
@@ -140,13 +141,29 @@ export default function CartPage() {
                   <div className="col-span-2 text-center">Total</div>
                   <div className="col-span-1" />
                 </div>
-                {/* Items */}
+                
+                {/* Items Grouped by Merchant */}
                 <div className="divide-y divide-gray-100">
-                  {items.map(item => (
-                    <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-5 items-center">
-                      {/* Product */}
-                      <div className="md:col-span-5 flex items-center gap-4">
-                        <Link to={`/product/${item.product_id}`} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
+                  {Object.entries(
+                    items.reduce((acc, item) => {
+                      const mId = item.merchant_id || '00000000-0000-0000-0000-000000000000';
+                      const mName = item.merchant?.store_name || 'AkuGlow (Pusat)';
+                      if (!acc[mId]) acc[mId] = { name: mName, items: [] };
+                      acc[mId].items.push(item);
+                      return acc;
+                    }, {})
+                  ).map(([mId, group]) => (
+                    <div key={mId} className="border-b-4 border-gray-50 last:border-b-0">
+                      <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-blue-600 text-sm">storefront</span>
+                        <span className="font-bold text-gray-800 text-sm uppercase tracking-wide">{group.name}</span>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {group.items.map(item => (
+                          <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-5 items-center bg-white hover:bg-slate-50 transition-colors">
+                            {/* Product */}
+                            <div className="md:col-span-5 flex items-center gap-4">
+                              <Link to={`/product/${item.product_id}`} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
                           <img src={formatImage(item.product?.image)} alt={item.product?.name} className="w-full h-full object-cover" />
                         </Link>
                         <div>
@@ -166,9 +183,9 @@ export default function CartPage() {
                       {/* Qty */}
                       <div className="md:col-span-2 flex items-center justify-center">
                         <div className="flex items-center border-2 border-gray-100 rounded-xl overflow-hidden">
-                          <button onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.quantity, -1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-400 hover:bg-gray-50 transition-colors">-</button>
+                          <button onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.merchant_id, item.quantity, -1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-400 hover:bg-gray-50 transition-colors">-</button>
                           <span className="w-10 text-center text-sm font-black text-blue-700">{item.quantity}</span>
-                          <button onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.quantity, 1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-400 hover:bg-gray-50 transition-colors">+</button>
+                          <button onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.merchant_id, item.quantity, 1)} className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-400 hover:bg-gray-50 transition-colors">+</button>
                         </div>
                       </div>
                       {/* Total */}
@@ -185,6 +202,9 @@ export default function CartPage() {
                         </button>
                       </div>
                     </div>
+                  ))}
+                  </div>
+                  </div>
                   ))}
                 </div>
               </div>

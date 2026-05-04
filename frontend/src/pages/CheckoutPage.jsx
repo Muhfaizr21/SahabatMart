@@ -28,6 +28,7 @@ export default function CheckoutPage() {
   const [shippingRates, setShippingRates] = useState([]);
   const [shippingWarning, setShippingWarning] = useState("");
   const [loadingRates, setLoadingRates] = useState(false);
+  const [openGroups, setOpenGroups] = useState({ "Virtual Account": true });
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -61,9 +62,11 @@ export default function CheckoutPage() {
           fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels err:", e); return null; })
         ]);
 
-        if (channelsData && channelsData.data) {
-          // Backend sudah filter active=true — langsung map
-          const mapped = channelsData.data.map(c => ({
+        // [Fix] Handle unwrapped channels data from fetchJson
+        const channelsList = channelsData?.data || (Array.isArray(channelsData) ? channelsData : []);
+        
+        if (channelsList && channelsList.length > 0) {
+          const mapped = channelsList.map(c => ({
             id: c.code,
             label: c.name,
             icon: c.icon_url,
@@ -333,6 +336,12 @@ export default function CheckoutPage() {
       // Clear local cart
       setCart({ items: [] });
       
+      // [Sync Fix] Jika ada URL checkout dari Tripay, arahkan langsung ke sana
+      if (res.payment && res.payment.checkout_url) {
+        window.location.href = res.payment.checkout_url;
+        return;
+      }
+
       navigate('/order-success', { 
         state: { 
           order: res.order, 
@@ -600,32 +609,71 @@ export default function CheckoutPage() {
                       <div className="text-xs text-gray-400">Memuat metode pembayaran...</div>
                    </div>
                 ) : paymentMethods.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {paymentMethods.map(method => (
-                      <button
-                        key={method.id}
-                        type="button"
-                        onClick={() => setPaymentMethod(method.id)}
-                        className={`flex items-center gap-3 border-2 rounded-xl p-4 text-left transition-all relative overflow-hidden ${
-                          paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-300'
-                        }`}
-                      >
-                        {paymentMethod === method.id && (
-                          <div className="absolute top-0 right-0 bg-blue-500 text-white px-2 py-0.5 rounded-bl-lg text-[10px] font-bold">
-                            Terpilih
+                  <div className="space-y-4">
+                    {Object.entries(
+                      paymentMethods.reduce((acc, method) => {
+                        const group = method.desc || "Lainnya";
+                        if (!acc[group]) acc[group] = [];
+                        acc[group].push(method);
+                        return acc;
+                      }, {})
+                    ).map(([groupName, methods]) => (
+                      <div key={groupName} className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => setOpenGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                          className="w-full flex items-center justify-between px-5 py-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">
+                              {groupName.includes('Account') ? '🏦' : 
+                               groupName.includes('Wallet') ? '📱' : 
+                               groupName.includes('Retail') ? '🏪' : 
+                               groupName.includes('QR') ? '🤳' : '💳'}
+                            </span>
+                            <span className="font-bold text-gray-900">{groupName}</span>
+                          </div>
+                          <span className={`text-gray-400 transition-transform duration-300 ${openGroups[groupName] ? 'rotate-180' : ''}`}>
+                            ▼
+                          </span>
+                        </button>
+                        
+                        {openGroups[groupName] && (
+                          <div className="p-4 bg-white grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            {methods.map(method => {
+                              const feeFlat = method.fee_customer || 0;
+                              const feePercent = method.fee_customer_pct || 0;
+                              const totalPaymentFee = Math.round((total * (feePercent / 100)) + feeFlat);
+
+                              return (
+                                <button
+                                  key={method.id}
+                                  type="button"
+                                  onClick={() => setPaymentMethod(method.id)}
+                                  className={`flex items-center gap-3 border-2 rounded-xl p-4 text-left transition-all relative overflow-hidden ${
+                                    paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-300'
+                                  }`}
+                                >
+                                  {paymentMethod === method.id && (
+                                    <div className="absolute top-0 right-0 bg-blue-500 text-white px-2 py-0.5 rounded-bl-lg text-[10px] font-bold">
+                                      Terpilih
+                                    </div>
+                                  )}
+                                  <img src={method.icon} alt={method.label} className="w-10 h-10 object-contain bg-white rounded border border-gray-100 p-1" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-gray-800 text-sm truncate leading-tight">{method.label}</div>
+                                    {totalPaymentFee > 0 && (
+                                      <div className="text-[10px] font-bold text-orange-500 mt-1">
+                                        + Biaya: Rp{totalPaymentFee.toLocaleString('id-ID')}
+                                      </div>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
-                        <img src={method.icon} alt={method.label} className="w-12 h-12 object-contain bg-white rounded border border-gray-100 p-1" />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-800 text-sm truncate leading-tight">{method.label}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5">{method.desc}</div>
-                          {method.fee_customer > 0 && (
-                            <div className="text-[10px] font-bold text-orange-500 mt-1">
-                              + Biaya Layanan: Rp{method.fee_customer.toLocaleString('id-ID')}
-                            </div>
-                          )}
-                        </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -640,28 +688,44 @@ export default function CheckoutPage() {
             <div className="lg:w-80 flex-shrink-0">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24">
                 <h3 className="font-bold text-gray-900 text-lg mb-5">Ringkasan Pesanan</h3>
-                <div className="space-y-4 mb-5 max-h-60 overflow-y-auto pr-2">
-                  {cart.items?.map((item, i) => (
-                    <div key={i} className="flex gap-3">
-                      <div className="relative flex-shrink-0">
-                        {item.product?.image_url || item.product?.image ? (
-                          <img
-                            src={item.product?.image_url || item.product?.image}
-                            alt={item.product?.name}
-                            className="w-12 h-12 rounded-xl object-cover border border-gray-100"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 text-sm font-bold">
-                            {item.product?.name?.charAt(0) || '?'}
+                <div className="space-y-4 mb-5 max-h-[400px] overflow-y-auto pr-2">
+                  {Object.entries(
+                    (cart.items || []).reduce((acc, item) => {
+                      const mId = item.merchant_id || '00000000-0000-0000-0000-000000000000';
+                      const mName = item.merchant?.store_name || 'AkuGlow (Pusat)';
+                      if (!acc[mId]) acc[mId] = { name: mName, items: [] };
+                      acc[mId].items.push(item);
+                      return acc;
+                    }, {})
+                  ).map(([mId, group]) => (
+                    <div key={mId} className="space-y-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                      <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1">
+                         <span className="material-symbols-outlined text-[12px]">storefront</span>
+                         {group.name}
+                      </div>
+                      {group.items.map((item, i) => (
+                        <div key={i} className="flex gap-3">
+                          <div className="relative flex-shrink-0">
+                            {item.product?.image_url || item.product?.image ? (
+                              <img
+                                src={item.product?.image_url || item.product?.image}
+                                alt={item.product?.name}
+                                className="w-12 h-12 rounded-xl object-cover border border-gray-100"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 text-sm font-bold">
+                                {item.product?.name?.charAt(0) || '?'}
+                              </div>
+                            )}
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white">{item.quantity}</span>
                           </div>
-                        )}
-                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white">{item.quantity}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-gray-900 font-bold leading-tight line-clamp-1 truncate">{item.product?.name}</div>
-                        <div className="text-[10px] text-blue-600 font-medium leading-tight line-clamp-1">{item.product_variant?.name || 'Default Varian'}</div>
-                        <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id-ID')}</div>
-                      </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] text-gray-900 font-bold leading-tight line-clamp-1 truncate">{item.product?.name}</div>
+                            <div className="text-[10px] text-blue-600 font-medium leading-tight line-clamp-1">{item.product_variant?.name || 'Default Varian'}</div>
+                            <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id-ID')}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -712,15 +776,31 @@ export default function CheckoutPage() {
                       <span className="font-medium">-Rp{discount.toLocaleString('id-ID')}</span>
                     </div>
                   )}
-                  {paymentMethods.find(m => m.id === paymentMethod)?.fee_customer > 0 && (
-                    <div className="flex justify-between text-orange-600">
-                      <span>Biaya Layanan (Payment)</span>
-                      <span className="font-medium">Rp{paymentMethods.find(m => m.id === paymentMethod).fee_customer.toLocaleString('id-ID')}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const selectedMethod = paymentMethods.find(m => m.id === paymentMethod);
+                    const feeFlat = selectedMethod?.fee_customer || 0;
+                    const feePercent = selectedMethod?.fee_customer_pct || 0;
+                    const totalPaymentFee = Math.round((total * (feePercent / 100)) + feeFlat);
+                    
+                    if (totalPaymentFee > 0) {
+                      return (
+                        <div className="flex justify-between text-orange-600">
+                          <span>Biaya Layanan (Payment)</span>
+                          <span className="font-medium">Rp{totalPaymentFee.toLocaleString('id-ID')}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
                     <span>Total Tagihan</span>
-                    <span>Rp{(total + (paymentMethods.find(m => m.id === paymentMethod)?.fee_customer || 0)).toLocaleString('id-ID')}</span>
+                    <span>Rp{(() => {
+                      const selectedMethod = paymentMethods.find(m => m.id === paymentMethod);
+                      const feeFlat = selectedMethod?.fee_customer || 0;
+                      const feePercent = selectedMethod?.fee_customer_pct || 0;
+                      const totalPaymentFee = Math.round((total * (feePercent / 100)) + feeFlat);
+                      return (total + totalPaymentFee).toLocaleString('id-ID');
+                    })()}</span>
                   </div>
                 </div>
                 <button

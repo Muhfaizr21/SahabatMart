@@ -116,7 +116,7 @@ export default function RestockRequest() {
       {/* HEADER SECTION */}
       <div className="artisan-header">
          <div className="header-left">
-            <div className="breadcrumb">SahabatMart &bull; Merchant</div>
+            <div className="breadcrumb">AkuGlow &bull; Merchant</div>
             <h1>Ringkasan Stok</h1>
             <p className="subtitle">Kelola inventori toko Anda dengan sinkronisasi langsung dari pusat.</p>
          </div>

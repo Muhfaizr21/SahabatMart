@@ -72,7 +72,7 @@ export default function AdminBlogs() {
         subtitle="Write news, tips and lifestyle content for your customers"
       >
         <button 
-          onClick={() => { setFormData({ id: 0, title: '', summary: '', content: '', author: 'Admin SahabatMart', category: 'Update', image: '', status: 'published' }); setShowModal(true); }}
+          onClick={() => { setFormData({ id: 0, title: '', summary: '', content: '', author: 'Admin AkuGlow', category: 'Update', image: '', status: 'published' }); setShowModal(true); }}
           style={A.btnPrimary}
         >
           <i className="bx bx-plus-circle" /> Tulis Artikel Baru

@@ -673,7 +673,7 @@ func (s *OrderService) SyncOrderStatusFromGroups(tx *gorm.DB, orderID string) er
 					tx.Model(&models.UserProfile{}).Where("user_id = ?", *order.BuyerID).
 						UpdateColumn("reward_points", gorm.Expr("reward_points + ?", points))
 					
-					_ = s.Notification.Push(*order.BuyerID, "buyer", "reward_earned", "🎁 Poin SahabatMart!", 
+					_ = s.Notification.Push(*order.BuyerID, "buyer", "reward_earned", "🎁 Poin AkuGlow!", 
 						fmt.Sprintf("Selamat! Anda mendapatkan %d poin dari pesanan %s.", points, order.OrderNumber), "/profile?tab=points")
 				}
 			}

@@ -74,7 +74,7 @@ export default function WishlistPage() {
           </div>
        </div>
        <h2 className="text-xl font-bold text-slate-900 mb-2">Sinkronisasi Data...</h2>
-       <p className="text-slate-500 text-sm max-w-xs">Kami sedang menyiapkan daftar produk impian Anda dari server premium AkuGrow.</p>
+       <p className="text-slate-500 text-sm max-w-xs">Kami sedang menyiapkan daftar produk impian Anda dari server premium AkuGlow.</p>
     </main>
   );
 

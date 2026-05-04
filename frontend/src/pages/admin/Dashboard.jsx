@@ -170,7 +170,7 @@ export default function AdminDashboard() {
             Command Center
           </h1>
           <p style={{ fontSize: 14, color: '#64748b', fontWeight: 500, marginBottom: 0 }}>
-            Monitor and manage your entire SahabatMart ecosystem in real-time.
+            Monitor and manage your entire AkuGlow ecosystem in real-time.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>

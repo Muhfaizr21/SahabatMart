@@ -1,5 +1,5 @@
 /**
- * Utilitas Autentikasi SahabatMart
+ * Utilitas Autentikasi AkuGlow
  * Fokus: Keamanan, Kecepatan, dan Pencegahan Blank Screen
  */
 

@@ -94,7 +94,7 @@ const AdminLogistics = () => {
         <div style={A.page} className="fade-in">
             <PageHeader 
                 title="Courier Integration Center" 
-                subtitle="Kelola gateway ekspedisi dan partner pengiriman platform SahabatMart secara global."
+                subtitle="Kelola gateway ekspedisi dan partner pengiriman platform AkuGlow secara global."
             >
                 <button 
                     style={{ 
@@ -295,7 +295,7 @@ const AdminLogistics = () => {
                 <div>
                     <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 17, marginBottom: 6 }}>Administrative Notice: Global Logistics Impact</div>
                     <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6, maxWidth: 800 }}>
-                        Modifikasi pada status saluran logistik di panel ini akan mempengaruhi **seluruh ekosistem SahabatMart**. 
+                        Modifikasi pada status saluran logistik di panel ini akan mempengaruhi **seluruh ekosistem AkuGlow**. 
                         Merchant tidak akan dapat memilih kurir yang dinonaktifkan, dan opsi tersebut akan hilang dari halaman checkout pembeli secara instan.
                     </div>
                 </div>

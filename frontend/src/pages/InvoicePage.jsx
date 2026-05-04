@@ -62,17 +62,14 @@ export default function InvoicePage() {
         <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-10 border-b-4 border-gray-50 pb-8">
           <div className="w-full sm:w-auto">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-xl shadow-blue-200">
-                A
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-gray-900">AKU<span className="text-blue-600">GROW</span></h1>
+              <img src="/akuglow.jpg" alt="AkuGlow" className="h-12 w-auto object-contain" />
             </div>
             <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Diterbitkan Oleh</p>
-            <p className="font-black text-gray-900 text-sm sm:text-base">PT Sahabat Mart Indonesia</p>
+            <p className="font-black text-gray-900 text-sm sm:text-base">PT AkuGlow Mart Indonesia</p>
             <p className="text-xs sm:text-sm text-gray-500 font-medium leading-relaxed max-w-xs">
-              Gedung AkuGrow Center Lt. 12<br/>
+              Gedung AkuGlow Center Lt. 12<br/>
               Jl. Jenderal Sudirman No. 45, Jakarta Pusat<br/>
-              support@akugrow.com
+              support@akuglow.com
             </p>
           </div>
           <div className="w-full md:text-right flex flex-col items-start md:items-end">
@@ -178,7 +175,7 @@ export default function InvoicePage() {
         </div>
 
         <div className="mt-16 pt-8 border-t border-gray-50 text-center">
-           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em]">AKUGROW SYSTEM GENERATED INVOICE</p>
+           <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em]">AKUGLOW SYSTEM GENERATED INVOICE</p>
         </div>
       </div>
     </div>

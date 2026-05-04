@@ -127,7 +127,7 @@ export default function TeamPerformance() {
               <p className="text-xs text-slate-400 mt-0.5">
                 {isEligible
                   ? '🎉 Anda memenuhi syarat! Ajukan upgrade sekarang.'
-                  : 'Penuhi 2 syarat berikut untuk menjadi Merchant Akuglow'}
+                  : 'Penuhi 2 syarat berikut untuk menjadi Merchant AkuGlow'}
               </p>
             </div>
             {isEligible && (
@@ -283,7 +283,7 @@ export default function TeamPerformance() {
           Halaman ini menampilkan mitra yang bergabung melalui link affiliate Anda.{' '}
           <strong className="text-white">Mitra aktif</strong> = memiliki minimal 1 transaksi selesai dalam 30 hari terakhir.
           Omset tim dihitung dari seluruh jaringan (semua level ke bawah) dan digunakan sebagai syarat upgrade ke{' '}
-          <strong className="text-white">Merchant Akuglow</strong>.
+          <strong className="text-white">Merchant AkuGlow</strong>.
         </div>
       </div>
     </div>

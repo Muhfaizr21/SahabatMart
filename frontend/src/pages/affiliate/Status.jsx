@@ -71,7 +71,7 @@ export default function AffiliateStatus() {
         <h1 className="text-2xl md:text-3xl font-black text-white font-['Plus_Jakarta_Sans'] tracking-tight">
           Status <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Mitra</span>
         </h1>
-        <p className="text-slate-400 text-sm mt-0.5">Pantau jenjang karir dan progres Anda sebagai Mitra Akuglow</p>
+        <p className="text-slate-400 text-sm mt-0.5">Pantau jenjang karir dan progres Anda sebagai Mitra AkuGlow</p>
       </div>
 
       {successMsg && (

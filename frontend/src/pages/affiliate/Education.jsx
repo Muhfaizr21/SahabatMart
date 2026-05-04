@@ -153,10 +153,10 @@ export default function BusinessEducation() {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-indigo-200 text-xs font-bold uppercase tracking-widest mb-6 border border-white/5">
             <span className="material-symbols-outlined text-sm">school</span>
-            AkuGrow Academy
+            AkuGlow Academy
           </div>
           <h1 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight">
-            Level Up Bisnis Anda <br/> di <span className="text-purple-300">AkuGrow</span>
+            Level Up Bisnis Anda <br/> di <span className="text-purple-300">AkuGlow</span>
           </h1>
           <p className="text-indigo-100/70 text-lg mb-8 leading-relaxed">
             Pusat edukasi lengkap untuk para Mitra. Pelajari rahasia sukses membangun jaringan distribusi dan affiliate dari nol hingga profesional.
@@ -177,7 +177,7 @@ export default function BusinessEducation() {
         <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-20 text-center">
           <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">school</span>
           <h3 className="text-xl font-bold text-slate-400">Belum Ada Materi</h3>
-          <p className="text-slate-500 text-sm">Nantikan update materi terbaru dari tim AkuGrow.</p>
+          <p className="text-slate-500 text-sm">Nantikan update materi terbaru dari tim AkuGlow.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -194,7 +194,7 @@ export default function BusinessEducation() {
               <span className="inline-block w-2 h-2 bg-red-400 rounded-full animate-pulse"></span>
               Live Webinar
            </div>
-           <h2 className="text-2xl font-bold text-white mb-2">Kick-Off Meeting AkuGrow 2026</h2>
+           <h2 className="text-2xl font-bold text-white mb-2">Kick-Off Meeting AkuGlow 2026</h2>
            <p className="text-slate-400 text-sm">Besok, pukul 19:30 WIB • Via Zoom (Link di Mitra Area)</p>
         </div>
         <button className="bg-white text-slate-900 font-bold px-8 py-3 rounded-xl hover:bg-purple-100 transition-colors">

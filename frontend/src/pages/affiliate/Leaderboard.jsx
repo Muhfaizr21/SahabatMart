@@ -31,7 +31,7 @@ export default function Leaderboard() {
         <h1 className="text-3xl font-black text-white font-['Plus_Jakarta_Sans'] tracking-tight">
           Leaderboard
         </h1>
-        <p className="text-slate-400 mt-1 text-sm">Top 10 Mitra Berprestasi Akuglow.</p>
+        <p className="text-slate-400 mt-1 text-sm">Top 10 Mitra Berprestasi AkuGlow.</p>
       </div>
 
       <div

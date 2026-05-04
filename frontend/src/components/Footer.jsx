@@ -12,8 +12,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white"><CartIcon /></div>
-              <span className="text-xl font-bold text-white">AkuGrow</span>
+              <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain brightness-200" />
             </div>
             <p className="text-sm leading-relaxed mb-6 max-w-xs">
               Toko kecantikan dan kesehatan terpercaya dengan produk berkualitas dan harga bersahabat untuk semua kebutuhan kamu.
@@ -29,7 +28,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-3">
                 <svg width="14" height="14" className="text-blue-500 flex-shrink-0" fill="none" stroke="#3b82f6" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <span>support@akugrow.id</span>
+                <span>support@akuglow.id</span>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
@@ -71,7 +70,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm">&copy; 2024 AkuGrow. All rights reserved.</p>
+          <p className="text-sm">&copy; 2025 AkuGlow. All rights reserved.</p>
           <div className="flex gap-6 text-sm">
             {['Privacy', 'Terms', 'Sitemap'].map(l => (
               <a key={l} href="#" className="hover:text-blue-400 transition-colors">{l}</a>
