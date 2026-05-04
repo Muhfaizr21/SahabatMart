@@ -32,6 +32,7 @@ export default function AdminAddProduct() {
   const [brands, setBrands] = useState([]);
   const [attrs, setAttrs] = useState([]);
   const [presets, setPresets] = useState([]);
+  const [tierPresets, setTierPresets] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -40,7 +41,8 @@ export default function AdminAddProduct() {
     category: '', brand: '', attributes: '{}', image: '', images: '[]', stock: 100, status: 'active',
     base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
     base_distribution_fee: 0, base_distribution_fee_nominal: 0,
-    commission_preset_id: ''
+    commission_preset_id: '',
+    tier_commission_preset_id: ''
   });
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
@@ -50,17 +52,20 @@ export default function AdminAddProduct() {
       fetchJson(`${API}/categories`),
       fetchJson(`${API}/brands`),
       fetchJson(`${API}/attributes`),
-      fetchJson(`${API}/commission-presets`)
-    ]).then(([c, b, a, prs]) => {
+      fetchJson(`${API}/commission-presets`),
+      fetchJson(`${API}/tier-commission-presets`)
+    ]).then(([c, b, a, prs, tprs]) => {
       const cats = Array.isArray(c) ? c : (c?.data || []);
       const brds = Array.isArray(b) ? b : (b?.data || []);
       const atts = Array.isArray(a) ? a : (a?.data || []);
       const pData = Array.isArray(prs) ? prs : (prs?.data || []);
+      const tpData = Array.isArray(tprs) ? tprs : (tprs?.data || []);
 
       setCategories(cats);
       setBrands(brds);
       setAttrs(atts);
       setPresets(pData);
+      setTierPresets(tpData);
 
       if (cats.length > 0) setP(prev => ({ ...prev, category: cats[0].name }));
       if (brds.length > 0) setP(prev => ({ ...prev, brand: brds[0].name }));
@@ -331,7 +336,7 @@ export default function AdminAddProduct() {
 
              {/* Preset Selector */}
              <div style={{ marginTop: 24 }}>
-                <FormField label="Multi-Level Commission Preset">
+                <FormField label="Multi-Level Commission Preset (Upline)">
                   <select
                     value={p.commission_preset_id || ''}
                     onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
@@ -342,10 +347,28 @@ export default function AdminAddProduct() {
                       <option key={pr.id} value={pr.id}>{pr.name}</option>
                     ))}
                   </select>
+                  <p style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Distribusi komisi berjenjang ke upline (MLM Style).
+                  </p>
                 </FormField>
-                <p style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
-                  Assign preset untuk mendistribusikan komisi ke jaringan upline affiliate saat produk ini terjual.
-                </p>
+
+                <div style={{ height: 16 }} />
+
+                <FormField label="Tier Commission Preset (Matrix)">
+                  <select
+                    value={p.tier_commission_preset_id || ''}
+                    onChange={e => setP(prev => ({ ...prev, tier_commission_preset_id: e.target.value || null }))}
+                    style={{ ...S.select, borderColor: '#10b981' }}
+                  >
+                    <option value="">-- Tidak Pakai Preset (Gunakan Rate Produk) --</option>
+                    {tierPresets.filter(pr => pr.is_active).map(pr => (
+                      <option key={pr.id} value={pr.id}>{pr.name}</option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Atur rate komisi yang berbeda untuk setiap jenjang membership mitra.
+                  </p>
+                </FormField>
              </div>
           </div>
 

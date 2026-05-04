@@ -1510,6 +1510,8 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		BaseDistributionFee        float64 `json:"base_distribution_fee"`
 		BaseDistributionFeeNominal float64 `json:"base_distribution_fee_nominal"`
 		MerchantCommissionPercent float64 `json:"merchant_commission_percent"`
+		CommissionPresetID        *string `json:"commission_preset_id"`
+		TierCommissionPresetID    *string `json:"tier_commission_preset_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
@@ -1536,6 +1538,8 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"base_distribution_fee":         req.BaseDistributionFee,
 		"base_distribution_fee_nominal": req.BaseDistributionFeeNominal,
 		"merchant_commission_percent":   req.MerchantCommissionPercent,
+		"commission_preset_id":          req.CommissionPresetID,
+		"tier_commission_preset_id":     req.TierCommissionPresetID,
 	}
 
 	// Use Transaction for atomic sync

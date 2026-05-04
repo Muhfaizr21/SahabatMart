@@ -400,9 +400,20 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 			} else {
 				// Fallback ke logika lama (no preset)
 				var tierComm models.ProductTierCommission
-				if err := db.Where("product_id = ? AND membership_tier_id = ?", item.ProductID, aff.MembershipTierID).First(&tierComm).Error; err == nil {
-					affAmt = subtotal * tierComm.CommissionRate
-				} else if product.BaseAffiliateFee > 0 {
+				var tpItem models.TierCommissionPresetItem
+				
+				if product.TierCommissionPresetID != nil && *product.TierCommissionPresetID != "" {
+					// Gunakan Preset Matrix
+					if err := db.Where("preset_id = ? AND membership_tier_id = ?", *product.TierCommissionPresetID, aff.MembershipTierID).First(&tpItem).Error; err == nil {
+						affAmt = subtotal * tpItem.CommissionRate
+					}
+				}
+
+				if affAmt == 0 {
+					// Fallback ke manual matrix per produk
+					if err := db.Where("product_id = ? AND membership_tier_id = ?", item.ProductID, aff.MembershipTierID).First(&tierComm).Error; err == nil {
+						affAmt = subtotal * tierComm.CommissionRate
+					} else if product.BaseAffiliateFee > 0 {
 					affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
 				} else if product.BaseAffiliateFeeNominal > 0 {
 					affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)

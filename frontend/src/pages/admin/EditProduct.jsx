@@ -26,13 +26,15 @@ export default function AdminEditProduct() {
     base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
     base_distribution_fee: 0, base_distribution_fee_nominal: 0,
     merchant_commission_percent: 0,
-    commission_preset_id: ''
+    commission_preset_id: '',
+    tier_commission_preset_id: ''
   });
 
   const [tiers, setTiers] = useState([]);
   const [tierComms, setTierComms] = useState([]);
   const [updatingTier, setUpdatingTier] = useState(null);
   const [presets, setPresets] = useState([]);
+  const [tierPresets, setTierPresets] = useState([]);
 
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
@@ -49,8 +51,10 @@ export default function AdminEditProduct() {
       fetchJson(`${API}/products/tier-commissions?product_id=${productId}`),
       fetchJson(`${API}/products/detail?id=${productId}`),
       fetchJson(`${API}/commission-presets`),
-    ]).then(([cats, brds, atts, tiersData, tComms, prod, prs]) => {
+      fetchJson(`${API}/tier-commission-presets`),
+    ]).then(([cats, brds, atts, tiersData, tComms, prod, prs, tprs]) => {
       setPresets(Array.isArray(prs) ? prs : (prs?.data || []));
+      setTierPresets(Array.isArray(tprs) ? tprs : (tprs?.data || []));
       setCategories(Array.isArray(cats) ? cats : (cats?.data || []));
       setBrands(Array.isArray(brds) ? brds : (brds?.data || []));
       setAttrs(Array.isArray(atts) ? atts : (atts?.data || []));
@@ -73,6 +77,7 @@ export default function AdminEditProduct() {
           base_distribution_fee_nominal: item.base_distribution_fee_nominal || 0,
           merchant_commission_percent: item.merchant_commission_percent || 0,
           commission_preset_id: item.commission_preset_id || '',
+          tier_commission_preset_id: item.tier_commission_preset_id || '',
           attributes: item.attributes || '{}'
         });
         try {
@@ -385,11 +390,10 @@ export default function AdminEditProduct() {
           {/* Card 4: Commission Preset Selector */}
           <div style={{ ...A.card, padding: 25 }}>
             <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="bx bx-git-branch" style={{ color: '#7c3aed', transform: 'rotate(90deg)' }} /> Multi-Level Commission Preset
+              <i className="bx bx-git-branch" style={{ color: '#7c3aed', transform: 'rotate(90deg)' }} /> Multi-Level Commission Preset (Upline)
             </h5>
             <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
-              Assign preset untuk mendistribusikan komisi secara otomatis ke seluruh jaringan upline affiliate saat produk ini terjual.
-              Jika tidak dipilih, sistem menggunakan komisi flat tier (tabel di atas).
+              Assign preset untuk mendistribusikan komisi secara otomatis ke seluruh jaringan upline affiliate.
             </p>
 
             <select
@@ -403,33 +407,71 @@ export default function AdminEditProduct() {
               ))}
             </select>
 
+            <div style={{ height: 1, background: '#f1f5f9', margin: '16px 0' }} />
+
+            <h5 style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="bx bx-matrix" style={{ color: '#10b981' }} /> Tier Commission Preset (Matrix)
+            </h5>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+              Pilih preset matriks komisi untuk menetapkan rate khusus per jenjang membership.
+            </p>
+
+            <select
+              value={p.tier_commission_preset_id || ''}
+              onChange={e => setP(prev => ({ ...prev, tier_commission_preset_id: e.target.value || null }))}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, fontWeight: 600, color: '#1e293b', outline: 'none', marginBottom: 16 }}
+            >
+              <option value="">-- Tidak Pakai Preset (Gunakan Rate Produk) --</option>
+              {tierPresets.filter(pr => pr.is_active).map(pr => (
+                <option key={pr.id} value={pr.id}>{pr.name}</option>
+              ))}
+            </select>
+
             {/* Preview preset yang dipilih */}
-            {p.commission_preset_id && (() => {
-              const selected = presets.find(pr => pr.id === p.commission_preset_id);
-              if (!selected) return null;
-              return (
-                <div style={{ background: 'linear-gradient(135deg, #7c3aed08, #4361ee05)', border: '1px solid #7c3aed20', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.04em' }}>Preview Distribusi: {selected.name}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {(selected.levels || []).map((lv, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: `hsl(${260 + lv.level * 15}, 70%, 58%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', flexShrink: 0 }}>{lv.level}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>{lv.level === 1 ? 'Referrer Langsung' : `Upline Level ${lv.level}`}</div>
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#7c3aed' }}>{(lv.rate * 100).toFixed(1)}%</div>
-                        <div style={{ width: 50, height: 5, background: '#e2e8f0', borderRadius: 3 }}>
-                          <div style={{ height: '100%', width: `${Math.min(lv.rate * 100 * 5, 100)}%`, background: '#7c3aed', borderRadius: 3 }} />
-                        </div>
-                        {idx < (selected.levels.length - 1) && (
-                          <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', position: 'absolute', left: 22, marginTop: 28 }} />
-                        )}
+            {(p.commission_preset_id || p.tier_commission_preset_id) && (
+              <div style={{ marginTop: 10 }}>
+                {p.commission_preset_id && (() => {
+                  const selected = presets.find(pr => pr.id === p.commission_preset_id);
+                  if (!selected) return null;
+                  return (
+                    <div style={{ background: 'linear-gradient(135deg, #7c3aed08, #4361ee05)', border: '1px solid #7c3aed20', borderRadius: 12, padding: 16, marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.04em' }}>Multi-Level: {selected.name}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(selected.levels || []).map((lv, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#fff' }}>{lv.level}</div>
+                            <div style={{ flex: 1, fontSize: 12, color: '#475569', fontWeight: 600 }}>Level {lv.level}</div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: '#7c3aed' }}>{(lv.rate * 100).toFixed(1)}%</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+                    </div>
+                  );
+                })()}
+
+                {p.tier_commission_preset_id && (() => {
+                  const selected = tierPresets.find(pr => pr.id === p.tier_commission_preset_id);
+                  if (!selected) return null;
+                  return (
+                    <div style={{ background: 'linear-gradient(135deg, #10b98108, #05966905)', border: '1px solid #10b98120', borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#059669', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.04em' }}>Tier Matrix: {selected.name}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(selected.tiers || []).map((tItem, idx) => {
+                          const tierObj = tiers.find(t => t.id === tItem.membership_tier_id);
+                          return (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 10, height: 10, borderRadius: '50%', background: tierObj?.color || '#ccc' }} />
+                              <div style={{ flex: 1, fontSize: 12, color: '#475569', fontWeight: 600 }}>{tierObj?.name}</div>
+                              <div style={{ fontSize: 14, fontWeight: 800, color: '#059669' }}>{(tItem.commission_rate * 100).toFixed(1)}%</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
 
