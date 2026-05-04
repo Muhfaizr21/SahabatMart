@@ -572,6 +572,21 @@ export default function MembershipTiers() {
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
+                <FieldLabel>Preset Komisi Multi-Level (Upline)</FieldLabel>
+                <select 
+                  style={{ ...A.select, width: '100%' }} 
+                  value={modal.commission_matrix_preset_id || ''} 
+                  onChange={e => setModal({...modal, commission_matrix_preset_id: e.target.value || null})}
+                >
+                  <option value="">-- Gunakan Default Platform --</option>
+                  {presets.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Pilih preset untuk mendistribusikan komisi ke jaringan upline saat mitra di level ini melakukan penjualan.</p>
+              </div>
+
+              <div style={{ gridColumn: 'span 2' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input type="checkbox" checked={modal.is_active} onChange={e => setModal({...modal, is_active: e.target.checked})} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Aktifkan jenjang ini</span>

@@ -80,6 +80,7 @@ type MembershipTier struct {
 	Icon                 string  `gorm:"type:varchar(50);default:'military_tech'" json:"icon"`
 	Description          string  `gorm:"type:text" json:"description"`
 	IsActive             bool    `gorm:"default:true" json:"is_active"`
+	CommissionMatrixPresetID *string `gorm:"type:uuid" json:"commission_matrix_preset_id"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }

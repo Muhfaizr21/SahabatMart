@@ -52,6 +52,7 @@ import BlogDetailPage from './pages/BlogDetailPage';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
 import ProfilePage from './pages/ProfilePage';
+import CartDrawer from './components/CartDrawer';
 import WishlistPage from './pages/WishlistPage';
 import ComparePage from './pages/ComparePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -108,7 +109,12 @@ function NavbarManager() {
   const location = useLocation();
   const hidePaths = ['/admin', '/merchant', '/affiliate'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
-  return <Navbar />;
+  return (
+    <>
+      <Navbar />
+      <CartDrawer />
+    </>
+  );
 }
 
 function FooterManager() {
@@ -142,7 +148,7 @@ function NotFoundPage() {
         <div className="text-8xl font-bold text-gray-200 mb-4">404</div>
         <h1 className="text-3xl font-bold text-gray-900 mb-3">Halaman Tidak Ditemukan</h1>
         <p className="text-gray-500 mb-8">Maaf, halaman yang kamu cari tidak ada atau sudah dipindahkan.</p>
-        <a href="/" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors">
+        <a href="/" className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all inline-block shadow-lg shadow-blue-100">
           Kembali ke Beranda
         </a>
       </div>
@@ -206,7 +212,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ShopPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
-          <Route path="/cart" element={<CartPage />} />
+          <Route path="/cart" element={<Navigate to="/checkout" replace />} />
           <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
            <Route path="/order/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />

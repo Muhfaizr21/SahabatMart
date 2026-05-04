@@ -152,9 +152,9 @@ export default function ProductDetailPage() {
         })
       });
       window.dispatchEvent(new Event('cartUpdate'));
-      alert('Berhasil ditambahkan ke keranjang!');
+      window.dispatchEvent(new Event('openCart'));
     } catch (err) {
-      alert('Gagal: ' + err.message);
+      alert('Gagal menambah ke keranjang: ' + err.message);
       setAddedToCart(false);
     }
   };
@@ -477,7 +477,7 @@ export default function ProductDetailPage() {
                   className="flex-1 h-14 sm:h-16 bg-gray-900 hover:bg-blue-600 disabled:bg-gray-300 text-white font-black px-6 sm:px-10 rounded-[1.25rem] shadow-2xl shadow-gray-200/50 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
                   <ShoppingBag size={20} />
-                  <span className="text-sm sm:text-base uppercase tracking-widest">{addedToCart ? 'Product Added!' : 'Add to Bag'}</span>
+                  <span className="text-sm sm:text-base uppercase tracking-widest">{addedToCart ? 'Redirecting...' : 'Beli Sekarang'}</span>
                 </button>
 
                 <button 

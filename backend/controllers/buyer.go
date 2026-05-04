@@ -123,8 +123,8 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 		merchantItems[mID] = append(merchantItems[mID], orderItem)
 	}
 
-	// Combined rates: courier_key -> aggregated rate data
-	combinedRates := make(map[string]map[string]interface{})
+	// Grouped rates: merchant_id -> []rate
+	merchantRates := make(map[string][]map[string]interface{})
 
 	for mID, items := range merchantItems {
 		var merchant models.Merchant
@@ -134,12 +134,16 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 		couriers := merchant.EnabledCouriers
 		
 		if origin == "" {
-			// Fallback ke Jakarta Pusat (Gambir) agar ongkir tetap bisa muncul
-			log.Printf("[Shipping] Merchant %s belum punya BiteshipAreaID, fallback ke Jakarta Pusat", mID)
-			origin = "IDNP3CL10"
+			// Ambil BiteshipAreaID dari Merchant Pusat sebagai fallback
+			var pusat models.Merchant
+			bc.DB.First(&pusat, "id = ?", "00000000-0000-0000-0000-000000000000")
+			if pusat.BiteshipAreaID != "" {
+				origin = pusat.BiteshipAreaID
+			} else {
+				origin = "IDNP3CL10" // Fallback terakhir jika pusat pun kosong
+			}
 		}
 
-		// --- GLOBAL LOGISTICS FILTER ---
 		var activeGlobalCouriers []string
 		bc.DB.Model(&models.LogisticChannel{}).Where("is_active = ?", true).Pluck("code", &activeGlobalCouriers)
 		
@@ -159,65 +163,26 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 		
 		finalCouriers := strings.Join(filteredCouriers, ",")
 		if finalCouriers == "" {
-			// FALLBACK: Use all globally active couriers if merchant has none specified
 			finalCouriers = strings.Join(activeGlobalCouriers, ",")
 		}
 
 		if finalCouriers == "" {
-			log.Printf("[Shipping] WARN: No couriers active globally, skipping merchant %s", mID)
 			continue
 		}
-
-		log.Printf("[Shipping] Fetching rates for merchant %s (Origin: %s) to Dest: %s with Couriers: %s", mID, origin, req.DestinationAreaID, finalCouriers)
 
 		rates, err := bc.ShippingService.GetRates(origin, req.DestinationAreaID, items, finalCouriers)
 		if err != nil {
-			log.Printf("[Shipping] ERROR getting rates for merchant %s: %v", mID, err)
+			log.Printf("[Shipping] ERROR for merchant %s: %v", mID, err)
 			continue
 		}
-
-		for _, rate := range rates {
-			code, _ := rate["courier_code"].(string)
-			service, _ := rate["courier_service"].(string)
-			key := code + "_" + service
-			priceRaw := rate["price"]
-			
-			var price int64
-			switch v := priceRaw.(type) {
-			case float64:
-				price = int64(v)
-			case int64:
-				price = v
-			case int:
-				price = int64(v)
-			}
-
-			if existing, ok := combinedRates[key]; ok {
-				existingPrice := existing["price"].(int64)
-				existing["price"] = existingPrice + price
-			} else {
-				// Clone to avoid mutation issues
-				newRate := make(map[string]interface{})
-				for k, v := range rate {
-					newRate[k] = v
-				}
-				newRate["price"] = price // ensure it's int64 for consistent addition
-				combinedRates[key] = newRate
-			}
-		}
-	}
-
-	// Convert map back to slice
-	finalRates := []map[string]interface{}{}
-	for _, rate := range combinedRates {
-		finalRates = append(finalRates, rate)
+		merchantRates[mID] = rates
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"rates": finalRates,
+		"rates": merchantRates,
 		"warning": func() string {
-			if len(finalRates) == 0 {
-				return "Kurir tidak tersedia saat ini. Pastikan saldo Biteship mencukupi dan area pengiriman valid."
+			if len(merchantRates) == 0 {
+				return "Kurir tidak tersedia saat ini."
 			}
 			return ""
 		}(),

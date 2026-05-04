@@ -204,7 +204,7 @@ export default function AdminProductList() {
                 style={{ ...A.btnPrimary, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
                 onClick={() => window.print()}
               >
-                <i className="bx bx-printer" style={{ fontSize: 18 }} /> Print Label
+                <i className="bx bx-printer" style={{ fontSize: 18 }} /> Cetak Label
               </button>
               <button 
                 style={{ ...A.btnGhost, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
@@ -221,7 +221,7 @@ export default function AdminProductList() {
         </Modal>
       )}
 
-      <PageHeader title="Product Catalog" subtitle="Kelola dan moderasi seluruh listing produk platform AkuGlow.">
+      <PageHeader title="Katalog Produk" subtitle="Kelola dan moderasi seluruh listing produk platform AkuGlow.">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
           <div style={{ ...A.searchWrap, minWidth: 250, flex: 1 }}>
             <i className="bx bx-search" style={A.searchIcon} />

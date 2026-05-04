@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
 
 export default function WishlistPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -55,7 +56,7 @@ export default function WishlistPage() {
       
       // Update UI: Remove from list after successful move
       setItems(prev => prev.filter(x => x.id !== p.id));
-      alert('Produk berhasil dipindahkan ke keranjang belanja! 🛒✨');
+      window.dispatchEvent(new Event('openCart'));
     } catch (err) { 
       alert(err.message || 'Gagal memindahkan produk'); 
     } finally { 
@@ -187,7 +188,7 @@ export default function WishlistPage() {
                       {acting === item.id ? (
                         <i className="bx bx-loader-alt animate-spin text-lg"></i>
                       ) : (
-                        <><i className="bx bx-cart-add text-lg"></i> Pindahkan Ke Keranjang</>
+                        <><i className="bx bx-shopping-bag text-lg"></i> Beli Sekarang</>
                       )}
                     </button>
                   </div>

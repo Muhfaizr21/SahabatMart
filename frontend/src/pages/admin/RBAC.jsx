@@ -530,7 +530,7 @@ const AdminRBAC = () => {
                                 <i className="bx bxs-check-shield" style={{ fontSize: 32, color: '#10b981' }} />
                                 <div>
                                     <div style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>Akses Penuh Keseluruhan Sistem</div>
-                                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>Sebagai Superadmin, akun ini mengabaikan semua batasan RBAC dan memiliki wewenang penuh atas seluruh modul dan fungsi platform SahabatMart.</div>
+                                    <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>Sebagai Superadmin, akun ini mengabaikan semua batasan RBAC dan memiliki wewenang penuh atas seluruh modul dan fungsi platform AkuGlow.</div>
                                 </div>
                             </div>
                         ) : (

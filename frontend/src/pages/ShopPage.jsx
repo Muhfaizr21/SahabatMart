@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { PUBLIC_API_BASE, BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
 
 const badgeColors = { hot: 'bg-red-500', trending: 'bg-blue-500', offer: 'bg-green-500', sale: 'bg-orange-500' };
@@ -27,6 +27,7 @@ const priceRanges = [
 
 export default function ShopPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const catParam = searchParams.get('cat');
   const searchParam = searchParams.get('search');
   
@@ -131,7 +132,7 @@ export default function ShopPage() {
       });
       // Global sync for Navbar & others
       window.dispatchEvent(new Event('cartUpdate'));
-      alert(`Berhasil menambahkan ${product.name} ke keranjang! 🛒`);
+      window.dispatchEvent(new Event('openCart'));
     } catch (err) {
       alert('Gagal menambah ke keranjang: ' + err.message);
     }
@@ -190,28 +191,7 @@ export default function ShopPage() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
-      {/* Page Header */}
-      <div className="relative bg-[#0A0A0B] overflow-hidden">
-        {/* Abstract Background Decoration */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full -mr-64 -mt-64 animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-500/10 blur-[100px] rounded-full -ml-32 -mb-32"></div>
-        
-        <div className="relative max-w-7xl mx-auto px-6 py-16 md:py-24">
-          <div className="max-w-2xl">
-            <nav className="flex items-center gap-2 text-blue-400 text-xs font-black uppercase tracking-[0.2em] mb-4">
-              <Link to="/" className="hover:text-blue-300 transition-colors">Beranda</Link>
-              <span className="text-gray-700">/</span>
-              <span className="text-white">Katalog Produk</span>
-            </nav>
-            <h1 className="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-              Toko <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">AkuGlow</span>
-            </h1>
-            <p className="text-gray-400 text-sm md:text-base max-w-lg leading-relaxed font-medium">
-              Temukan koleksi produk kecantikan premium terbaik yang dikurasi khusus untuk kesehatan dan kemilau kulit Anda.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Page Header Removed */}
 
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="flex flex-col lg:flex-row gap-8">

@@ -13,6 +13,7 @@ const (
 	OrderReadyToShip    OrderStatus = "ready_to_ship"
 	OrderShipped        OrderStatus = "shipped"
 	OrderDelivered      OrderStatus = "delivered"
+	OrderReadyForPickup OrderStatus = "ready_for_pickup"
 	OrderCompleted      OrderStatus = "completed"
 	OrderCancelled      OrderStatus = "cancelled"
 	OrderRefundRequested OrderStatus = "refund_requested"
@@ -32,6 +33,7 @@ const (
 	MOrderHandedToCourier MerchantOrderStatus = "handed_to_courier"
 	MOrderShipped        MerchantOrderStatus = "shipped"
 	MOrderDelivered      MerchantOrderStatus = "delivered"
+	MOrderReadyForPickup MerchantOrderStatus = "ready_for_pickup"
 	MOrderCompleted      MerchantOrderStatus = "completed"
 	MOrderCancelled      MerchantOrderStatus = "cancelled"
 	MOrderRefundRequested MerchantOrderStatus = "refund_requested"
@@ -109,8 +111,9 @@ type OrderMerchantGroup struct {
 	Discount        float64             `gorm:"type:decimal(15,2);not null;default:0" json:"discount"`
 	MerchantPayout  float64             `gorm:"type:decimal(15,2);not null;default:0" json:"merchant_payout"`
 
+	ShippingType    string              `gorm:"type:varchar(20);default:'expedition'" json:"shipping_type"` // pickup, expedition
 	CourierCode     string              `gorm:"type:varchar(50)" json:"courier_code"`
-	ServiceCode     string              `gorm:"type:varchar(50)" json:"service_code"`
+	CourierService  string              `gorm:"type:varchar(50)" json:"courier_service"`
 	TrackingNumber  string              `gorm:"type:varchar(100)" json:"tracking_number"`
 	BiteshipOrderID string              `gorm:"type:varchar(100)" json:"biteship_order_id"` // External Reference
 	ShippedAt       *time.Time          `json:"shipped_at"`

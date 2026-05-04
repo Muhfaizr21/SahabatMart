@@ -81,8 +81,8 @@ function ProductCard({ product }) {
           quantity: 1
         })
       });
-      alert('Berhasil ditambah ke keranjang!');
-      window.location.reload(); 
+      window.dispatchEvent(new Event('cartUpdate'));
+      window.dispatchEvent(new Event('openCart'));
     } catch (err) {
       alert(err.message);
     } finally {
@@ -131,7 +131,7 @@ function ProductCard({ product }) {
             disabled={adding || product.stock <= 0}
             className={`text-[11px] font-bold px-3 py-2 rounded-xl transition-all flex-shrink-0 ${product.stock <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
-            {adding ? '...' : (product.stock <= 0 ? 'Habis' : '+ Keranjang')}
+            {adding ? '...' : (product.stock <= 0 ? 'Habis' : 'Beli')}
           </button>
         </div>
       </div>

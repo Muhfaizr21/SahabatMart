@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate } from '../lib/api';
 
-const steps = ['Keranjang', 'Checkout', 'Konfirmasi'];
+const steps = ['Detail Pengiriman', 'Konfirmasi'];
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -22,10 +22,10 @@ export default function CheckoutPage() {
   const [checkingVoucher, setCheckingVoucher] = useState(false);
   const [shippingType, setShippingType] = useState('expedition');
   const [shippingCost, setShippingCost] = useState(0);
-  const [selectedShipping, setSelectedShipping] = useState(null);
+  const [selectedShippings, setSelectedShippings] = useState({}); // { [merchant_id]: rateObj }
   const [areas, setAreas] = useState([]);
   const [searchingArea, setSearchingArea] = useState(false);
-  const [shippingRates, setShippingRates] = useState([]);
+  const [shippingRates, setShippingRates] = useState({}); // { [merchant_id]: [rates] }
   const [shippingWarning, setShippingWarning] = useState("");
   const [loadingRates, setLoadingRates] = useState(false);
   const [openGroups, setOpenGroups] = useState({ "Virtual Account": true });
@@ -197,7 +197,7 @@ export default function CheckoutPage() {
     try {
       const sourceItems = overrideItems || cart.items;
       if (!sourceItems || sourceItems.length === 0) {
-        setShippingRates([]);
+        setShippingRates({});
         return;
       }
       const items = sourceItems.map(i => ({
@@ -205,9 +205,7 @@ export default function CheckoutPage() {
         product_name: i.product?.name || 'Produk',
         unit_price: getItemPrice(i),
         quantity: i.quantity,
-        // Berat dari variant > produk > default 200g (dalam gram)
         weight: i.product_variant?.weight || i.product?.weight || 200,
-        // merchant_id langsung dari cart item, bukan dari nested product
         merchant_id: i.merchant_id || '00000000-0000-0000-0000-000000000000'
       }));
       const res = await fetchJson(`${API_BASE}/api/shipping/rates`, {
@@ -215,15 +213,27 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ destination_area_id: areaId, items })
       });
-      console.log("[Shipping] Rates received:", res.rates);
-      setShippingRates(res.rates || []);
+      
+      const rates = res.rates || {};
+      setShippingRates(rates);
       setShippingWarning(res.warning || "");
-      if (!res.rates || res.rates.length === 0) {
-        console.warn("[Shipping] No rates found for items:", items);
-      }
+
+      // Auto-select first rate for each merchant if not yet selected
+      const initialSelected = { ...selectedShippings };
+      Object.keys(rates).forEach(mID => {
+        if (!initialSelected[mID] && rates[mID].length > 0) {
+          initialSelected[mID] = rates[mID][0];
+        }
+      });
+      setSelectedShippings(initialSelected);
+
+      // Total shipping cost update
+      const totalCost = Object.values(initialSelected).reduce((sum, r) => sum + (r?.price || 0), 0);
+      setShippingCost(totalCost);
+
     } catch (err) {
       console.error('Fetch rates failed:', err);
-      setShippingRates([]);
+      setShippingRates({});
     } finally {
       setLoadingRates(false);
     }
@@ -274,22 +284,22 @@ export default function CheckoutPage() {
             total_shipping_cost: shippingCost,
             notes: form.notes,
             merchant_groups: (() => {
-              // Group cart items by merchant_id to build per-merchant groups
               const grouped = {};
               cart.items.forEach(i => {
                 const mId = i.merchant_id || '00000000-0000-0000-0000-000000000000';
                 if (!grouped[mId]) grouped[mId] = [];
                 grouped[mId].push(i);
               });
-              return Object.keys(grouped).map(mId => ({
-                merchant_id: mId,
-                courier_code: selectedShipping?.courier_code || '',
-                service_code: selectedShipping?.courier_service || '',
-                // shipping cost dibagi merata jika multi-merchant, atau penuh jika single
-                shipping_cost: Object.keys(grouped).length > 1
-                  ? Math.round(shippingCost / Object.keys(grouped).length)
-                  : shippingCost
-              }));
+              return Object.keys(grouped).map(mId => {
+                const sel = selectedShippings[mId];
+                return {
+                  merchant_id: mId,
+                  courier_code: sel?.courier_code || 'PICKUP',
+                  service_code: sel?.courier_service || 'SELF',
+                  shipping_cost: sel?.price || 0,
+                  shipping_type: shippingType
+                };
+              });
             })()
           },
           upline_id: uplineRef,
@@ -365,9 +375,9 @@ export default function CheckoutPage() {
           <div className="flex items-center gap-3 mt-4">
             {steps.map((step, i) => (
               <div key={step} className="flex items-center gap-3">
-                <div className={`flex items-center gap-2 ${i <= 1 ? 'text-white' : 'text-blue-300'}`}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i < 1 ? 'bg-green-400' : i === 1 ? 'bg-white text-blue-700' : 'bg-white/20'}`}>
-                    {i < 1 ? '✓' : i + 1}
+                <div className={`flex items-center gap-2 ${i === 0 ? 'text-white' : 'text-blue-300'}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-white text-blue-700' : 'bg-white/20'}`}>
+                    {i + 1}
                   </div>
                   <span className="text-sm font-medium">{step}</span>
                 </div>
@@ -552,32 +562,52 @@ export default function CheckoutPage() {
                 )}
 
                 {shippingType === 'expedition' ? (
-                  <div className="space-y-3">
+                  <div className="space-y-8">
                     {loadingRates ? (
                        <div className="py-10 text-center">
-                          <div className="animate-spin mb-2">🌀</div>
+                          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                           <div className="text-xs text-gray-400">Mengambil ongkir terbaik...</div>
                        </div>
-                    ) : shippingRates.length > 0 ? (
-                      shippingRates.map((method, idx) => (
-                        <label key={idx} className="flex items-center gap-4 border-2 border-gray-100 rounded-xl p-4 cursor-pointer hover:border-blue-300 transition-all has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                          <input 
-                            type="radio" 
-                            name="shipping" 
-                            checked={selectedShipping?.courier_code === method.courier_code && selectedShipping?.courier_service === method.courier_service}
-                            onChange={() => {
-                              setSelectedShipping(method);
-                              setShippingCost(method.price);
-                            }}
-                            className="accent-blue-600 w-4 h-4" 
-                          />
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-800 text-sm uppercase">{method.courier_name} {method.courier_service}</div>
-                            <div className="text-xs text-gray-500">Estimasi {method.duration}</div>
+                    ) : Object.keys(shippingRates).length > 0 ? (
+                      Object.entries(shippingRates).map(([mID, rates]) => {
+                        const mName = cart.items.find(i => (i.merchant_id || '00000000-0000-0000-0000-000000000000') === mID)?.merchant?.store_name || 'AkuGlow (Pusat)';
+                        return (
+                          <div key={mID} className="animate-in fade-in slide-in-from-top-2 duration-500">
+                            <div className="flex items-center gap-2 mb-4 bg-gray-50 p-3 rounded-xl">
+                              <i className="bx bx-store text-blue-600"></i>
+                              <span className="text-[10px] font-black text-gray-800 uppercase tracking-widest">Kirim dari: {mName}</span>
+                            </div>
+                            <div className="space-y-3">
+                              {rates.map((method, idx) => (
+                                <label key={idx} className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                                  selectedShippings[mID]?.courier_code === method.courier_code && selectedShippings[mID]?.courier_service === method.courier_service
+                                  ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100' : 'border-gray-100 hover:border-gray-200 bg-white'
+                                }`}>
+                                  <input 
+                                    type="radio" 
+                                    name={`shipping_${mID}`} 
+                                    checked={selectedShippings[mID]?.courier_code === method.courier_code && selectedShippings[mID]?.courier_service === method.courier_service}
+                                    onChange={() => {
+                                      const newSelected = { ...selectedShippings, [mID]: method };
+                                      setSelectedShippings(newSelected);
+                                      const totalCost = Object.values(newSelected).reduce((sum, r) => sum + (r?.price || 0), 0);
+                                      setShippingCost(totalCost);
+                                    }}
+                                    className="accent-blue-600 w-4 h-4" 
+                                  />
+                                  <div className="flex-1">
+                                    <div className="font-bold text-gray-900 text-sm uppercase tracking-tight">
+                                      {method.courier_name} <span className="text-blue-600">{method.courier_service}</span>
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-medium mt-0.5">Estimasi {method.duration}</div>
+                                  </div>
+                                  <div className="text-sm font-black text-gray-900">Rp{method.price.toLocaleString('id-ID')}</div>
+                                </label>
+                              ))}
+                            </div>
                           </div>
-                          <div className="text-sm font-bold text-gray-700">Rp{method.price.toLocaleString('id-ID')}</div>
-                        </label>
-                      ))
+                        );
+                      })
                     ) : (
                        <div className="py-10 px-6 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                          <div className="text-3xl mb-2 opacity-30">🚚</div>
@@ -590,11 +620,69 @@ export default function CheckoutPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="p-6 rounded-2xl border-2 border-blue-500 bg-blue-50 flex flex-col items-center text-center">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl mb-4 shadow-xl shadow-blue-200/50">🏪</div>
-                    <h4 className="font-black text-blue-900 mb-1">Pick-up di Merchant Terdekat</h4>
-                    <p className="text-xs text-blue-600 mb-4 px-6 leading-relaxed">Pesanan Anda akan disiapkan untuk diambil di lokasi merchant yang Anda pilih saat memasukkan produk ke keranjang.</p>
-                    <div className="bg-white px-4 py-2 rounded-full border border-blue-200 text-[10px] font-black text-blue-600 uppercase tracking-widest">Biaya Pengiriman: GRATIS</div>
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-blue-200">
+                      {/* Decorative Background Elements */}
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[80px] rounded-full -mr-32 -mt-32"></div>
+                      <div className="absolute bottom-0 left-0 w-40 h-40 bg-black/10 blur-[60px] rounded-full -ml-20 -mb-20"></div>
+                      
+                      <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
+                        <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-inner border border-white/30 flex-shrink-0 animate-bounce-slow">
+                          🏪
+                        </div>
+                        <div className="flex-1">
+                          <div className="inline-block bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-white/10">
+                            Self Pick-up Option
+                          </div>
+                          <h4 className="text-2xl font-black mb-2 tracking-tight">Ambil Sendiri di Toko</h4>
+                          <p className="text-blue-100 text-sm leading-relaxed mb-6 font-medium">
+                            Hemat ongkos kirim dengan mengambil langsung pesanan Anda di titik lokasi merchant kami.
+                          </p>
+                          
+                          {/* Merchant List */}
+                          <div className="space-y-3 mb-8">
+                            <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] block mb-2">Lokasi Penjemputan:</span>
+                            {Object.entries(
+                              cart.items.reduce((acc, item) => {
+                                const mId = item.merchant_id || '00000000-0000-0000-0000-000000000000';
+                                const mName = item.merchant?.store_name || 'Gudang Pusat SahabatMart';
+                                const mCity = item.merchant?.city || 'Jakarta Pusat';
+                                if (!acc[mId]) acc[mId] = { name: mName, city: mCity };
+                                return acc;
+                              }, {})
+                            ).map(([mId, m]) => (
+                              <div key={mId} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/5">
+                                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs">📍</div>
+                                <div>
+                                  <div className="text-xs font-black">{m.name}</div>
+                                  <div className="text-[10px] text-blue-200">{m.city}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Steps */}
+                          <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6">
+                            {[
+                              { icon: 'bx-credit-card', label: 'Bayar' },
+                              { icon: 'bx-package', label: 'Siapkan' },
+                              { icon: 'bx-walk', label: 'Ambil' }
+                            ].map((step, i) => (
+                              <div key={i} className="text-center group">
+                                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-2 group-hover:bg-white/30 transition-colors">
+                                  <i className={`bx ${step.icon} text-lg`}></i>
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-tighter">{step.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-center gap-2 text-blue-600 bg-blue-50 py-3 rounded-2xl border border-blue-100">
+                      <i className="bx bx-check-shield text-xl"></i>
+                      <span className="text-[11px] font-black uppercase tracking-widest">Biaya Pengiriman: Gratis & Aman</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -766,8 +854,8 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Pengiriman</span>
-                    <span className={shippingType === 'pickup' || (shippingType === 'expedition' && selectedShipping) || shippingCost === 0 ? "text-green-600 font-bold" : "text-gray-400 font-medium italic"}>
-                      {shippingType === 'pickup' ? 'GRATIS' : (shippingType === 'expedition' && selectedShipping) ? `Rp${shippingCost.toLocaleString('id-ID')}` : 'Pilih Kurir'}
+                    <span className={shippingType === 'pickup' || (shippingType === 'expedition' && Object.keys(selectedShippings).length > 0) || shippingCost === 0 ? "text-green-600 font-bold" : "text-gray-400 font-medium italic"}>
+                      {shippingType === 'pickup' ? 'GRATIS' : (shippingType === 'expedition' && Object.keys(selectedShippings).length > 0) ? `Rp${shippingCost.toLocaleString('id-ID')}` : 'Pilih Kurir'}
                     </span>
                   </div>
                   {discount > 0 && (

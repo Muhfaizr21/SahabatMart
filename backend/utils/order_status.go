@@ -13,9 +13,11 @@ func ValidateOrderTransition(current, next models.OrderStatus) error {
 	case models.OrderPaid:
 		allowed = (next == models.OrderProcessing || next == models.OrderReadyToShip || next == models.OrderRefunded)
 	case models.OrderProcessing:
-		allowed = (next == models.OrderReadyToShip || next == models.OrderShipped)
+		allowed = (next == models.OrderReadyToShip || next == models.OrderShipped || next == models.OrderReadyForPickup)
 	case models.OrderReadyToShip:
 		allowed = (next == models.OrderShipped)
+	case models.OrderReadyForPickup:
+		allowed = (next == models.OrderCompleted || next == models.OrderRefundRequested)
 	case models.OrderShipped:
 		allowed = (next == models.OrderDelivered || next == models.OrderDisputed)
 	case models.OrderDelivered:

@@ -157,13 +157,13 @@ export default function AdminMerchants() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Empire Merchants & Tenants" subtitle="Pusat kendali mitra bisnis. Kelola verifikasi, batasan operasional, dan kesepakatan komisi khusus.">
+      <PageHeader title="Daftar Merchant & Tenant" subtitle="Pusat kendali mitra bisnis. Kelola verifikasi, batasan operasional, dan kesepakatan komisi khusus.">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
           <div style={{ ...A.searchWrap, minWidth: 0, flex: 1, minWidth: isMobile ? '100%' : 250 }}>
             <i className="bx bx-search" style={A.searchIcon} />
             <input
               style={A.searchInput}
-              placeholder="Search tenant name..."
+              placeholder="Cari nama merchant..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && load()}
@@ -174,9 +174,9 @@ export default function AdminMerchants() {
       </PageHeader>
 
       <StatRow stats={[
-        { label: 'Active Tenants', val: stats.active || 0, icon: 'bx-store', color: '#10b981' },
-        { label: 'Pending Approval', val: stats.pending || 0, icon: 'bx-time-five', color: '#f59e0b' },
-        { label: 'Suspended Entities', val: stats.suspended || 0, icon: 'bx-block', color: '#ef4444' },
+        { label: 'Merchant Aktif', val: stats.active || 0, icon: 'bx-store', color: '#10b981' },
+        { label: 'Menunggu Persetujuan', val: stats.pending || 0, icon: 'bx-time-five', color: '#f59e0b' },
+        { label: 'Merchant Diblokir', val: stats.suspended || 0, icon: 'bx-block', color: '#ef4444' },
       ]} />
 
       <TablePanel
@@ -184,10 +184,10 @@ export default function AdminMerchants() {
         tabs={
           <div style={{ display: 'flex', overflowX: 'auto', gap: 10, paddingBottom: 4, scrollBehavior: 'smooth' }}>
             {[
-              { val: '', label: 'Full Spectrum' },
-              { val: 'active', label: 'Operational' },
-              { val: 'pending', label: 'Verification Queue' },
-              { val: 'suspended', label: 'Sanctioned' },
+              { val: '', label: 'Semua Status' },
+              { val: 'active', label: 'Operasional' },
+              { val: 'pending', label: 'Antrean Verifikasi' },
+              { val: 'suspended', label: 'Sanksi' },
             ].map(t => (
               <button key={t.val} style={{ ...A.tab(filter === t.val), whiteSpace: 'nowrap', fontSize: isMobile ? 12 : 14 }} onClick={() => setFilter(t.val)}>{t.label}</button>
             ))}
@@ -199,7 +199,7 @@ export default function AdminMerchants() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
             <thead>
               <tr>
-                {['Store Entity', 'Oper. Status', 'Legal ID', 'Capital Flow', 'Timeline', 'Actions'].map((h, i) => (
+                {['Entitas Toko', 'Status Operasional', 'Legalitas', 'Arus Kas', 'Bergabung', 'Aksi'].map((h, i) => (
                   <th key={h} style={{ ...A.th, textAlign: i === 5 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 5 ? 24 : 16 }}>{h}</th>
                 ))}
               </tr>
@@ -208,7 +208,7 @@ export default function AdminMerchants() {
               {merchants.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
                   <i className="bx bx-store-alt" style={{ fontSize: 60, display: 'block', marginBottom: 16, opacity: 0.1 }} />
-                  <div style={{ fontWeight: 800 }}>No entities detected in this sector.</div>
+                  <div style={{ fontWeight: 800 }}>Tidak ada entitas yang terdeteksi di sektor ini.</div>
                 </td></tr>
               ) : merchants.map((m, idx) => (
                 <tr key={m.id}
@@ -316,7 +316,7 @@ export default function AdminMerchants() {
       </TablePanel>
 
       {modal && (
-        <Modal title="Merchant Governance Panel" onClose={() => setModal(null)} wide>
+        <Modal title="Panel Kendali Merchant" onClose={() => setModal(null)} wide>
           {/* Safety Buffer for Header Clipping */}
           <div style={{ height: 4 }} /> 
           
@@ -336,7 +336,7 @@ export default function AdminMerchants() {
               <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, marginBottom: 6 }}>TENANT-ID: <span style={{ color: '#4f46e5' }}>{modal.id?.slice(0, 16)}...</span></div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <span style={{ ...statusBadge(modal.status), fontSize: 10, padding: '3px 8px' }}>{modal.status?.toUpperCase()}</span>
-                {modal.is_verified && <span style={{ ...statusBadge('verified'), fontSize: 10, padding: '3px 8px' }}><i className="bx bxs-badge-check" /> VERIFIED</span>}
+                {modal.is_verified && <span style={{ ...statusBadge('verified'), fontSize: 10, padding: '3px 8px' }}><i className="bx bxs-badge-check" /> TERVERIFIKASI</span>}
               </div>
             </div>
           </div>
@@ -344,9 +344,9 @@ export default function AdminMerchants() {
           {/* Stats Summary (Simplified) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
             {[
-              { label: 'Evaluation', val: idr(modal.total_sales), color: '#10b981' },
-              { label: 'Capital', val: idr(modal.balance), color: '#4f46e5' },
-              { label: 'Tenure', val: modal.joined_at && !modal.joined_at.startsWith('0001') ? fmtDate(modal.joined_at) : 'New Mitra', color: '#64748b' },
+              { label: 'Omzet', val: idr(modal.total_sales), color: '#10b981' },
+              { label: 'Saldo', val: idr(modal.balance), color: '#4f46e5' },
+              { label: 'Lama Bergabung', val: modal.joined_at && !modal.joined_at.startsWith('0001') ? fmtDate(modal.joined_at) : 'Mitra Baru', color: '#64748b' },
             ].map(s => (
               <div key={s.label} style={{ textAlign: 'center', padding: '12px 8px', borderRadius: 12, border: '1px solid #f1f5f9' }}>
                 <div style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
@@ -359,24 +359,28 @@ export default function AdminMerchants() {
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 24 }}>
             {/* Status & Reasoning */}
             <div>
-              <FieldLabel>Entity Status</FieldLabel>
+              <FieldLabel>Status Entitas</FieldLabel>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
-                {['active', 'pending', 'suspended'].map(s => (
-                  <button key={s}
-                    onClick={() => updateStatus(modal.id, s)}
+                {[
+                  { id: 'active', label: 'Aktif' },
+                  { id: 'pending', label: 'Pending' },
+                  { id: 'suspended', label: 'Blokir' }
+                ].map(s => (
+                  <button key={s.id}
+                    onClick={() => updateStatus(modal.id, s.id)}
                     style={{
                       padding: '10px 4px', borderRadius: 10, border: 'none', cursor: 'pointer',
                       fontWeight: 800, fontSize: 10, textTransform: 'uppercase',
-                      background: modal.status === s ? (s === 'active' ? '#10b981' : s === 'pending' ? '#f59e0b' : '#ef4444') : '#f1f5f9',
-                      color: modal.status === s ? '#fff' : '#64748b',
+                      background: modal.status === s.id ? (s.id === 'active' ? '#10b981' : s.id === 'pending' ? '#f59e0b' : '#ef4444') : '#f1f5f9',
+                      color: modal.status === s.id ? '#fff' : '#64748b',
                       transition: 'all 0.2s'
                     }}
-                  >{s}</button>
+                  >{s.label}</button>
                 ))}
               </div>
               <textarea
                 style={{ ...A.textarea, minHeight: 80, fontSize: 12, padding: 12, background: '#fff', border: '1px solid #e2e8f0' }}
-                placeholder="Reasoning for status change..."
+                placeholder="Alasan perubahan status..."
                 value={note}
                 onChange={e => setNote(e.target.value)}
               />
@@ -384,7 +388,7 @@ export default function AdminMerchants() {
 
             {/* Commissions & Verify */}
             <div>
-              <FieldLabel>Platform Settings</FieldLabel>
+              <FieldLabel>Pengaturan Platform</FieldLabel>
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
@@ -394,9 +398,9 @@ export default function AdminMerchants() {
                     style={{ ...A.input, padding: '10px 12px', fontSize: 14, flex: 1 }}
                     placeholder="Fee %"
                   />
-                  <button onClick={saveCommission} disabled={commission.loading} style={{ ...A.btnPrimary, padding: '0 16px', fontSize: 12 }}>Apply</button>
+                  <button onClick={saveCommission} disabled={commission.loading} style={{ ...A.btnPrimary, padding: '0 16px', fontSize: 12 }}>Simpan</button>
                 </div>
-                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>Custom service fee for this entity.</p>
+                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>Tarif fee layanan khusus untuk entitas ini.</p>
               </div>
 
               <button
@@ -409,18 +413,18 @@ export default function AdminMerchants() {
                 }}
               >
                 <i className={`bx ${modal.is_verified ? 'bxs-badge-check' : 'bx-badge'}`} />
-                {modal.is_verified ? 'Revoke Verification' : 'Grant Verification Seal'}
+                {modal.is_verified ? 'Cabut Verifikasi' : 'Berikan Label Terverifikasi'}
               </button>
 
               <div style={{ marginTop: 8, padding: 16, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                <FieldLabel>Biteship Logistics Area</FieldLabel>
+                <FieldLabel>Area Logistik Biteship</FieldLabel>
                 <div style={{ position: 'relative' }}>
                   <input 
                     style={{ ...A.input, padding: '10px 12px', fontSize: 12 }} 
-                    placeholder="Search Area (Kecamatan)..." 
+                    placeholder="Cari Kecamatan..." 
                     onChange={e => handleSearchArea(e.target.value)}
                   />
-                  {searchingArea && <div style={{ position: 'absolute', right: 10, top: 12, fontSize: 10, color: '#4f46e5' }}>Searching...</div>}
+                  {searchingArea && <div style={{ position: 'absolute', right: 10, top: 12, fontSize: 10, color: '#4f46e5' }}>Mencari...</div>}
                   
                   {areas.length > 0 && (
                     <div style={{ position: 'absolute', zIndex: 100, left: 0, right: 0, top: '100%', mt: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', maxH: 200, overflowY: 'auto' }}>
@@ -439,13 +443,13 @@ export default function AdminMerchants() {
                   </div>
                 ) : (
                   <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>
-                    <i className="bx bx-error-circle" /> Logistics Area not configured
+                    <i className="bx bx-error-circle" /> Area logistik belum dikonfigurasi
                   </div>
                 )}
               </div>
 
               <div style={{ marginTop: 12, padding: 16, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                <FieldLabel>Enabled Couriers</FieldLabel>
+                <FieldLabel>Kurir yang Aktif</FieldLabel>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                   {logisticChannels.filter(lc => lc.is_active).map(c => {
                     const active = modal.enabled_couriers?.split(',').includes(c.code);
@@ -466,7 +470,7 @@ export default function AdminMerchants() {
                     );
                   })}
                 </div>
-                <p style={{ fontSize: 9, color: '#94a3b8', marginTop: 8 }}>Select which logistics are available for this merchant. Empty means platform default.</p>
+                <p style={{ fontSize: 9, color: '#94a3b8', marginTop: 8 }}>Pilih kurir yang tersedia untuk merchant ini. Kosong berarti mengikuti default platform.</p>
               </div>
             </div>
           </div>
@@ -478,12 +482,12 @@ export default function AdminMerchants() {
 
           {/* Modal Footer Actions (User-style) */}
           <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center' }}>
-             <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>Merchant Entity registered since {fmtDate(modal.created_at)}</p>
+             <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>Entitas Merchant terdaftar sejak {fmtDate(modal.created_at)}</p>
              <button
                 style={{ ...A.btnPrimary, width: '100%', justifyContent: 'center', padding: '12px', background: 'linear-gradient(135deg, #1e293b, #0f172a)' }}
                 onClick={() => setModal(null)}
              >
-                Close Control Panel
+                Tutup Panel Kendali
              </button>
           </div>
         </Modal>

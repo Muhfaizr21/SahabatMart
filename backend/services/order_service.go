@@ -132,30 +132,40 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			var merchant models.Merchant
 			tx.First(&merchant, "id = ?", merchantID)
 
-			var requestedCourier, requestedService string
+			var requestedCourier, requestedService, requestedType string
 			var groupShippingCost float64
 			for _, mg := range shippingInfo.MerchantGroups {
 				if mg.MerchantID == merchantID {
 					requestedCourier = mg.CourierCode
-					requestedService = mg.ServiceCode
+					requestedService = mg.CourierService // Use the updated model field name
+					if requestedService == "" {
+						requestedService = mg.ServiceCode // Fallback for old requests
+					}
 					groupShippingCost = mg.ShippingCost
+					requestedType = mg.ShippingType
 					break
 				}
 			}
 
 			if requestedCourier == "" && len(shippingInfo.MerchantGroups) > 0 {
 				requestedCourier = shippingInfo.MerchantGroups[0].CourierCode
-				requestedService = shippingInfo.MerchantGroups[0].ServiceCode
+				requestedService = shippingInfo.MerchantGroups[0].CourierService
+				if requestedService == "" {
+					requestedService = shippingInfo.MerchantGroups[0].ServiceCode
+				}
 				groupShippingCost = shippingInfo.MerchantGroups[0].ShippingCost
+				requestedType = shippingInfo.MerchantGroups[0].ShippingType
 			}
 
 			group := models.OrderMerchantGroup{
-				OrderID:      order.ID,
-				MerchantID:   merchantID,
-				Status:       models.MOrderNew,
-				CourierCode:  requestedCourier,
-				ServiceCode:  requestedService,
-				ShippingCost: groupShippingCost,
+				OrderID:        order.ID,
+				MerchantID:     merchantID,
+				Status:         models.MOrderNew,
+				CourierCode:    requestedCourier,
+				CourierService: requestedService,
+				ShippingType:   requestedType,
+				ShippingCost:   groupShippingCost,
+				MerchantPayout: 0,
 			}
 
 			if err := tx.Create(&group).Error; err != nil {
@@ -512,7 +522,7 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			GrossAmount: subtotal,
 			RateApplied: pl.Rate,
 			Amount:      commAmt,
-			Status:      models.CommissionPending,
+			Status:      models.CommissionPending, // Akan di-update saat wallet settlement
 			HoldUntil:   &holdUntil,
 		}
 		if err := tx.Create(&commRecord).Error; err != nil {
@@ -525,12 +535,6 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			Amount:      commAmt,
 			Rate:        pl.Rate,
 		})
-
-		// [Akuglow Sync] Notify Affiliate of new commission
-		s.Notification.Push(currentAffiliateID, "affiliate", "commission_pending", 
-			"💸 Komisi Baru Masuk!", 
-			fmt.Sprintf("Anda mendapatkan komisi Rp %.0f dari pesanan %s.", commAmt, order.OrderNumber), 
-			"/affiliate/commissions")
 
 		// Naik ke upline berikutnya
 		if aff.UplineID != nil {

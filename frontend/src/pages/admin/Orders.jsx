@@ -86,7 +86,7 @@ export default function AdminOrders() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Order Lifecycle" subtitle="Monitoring dan manajemen seluruh transaksi platform.">
+      <PageHeader title="Siklus Pesanan" subtitle="Monitoring dan manajemen seluruh transaksi platform.">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <div style={A.searchWrap}>
             <i className="bx bx-search" style={A.searchIcon} />
@@ -108,7 +108,7 @@ export default function AdminOrders() {
             setSearch(''); setDateFrom(''); setDateTo(''); setTab('');
             setPage(1);
             setTimeout(() => load(1), 50);
-          }} title="Reset Filters"><i className="bx bx-reset" /></button>
+          }} title="Reset Filter"><i className="bx bx-reset" /></button>
           <button style={A.btnGhost} onClick={() => load(page)}><i className="bx bx-refresh" /> Refresh</button>
         </div>
       </PageHeader>

@@ -73,6 +73,7 @@ export default function MerchantOrders() {
     { label: 'Baru', value: 'new' },
     { label: 'Dikonfirmasi', value: 'confirmed' },
     { label: 'Diproses', value: 'processing' },
+    { label: 'Siap Diambil', value: 'ready_for_pickup' },
     { label: 'Dikirim', value: 'shipped' },
     { label: 'Selesai', value: 'completed' },
   ];
@@ -123,12 +124,12 @@ export default function MerchantOrders() {
                </div>
                
                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                 <div style={{ padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5,
-                   background: order.status === 'completed' ? '#ecfdf5' : '#fffbeb',
-                   color: order.status === 'completed' ? '#10b981' : '#f59e0b'
-                 }}>
-                   {order.status}
-                 </div>
+                  <div style={{ padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5,
+                    background: order.status === 'completed' ? '#ecfdf5' : order.status === 'ready_for_pickup' ? '#eef2ff' : '#fffbeb',
+                    color: order.status === 'completed' ? '#10b981' : order.status === 'ready_for_pickup' ? '#4f46e5' : '#f59e0b'
+                  }}>
+                    {order.status.replace(/_/g, ' ')}
+                  </div>
                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{idr(order.merchant_payout || 0)}</div>
                </div>
             </div>
@@ -173,12 +174,18 @@ export default function MerchantOrders() {
                   <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Detail Logistik</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Metode</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: order.shipping_type === 'pickup' ? '#4f46e5' : '#0f172a' }}>
+                        {order.shipping_type === 'pickup' ? '🏪 Ambil di Toko' : '🚚 Ekspedisi'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Kurir</span>
                       <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.courier_code || 'Menunggu Konfirmasi'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>No. Resi</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.tracking_number || 'Belum Dikirim'}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>No. Resi / Kode</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{order.tracking_number || (order.shipping_type === 'pickup' ? 'Menunggu Siap' : 'Belum Dikirim')}</span>
                     </div>
                   </div>
 
@@ -227,7 +234,14 @@ export default function MerchantOrders() {
                       <button style={{ ...A.btnPrimary, flex: 1, height: 48 }} onClick={() => handleUpdateStatus(order.id, 'processing')} disabled={updating === order.id}>Proses Barang</button>
                     )}
                     {order.status === 'processing' && (
-                      <button style={{ ...A.btnPrimary, flex: 1, height: 48, background: '#4f46e5', borderColor: '#4f46e5' }} onClick={() => handleUpdateStatus(order.id, 'shipped')} disabled={updating === order.id}>Input Resi & Kirim</button>
+                      order.shipping_type === 'pickup' ? (
+                        <button style={{ ...A.btnPrimary, flex: 1, height: 48, background: '#4f46e5', borderColor: '#4f46e5' }} onClick={() => handleUpdateStatus(order.id, 'ready_for_pickup')} disabled={updating === order.id}>Siap Diambil</button>
+                      ) : (
+                        <button style={{ ...A.btnPrimary, flex: 1, height: 48, background: '#4f46e5', borderColor: '#4f46e5' }} onClick={() => handleUpdateStatus(order.id, 'shipped')} disabled={updating === order.id}>Input Resi & Kirim</button>
+                      )
+                    )}
+                    {order.status === 'ready_for_pickup' && (
+                      <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#f5f3ff', color: '#4f46e5', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Menunggu Diambil Buyer</div>
                     )}
                     {order.status === 'shipped' && (
                       <div style={{ flex: 1, textAlign: 'center', padding: 14, background: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 800, borderRadius: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Paket dalam Perjalanan</div>
