@@ -30,11 +30,12 @@ type AdminController struct {
 
 func NewAdminController(db *gorm.DB) *AdminController {
 	audit := services.NewAuditService(repositories.NewAuditRepository(db))
+	notif := services.NewNotificationService(db)
 	return &AdminController{
 		DB:      db,
-		Service: services.NewAdminService(db, audit),
+		Service: services.NewAdminService(db, audit, notif),
 		Audit:   audit,
-		Notif:   services.NewNotificationService(db),
+		Notif:   notif,
 		Storage: services.NewStorageService("http://localhost:8080", "uploads"),
 	}
 }
@@ -3057,6 +3058,38 @@ func (ac *AdminController) MarkNotificationRead(w http.ResponseWriter, r *http.R
 		ac.Notif.MarkAllAsRead("", "admin")
 	} else {
 		ac.Notif.MarkAsRead(req.ID)
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// POST /api/admin/notifications/read-all
+func (ac *AdminController) MarkAllNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	if err := ac.Notif.MarkAllAsRead("", "admin"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menandai semua notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/admin/notifications
+func (ac *AdminController) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ID notifikasi diperlukan")
+		return
+	}
+	if err := ac.Notif.Delete(id); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/admin/notifications/all
+func (ac *AdminController) DeleteAllNotifications(w http.ResponseWriter, r *http.Request) {
+	if err := ac.Notif.DeleteAll("", "admin"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus semua notifikasi")
+		return
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

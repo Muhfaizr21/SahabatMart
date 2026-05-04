@@ -226,8 +226,9 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	
 	mux.HandleFunc("/api/merchant/notifications", merchantOnly(merchantCtrl.GetNotifications))
 	mux.HandleFunc("/api/merchant/notifications/read", merchantOnly(merchantCtrl.MarkNotificationRead))
+	mux.HandleFunc("/api/merchant/notifications/read-all", merchantOnly(merchantCtrl.MarkAllNotificationsRead))
 	mux.HandleFunc("/api/merchant/notifications/delete", merchantOnly(merchantCtrl.DeleteNotification))
-	mux.HandleFunc("/api/merchant/notifications/delete-all", merchantOnly(merchantCtrl.DeleteAllNotifications))
+	mux.HandleFunc("/api/merchant/notifications/all", merchantOnly(merchantCtrl.DeleteAllNotifications))
 	mux.HandleFunc("/api/merchant/affiliate-stats", merchantOnly(merchantCtrl.GetAffiliateStats))
 
 	// --- Affiliate Routes ---
@@ -254,6 +255,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/affiliate/notifications", affiliateOnly(affiliateCtrl.GetNotifications))
 	mux.HandleFunc("/api/affiliate/notifications/read", affiliateOnly(affiliateCtrl.MarkNotificationRead))
 	mux.HandleFunc("/api/affiliate/notifications/read-all", affiliateOnly(affiliateCtrl.MarkAllNotificationsRead))
+	mux.HandleFunc("/api/affiliate/notifications/delete", affiliateOnly(affiliateCtrl.DeleteNotification))
+	mux.HandleFunc("/api/affiliate/notifications/all", affiliateOnly(affiliateCtrl.DeleteAllNotifications))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
 
 	// --- Admin Routes ---
@@ -294,10 +297,13 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/merchants/stats", adminOnly(adminCtrl.GetMerchantStats))
 	mux.HandleFunc("/api/admin/monthly", adminOnly(adminCtrl.GetMonthlyRevenue))
 	mux.HandleFunc("/api/admin/finance/monthly", adminOnly(adminCtrl.GetMonthlyRevenue)) // Alias for dashboard
+
+	// Notifications
 	mux.HandleFunc("/api/admin/notifications", adminOnly(adminCtrl.GetNotifications))
 	mux.HandleFunc("/api/admin/notifications/read", adminOnly(adminCtrl.MarkNotificationRead))
-
-	// User Management
+	mux.HandleFunc("/api/admin/notifications/read-all", adminOnly(adminCtrl.MarkAllNotificationsRead))
+	mux.HandleFunc("/api/admin/notifications/delete", adminOnly(adminCtrl.DeleteNotification))
+	mux.HandleFunc("/api/admin/notifications/all", adminOnly(adminCtrl.DeleteAllNotifications))
 	mux.HandleFunc("/api/admin/users", can("manage_users")(adminCtrl.GetUsers))
 	mux.HandleFunc("/api/admin/users/create", can("manage_users")(adminCtrl.CreateUser))
 	mux.HandleFunc("/api/admin/users/update", can("manage_users")(adminCtrl.UpdateUser))
@@ -412,8 +418,11 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/rbac/roles/upsert", superAdminOnly(rbacCtrl.UpsertRole))
 	mux.HandleFunc("/api/admin/rbac/roles/delete", superAdminOnly(rbacCtrl.DeleteRole))
 	mux.HandleFunc("/api/admin/rbac/users", superAdminOnly(rbacCtrl.CreateAdminUser))
+	mux.HandleFunc("/api/admin/rbac/users/update", superAdminOnly(rbacCtrl.UpdateAdminUser))
 	mux.HandleFunc("/api/admin/rbac/users/status", superAdminOnly(rbacCtrl.ToggleAdminStatus))
 	mux.HandleFunc("/api/admin/rbac/users/delete", superAdminOnly(rbacCtrl.DeleteAdmin))
+	mux.HandleFunc("/api/admin/rbac/stats", superAdminOnly(rbacCtrl.GetStats))
+	mux.HandleFunc("/api/admin/rbac/admins", superAdminOnly(rbacCtrl.GetAdmins))
 
 	// System & Config
 	mux.HandleFunc("/api/admin/configs", adminOnly(adminCtrl.GetSettings))

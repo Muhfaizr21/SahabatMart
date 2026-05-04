@@ -137,6 +137,22 @@ const AffiliateLayout = () => {
     } catch (e) {}
   };
 
+  const deleteNotif = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await fetchJson(`${AFFILIATE_API_BASE}/notifications/delete?id=${id}`, { method: 'DELETE' });
+      fetchNotifs();
+    } catch (e) {}
+  };
+
+  const deleteAllNotifs = async () => {
+    if(!window.confirm("Hapus semua notifikasi?")) return;
+    try {
+      await fetchJson(`${AFFILIATE_API_BASE}/notifications/all`, { method: 'DELETE' });
+      fetchNotifs();
+    } catch (e) {}
+  };
+
   const sidebarRef = React.useRef(null);
 
   useEffect(() => {
@@ -353,15 +369,26 @@ const AffiliateLayout = () => {
                           </span>
                         )}
                       </div>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markAllAsRead();
-                        }}
-                        className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-tight"
-                      >
-                        Tandai Semua Dibaca
-                      </button>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markAllAsRead();
+                          }}
+                          className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-tight"
+                        >
+                          Tandai Dibaca
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteAllNotifs();
+                          }}
+                          className="text-[10px] font-bold text-rose-400 hover:text-rose-300 transition-colors uppercase tracking-tight"
+                        >
+                          Hapus Semua
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
@@ -379,11 +406,11 @@ const AffiliateLayout = () => {
                               setNotifOpen(false);
                               if (n.link) navigate(n.link);
                             }}
-                            className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group ${!n.is_read ? 'bg-purple-500/5' : ''}`}
+                            className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group relative ${!n.is_read ? 'bg-purple-500/5' : ''}`}
                           >
                             <div className="flex gap-3">
                               <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-purple-400' : 'bg-transparent'}`} />
-                              <div className="flex-1 min-w-0">
+                              <div className="flex-1 min-w-0 pr-6">
                                 <p className={`text-[12px] leading-tight mb-1 ${!n.is_read ? 'text-white font-bold' : 'text-slate-300 font-medium'}`}>
                                   {n.title}
                                 </p>
@@ -394,6 +421,12 @@ const AffiliateLayout = () => {
                                   {new Date(n.created_at).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               </div>
+                              <button 
+                                onClick={(e) => deleteNotif(e, n.id)}
+                                className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-rose-400"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                              </button>
                             </div>
                           </div>
                         ))

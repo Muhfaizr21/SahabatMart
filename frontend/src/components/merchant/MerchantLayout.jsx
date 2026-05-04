@@ -62,10 +62,7 @@ const MerchantLayout = () => {
 
   const handleClearAllNotifs = async () => {
     try {
-      await fetchJson(`${MERCHANT_API_BASE}/notifications/read`, {
-        method: 'PUT',
-        body: JSON.stringify({ id: "" })
-      });
+      await fetchJson(`${MERCHANT_API_BASE}/notifications/read-all`, { method: 'POST' });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch (err) {
       console.error("Failed to clear notifs", err);
@@ -75,7 +72,7 @@ const MerchantLayout = () => {
   const handleDeleteAllNotifs = async () => {
     if(!window.confirm("Hapus semua notifikasi?")) return;
     try {
-      await fetchJson(`${MERCHANT_API_BASE}/notifications/delete-all`, { method: 'DELETE' });
+      await fetchJson(`${MERCHANT_API_BASE}/notifications/all`, { method: 'DELETE' });
       setNotifications([]);
     } catch (err) {
       console.error("Failed to delete all notifs", err);

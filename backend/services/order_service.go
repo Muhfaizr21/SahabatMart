@@ -247,7 +247,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		adminID := "00000000-0000-0000-0000-000000000001"
 		_ = s.Notification.Push(adminID, "admin", "order_new", "Pesanan Baru Masuk!", 
 			fmt.Sprintf("Pesanan %s menunggu pembayaran.", order.OrderNumber), 
-			fmt.Sprintf("/admin/orders/%s", order.ID))
+			fmt.Sprintf("/admin/orders/detail/%s", order.ID))
 	}
 
 	return order, err
@@ -291,14 +291,14 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 		if order.BuyerID != nil {
 			_ = s.Notification.Push(*order.BuyerID, "buyer", "payment_success", "Pembayaran Berhasil", 
 				fmt.Sprintf("Pembayaran untuk pesanan %s telah kami terima.", order.OrderNumber), 
-				fmt.Sprintf("/orders/%s", order.ID))
+				fmt.Sprintf("/order/%s", order.ID))
 		}
 
 		// [NOTIF] Kirim ke Admin Topbar (Pembayaran Masuk)
 		adminID := "00000000-0000-0000-0000-000000000001"
 		_ = s.Notification.Push(adminID, "admin", "payment_received", "Pembayaran Diterima!", 
 			fmt.Sprintf("Pembayaran untuk pesanan %s telah divalidasi.", order.OrderNumber), 
-			fmt.Sprintf("/admin/orders/%s", order.ID))
+			fmt.Sprintf("/admin/orders/detail/%s", order.ID))
 
 		// [NOTIF] Kirim ke Merchant: SIAP KIRIM
 		var groups []models.OrderMerchantGroup
@@ -306,7 +306,7 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 		for _, g := range groups {
 			_ = s.Notification.Push(g.MerchantID, "merchant", "order_ready_to_ship", "📦 Pesanan Siap Kirim!", 
 				fmt.Sprintf("Pesanan %s telah dibayar. Silakan segera packing dan kirim item pembeli.", order.OrderNumber), 
-				fmt.Sprintf("/merchant/orders/%s", order.ID))
+				"/merchant/orders")
 		}
 
 		// Cek Upgrade Tier Affiliate jika ada
@@ -513,6 +513,12 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			Amount:      commAmt,
 			Rate:        pl.Rate,
 		})
+
+		// [Akuglow Sync] Notify Affiliate of new commission
+		s.Notification.Push(currentAffiliateID, "affiliate", "commission_pending", 
+			"💸 Komisi Baru Masuk!", 
+			fmt.Sprintf("Anda mendapatkan komisi Rp %.0f dari pesanan %s.", commAmt, order.OrderNumber), 
+			"/affiliate/commissions")
 
 		// Naik ke upline berikutnya
 		if aff.UplineID != nil {

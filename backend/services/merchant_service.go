@@ -13,14 +13,16 @@ import (
 )
 
 type MerchantService struct {
-	DB   *gorm.DB
-	Repo *repositories.ProductRepository
+	DB    *gorm.DB
+	Repo  *repositories.ProductRepository
+	Notif *NotificationService
 }
 
-func NewMerchantService(db *gorm.DB) *MerchantService {
+func NewMerchantService(db *gorm.DB, notif *NotificationService) *MerchantService {
 	return &MerchantService{
-		DB:   db,
-		Repo: repositories.NewProductRepository(db),
+		DB:    db,
+		Repo:  repositories.NewProductRepository(db),
+		Notif: notif,
 	}
 }
 
@@ -198,6 +200,14 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 	var finalReq models.RestockRequest
 	if err == nil {
 		s.DB.Preload("Items").First(&finalReq, "id = ?", req.ID)
+
+		// [Akuglow Sync] Notify Admin
+		if s.Notif != nil {
+			adminID := "00000000-0000-0000-0000-000000000001"
+			s.Notif.Push(adminID, "admin", "restock_requested", "🛒 Permintaan Kulakan Baru", 
+				fmt.Sprintf("Merchant %s mengajukan permintaan kulakan baru (%d item).", merchantID, totalQty), 
+				"/admin/merchants/restock")
+		}
 	}
 	return &finalReq, err
 }

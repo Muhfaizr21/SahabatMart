@@ -21,10 +21,11 @@ type MerchantController struct {
 }
 
 func NewMerchantController(db *gorm.DB) *MerchantController {
+	notif := services.NewNotificationService(db)
 	return &MerchantController{
 		DB:      db,
-		Service: services.NewMerchantService(db),
-		Notif:   services.NewNotificationService(db),
+		Service: services.NewMerchantService(db, notif),
+		Notif:   notif,
 	}
 }
 
@@ -482,6 +483,21 @@ func (mc *MerchantController) MarkNotificationRead(w http.ResponseWriter, r *htt
 		mc.Notif.MarkAllAsRead(merchantID, "merchant")
 	} else {
 		mc.Notif.MarkAsRead(req.ID)
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// POST /api/merchant/notifications/read-all
+func (mc *MerchantController) MarkAllNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+	if err := mc.Notif.MarkAllAsRead(merchantID, "merchant"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menandai semua notifikasi")
+		return
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

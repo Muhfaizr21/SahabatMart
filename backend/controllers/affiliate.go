@@ -888,3 +888,32 @@ func (ac *AffiliateController) MarkAllNotificationsRead(w http.ResponseWriter, r
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Semua notifikasi ditandai telah dibaca"})
 }
+
+// DELETE /api/affiliate/notifications?id=...
+func (ac *AffiliateController) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ID Notifikasi diperlukan")
+		return
+	}
+	if err := ac.Notif.Delete(id); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/affiliate/notifications/all
+func (ac *AffiliateController) DeleteAllNotifications(w http.ResponseWriter, r *http.Request) {
+	affiliateID, ok := r.Context().Value("affiliate_id").(string)
+	if !ok || affiliateID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "ID Affiliate tidak ditemukan")
+		return
+	}
+	if err := ac.Notif.DeleteAll(affiliateID, "affiliate"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus semua notifikasi")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+

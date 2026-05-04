@@ -15,22 +15,24 @@ import { Toaster } from 'react-hot-toast';
 // ── Protected Route Wrapper ─────────
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
-  if (!token) {
+  const user = getStoredUser();
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   return children;
 }
 
 function AdminRoute({ children }) {
-  const token = localStorage.getItem('token');
   const user = getStoredUser();
 
-  if (!token) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
   if (!isAdminUser(user)) {
-    return <Navigate to="/" replace />;
+    // Jika bukan admin (misal merchant/affiliate), lempar ke beranda masing-masing
+    const target = user.role === 'merchant' ? '/merchant' : (user.role === 'affiliate' ? '/affiliate' : '/');
+    return <Navigate to={target} replace />;
   }
 
   return children;

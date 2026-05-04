@@ -17,6 +17,7 @@ type User struct {
 	AdminRole           string         `gorm:"type:varchar(50)" json:"admin_role"` // super, finance, cs_staff
 	Department          string         `gorm:"type:varchar(100)" json:"department"` // IT, Marketing, Finance
 	AdminPermissions    string         `gorm:"type:text" json:"admin_permissions"` // ["manage_users", "manage_finance"]
+	Permissions         []string       `gorm:"-" json:"permissions,omitempty"`
 	Status              string         `gorm:"type:user_status;default:'active';not null" json:"status"`
 	EmailVerifiedAt     *time.Time     `json:"email_verified_at"`
 	PhoneVerifiedAt     *time.Time     `json:"phone_verified_at"`

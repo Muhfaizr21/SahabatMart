@@ -11,13 +11,15 @@ import (
 type AdminService struct {
 	UserRepo *repositories.UserRepository
 	Audit    *AuditService
+	Notif    *NotificationService
 	DB       *gorm.DB
 }
 
-func NewAdminService(db *gorm.DB, audit *AuditService) *AdminService {
+func NewAdminService(db *gorm.DB, audit *AuditService, notif *NotificationService) *AdminService {
 	return &AdminService{
 		UserRepo: repositories.NewUserRepository(db),
 		Audit:    audit,
+		Notif:    notif,
 		DB:       db,
 	}
 }
@@ -82,6 +84,18 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 		}
 
 		s.Audit.Log(adminID, "moderate_restock", "restock_request", requestID, "status="+status, "internal")
+
+		// [Akuglow Sync] Notify Merchant
+		title := "📦 Update Restock"
+		msg := fmt.Sprintf("Permintaan kulakan Anda %s telah diperbarui menjadi: %s.", req.ID, status)
+		if status == "approved" { title = "✅ Restock Disetujui" }
+		if status == "shipped" { title = "🚚 Restock Dikirim" }
+		if status == "rejected" { title = "❌ Restock Ditolak" }
+
+		if s.Notif != nil {
+			_ = s.Notif.Push(req.MerchantID, "merchant", "restock_update", title, msg, "/merchant/restock")
+		}
+
 		return nil
 	})
 }

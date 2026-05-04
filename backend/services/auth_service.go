@@ -143,10 +143,29 @@ func (s *AuthService) Login(email, password, clientIP string) (*models.User, str
 
 	s.HandleSuccessfulLogin(user, clientIP)
 
+	s.PopulatePermissions(user)
+
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
 	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID)
 
 	return user, token, err
+}
+
+func (s *AuthService) PopulatePermissions(user *models.User) {
+	if user.Role == "superadmin" {
+		user.Permissions = []string{"all"}
+		return
+	}
+	if user.Role == "admin" && user.AdminRole != "" {
+		var role models.Role
+		if err := s.DB.Preload("Permissions").First(&role, "name = ?", user.AdminRole).Error; err == nil {
+			var perms []string
+			for _, p := range role.Permissions {
+				perms = append(perms, p.Code)
+			}
+			user.Permissions = perms
+		}
+	}
 }
 
 func (s *AuthService) GetExtraIDs(userID, role string) (string, string) {

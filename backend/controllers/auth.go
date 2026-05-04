@@ -161,6 +161,7 @@ func (ac *AuthController) GetMe(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
 		return
 	}
+	ac.Service.PopulatePermissions(&user)
 
 	utils.JSONResponse(w, http.StatusOK, user)
 }

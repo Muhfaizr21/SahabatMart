@@ -16,77 +16,85 @@ const C = {
   sideW:     260,
 };
 
-// ─── MENU STRUCTURE ────────────────────────────────────
-const menu = [
-  { name: 'Dashboard', icon: 'bxs-dashboard', path: '/admin', end: true },
-  { name: 'Kasir (POS)', icon: 'bxs-calculator', path: '/admin/pos' },
-  { name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist' },
-  {
-    name: 'Manajemen User', icon: 'bxs-user-account',
-    children: [
-      { name: 'Semua Pengguna', path: '/admin/users' },
-      { name: 'Daftar Afiliasi', path: '/admin/affiliates' },
-      { name: 'Level Keanggotaan', path: '/admin/membership-tiers' },
-    ]
+const rawMenu = [
+  { type: 'item', name: 'Dashboard', icon: 'bxs-dashboard', path: '/admin', end: true, perm: 'view_dashboard' },
 
-  },
+  { type: 'label', text: 'Anggota & Pengguna' },
   {
-    name: 'Toko (Merchant)', icon: 'bxs-store-alt',
+    type: 'item', name: 'Manajemen User', icon: 'bxs-user-account',
     children: [
-      { name: 'Semua Toko', path: '/admin/merchants' },
-      { name: 'Permintaan Stok', path: '/admin/merchants/restock' },
+      { name: 'Semua Pengguna', path: '/admin/users', perm: 'user_view' },
+      { name: 'Daftar Afiliasi', path: '/admin/affiliates', perm: 'affiliate_view' },
+      { name: 'Level Keanggotaan', path: '/admin/membership-tiers', perm: 'affiliate_manage_tiers' },
     ]
   },
   {
-    name: 'Katalog Produk', icon: 'bxs-package',
+    type: 'item', name: 'Toko (Merchant)', icon: 'bxs-store-alt',
     children: [
-      { name: 'Gudang Pusat (Stok)', path: '/admin/inventory/pusat' },
-      { name: 'Semua Produk', path: '/admin/products' },
-      { name: 'Kategori Produk', path: '/admin/categories' },
-      { name: 'Brand / Merek', path: '/admin/brands' },
-      { name: 'Ulasan Produk', path: '/admin/reviews' },
-      { name: 'Moderasi Konten', path: '/admin/moderation' },
+      { name: 'Semua Toko', path: '/admin/merchants', perm: 'merchant_view' },
+      { name: 'Permintaan Stok', path: '/admin/merchants/restock', perm: 'inventory_restock' },
+    ]
+  },
+
+  { type: 'label', text: 'Penjualan & Katalog' },
+  { type: 'item', name: 'Kasir (POS)', icon: 'bxs-calculator', path: '/admin/pos', perm: 'order_view' },
+  { type: 'item', name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist', perm: 'view_analytics' },
+  {
+    type: 'item', name: 'Katalog Produk', icon: 'bxs-package',
+    children: [
+      { name: 'Gudang Pusat (Stok)', path: '/admin/inventory/pusat', perm: 'inventory_view' },
+      { name: 'Semua Produk', path: '/admin/products', perm: 'product_view' },
+      { name: 'Kategori Produk', path: '/admin/categories', perm: 'category_view' },
+      { name: 'Brand / Merek', path: '/admin/brands', perm: 'product_view' },
+      { name: 'Ulasan Produk', path: '/admin/reviews', perm: 'product_view' },
+      { name: 'Moderasi Konten', path: '/admin/moderation', perm: 'product_update' },
     ]
   },
   {
-    name: 'Pesanan', icon: 'bxs-receipt',
+    type: 'item', name: 'Pesanan', icon: 'bxs-receipt',
     children: [
-      { name: 'Semua Pesanan', path: '/admin/orders' },
-      { name: 'Komplain & Sengketa', path: '/admin/disputes' },
+      { name: 'Semua Pesanan', path: '/admin/orders', perm: 'order_view' },
+      { name: 'Komplain & Sengketa', path: '/admin/disputes', perm: 'order_update_status' },
     ]
   },
-  { name: 'Voucher & Promo', icon: 'bxs-coupon', path: '/admin/vouchers' },
+  { type: 'item', name: 'Voucher & Promo', icon: 'bxs-coupon', path: '/admin/vouchers', perm: 'marketing_view_voucher' },
+
+  { type: 'label', text: 'Laporan Keuangan' },
   {
-    name: 'Keuangan', icon: 'bxs-wallet',
+    type: 'item', name: 'Keuangan', icon: 'bxs-wallet',
     children: [
-      { name: 'Buku Besar (Ledger)', path: '/admin/finance' },
-      { name: 'Aturan Komisi', path: '/admin/commissions' },
-      { name: 'Preset Komisi', path: '/admin/commission-presets' },
-      { name: 'Pencairan Dana', path: '/admin/payouts' },
+      { name: 'Buku Besar (Ledger)', path: '/admin/finance', perm: 'finance_view_summary' },
+      { name: 'Aturan Komisi', path: '/admin/commissions', perm: 'finance_view_summary' },
+      { name: 'Preset Komisi', path: '/admin/commission-presets', perm: 'finance_view_summary' },
+      { name: 'Pencairan Dana', path: '/admin/payouts', perm: 'finance_process_payout' },
     ]
   },
+
+  { type: 'label', text: 'Manajemen Konten' },
   {
-    name: 'Konten & Tampilan', icon: 'bxs-layout',
+    type: 'item', name: 'Konten & Tampilan', icon: 'bxs-layout',
     children: [
-      { name: 'Artikel Blog', path: '/admin/blogs' },
-      { name: 'Banner Promo', path: '/admin/banners' },
-      { name: 'Edukasi Afiliasi', path: '/admin/education' },
-      { name: 'Event Afiliasi', path: '/admin/events' },
-      { name: 'Bahan Promosi', path: '/admin/promo' },
+      { name: 'Artikel Blog', path: '/admin/blogs', perm: 'content_blog' },
+      { name: 'Banner Promo', path: '/admin/banners', perm: 'marketing_manage_banner' },
+      { name: 'Edukasi Afiliasi', path: '/admin/education', perm: 'content_education' },
+      { name: 'Event Afiliasi', path: '/admin/events', perm: 'content_event' },
+      { name: 'Bahan Promosi', path: '/admin/promo', perm: 'content_promo_material' },
     ]
   },
+
+  { type: 'label', text: 'Sistem & Keamanan' },
   {
-    name: 'Skin Journey', icon: 'bx-leaf',
+    type: 'item', name: 'Skin Journey', icon: 'bx-leaf',
     children: [
-      { name: 'Monitoring Jurnal', path: '/admin/skin-journey' },
+      { name: 'Monitoring Jurnal', path: '/admin/skin-journey', perm: 'view_analytics' },
     ]
   },
-  { name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit' },
-  { name: 'Logistik & Kurir', icon: 'bxs-truck', path: '/admin/logistics' },
-  { name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security' },
-  { name: 'Pesan Masuk', icon: 'bxs-inbox', path: '/admin/inbox' },
-  { name: 'Hak Akses (RBAC)', icon: 'bxs-key', path: '/admin/rbac' },
-  { name: 'Pengaturan Sistem', icon: 'bxs-cog', path: '/admin/settings' },
+  { type: 'item', name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit', perm: 'settings_view' },
+  { type: 'item', name: 'Logistik & Kurir', icon: 'bxs-truck', path: '/admin/logistics', perm: 'settings_view' },
+  { type: 'item', name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security', perm: 'settings_view' },
+  { type: 'item', name: 'Pesan Masuk', icon: 'bxs-inbox', path: '/admin/inbox', perm: 'user_view' },
+  { type: 'item', name: 'Hak Akses (RBAC)', icon: 'bxs-key', path: '/admin/rbac', perm: 'rbac_view' },
+  { type: 'item', name: 'Pengaturan Sistem', icon: 'bxs-cog', path: '/admin/settings', perm: 'settings_view' },
 ];
 
 // ─── SIDEBAR ITEM ──────────────────────────────────────
@@ -169,7 +177,7 @@ const Label = ({ text }) => (
 
 // ─── MAIN LAYOUT ───────────────────────────────────────
 const AdminLayout = () => {
-  const user = getStoredUser();
+  const [user, setUser] = useState(getStoredUser());
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [notifs, setNotifs] = useState([]);
@@ -178,6 +186,22 @@ const AdminLayout = () => {
   const [openProfile, setOpenProfile] = useState(false);
   const profileRef = React.useRef(null);
   const notifRef = React.useRef(null);
+
+  useEffect(() => {
+    // Sync latest user permissions
+    const syncUser = async () => {
+      try {
+        const res = await fetchJson(`${ADMIN_API_BASE.replace('/admin', '/auth')}/me`);
+        if (res && res.id) {
+          localStorage.setItem('user', JSON.stringify(res));
+          setUser(res);
+        }
+      } catch (err) {
+        console.error("Failed to sync user", err);
+      }
+    };
+    syncUser();
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -218,7 +242,7 @@ const AdminLayout = () => {
     return () => clearInterval(timer);
   }, []);
 
-  if (!user || user.role !== 'superadmin') {
+  if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
     return <Navigate to="/login" replace />;
   }
 
@@ -269,43 +293,66 @@ const AdminLayout = () => {
 
         {/* Nav */}
         <nav className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
-          {!collapsed ? (
-            <>
-              <NavItem item={menu[0]} />
-              <Label text="Anggota & Pengguna" />
-              <NavItem item={menu[3]} />
-              <NavItem item={menu[4]} />
-              <Label text="Penjualan & Katalog" />
-              <NavItem item={menu[1]} />
-              <NavItem item={menu[2]} />
-              <NavItem item={menu[5]} />
-              <NavItem item={menu[6]} />
-              <NavItem item={menu[7]} />
-              <Label text="Laporan Keuangan" />
-              <NavItem item={menu[8]} />
-              <Label text="Manajemen Konten" />
-              <NavItem item={menu[9]} />
-              <Label text="Sistem & Keamanan" />
-              <NavItem item={menu[10]} />
-              <NavItem item={menu[11]} />
-              <NavItem item={menu[12]} />
-              <NavItem item={menu[13]} />
-              <NavItem item={menu[14]} />
-              <NavItem item={menu[15]} />
-              <NavItem item={menu[16]} />
-            </>
-          ) : (
-            menu.map(item => (
-              <NavLink
-                key={item.name}
-                to={item.path || (item.children?.[0]?.path) || '#'}
-                title={item.name}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: 10, marginBottom: 4, textDecoration: 'none', color: C.muted }}
-              >
-                <i className={`bx ${item.icon}`} style={{ fontSize: 20 }} />
-              </NavLink>
-            ))
-          )}
+          {(() => {
+            const checkPerm = (code) => {
+              if (!user) return false;
+              if (user.role === 'superadmin') return true;
+              if (!code) return true;
+              const perms = user.permissions || [];
+              return perms.includes(code) || perms.includes('all');
+            };
+
+            const finalMenu = [];
+            let lastWasLabel = false;
+
+            rawMenu.forEach((m) => {
+              if (m.type === 'label') {
+                if (!lastWasLabel) finalMenu.push(m);
+                lastWasLabel = true;
+              } else if (m.type === 'item') {
+                if (m.children) {
+                  const allowedChildren = m.children.filter(c => checkPerm(c.perm));
+                  if (allowedChildren.length > 0) {
+                    finalMenu.push({ ...m, children: allowedChildren });
+                    lastWasLabel = false;
+                  }
+                } else if (checkPerm(m.perm)) {
+                  finalMenu.push(m);
+                  lastWasLabel = false;
+                }
+              }
+            });
+
+            // Cleanup trailing label
+            if (finalMenu.length > 0 && finalMenu[finalMenu.length - 1].type === 'label') {
+              finalMenu.pop();
+            }
+
+            return finalMenu.map((m, idx) => {
+              if (m.type === 'label') {
+                // don't render label if collapsed
+                return !collapsed ? <Label key={`lbl-${idx}`} text={m.text} /> : null;
+              }
+              if (collapsed) {
+                return (
+                  <NavLink
+                    key={m.name}
+                    to={m.path || (m.children?.[0]?.path) || '#'}
+                    title={m.name}
+                    style={({ isActive }) => ({
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '10px', borderRadius: 10, marginBottom: 4, textDecoration: 'none',
+                      color: isActive ? C.accent : C.muted,
+                      background: isActive ? C.accentGlow : 'transparent'
+                    })}
+                  >
+                    <i className={`bx ${m.icon}`} style={{ fontSize: 20 }} />
+                  </NavLink>
+                );
+              }
+              return <NavItem key={m.name} item={m} />;
+            });
+          })()}
         </nav>
 
         {/* Bottom: User */}
@@ -413,19 +460,37 @@ const AdminLayout = () => {
                 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Notifikasi</span>
-                    {unreadCount > 0 && (
-                      <button 
-                        onClick={async () => {
-                          try {
-                            await fetchJson(`${ADMIN_API_BASE}/notifications/read-all`, { method: 'POST' });
-                            fetchNotifs();
-                          } catch(e){}
-                        }}
-                        style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Tandai semua dibaca
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await fetchJson(`${ADMIN_API_BASE}/notifications/read-all`, { method: 'POST' });
+                              fetchNotifs();
+                            } catch(e){}
+                          }}
+                          style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Tandai dibaca
+                        </button>
+                      )}
+                      {notifs.length > 0 && (
+                        <button 
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if(!window.confirm("Hapus semua notifikasi?")) return;
+                            try {
+                              await fetchJson(`${ADMIN_API_BASE}/notifications/all`, { method: 'DELETE' });
+                              fetchNotifs();
+                            } catch(e){}
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Hapus semua
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ maxHeight: 350, overflowY: 'auto' }}>
                     {notifs.length === 0 ? (
@@ -437,9 +502,18 @@ const AdminLayout = () => {
                       notifs.map(n => (
                         <div 
                           key={n.id}
-                          onClick={() => {
+                          onClick={async () => {
                             setOpenNotif(false);
+                            if (!n.is_read) {
+                              try {
+                                await fetchJson(`${ADMIN_API_BASE}/notifications/read`, {
+                                  method: 'PUT',
+                                  body: JSON.stringify({ id: n.id })
+                                });
+                              } catch(e) {}
+                            }
                             navigate(n.link);
+                            fetchNotifs();
                           }}
                           style={{
                             padding: '12px 16px', borderBottom: '1px solid #f8fafc',
@@ -449,7 +523,22 @@ const AdminLayout = () => {
                         >
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>{n.title}</div>
                           <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4, marginBottom: 4 }}>{n.message}</div>
-                          <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>{new Date(n.created_at).toLocaleString()}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>{new Date(n.created_at).toLocaleString()}</div>
+                            <button 
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await fetchJson(`${ADMIN_API_BASE}/notifications/delete?id=${n.id}`, { method: 'DELETE' });
+                                  fetchNotifs();
+                                } catch(e){}
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px 4px' }}
+                              title="Hapus"
+                            >
+                              <i className="bx bx-trash" style={{ fontSize: 12 }} />
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}

@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AUTH_API_BASE, fetchJson } from '../lib/api';
+import { getStoredUser, isAdminUser } from '../lib/auth';
+
+const getRedirectPath = (user) => {
+  if (!user) return '/';
+  if (user.role === 'admin' || user.role === 'superadmin') return '/admin';
+  if (user.role === 'merchant') return '/merchant';
+  if (user.role === 'affiliate') return '/affiliate';
+  return '/';
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -9,6 +18,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const location = useLocation();
+
+  // Redirection is handled in handleLogin and the Google callback useEffect.
+  // We remove the mount-time redirect to prevent infinite loops with AdminRoute.
+
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -23,20 +36,9 @@ export default function LoginPage() {
           headers: { 'Authorization': `Bearer ${token}` }
       }).then(user => {
           localStorage.setItem('user', JSON.stringify(user));
-          
-          // Redirect berdasarkan role
-          if (user.role === 'admin' || user.role === 'superadmin') {
-            navigate('/admin');
-          } else if (user.role === 'merchant') {
-            navigate('/merchant');
-          } else if (user.role === 'affiliate') {
-            navigate('/affiliate');
-          } else {
-            navigate('/');
-          }
-          window.location.reload();
+          navigate(getRedirectPath(user), { replace: true });
       }).catch(err => {
-          setError("Gagal sinkronisasi data Google: " + err.message);
+          setError('Gagal sinkronisasi data Google: ' + err.message);
           setLoading(false);
       });
     }
@@ -60,18 +62,7 @@ export default function LoginPage() {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Redirect berdasarkan role
-      if (data.user.role === 'admin' || data.user.role === 'superadmin') {
-        navigate('/admin');
-      } else if (data.user.role === 'merchant') {
-        navigate('/merchant');
-      } else if (data.user.role === 'affiliate') {
-        navigate('/affiliate');
-      } else {
-        navigate('/');
-      }
-      window.location.reload(); 
+      navigate(getRedirectPath(data.user), { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
