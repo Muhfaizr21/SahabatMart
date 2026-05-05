@@ -94,11 +94,30 @@ export default function Navbar() {
     };
   }, [location.pathname, user?.id]);
 
+  useEffect(() => {
+    const searchParam = new URLSearchParams(location.search).get('search');
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    } else {
+      setSearchQuery('');
+    }
+  }, [location.search]);
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
+    } else {
+      navigate('/shop');
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    if (location.pathname === '/shop') {
+      const params = new URLSearchParams(location.search);
+      params.delete('search');
+      navigate(`/shop?${params.toString()}`);
     }
   };
 
@@ -109,7 +128,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+      <header className="bg-black border-b border-white/10 sticky top-0 z-50 shadow-sm text-white">
         {/* Top Header */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4 lg:gap-8">
           {/* Logo */}
@@ -119,15 +138,24 @@ export default function Navbar() {
 
           {/* Desktop Search Bar */}
           <form onSubmit={handleSearch} className="hidden lg:flex flex-1 max-w-2xl">
-            <div className="flex w-full border-2 border-gray-100 rounded-2xl overflow-hidden focus-within:border-blue-500 transition-all bg-gray-50 focus-within:bg-white focus-within:shadow-xl focus-within:shadow-blue-50/50">
+            <div className="flex w-full border border-white/20 rounded-2xl overflow-hidden focus-within:border-primary transition-all bg-white/5 focus-within:bg-white/10 group relative">
               <input 
                 type="text" 
-                placeholder="Cari produk premium, kategori, atau merk..." 
-                className="flex-1 px-6 py-2.5 text-sm outline-none bg-transparent"
+                placeholder="Cari produk premium..." 
+                className="flex-1 px-6 py-2.5 text-sm outline-none bg-transparent text-white placeholder:text-gray-500 pr-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 px-6 text-white transition-colors flex items-center justify-center">
+              {searchQuery && (
+                <button 
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-16 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors p-1"
+                >
+                  <CloseIcon />
+                </button>
+              )}
+              <button type="submit" className="bg-primary hover:bg-primary-dark px-6 text-white transition-colors flex items-center justify-center">
                 <SearchIcon />
               </button>
             </div>
@@ -136,55 +164,55 @@ export default function Navbar() {
           {/* Actions */}
           <div className="flex items-center gap-1.5 sm:gap-5">
             {/* Mobile Search Toggle (Optional but helpful) */}
-            <button className="lg:hidden p-2 text-gray-500 hover:text-blue-600 active:scale-90 transition-all" onClick={() => setMenuOpen(!menuOpen)}>
+            <button className="lg:hidden p-2 text-gray-500 hover:text-primary active:scale-90 transition-all" onClick={() => setMenuOpen(!menuOpen)}>
               <SearchIcon />
             </button>
 
             <div className="relative">
               <button 
-                className="flex items-center gap-2.5 text-gray-700 hover:text-blue-600 transition-all group"
+                className="flex items-center gap-2.5 text-white hover:text-primary transition-all group"
                 onClick={() => setUserDropdown(!userDropdown)}
               >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:border-blue-200 transition-all overflow-hidden">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10 group-hover:border-primary-light/30 transition-all overflow-hidden">
                   {loggedIn && user?.profile?.photo_url ? (
                     <img src={user.profile.photo_url} className="w-full h-full object-cover" alt="Profile" />
                   ) : <UserIcon />}
                 </div>
                 <div className="hidden md:block text-left">
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">Akun Saya</p>
-                  <p className="text-sm font-black text-gray-800 leading-none">
+                  <p className="text-sm font-black text-white leading-none">
                     {loggedIn ? (user?.profile?.full_name?.split(' ')[0] || 'Member') : 'Masuk'}
                   </p>
                 </div>
               </button>
 
               {userDropdown && (
-                <div className="absolute top-full right-0 mt-3 w-56 bg-white border border-gray-100 shadow-2xl rounded-2xl py-3 z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-full right-0 mt-3 w-56 bg-black border border-white/10 shadow-2xl rounded-2xl py-3 z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   {loggedIn ? (
                     <>
                       <div className="px-4 pb-3 border-b border-gray-50 mb-2">
-                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{user?.role}</p>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest">{user?.role}</p>
                         <p className="text-xs font-medium text-gray-500 truncate">{user?.email}</p>
                       </div>
-                      <Link to="/profile" className="block px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Profil Saya</Link>
-                      <Link to="/profile?tab=orders" className="block px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Pesanan Saya</Link>
+                      <Link to="/profile" className="block px-4 py-2.5 text-sm font-bold text-gray-300 hover:bg-white/5" onClick={() => setUserDropdown(false)}>Profil Saya</Link>
+                      <Link to="/profile?tab=orders" className="block px-4 py-2.5 text-sm font-bold text-gray-300 hover:bg-white/5" onClick={() => setUserDropdown(false)}>Pesanan Saya</Link>
                       {isAdmin && (
-                        <Link to="/admin" className="block px-4 py-2.5 text-sm font-black text-blue-600 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Dashboard Admin</Link>
+                        <Link to="/admin" className="block px-4 py-2.5 text-sm font-black text-primary hover:bg-white/5" onClick={() => setUserDropdown(false)}>Dashboard Admin</Link>
                       )}
                       {user?.role === 'merchant' && (
-                        <Link to="/merchant" className="block px-4 py-2.5 text-sm font-black text-blue-600 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Dashboard Merchant</Link>
+                        <Link to="/merchant" className="block px-4 py-2.5 text-sm font-black text-primary hover:bg-white/5" onClick={() => setUserDropdown(false)}>Dashboard Merchant</Link>
                       )}
                       {user?.role === 'affiliate' && (
-                        <Link to="/affiliate" className="block px-4 py-2.5 text-sm font-black text-blue-600 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Dashboard Affiliate</Link>
+                        <Link to="/affiliate" className="block px-4 py-2.5 text-sm font-black text-primary hover:bg-white/5" onClick={() => setUserDropdown(false)}>Dashboard Affiliate</Link>
                       )}
-                      <div className="mt-2 pt-2 border-t border-gray-50">
-                        <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">Keluar (Logout)</button>
+                      <div className="mt-2 pt-2 border-t border-white/10">
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-500/10">Keluar (Logout)</button>
                       </div>
                     </>
                   ) : (
                     <>
-                      <Link to="/login" className="block px-4 py-2.5 text-sm font-black text-gray-800 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Masuk Akun</Link>
-                      <Link to="/register" className="block px-4 py-2.5 text-sm font-bold text-gray-500 hover:bg-blue-50" onClick={() => setUserDropdown(false)}>Daftar Baru</Link>
+                      <Link to="/login" className="block px-4 py-2.5 text-sm font-black text-white hover:bg-white/5" onClick={() => setUserDropdown(false)}>Masuk Akun</Link>
+                      <Link to="/register" className="block px-4 py-2.5 text-sm font-bold text-gray-400 hover:bg-white/5" onClick={() => setUserDropdown(false)}>Daftar Baru</Link>
                     </>
                   )}
                 </div>
@@ -192,20 +220,20 @@ export default function Navbar() {
             </div>
 
             {loggedIn && (
-              <Link to="/wishlist" className="hidden sm:flex relative p-2.5 text-gray-700 hover:text-red-500 transition-colors">
+              <Link to="/wishlist" className="hidden sm:flex relative p-2.5 text-white hover:text-red-500 transition-colors">
                 <HeartIcon />
-                {wishCount > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{wishCount}</span>}
+                {wishCount > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-black">{wishCount}</span>}
               </Link>
             )}
 
             {loggedIn && (
               <button 
                 onClick={() => window.dispatchEvent(new Event('openCart'))}
-                className="relative p-2.5 text-gray-700 hover:text-blue-600 transition-colors cursor-pointer active:scale-90"
+                className="relative p-2.5 text-white hover:text-primary transition-colors cursor-pointer active:scale-90"
               >
                 <CartIcon />
                 {cartCount > 0 && (
-                  <span className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-white">{cartCount}</span>
+                  <span className="absolute top-0 right-0 bg-primary text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-black">{cartCount}</span>
                 )}
               </button>
             )}
@@ -213,13 +241,13 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Horizontal Sub-Navbar */}
-        <div className="lg:hidden border-t border-gray-50 overflow-x-auto no-scrollbar bg-white/50 backdrop-blur-sm">
+        <div className="lg:hidden border-t border-white/5 overflow-x-auto no-scrollbar bg-black/95 backdrop-blur-sm">
           <div className="flex items-center gap-6 px-4 h-11 whitespace-nowrap min-w-max">
             {navLinks.map(link => (
               <Link 
                 key={link.label} 
                 to={link.href} 
-                className={`text-[13px] font-bold transition-all ${location.pathname === link.href ? 'text-blue-600 border-b-2 border-blue-600 h-full flex items-center' : 'text-gray-500 hover:text-blue-600'}`}
+                className={`text-[13px] font-bold transition-all ${location.pathname === link.href ? 'text-primary border-b-2 border-primary h-full flex items-center' : 'text-gray-400 hover:text-primary'}`}
               >
                 {link.label}
               </Link>
@@ -228,46 +256,53 @@ export default function Navbar() {
         </div>
 
         {/* Desktop Navigation Bottom */}
-        <div className="hidden lg:block border-t border-gray-100 bg-gray-50/50">
+        <div className="hidden lg:block border-t border-white/10 bg-black">
           <div className="max-w-7xl mx-auto px-6 flex items-center gap-10 h-12">
             <nav className="flex items-center gap-8">
               {navLinks.map(link => (
-                <Link key={link.label} to={link.href} className="text-sm font-bold text-gray-600 hover:text-blue-600 transition-colors">{link.label}</Link>
+                <Link key={link.label} to={link.href} className="text-sm font-bold text-gray-300 hover:text-primary transition-colors">{link.label}</Link>
               ))}
             </nav>
             <div className="ml-auto flex items-center gap-2 text-sm">
-              <span className="text-gray-400">Butuh bantuan?</span>
-              <span className="font-black text-gray-900 italic">AkuGlow Care</span>
+              <span className="text-gray-500">Butuh bantuan?</span>
+              <span className="font-black text-white italic">AkuGlow Care</span>
             </div>
           </div>
         </div>
 
         {/* Mobile Menu Overlay / Search Overlay */}
         {menuOpen && (
-          <div className="lg:hidden fixed inset-0 top-[90px] z-[55] bg-white animate-in fade-in slide-in-from-top duration-300 overflow-y-auto pb-20">
+          <div className="lg:hidden fixed inset-0 top-[90px] z-[55] bg-black animate-in fade-in slide-in-from-top duration-300 overflow-y-auto pb-20 text-white">
             <div className="px-6 py-6 space-y-6">
               <div className="relative">
                 <form onSubmit={handleSearch}>
                   <input 
                     type="text" 
                     placeholder="Apa yang kamu cari?" 
-                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-5 py-3.5 text-base outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-base outline-none focus:border-primary focus:bg-white/10 transition-all shadow-sm text-white pr-12"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                  <button type="submit" className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600">
-                    <SearchIcon />
-                  </button>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    {searchQuery && (
+                      <button type="button" onClick={clearSearch} className="text-gray-500 hover:text-white p-1">
+                        <CloseIcon />
+                      </button>
+                    )}
+                    <button type="submit" className="text-primary">
+                      <SearchIcon />
+                    </button>
+                  </div>
                 </form>
               </div>
               
               <div className="grid grid-cols-1 gap-4">
-                <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Menu Navigasi</p>
+                <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Menu Navigasi</p>
                 {navLinks.map(link => (
                   <Link 
                     key={link.label} 
                     to={link.href} 
-                    className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-blue-50 text-base font-bold text-gray-800 transition-all border border-gray-100" 
+                    className="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-primary/20 text-base font-bold text-white transition-all border border-white/5" 
                     onClick={() => setMenuOpen(false)}
                   >
                     {link.label}
@@ -278,8 +313,8 @@ export default function Navbar() {
 
               {!loggedIn && (
                 <div className="grid grid-cols-2 gap-3 pt-4">
-                  <Link to="/login" className="bg-blue-600 text-white text-center py-3.5 rounded-2xl font-black text-sm shadow-lg shadow-blue-200" onClick={() => setMenuOpen(false)}>Masuk</Link>
-                  <Link to="/register" className="bg-gray-100 text-gray-700 text-center py-3.5 rounded-2xl font-black text-sm border border-gray-200" onClick={() => setMenuOpen(false)}>Daftar</Link>
+                  <Link to="/login" className="bg-primary text-white text-center py-3.5 rounded-2xl font-black text-sm shadow-lg shadow-primary-light/30" onClick={() => setMenuOpen(false)}>Masuk</Link>
+                  <Link to="/register" className="bg-white/10 text-white text-center py-3.5 rounded-2xl font-black text-sm border border-white/10" onClick={() => setMenuOpen(false)}>Daftar</Link>
                 </div>
               )}
             </div>
@@ -287,25 +322,29 @@ export default function Navbar() {
         )}
       </header>
 
-      {/* Modern Bottom Navigation for Mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 px-6 py-2.5 flex items-center justify-between shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-        <Link to="/" className={`flex flex-col items-center gap-1 transition-all ${location.pathname === '/' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}>
-          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          <span className="text-[10px] font-bold">Home</span>
-        </Link>
-        <Link to="/shop" className={`flex flex-col items-center gap-1 transition-all ${location.pathname === '/shop' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}>
-          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          <span className="text-[10px] font-bold">Toko</span>
-        </Link>
-        <Link to="/wishlist" className={`flex flex-col items-center gap-1 transition-all ${location.pathname === '/wishlist' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}>
-          <HeartIcon />
-          <span className="text-[10px] font-bold">Favorit</span>
-        </Link>
-        <Link to="/profile" className={`flex flex-col items-center gap-1 transition-all ${location.pathname === '/profile' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}>
-          <UserIcon />
-          <span className="text-[10px] font-bold">Profil</span>
-        </Link>
-      </nav>
+      {/* Modern Floating Bottom Navigation for Mobile */}
+      <div className="lg:hidden fixed bottom-6 left-0 right-0 z-[100] px-5 flex justify-center pointer-events-none">
+        <nav className="w-full max-w-sm bg-black/80 backdrop-blur-2xl border border-white/10 px-10 py-3.5 flex items-center justify-between shadow-[0_15px_50px_rgba(0,0,0,0.5)] rounded-[2.5rem] pointer-events-auto transition-transform active:scale-[0.98]">
+          <Link to="/" className={`flex flex-col items-center gap-1.5 transition-all ${location.pathname === '/' ? 'text-primary scale-110' : 'text-gray-400'}`}>
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span className="text-[9px] font-black uppercase tracking-wider">Home</span>
+          </Link>
+          <Link to="/shop" className={`flex flex-col items-center gap-1.5 transition-all ${location.pathname === '/shop' ? 'text-primary scale-110' : 'text-gray-400'}`}>
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span className="text-[9px] font-black uppercase tracking-wider">Belanja</span>
+          </Link>
+          {loggedIn && (
+            <Link to="/wishlist" className={`flex flex-col items-center gap-1.5 transition-all ${location.pathname === '/wishlist' ? 'text-primary scale-110' : 'text-gray-400'}`}>
+              <HeartIcon />
+              <span className="text-[9px] font-black uppercase tracking-wider">Favorit</span>
+            </Link>
+          )}
+          <Link to={loggedIn ? "/profile" : "/login"} className={`flex flex-col items-center gap-1.5 transition-all ${location.pathname === (loggedIn ? '/profile' : '/login') ? 'text-primary scale-110' : 'text-gray-400'}`}>
+            <UserIcon />
+            <span className="text-[9px] font-black uppercase tracking-wider">Profil</span>
+          </Link>
+        </nav>
+      </div>
     </>
   );
 }

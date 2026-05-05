@@ -58,6 +58,12 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CouponPage from './pages/CouponPage';
 import InvoicePage from './pages/InvoicePage';
+
+// New Components for AkuGlow Home Look
+import StatsSection from './components/StatsSection';
+import AboutMission from './components/AboutMission';
+import Testimonials from './components/Testimonials';
+import DiagnosticCTA from './components/DiagnosticCTA';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminProductList from './pages/admin/ProductList';
@@ -131,14 +137,11 @@ function HomePage() {
     <>
       <HeroSlider />
       <FeatureBar />
-      <VoucherSection />
-      <RecommendedSection 
-        limit={10} 
-        title="Rekomendasi Untukmu ✨" 
-        subtitle="Berdasarkan apa yang sering kamu lihat dan sukai." 
-        className="mt-10"
-      />
+      <AboutMission />
       <ProductSection />
+      <StatsSection />
+      <Testimonials />
+      <DiagnosticCTA />
       <PromoBanner />
     </>
   );
@@ -154,7 +157,7 @@ function NotFoundPage() {
         <div className="text-8xl font-bold text-gray-200 mb-4">404</div>
         <h1 className="text-3xl font-bold text-gray-900 mb-3">Halaman Tidak Ditemukan</h1>
         <p className="text-gray-500 mb-8">Maaf, halaman yang kamu cari tidak ada atau sudah dipindahkan.</p>
-        <a href="/" className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all inline-block shadow-lg shadow-blue-100">
+        <a href="/" className="bg-rose-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-rose-700 transition-all inline-block shadow-lg shadow-rose-100">
           Kembali ke Beranda
         </a>
       </div>

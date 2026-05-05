@@ -108,26 +108,26 @@ export const products = [
 export const sliders = [
   {
     id: 1,
-    badge: 'Mulai dari Rp85.000',
-    title: 'Koleksi Skincare Terbaik 2026',
-    offer: 'Diskon 35%',
+    badge: 'Formula Korea Premium',
+    title: 'Wujudkan Kulit Glowing Impian Anda',
+    offer: 'Diskon Spesial',
     image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=500&fit=crop',
-    bg: '#ec4899', // Pink
+    bg: '#E11D48', // Crimson
   },
   {
     id: 2,
-    badge: 'Kualitas Premium',
-    title: 'Glowing Alami Setiap Hari',
-    offer: 'Hemat 10%',
+    badge: 'Best Seller 2026',
+    title: 'Rahasia Kecantikan Alami Setiap Hari',
+    offer: 'Hemat 15%',
     image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=500&fit=crop',
-    bg: '#8b5cf6', // Violet
+    bg: '#BE123C', // Primary Dark
   },
   {
     id: 3,
-    badge: 'Produk Terlaris',
-    title: 'Sehat & Cantik dari Dalam',
-    offer: 'Hingga 20%',
+    badge: 'Teruji Klinis',
+    title: 'Sehat & Cantik dari Dalam ke Luar',
+    offer: 'Gift Eksklusif',
     image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=600&h=500&fit=crop',
-    bg: '#6366f1', // Indigo
+    bg: '#FB7185', // Primary Light
   },
 ];

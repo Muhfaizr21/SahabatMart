@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
 import { A, PageHeader, Modal, TablePanel, statusBadge, FieldLabel, fmtDate } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
@@ -28,13 +28,17 @@ export default function AdminBlogs() {
     const fd = new FormData();
     fd.append('image', file);
     try {
-      const res = await fetchJson(`${ADMIN_API_BASE}/upload`, { method: 'POST', body: fd });
-      if (res.imageUrl) {
-        setFormData(prev => ({ ...prev, image: res.imageUrl }));
+      const res = await uploadFile(`${ADMIN_API_BASE}/upload`, file);
+      const url = res.imageUrl || res.url || res.data?.url;
+      if (url) {
+        setFormData(prev => ({ ...prev, image: url }));
         toast.success('Gambar terunggah');
       }
-    } catch (err) { toast.error('Upload gagal'); }
-    finally { setUploading(false); }
+    } catch (err) { 
+      toast.error('Upload gagal: ' + err.message); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
   const handleSave = (e) => {

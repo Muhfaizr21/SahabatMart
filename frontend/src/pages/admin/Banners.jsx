@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
 import { A, PageHeader, Modal, FieldLabel, idr } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
@@ -27,13 +27,17 @@ export default function AdminBanners() {
     const fd = new FormData();
     fd.append('image', file);
     try {
-      const resp = await fetchJson(`${ADMIN_API_BASE}/upload`, { method: 'POST', body: fd });
-      if (resp.imageUrl) {
-        setFormData({ ...formData, image: resp.imageUrl });
+      const resp = await uploadFile(`${ADMIN_API_BASE}/upload`, file);
+      const url = resp.imageUrl || resp.url || resp.data?.url;
+      if (url) {
+        setFormData({ ...formData, image: url });
         toast.success('Gambar terunggah');
       }
-    } catch { toast.error('Upload gagal'); }
-    finally { setUploading(false); }
+    } catch { 
+      toast.error('Upload gagal'); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
   const handleSave = (e) => {

@@ -33,7 +33,7 @@ func SeedAll(db *gorm.DB) {
 		&models.Order{}, &models.OrderMerchantGroup{}, &models.OrderItem{},
 		&models.Cart{}, &models.CartItem{},
 		&models.Voucher{}, &models.Banner{},
-		&models.Permission{}, &models.Role{},
+		&models.Permission{}, &models.Role{}, &models.BlogPost{},
 	)
 
 	// DROP TRIGGER if exists
@@ -53,7 +53,7 @@ func SeedAll(db *gorm.DB) {
 		"product_tier_commissions", "product_variants", "products", "vouchers", "banners",
 		"affiliate_members", "membership_tiers", "categories", "brands",
 		"user_profiles", "users",
-		"roles", "permissions", "role_permissions",
+		"roles", "permissions", "role_permissions", "blog_posts",
 	}
 
 	for _, table := range tables {
@@ -84,6 +84,8 @@ func SeedAll(db *gorm.DB) {
 	seedMarketing(db)
 	seedRBAC(db)
 	SeedConfigs(db)
+	seedBlogs(db)
+	seedBanners(db)
 
 	// 7. Seed Network (Merchant & Affiliate relationship)
 	SeedNetwork(db)
@@ -586,6 +588,11 @@ func SeedConfigs(db *gorm.DB) {
 		{Key: "skin_ai_prompt", Value: "", Description: "Prompt khusus AI Skin Analyzer (kosong = gunakan default)"},
 		{Key: "skin_journey_day25_voucher", Value: "AKUGLOW25", Description: "Kode Voucher Reward Hari ke-25"},
 		{Key: "skin_journey_affirmations", Value: "", Description: "Affirmasi custom (JSON array, kosong = default)"},
+		// AkuGlow Statistics (Home Page)
+		{Key: "stats_years_exp", Value: "5+", Description: "Statistik: Tahun Pengalaman"},
+		{Key: "stats_products_sold", Value: "20K+", Description: "Statistik: Produk Terjual"},
+		{Key: "stats_satisfied_users", Value: "7M+", Description: "Statistik: Pengguna Puas"},
+		{Key: "stats_official_stores", Value: "4+", Description: "Statistik: Mitra Toko Resmi"},
 	}
 
 	for _, c := range configs {
@@ -596,3 +603,125 @@ func SeedConfigs(db *gorm.DB) {
 		}
 	}
 }
+
+func seedBlogs(db *gorm.DB) {
+	fmt.Println("  -> Seeding 5 Premium Blog Posts...")
+	blogs := []models.BlogPost{
+		{
+			Title:    "Rahasia Kulit Glowing dalam 7 Hari",
+			Slug:     "rahasia-kulit-glowing-7-hari",
+			Summary:  "Pelajari langkah-langkah mudah untuk mendapatkan kulit cerah dan sehat hanya dalam satu minggu.",
+			Content:  "Memiliki kulit glowing bukan lagi impian. Dengan rutinitas yang tepat dan penggunaan produk yang mengandung Vitamin C serta Niacinamide, Anda bisa melihat perubahan signifikan. <br /><br />Hari 1: Double Cleansing<br />Hari 2: Eksfoliasi Lembut<br />Hari 3: Hidrasi Maksimal dengan Essence<br />Hari 4-7: Fokus pada nutrisi serum.",
+			Author:   "Dr. Sarah Glow",
+			Category: "Tips Skincare",
+			Image:    "photo-1556228578-0d85b1a4d571",
+			Status:   "published",
+		},
+		{
+			Title:    "Double Cleansing: Mengapa Ini Penting?",
+			Slug:     "pentingnya-double-cleansing",
+			Summary:  "Banyak yang melewatkan langkah ini, padahal double cleansing adalah kunci kulit bebas jerawat.",
+			Content:  "Double cleansing adalah proses membersihkan wajah dua kali. Pertama menggunakan pembersih berbasis minyak (oil-based) untuk mengangkat makeup dan sunscreen, kemudian diikuti dengan pembersih berbasis air (water-based) untuk membersihkan sisa kotoran dan keringat.",
+			Author:   "Admin AkuGlow",
+			Category: "Edukasi",
+			Image:    "photo-1556228578-0d85b1a4d571",
+			Status:   "published",
+		},
+		{
+			Title:    "Panduan Memilih Sunscreen untuk Kulit Berminyak",
+			Slug:     "panduan-sunscreen-kulit-berminyak",
+			Summary:  "Jangan takut lengket! Ini tips memilih sunscreen yang ringan dan matte untuk kulit berminyak.",
+			Content:  "Pemilik kulit berminyak seringkali menghindari sunscreen karena takut wajah semakin berminyak. Padahal, saat ini sudah banyak formula 'Watery Essence' atau 'Gel' yang memberikan hasil akhir matte dan sangat ringan di kulit.",
+			Author:   "Beauty Expert",
+			Category: "Skincare",
+			Image:    "photo-1556228578-0d85b1a4d571",
+			Status:   "published",
+		},
+		{
+			Title:    "Makanan yang Membantu Mencerahkan Kulit dari Dalam",
+			Slug:     "makanan-pencerah-kulit-alami",
+			Summary:  "Skincare saja tidak cukup. Konsumsi makanan ini untuk hasil kulit yang lebih maksimal.",
+			Content:  "Apa yang Anda makan tercermin pada kulit Anda. Makanan kaya antioksidan seperti berry, alpukat, dan sayuran hijau sangat membantu dalam proses regenerasi sel kulit dan melawan radikal bebas penyebab kusam.",
+			Author:   "Nutrionist",
+			Category: "Lifestyle",
+			Image:    "photo-1556228578-0d85b1a4d571",
+			Status:   "published",
+		},
+		{
+			Title:    "Promo Spesial AkuGlow: Skin Barrier Reborn",
+			Slug:     "promo-skin-barrier-reborn",
+			Summary:  "Dapatkan paket spesial perbaikan skin barrier dengan harga eksklusif bulan ini.",
+			Content:  "Kami mengerti betapa frustrasinya saat skin barrier rusak. Oleh karena itu, bulan ini AkuGlow menghadirkan paket 'Barrier Saver' yang terdiri dari Gentle Cleanser, Ceramide Toner, dan Moisturizer dengan diskon hingga 30%!",
+			Author:   "Promo Team",
+			Category: "Promo",
+			Image:    "photo-1556228578-0d85b1a4d571",
+			Status:   "published",
+		},
+	}
+
+	for _, b := range blogs {
+		var existing models.BlogPost
+		// Cari berdasarkan slug untuk idempoten
+		err := db.Where("slug = ?", b.Slug).First(&existing).Error
+		if err != nil {
+			// Jika tidak ada, buat baru
+			db.Create(&b)
+		} else {
+			// Jika ada, update kontennya agar seeder selalu sinkron dengan konten terbaru
+			// Menggunakan Updates(b) pada objek 'existing' yang sudah punya ID (Primary Key)
+			db.Model(&existing).Updates(b)
+		}
+	}
+}
+
+func seedBanners(db *gorm.DB) {
+	fmt.Println("  -> Seeding Premium Home Banners...")
+	banners := []models.Banner{
+		{
+			Title:    "Official Store Medan",
+			SubTitle: "Buka sekarang! Nikmati promo pengiriman gratis FREE ONGKIR ke seluruh wilayah Sumatera Utara.",
+			Badge:    "NEW STORE",
+			Offer:    "FREE ONGKIR",
+			Image:    "photo-1556228578-0d85b1a4d571",
+			BgColor:  "#3b82f6",
+			Link:     "/shop",
+			Order:    1,
+			IsActive: true,
+		},
+		{
+			Title:    "Ramadan Glow Sale",
+			SubTitle: "Dapatkan paket perawatan kulit terbaik untuk tampil maksimal di hari raya. Stok terbatas!",
+			Badge:    "PROMO RAMADAN",
+			Offer:    "UP TO 50% OFF",
+			Image:    "photo-1612817288484-6f916006741a",
+			BgColor:  "#059669",
+			Link:     "/shop",
+			Order:    2,
+			IsActive: true,
+		},
+		{
+			Title:    "Morning Routine Essentials",
+			SubTitle: "Lengkapi koleksi harianmu dengan produk premium pilihan para ahli kecantikan AkuGlow.",
+			Badge:    "TRENDING",
+			Offer:    "BEST SELLER",
+			Image:    "photo-1596462502278-27bfdc4033c8",
+			BgColor:  "#6366f1",
+			Link:     "/shop",
+			Order:    3,
+			IsActive: true,
+		},
+	}
+
+	for _, b := range banners {
+		var existing models.Banner
+		// Cari berdasarkan judul untuk idempoten
+		err := db.Where("title = ?", b.Title).First(&existing).Error
+		if err != nil {
+			db.Create(&b)
+		} else {
+			db.Model(&existing).Updates(b)
+		}
+	}
+}
+
+

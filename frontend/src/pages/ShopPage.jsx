@@ -26,7 +26,7 @@ const priceRanges = [
 ];
 
 export default function ShopPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const catParam = searchParams.get('cat');
   const searchParam = searchParams.get('search');
@@ -355,14 +355,22 @@ export default function ShopPage() {
                  </div>
                  
                  <div className="relative flex-1 min-w-[300px]">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black">search</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black pointer-events-none">search</span>
                     <input 
                       type="text"
                       placeholder="Cari di toko ini..."
-                      className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-blue-500 transition-all text-sm font-bold"
+                      className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-blue-500 transition-all text-sm font-bold"
                       value={searchTerm}
                       onChange={(e) => handleLocalSearch(e.target.value)}
                     />
+                    {searchTerm && (
+                      <button 
+                        onClick={() => handleLocalSearch('')}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg font-black">close</span>
+                      </button>
+                    )}
                  </div>
               </div>
 
@@ -381,14 +389,22 @@ export default function ShopPage() {
             {/* Mobile Local Search Bar (Visible on Mobile) */}
             <div className="lg:hidden mb-6">
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black">search</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black pointer-events-none">search</span>
                 <input 
                   type="text"
                   placeholder="Cari di toko ini..."
-                  className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm font-bold shadow-sm"
+                  className="w-full pl-11 pr-11 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm font-bold shadow-sm"
                   value={searchTerm}
                   onChange={(e) => handleLocalSearch(e.target.value)}
                 />
+                {searchTerm && (
+                  <button 
+                    onClick={() => handleLocalSearch('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-lg font-black">close</span>
+                  </button>
+                )}
               </div>
             </div>
 

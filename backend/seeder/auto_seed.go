@@ -67,4 +67,10 @@ func AutoSeedCriticalData(db *gorm.DB) {
 
 	// [AkuGlow Products] Auto-seed products from official store
 	SeedAkuglowProducts(db)
+
+	// [Blog Posts] Auto-seed news
+	seedBlogs(db)
+
+	// [Home Banners] Auto-seed slider
+	seedBanners(db)
 }

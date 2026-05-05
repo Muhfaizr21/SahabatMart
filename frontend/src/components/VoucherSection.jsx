@@ -42,10 +42,10 @@ export default function VoucherSection() {
                 <i className="bx bxs-zap animate-pulse"></i>
                 Penawaran Terbatas
              </div>
-             <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-none tracking-tight">Klaim <span className="text-blue-600">Kupon</span> Belanja Hari Ini!</h2>
+             <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-none tracking-tight">Klaim <span className="text-primary">Kupon</span> Belanja Hari Ini!</h2>
              <p className="text-gray-500 mt-4 text-lg font-medium">Jangan lewatkan potongan harga spesial khusus untuk pelanggan setia AkuGlow.</p>
           </div>
-          <Link to="/coupons" className="group flex items-center gap-2 text-blue-600 font-bold hover:underline">
+          <Link to="/coupons" className="group flex items-center gap-2 text-primary font-bold hover:underline">
             Lihat Semua Kupon
             <i className="bx bx-right-arrow-alt text-2xl transition-transform group-hover:translate-x-1"></i>
           </Link>
@@ -53,18 +53,18 @@ export default function VoucherSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {vouchers.map((v, i) => (
-            <div key={i} className="group relative bg-gray-50 rounded-[2.5rem] p-8 border border-gray-100 hover:border-blue-200 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-50">
+            <div key={i} className="group relative bg-gray-50 rounded-[2.5rem] p-8 border border-gray-100 hover:border-primary-light/30 transition-all duration-500 hover:shadow-2xl hover:shadow-primary-light/10">
               {/* Desain Circle Cutout (Efek Tiket) */}
               <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-gray-100 rounded-full shadow-inner"></div>
               <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-gray-100 rounded-full shadow-inner"></div>
 
               <div className="flex flex-col h-full text-center items-center">
-                 <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm border border-gray-100 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-500">
+                 <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-primary shadow-sm border border-gray-100 mb-6 group-hover:bg-primary group-hover:text-white transition-colors duration-500">
                     <i className="bx bxs-coupon text-3xl"></i>
                  </div>
                  
                  <div className="flex flex-col gap-1 mb-4">
-                    <span className="text-xs font-black text-blue-600 uppercase tracking-widest">{v.title}</span>
+                    <span className="text-xs font-black text-primary uppercase tracking-widest">{v.title}</span>
                     <h3 className="text-3xl font-black text-gray-900">
                         {v.discount_type === 'percent' ? `${v.discount_value}%` : `Rp${(v.discount_value || 0).toLocaleString('id')}`}
                     </h3>
@@ -78,12 +78,12 @@ export default function VoucherSection() {
                  <div className="mt-auto w-full">
                     <div 
                       onClick={() => handleCopy(v.code)}
-                      className="bg-white border-2 border-dashed border-gray-200 rounded-2xl px-4 py-4 font-mono font-black text-gray-900 tracking-[0.2em] text-lg mb-4 group-hover:border-blue-400 group-hover:text-blue-600 transition-colors cursor-pointer"
+                      className="bg-white border-2 border-dashed border-gray-200 rounded-2xl px-4 py-4 font-mono font-black text-gray-900 tracking-[0.2em] text-lg mb-4 group-hover:border-primary-light group-hover:text-primary transition-colors cursor-pointer"
                       title="Klik untuk menyalin"
                     >
                         {v.code}
                     </div>
-                    <Link to="/shop" className="block w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg hover:shadow-blue-200">
+                    <Link to="/shop" className="block w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-primary transition-all shadow-lg hover:shadow-primary-light/30">
                         Pakai Sekarang
                     </Link>
                  </div>

@@ -90,7 +90,7 @@ export default function ReviewSection({ productID }) {
         {canReview && !showForm && (
             <button 
                 onClick={() => setShowForm(true)}
-                className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-6 py-2.5 rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+                className="bg-primary text-white text-[10px] font-black uppercase tracking-widest px-6 py-2.5 rounded-xl shadow-lg shadow-primary/10 hover:bg-primary-dark transition-all"
             >
                 Tulis Ulasan
             </button>
@@ -99,7 +99,7 @@ export default function ReviewSection({ productID }) {
 
       {/* Review Form */}
       {showForm && (
-          <form onSubmit={handleSubmit} className="bg-blue-50/50 p-8 rounded-[2rem] border border-blue-100 space-y-6">
+          <form onSubmit={handleSubmit} className="bg-primary-light/10/50 p-8 rounded-[2rem] border border-primary/10 space-y-6">
               <div className="flex items-center justify-between">
                 <h4 className="font-black text-gray-900">Berikan Penilaian Anda</h4>
                 <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><i className="bx bx-x text-2xl"></i></button>
@@ -117,14 +117,14 @@ export default function ReviewSection({ productID }) {
                     onChange={(e) => setNewComment(e.target.value)}
                     required
                     placeholder="Ceritakan pengalaman Anda menggunakan produk ini..."
-                    className="w-full bg-white border border-blue-100 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[120px] transition-all"
+                    className="w-full bg-white border border-primary/10 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-primary outline-none min-h-[120px] transition-all"
                 />
               </div>
 
               <button 
                 type="submit" 
                 disabled={submitting}
-                className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:bg-gray-300"
+                className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-xl shadow-primary/10 hover:bg-primary-dark transition-all disabled:bg-gray-300"
               >
                 {submitting ? 'Mengirim...' : 'Kirim Ulasan Sekarang'}
               </button>
@@ -144,11 +144,11 @@ export default function ReviewSection({ productID }) {
                 <div key={r.id} className="bg-white p-8 rounded-[2rem] border border-gray-50 shadow-sm hover:shadow-md transition-shadow group">
                    <div className="flex items-center justify-between mb-4">
                      <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center font-black text-blue-600 text-xl shadow-sm">
+                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-light/10 to-indigo-50 flex items-center justify-center font-black text-primary text-xl shadow-sm">
                             {r.buyer?.profile?.full_name?.charAt(0) || "U"}
                          </div>
                          <div>
-                             <div className="font-black text-gray-900 group-hover:text-blue-600 transition-colors uppercase text-sm tracking-tight">{r.buyer?.profile?.full_name || "User AkuGlow"}</div>
+                             <div className="font-black text-gray-900 group-hover:text-primary transition-colors uppercase text-sm tracking-tight">{r.buyer?.profile?.full_name || "User AkuGlow"}</div>
                              <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5">
                                  <i className="bx bxs-check-circle text-green-500"></i> Verified Purchase • {new Date(r.created_at).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })}
                              </div>

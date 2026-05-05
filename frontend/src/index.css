@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  /* Premium & Soft Palette */
-  --color-primary: #4361ee;
-  --color-primary-dark: #3a0ca3;
-  --color-primary-light: #4895ef;
+  /* AkuGlow Crimson & Gold Palette */
+  --color-primary: #E11D48; /* Crimson Red */
+  --color-primary-dark: #BE123C;
+  --color-primary-light: #FB7185;
   
-  --color-secondary: #06d6a0;
-  --color-accent: #f4a261;
+  --color-secondary: #06d6a0; /* Keeping emerald for success */
+  --color-accent: #EAB308; /* Gold/Amber */
   
   --color-bg-light: #f8fafc;
   --color-bg-dark: #0f172a;
@@ -20,9 +20,9 @@
 }
 
 :root {
-  --bs-primary: #4361ee;
-  --bs-primary-rgb: 67, 97, 238;
-  --bs-body-bg: #f8fafc;
+  --bs-primary: #E11D48;
+  --bs-primary-rgb: 225, 29, 72;
+  --bs-body-bg: #ffffff;
   --bs-body-color: #1e293b;
   --bs-border-color: #e2e8f0;
 }

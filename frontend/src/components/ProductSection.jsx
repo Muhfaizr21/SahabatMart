@@ -97,9 +97,9 @@ export function ProductCard({ product }) {
   };
 
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full">
-      <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-square">
-        <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+    <div className="group bg-white rounded-3xl border border-gray-100 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 overflow-hidden flex flex-col h-full relative">
+      <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-[4/5]">
+        <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
         
         {/* Badge Stok Habis - Overlay */}
         {product.stock <= 0 && (
@@ -117,27 +117,27 @@ export function ProductCard({ product }) {
         </button>
       </Link>
 
-      <div className="p-4 flex flex-col flex-1">
-        <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mb-1 block">{product.category}</Link>
-        <Link to={`/product/${product.id}`} className="text-sm font-semibold text-gray-800 hover:text-blue-600 transition-colors leading-tight mb-2 block line-clamp-2 h-10">
+      <div className="p-3 sm:p-5 flex flex-col flex-1">
+        <Link to={`/shop?cat=${product.category}`} className="text-[9px] sm:text-[10px] text-primary font-bold uppercase tracking-widest mb-1 block">{product.category}</Link>
+        <Link to={`/product/${product.id}`} className="text-xs sm:text-base font-bold text-gray-900 hover:text-primary transition-colors leading-tight mb-2 block line-clamp-2 min-h-[2.5rem]">
           {product.name}
         </Link>
         
-        <div className="flex items-center gap-1.5 mb-4">
+        <div className="flex items-center gap-1 mb-3 sm:mb-4">
           <StarRating rating={product.rating || 0} />
-          <span className="text-[10px] text-gray-400">({product.reviews || 0})</span>
+          <span className="text-[9px] sm:text-[10px] text-gray-400 font-medium">({product.reviews || 0})</span>
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2">
+        <div className="mt-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex flex-col">
-            <span className="font-bold text-gray-900 text-sm">Rp{(product.price || 0).toLocaleString('id-ID')}</span>
+            <span className="font-black text-gray-900 text-sm sm:text-lg">Rp{(product.price || 0).toLocaleString('id-ID')}</span>
           </div>
           <button 
             onClick={addToCart}
             disabled={adding || product.stock <= 0}
-            className={`text-[11px] font-bold px-3 py-2 rounded-xl transition-all flex-shrink-0 ${product.stock <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            className={`text-[10px] sm:text-xs font-black px-4 py-2.5 rounded-xl sm:rounded-2xl transition-all flex-shrink-0 uppercase tracking-widest shadow-sm ${product.stock <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-primary text-white active:scale-95'}`}
           >
-            {adding ? '...' : (product.stock <= 0 ? 'Habis' : 'Beli')}
+            {adding ? '...' : (product.stock <= 0 ? 'Habis' : 'BELI')}
           </button>
         </div>
       </div>
@@ -150,11 +150,11 @@ export default function ProductSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchJson(`${PUBLIC_API_BASE}/products`)
+    // Fetch top 3 products sorted by popular (sales)
+    fetchJson(`${PUBLIC_API_BASE}/products?sort=popular&limit=3`)
       .then(d => {
-        // fetchJson unwrap means d is likely the array itself
         const data = Array.isArray(d) ? d : (d.data || []);
-        setTrending(data.slice(0, 10));
+        setTrending(data);
       })
       .catch(() => setTrending([]))
       .finally(() => setLoading(false));
@@ -164,17 +164,23 @@ export default function ProductSection() {
     <section className="py-14 bg-white">
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-10 text-center md:text-left">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Produk Pilihan ✨</h2>
-          <p className="text-gray-500 text-sm mt-1">Koleksi terbaik untuk kebutuhan harian Anda.</p>
+          <h2 className="text-2xl md:text-3xl font-black text-gray-900">Koleksi Terpopuler AkuGlow ✨</h2>
+          <p className="text-gray-500 text-sm mt-1">Pilihan produk skincare terbaik yang paling dicintai oleh komunitas kami.</p>
         </div>
         
         {loading ? (
-             <div className="text-center py-20"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+             <div className="text-center py-20"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div></div>
         ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
                 {trending.map(p => <ProductCard key={p.id} product={p} />)}
             </div>
         )}
+        
+        <div className="mt-12 text-center">
+          <Link to="/shop" className="inline-flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all">
+            Lihat Semua Produk <i className='bx bx-right-arrow-alt'></i>
+          </Link>
+        </div>
       </div>
     </section>
   );

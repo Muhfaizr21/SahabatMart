@@ -37,6 +37,17 @@ const DEFAULT_CONFIGS = [
   { key: 'skin_ai_model',           value: 'gpt-4o',           description: 'Model AI yang digunakan',    group: 'skin_ai',   type: 'select', options: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'] },
   { key: 'skin_ai_prompt',          value: '',                 description: 'Prompt Kustom (opsional, kosong = default)', group: 'skin_ai', type: 'textarea' },
   { key: 'skin_journey_day25_voucher', value: 'AKUGLOW25',     description: 'Kode Voucher Reward Hari ke-25', group: 'skin_ai', type: 'text' },
+  // Statistics
+  { key: 'stats_years_exp',         value: '5+',           description: 'Tahun Pengalaman',           group: 'stats',     type: 'text' },
+  { key: 'stats_products_sold',     value: '20K+',          description: 'Produk Terjual',             group: 'stats',     type: 'text' },
+  { key: 'stats_satisfied_users',    value: '7M+',           description: 'Pengguna Puas',              group: 'stats',     type: 'text' },
+  { key: 'stats_official_stores',    value: '4+',           description: 'Mitra Toko Resmi',           group: 'stats',     type: 'text' },
+  // Contact Information
+  { key: 'contact_address',         value: 'Jl. Sudirman No. 123, Jakarta Pusat', description: 'Alamat Kantor',          group: 'contact',   type: 'text' },
+  { key: 'contact_phone',           value: '+62 21 1234 5678', description: 'Nomor Telepon',           group: 'contact',   type: 'text' },
+  { key: 'contact_email',           value: 'support@akuglow.id', description: 'Email Support',            group: 'contact',   type: 'text' },
+  { key: 'contact_whatsapp',        value: '+6281234567890',     description: 'Nomor WhatsApp',          group: 'contact',   type: 'text' },
+  { key: 'contact_hours',           value: 'Senin - Jumat, 09:00 - 18:00', description: 'Jam Operasional',     group: 'contact',   type: 'text' },
 ];
 
 const GROUP_META = {
@@ -45,6 +56,8 @@ const GROUP_META = {
   payment:      { icon: 'bx-credit-card', label: 'Pembayaran',    color: '#10b981' },
   notification: { icon: 'bx-bell',        label: 'Notifikasi',    color: '#8b5cf6' },
   skin_ai:      { icon: 'bx-brain',       label: 'AI Skin Analyzer', color: '#f43f5e' },
+  stats:        { icon: 'bx-bar-chart-alt-2', label: 'Statistik Beranda', color: '#0ea5e9' },
+  contact:      { icon: 'bx-phone-call',  label: 'Informasi Kontak', color: '#f59e0b' },
   security:     { icon: 'bx-lock-alt',    label: 'Keamanan',      color: '#ef4444' },
 };
 

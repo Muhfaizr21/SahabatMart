@@ -111,7 +111,7 @@ export default function CartDrawer() {
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
           {loading && items.length === 0 ? (
             <div className="h-full flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center py-20">
@@ -122,7 +122,7 @@ export default function CartDrawer() {
               <p className="text-gray-400 text-sm max-w-[240px] mb-8">Wah, belum ada produk nih. Yuk eksplorasi sekarang!</p>
               <button 
                 onClick={() => { setIsOpen(false); navigate('/shop'); }}
-                className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95"
+                className="bg-primary text-white px-8 py-3 rounded-2xl font-bold hover:bg-primary-dark transition-all shadow-lg shadow-primary-light/30 active:scale-95"
               >
                 Mulai Belanja
               </button>
@@ -139,7 +139,7 @@ export default function CartDrawer() {
             ).map(([mId, group]) => (
               <div key={mId} className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-50">
-                  <i className="bx bx-store text-blue-600"></i>
+                  <i className="bx bx-store text-primary"></i>
                   <span className="text-[10px] font-black text-gray-800 uppercase tracking-widest">{group.name}</span>
                 </div>
                 <div className="space-y-6">
@@ -151,7 +151,7 @@ export default function CartDrawer() {
                       <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                         <div>
                           <div className="flex justify-between items-start gap-2">
-                            <h4 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug group-hover/item:text-blue-600 transition-colors">
+                            <h4 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug group-hover/item:text-primary transition-colors">
                               {item.product?.name}
                             </h4>
                             <button 
@@ -171,7 +171,7 @@ export default function CartDrawer() {
                             <button 
                               onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.merchant_id, item.quantity, -1)}
                               disabled={acting === item.id}
-                              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors font-black"
+                              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-primary transition-colors font-black"
                             >
                               {acting === item.id ? '...' : '-'}
                             </button>
@@ -179,12 +179,12 @@ export default function CartDrawer() {
                             <button 
                               onClick={() => updateQty(item.id, item.product_variant_id, item.product_id, item.merchant_id, item.quantity, 1)}
                               disabled={acting === item.id}
-                              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors font-black"
+                              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-primary transition-colors font-black"
                             >
                               {acting === item.id ? '...' : '+'}
                             </button>
                           </div>
-                          <span className="font-black text-blue-600 text-sm">
+                          <span className="font-black text-primary text-sm">
                             Rp{((item.product_variant?.price || item.product?.price || 0) * item.quantity).toLocaleString('id')}
                           </span>
                         </div>
@@ -217,7 +217,7 @@ export default function CartDrawer() {
               </button>
               <button 
                 onClick={() => { setIsOpen(false); navigate('/checkout'); }}
-                className="py-4 rounded-2xl font-black text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 text-sm flex items-center justify-center gap-2"
+                className="py-4 rounded-2xl font-black text-white bg-primary hover:bg-primary-dark transition-all shadow-xl shadow-primary/20 text-sm flex items-center justify-center gap-2"
               >
                 Checkout <i className="bx bx-right-arrow-alt text-xl"></i>
               </button>

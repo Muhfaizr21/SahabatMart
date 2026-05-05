@@ -78,7 +78,10 @@ func (ac *AdminController) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"url": url})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{
+		"url":      url,
+		"imageUrl": url, // Alias for frontend compatibility
+	})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2683,9 +2686,10 @@ func (ac *AdminController) UpsertSettings(w http.ResponseWriter, r *http.Request
 		return
 	}
 	for _, cfg := range configs {
-		ac.DB.Where("key = ?", cfg.Key).
+		if cfg.Key == "" { continue }
+		ac.DB.Where(models.PlatformConfig{Key: cfg.Key}).
 			Assign(models.PlatformConfig{Value: cfg.Value, Description: cfg.Description}).
-			FirstOrCreate(&models.PlatformConfig{})
+			FirstOrCreate(&models.PlatformConfig{Key: cfg.Key})
 	}
 	ac.Audit.Log(models.AdminID, "upsert_settings", "platform_config", "",
 		fmt.Sprintf("updated %d keys", len(configs)), r.RemoteAddr)
@@ -2764,13 +2768,31 @@ func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Requ
 		query = query.Where("category = ?", cat)
 	}
 
+	sort := r.URL.Query().Get("sort")
+	limitStr := r.URL.Query().Get("limit")
+	limit, _ := strconv.Atoi(limitStr)
+
 	// [Akuglow Refactor] Tampilkan total stok dari seluruh gudang
+	// Jika sort popular, kita perlu hitung sold count
+	if sort == "popular" {
+		// Sort by sold count from order_items
+		query = query.Select("products.*, (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE product_id = products.id) as sold_count_hidden").
+			Order("sold_count_hidden DESC")
+	} else {
+		query = query.Order("created_at DESC")
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
 	query.Preload("Inventories").Find(&products)
 	
 	// Tambahkan informasi stok agregat untuk ditampilkan di card
 	type ProductWithStock struct {
 		models.Product
 		TotalStock int `json:"total_stock"`
+		Sold       int `json:"sold"`
 	}
 	
 	result := make([]ProductWithStock, len(products))
@@ -2779,9 +2801,15 @@ func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Requ
 		for _, inv := range p.Inventories {
 			total += inv.Stock
 		}
+		
+		// Hitung sold count untuk ditampilkan
+		var sold int
+		ac.DB.Table("order_items").Where("product_id = ?", p.ID).Select("COALESCE(SUM(quantity), 0)").Scan(&sold)
+
 		result[i] = ProductWithStock{
 			Product:    p,
 			TotalStock: total,
+			Sold:       sold,
 		}
 	}
 
@@ -2981,7 +3009,18 @@ func (ac *AdminController) UpsertBlog(w http.ResponseWriter, r *http.Request) {
 		post.Slug = strings.ToLower(reg.ReplaceAllString(post.Title, "-"))
 		post.Slug = strings.Trim(post.Slug, "-")
 	}
-	ac.DB.Save(&post)
+	// Check slug collision
+	var existing models.BlogPost
+	if err := ac.DB.Where("slug = ? AND id != ?", post.Slug, post.ID).First(&existing).Error; err == nil {
+		// Collision found, append random suffix or timestamp
+		post.Slug = fmt.Sprintf("%s-%d", post.Slug, time.Now().Unix()%1000)
+	}
+
+	if err := ac.DB.Save(&post).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan artikel: "+err.Error())
+		return
+	}
+
 	ac.Audit.Log(models.AdminID, "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, post)
 }

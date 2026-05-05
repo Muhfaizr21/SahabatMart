@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2 } from 'lucide-react';
 import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import { useConfig } from '../hooks/useConfig';
 import toast from 'react-hot-toast';
 
 export default function ContactPage() {
+  const { config } = useConfig();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
 
@@ -28,9 +31,9 @@ export default function ContactPage() {
   return (
     <main className="max-w-6xl mx-auto px-6 py-16">
       <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Hubungi <span className="text-blue-600">Kami</span></h1>
+        <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Hubungi <span className="text-rose-600">Kami</span></h1>
         <p className="text-gray-500 font-medium max-w-xl mx-auto">Ada pertanyaan atau butuh bantuan? Tim kami siap membantu Anda kapan saja.</p>
-        <div className="w-20 h-1.5 bg-blue-600 rounded-full mx-auto mt-6 shadow-lg shadow-blue-100" />
+        <div className="w-20 h-1.5 bg-rose-600 rounded-full mx-auto mt-6 shadow-lg shadow-rose-100" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
@@ -46,7 +49,7 @@ export default function ContactPage() {
                   onChange={e => setFormData({...formData, name: e.target.value})}
                   required
                   placeholder="Nama kamu" 
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 focus:bg-white transition-all font-bold text-gray-700" 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-rose-600/5 focus:border-rose-600 focus:bg-white transition-all font-bold text-gray-700" 
                 />
               </div>
               <div>
@@ -57,7 +60,7 @@ export default function ContactPage() {
                   onChange={e => setFormData({...formData, email: e.target.value})}
                   required
                   placeholder="email@kamu.com" 
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 focus:bg-white transition-all font-bold text-gray-700" 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-rose-600/5 focus:border-rose-600 focus:bg-white transition-all font-bold text-gray-700" 
                 />
               </div>
             </div>
@@ -69,7 +72,7 @@ export default function ContactPage() {
                 onChange={e => setFormData({...formData, subject: e.target.value})}
                 required
                 placeholder="Subjek pesan" 
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 focus:bg-white transition-all font-bold text-gray-700" 
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-rose-600/5 focus:border-rose-600 focus:bg-white transition-all font-bold text-gray-700" 
               />
             </div>
             <div>
@@ -80,19 +83,19 @@ export default function ContactPage() {
                 onChange={e => setFormData({...formData, message: e.target.value})}
                 required
                 placeholder="Tulis pesan kamu secara detail..." 
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 focus:bg-white transition-all font-bold text-gray-700 resize-none" 
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm outline-none focus:ring-4 focus:ring-rose-600/5 focus:border-rose-600 focus:bg-white transition-all font-bold text-gray-700 resize-none" 
               />
             </div>
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-5 rounded-[1.5rem] transition-all shadow-xl shadow-blue-200/50 flex items-center justify-center gap-3 active:scale-[0.98]"
+              className="w-full bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white font-black py-5 rounded-[1.5rem] transition-all shadow-xl shadow-rose-200/50 flex items-center justify-center gap-3 active:scale-[0.98]"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <i className="bx bx-paper-plane text-xl"></i>
+                  <Send size={20} />
                   Kirim Pesan Sekarang
                 </>
               )}
@@ -102,23 +105,51 @@ export default function ContactPage() {
 
         <div className="lg:col-span-5 space-y-8">
           <h2 className="text-2xl font-black text-gray-900 mb-4 px-2">Informasi Kontak</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
-            {[
-              { label: 'Alamat', value: 'Jl. Sudirman No. 123, Jakarta Pusat, 10220', icon: 'bx-map', color: 'blue' },
-              { label: 'Telepon', value: '+62 21 1234 5678', icon: 'bx-phone', color: 'indigo' },
-              { label: 'Email', value: 'support@akuglow.id', icon: 'bx-envelope', color: 'sky' },
-              { label: 'Jam Operasional', value: 'Sen - Sab: 09.00 - 21.00 WIB', icon: 'bx-time-five', color: 'emerald' },
-            ].map((item) => (
-              <div key={item.label} className="bg-white rounded-3xl p-6 border border-gray-50 shadow-xl shadow-gray-200/20 flex gap-5 group hover:border-blue-100 transition-all">
-                <div className={`w-14 h-14 rounded-2xl bg-${item.color}-50 flex items-center justify-center text-2xl text-${item.color}-600 group-hover:scale-110 transition-transform`}>
-                  <i className={`bx ${item.icon}`}></i>
-                </div>
-                <div className="flex-1">
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{item.label}</div>
-                  <div className="text-sm font-black text-gray-800 leading-relaxed">{item.value}</div>
-                </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 group hover:bg-white hover:shadow-xl hover:shadow-rose-600/5 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-rose-600/10 flex items-center justify-center text-rose-600 shrink-0 group-hover:scale-110 transition-transform">
+                <MapPin size={24} />
               </div>
-            ))}
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">Alamat Kantor</h4>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {config.contact_address || 'Jl. Sudirman No. 123, Jakarta Pusat'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 group hover:bg-white hover:shadow-xl hover:shadow-rose-600/5 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-rose-600/10 flex items-center justify-center text-rose-600 shrink-0 group-hover:scale-110 transition-transform">
+                <Phone size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">Nomor Telepon</h4>
+                <p className="text-sm text-gray-500">{config.contact_phone || '+62 21 1234 5678'}</p>
+                <p className="text-xs text-rose-600 font-bold mt-1 uppercase tracking-tighter cursor-pointer hover:underline">
+                  WhatsApp: {config.contact_whatsapp || '+62 812-3456-7890'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 group hover:bg-white hover:shadow-xl hover:shadow-rose-600/5 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-rose-600/10 flex items-center justify-center text-rose-600 shrink-0 group-hover:scale-110 transition-transform">
+                <Mail size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">Email Support</h4>
+                <p className="text-sm text-gray-500">{config.contact_email || 'support@akuglow.id'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 group hover:bg-white hover:shadow-xl hover:shadow-rose-600/5 transition-all">
+              <div className="w-12 h-12 rounded-xl bg-rose-600/10 flex items-center justify-center text-rose-600 shrink-0 group-hover:scale-110 transition-transform">
+                <Clock size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">Jam Operasional</h4>
+                <p className="text-sm text-gray-500">{config.contact_hours || 'Senin - Jumat, 09:00 - 18:00'}</p>
+              </div>
+            </div>
           </div>
 
           <div className="bg-gradient-to-br from-gray-900 to-slate-800 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl">
@@ -126,12 +157,12 @@ export default function ContactPage() {
                 <h3 className="text-2xl font-bold mb-3">Butuh bantuan cepat?</h3>
                 <p className="text-white/60 text-sm mb-8 leading-relaxed">Hubungi pusat bantuan AkuGlow Care untuk respon instan dari tim support kami.</p>
                 <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl font-bold cursor-pointer hover:bg-white hover:text-gray-900 transition-all">
-                   <i className="bx bxl-whatsapp text-xl text-green-400"></i>
+                   <MessageCircle size={20} className="text-green-400" />
                    AkuGlow Care
                 </div>
              </div>
              {/* Decorative */}
-             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl"></div>
+             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-rose-600/20 rounded-full blur-3xl"></div>
           </div>
         </div>
       </div>
