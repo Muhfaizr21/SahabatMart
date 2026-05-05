@@ -271,6 +271,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/skin/progress", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostWeeklyProgress))
 	mux.HandleFunc("/api/skin/analyze", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.AnalyzeSkinPhoto))
 	mux.HandleFunc("/api/skin/set-program", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.SetUserProgram))
+	mux.HandleFunc("/api/skin/finish-program", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.FinishJourney))
 	mux.HandleFunc("/api/skin/routine", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetUserRoutine))
 	mux.HandleFunc("/api/skin/complete-step", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.MarkStepComplete))
 	mux.HandleFunc("/api/skin/recommend-programs", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetProgramRecommendations))

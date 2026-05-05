@@ -180,17 +180,8 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		days := int(nowDate.Sub(startDate).Hours()/24) + 1
 		results.DayCount = days
 
-		// Check for program completion
-		if results.Program != nil && results.Program.DurationDays > 0 {
-			if results.DayCount > results.Program.DurationDays {
-				results.IsCompleted = true
-				// Auto-update DB if not already marked
-				if !userJourney.IsCompleted {
-					sc.DB.Model(&userJourney).Update("is_completed", true)
-					log.Printf("🎉 [SkinJourney] User %s completed program %s", userID, results.Program.Name)
-				}
-			}
-		}
+		// Keep IsCompleted based strictly on the persisted DB status (User Triggered)
+		results.IsCompleted = userJourney.IsCompleted
 	} else {
 		results.DayCount = 1
 	}
@@ -817,6 +808,29 @@ func (sc *SkinController) AdminDeleteProgram(w http.ResponseWriter, r *http.Requ
 	id := r.URL.Query().Get("id")
 	sc.DB.Delete(&models.SkinJourneyProgram{}, id)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+// FinishJourney - User manually marks program as completed
+func (sc *SkinController) FinishJourney(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value("user_id").(string)
+	
+	var userJourney models.UserSkinJourney
+	if err := sc.DB.Where("user_id = ?", userID).First(&userJourney).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Journey tidak ditemukan")
+		return
+	}
+
+	if userJourney.IsCompleted {
+		utils.JSONError(w, http.StatusBadRequest, "Program sudah diselesaikan")
+		return
+	}
+
+	if err := sc.DB.Model(&userJourney).Update("is_completed", true).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyelesaikan program")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Selamat! Program kamu telah selesai! ✨"})
 }
 
 func (sc *SkinController) AdminGetSteps(w http.ResponseWriter, r *http.Request) {

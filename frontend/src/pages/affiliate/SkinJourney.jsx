@@ -139,6 +139,18 @@ export default function SkinJourney() {
     finally { setSavingJournal(false); }
   };
 
+  const handleFinishJourney = async () => {
+    if (!window.confirm('Apakah kamu yakin ingin menyelesaikan program ini? Kamu tidak akan bisa mencatat rutin harian lagi setelah ini.')) return;
+    
+    try {
+      await fetchJson(`${API_BASE}/api/skin/finish-program`, { method: 'POST' });
+      toast.success('🎉 Selamat! Program kamu telah selesai!');
+      fetchJourney();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menyelesaikan program');
+    }
+  };
+
   const handleSaveProgress = async () => {
     if (alreadyUploadedThisWeek) {
       toast.error(`Kamu sudah upload progres minggu ke-${currentWeekNumber}! Tunggu minggu depan ya 💪`);
@@ -272,13 +284,13 @@ export default function SkinJourney() {
       </h1>
       
       <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto mb-12 leading-relaxed">
-        Selamat! Kamu telah menyelesaikan program <span className="text-white font-bold">{journeyData?.program?.name}</span> selama {journeyData?.program?.duration_days} hari penuh dedikasi. Kulitmu kini lebih kuat, lebih sehat, dan lebih bercahaya.
+        Selamat! Kamu telah menyelesaikan program <span className="text-white font-bold">{journeyData?.program?.name}</span> selama {journeyData?.day_count} hari penuh dedikasi. Kulitmu kini lebih kuat, lebih sehat, dan lebih bercahaya.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-md">
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total Hari</p>
-          <h3 className="text-3xl font-black text-white">{journeyData?.program?.duration_days}</h3>
+          <h3 className="text-3xl font-black text-white">{journeyData?.day_count}</h3>
         </div>
         <div className="p-8 rounded-[32px] bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md">
           <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Final Rank</p>
@@ -403,6 +415,15 @@ export default function SkinJourney() {
             <span className="material-symbols-outlined text-lg">swap_horiz</span>
             GANTI PROGRAM
           </button>
+          {!journeyData?.is_completed && (
+            <button 
+              onClick={handleFinishJourney}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs font-black transition-all"
+            >
+              <span className="material-symbols-outlined text-lg">verified</span>
+              SELESAIKAN PROGRAM
+            </button>
+          )}
         </div>
       </div>
 
