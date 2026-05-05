@@ -55,9 +55,9 @@ Explain why this program fits the user's profile.`,
 
 	// 2. Seed Programs
 	programs := []models.SkinJourneyProgram{
-		{Name: "Essential Basic", Description: "Pilihan tepat untuk pemula atau gaya hidup sibuk. Fokus pada perawatan dasar: Cleansing, Hydrating, & Protecting.", Level: 1, StepCount: 3},
-		{Name: "Advanced", Description: "Perawatan lebih mendalam untuk masalah kulit moderat. Menambahkan serum dan perawatan khusus.", Level: 2, StepCount: 5},
-		{Name: "Intensive", Description: "Program komprehensif untuk hasil maksimal pada masalah kulit kompleks. 7 langkah perawatan lengkap pagi dan malam.", Level: 3, StepCount: 7},
+		{Name: "Essential Basic", Description: "Pilihan tepat untuk pemula atau gaya hidup sibuk. Fokus pada perawatan dasar: Cleansing, Hydrating, & Protecting.", Level: 1, StepCount: 3, DurationDays: 28},
+		{Name: "Advanced", Description: "Perawatan lebih mendalam untuk masalah kulit moderat. Menambahkan serum dan perawatan khusus.", Level: 2, StepCount: 5, DurationDays: 30},
+		{Name: "Intensive", Description: "Program komprehensif untuk hasil maksimal pada masalah kulit kompleks. 7 langkah perawatan lengkap pagi dan malam.", Level: 3, StepCount: 7, DurationDays: 30},
 	}
 
 	for _, p := range programs {

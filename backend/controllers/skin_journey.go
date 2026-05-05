@@ -127,6 +127,7 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		Routines          []models.SkinJourneyRoutine       `json:"routines,omitempty"`
 		Recommendations   []models.SkinJourneyProductMapping `json:"recommendations,omitempty"`
 		CompletedStepsToday []uint                         `json:"completed_steps_today"`
+		IsCompleted       bool                              `json:"is_completed"`
 	}
 
 	if pretest.ID != 0 {
@@ -178,6 +179,18 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		nowDate := time.Now().Truncate(24 * time.Hour)
 		days := int(nowDate.Sub(startDate).Hours()/24) + 1
 		results.DayCount = days
+
+		// Check for program completion
+		if results.Program != nil && results.Program.DurationDays > 0 {
+			if results.DayCount > results.Program.DurationDays {
+				results.IsCompleted = true
+				// Auto-update DB if not already marked
+				if !userJourney.IsCompleted {
+					sc.DB.Model(&userJourney).Update("is_completed", true)
+					log.Printf("🎉 [SkinJourney] User %s completed program %s", userID, results.Program.Name)
+				}
+			}
+		}
 	} else {
 		results.DayCount = 1
 	}
@@ -221,6 +234,12 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		if results.VoucherMessage == "" { 
 			results.VoucherMessage = "Kamu sudah berjuang 25 hari! Ini diskon 5% untuk stok bulan depan agar perjalananmu tidak terputus." 
 		}
+	}
+
+	// Completion Reward (Voucher Kelulusan)
+	if results.IsCompleted {
+		results.Voucher = "GLOWGRADUATE"
+		results.VoucherMessage = "SELAMAT! Kamu telah lulus Skin Journey. Gunakan kode GLOWGRADUATE untuk diskon 15% pada pembelian berikutnya sebagai hadiah kelulusanmu! 🎓✨"
 	}
 
 	results.RitualInstruction = cfgRitual.Value

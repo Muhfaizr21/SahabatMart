@@ -253,6 +253,104 @@ export default function SkinJourney() {
     </div>
   );
 
+  const renderCompletionScreen = () => (
+    <div className="max-w-4xl mx-auto py-12 px-6 text-center animate-in zoom-in-95 duration-700">
+      <div className="relative mb-16">
+        <div className="absolute inset-0 bg-rose-500/20 blur-[120px] rounded-full" />
+        <div className="relative z-10 w-32 h-32 bg-gradient-to-br from-rose-400 to-rose-600 rounded-[40px] flex items-center justify-center mx-auto shadow-2xl shadow-rose-500/40 rotate-12 group-hover:rotate-0 transition-transform duration-500">
+          <span className="material-symbols-outlined text-6xl text-white">workspace_premium</span>
+        </div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-2">
+           {[1,2,3].map(i => (
+             <div key={i} className={`w-2 h-2 rounded-full bg-rose-400 animate-ping delay-${i*200}`} />
+           ))}
+        </div>
+      </div>
+
+      <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter leading-tight italic">
+        "Journey <span className="text-rose-500">Accomplished.</span>"
+      </h1>
+      
+      <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto mb-12 leading-relaxed">
+        Selamat! Kamu telah menyelesaikan program <span className="text-white font-bold">{journeyData?.program?.name}</span> selama {journeyData?.program?.duration_days} hari penuh dedikasi. Kulitmu kini lebih kuat, lebih sehat, dan lebih bercahaya.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-md">
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total Hari</p>
+          <h3 className="text-3xl font-black text-white">{journeyData?.program?.duration_days}</h3>
+        </div>
+        <div className="p-8 rounded-[32px] bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md">
+          <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Final Rank</p>
+          <h3 className="text-3xl font-black text-indigo-300">{journeyData?.warrior_level?.level_name}</h3>
+        </div>
+        <div className="p-8 rounded-[32px] bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md">
+          <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total EXP</p>
+          <h3 className="text-3xl font-black text-emerald-300">{journeyData?.warrior_level?.experience?.toLocaleString()}</h3>
+        </div>
+      </div>
+
+      {journeyData?.voucher && (
+        <div className="mb-12 p-8 rounded-[40px] bg-gradient-to-r from-amber-500/10 to-rose-500/10 border border-amber-500/20 relative overflow-hidden group">
+          <div className="relative z-10">
+            <p className="text-amber-500 text-[10px] font-black uppercase tracking-widest mb-2">Reward Kelulusan 🎓</p>
+            <h3 className="text-white font-black text-2xl mb-4">{journeyData?.voucherMessage}</h3>
+            <div className="inline-flex items-center gap-4 p-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-xl">
+               <span className="text-2xl font-black text-white tracking-widest uppercase">{journeyData?.voucher}</span>
+               <button 
+                 onClick={() => {
+                   navigator.clipboard.writeText(journeyData?.voucher);
+                   toast.success('Kode voucher disalin!');
+                 }}
+                 className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
+               >
+                 <span className="material-symbols-outlined text-sm">content_copy</span>
+               </button>
+            </div>
+          </div>
+          <span className="material-symbols-outlined absolute -right-4 -bottom-4 text-8xl text-amber-500/10 group-hover:scale-110 transition-transform">confirmation_number</span>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+        <button 
+          onClick={() => {
+            if (window.confirm('Mulai program baru akan menganalisis ulang kondisi kulitmu saat ini. Lanjut?')) {
+              window.location.href='/affiliate/skin/pretest';
+            }
+          }}
+          className="w-full sm:w-auto px-10 py-5 bg-white text-slate-950 font-black text-sm rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-xl shadow-white/5 active:scale-95 flex items-center justify-center gap-3"
+        >
+          MULAI PROGRAM BARU
+          <span className="material-symbols-outlined">refresh</span>
+        </button>
+        
+        <button 
+          className="w-full sm:w-auto px-10 py-5 bg-slate-800 border border-white/10 text-white font-black text-sm rounded-2xl hover:bg-slate-700 transition-all active:scale-95 flex items-center justify-center gap-3"
+        >
+          DOWNLOAD SERTIFIKAT
+          <span className="material-symbols-outlined">download</span>
+        </button>
+      </div>
+
+      <div className="mt-20 p-10 rounded-[48px] bg-gradient-to-br from-slate-900 to-black border border-white/5 text-left relative overflow-hidden">
+        <div className="relative z-10">
+          <h4 className="text-white font-black text-xl mb-4">Apa Langkah Selanjutnya?</h4>
+          <p className="text-slate-500 text-sm leading-relaxed mb-8">
+            Kamu sekarang berada di fase <span className="text-rose-400 font-bold">Maintenance</span>. Pertahankan kebiasaan baik ini. Kami merekomendasikan untuk melakukan Pre-test ulang setiap 3 bulan atau saat kamu merasakan perubahan signifikan pada kondisi kulitmu.
+          </p>
+          <div className="flex items-center gap-4">
+             <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-500">
+                <span className="material-symbols-outlined text-sm">auto_awesome</span>
+             </div>
+             <p className="text-rose-400 text-[10px] font-black uppercase tracking-widest italic">Konsistensi adalah kunci kecantikan abadi.</p>
+          </div>
+        </div>
+        <span className="material-symbols-outlined absolute -right-10 -bottom-10 text-[240px] text-white/[0.02] select-none pointer-events-none">auto_fix_high</span>
+      </div>
+    </div>
+  );
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="w-12 h-12 rounded-full border-4 border-indigo-500/30 border-t-indigo-400 animate-spin" />
@@ -276,6 +374,8 @@ export default function SkinJourney() {
   );
 
   if (!journeyData?.program?.id || showSelector) return renderProgramSelector();
+
+  if (journeyData?.is_completed) return renderCompletionScreen();
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

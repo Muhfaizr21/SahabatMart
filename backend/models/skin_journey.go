@@ -118,6 +118,7 @@ type SkinJourneyProgram struct {
 	Description string    `gorm:"type:text" json:"description"`
 	Level       int       `json:"level"` // 1: Essential, 2: Advanced, 3: Intensive
 	StepCount   int       `json:"step_count"`
+	DurationDays int      `gorm:"default:28" json:"duration_days"`
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
 }
