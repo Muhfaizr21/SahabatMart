@@ -75,34 +75,37 @@ export default function LoginPage() {
       <div className="max-w-4xl w-full bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-gray-100">
         
         {/* Kolom Kiri - Branding */}
-        <div className="hidden md:flex flex-col w-1/2 bg-blue-600 p-14 relative overflow-hidden justify-between text-white">
-          <div className="absolute -top-32 -left-32 w-80 h-80 bg-blue-500 rounded-full blur-3xl opacity-60"></div>
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-400 rounded-full blur-3xl opacity-40 translate-y-10 translate-x-10"></div>
+        <div className="hidden md:flex flex-col w-1/2 bg-[#0A0A0A] p-14 relative overflow-hidden justify-between text-white border-r border-white/5">
+          <div className="absolute -top-32 -left-32 w-80 h-80 bg-rose-900 rounded-full blur-[120px] opacity-20"></div>
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-rose-800 rounded-full blur-[120px] opacity-10 translate-y-10 translate-x-10"></div>
           
           <div className="relative z-10 flex">
-            <Link to="/" className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 p-2 pl-4 pr-4 rounded-full backdrop-blur-md transition-all text-white text-sm font-medium border border-white/30">
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="rotate-180"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <Link to="/" className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 p-2 pl-4 pr-4 rounded-full backdrop-blur-xl transition-all text-white text-xs font-black border border-white/10 shadow-2xl">
+              <span className="material-symbols-outlined text-sm rotate-180">arrow_forward</span>
               Kembali ke Beranda
             </Link>
           </div>
           
           <div className="relative z-10 mt-auto">
-            <div className="inline-block px-3 py-1 bg-white/20 text-white font-bold text-xs rounded-full uppercase tracking-wider mb-4 border border-white/30 backdrop-blur-sm">Selamat Datang Kembali</div>
-            <h2 className="text-4xl font-bold mb-4 leading-tight">Belanja Lebih Mudah & Hemat.</h2>
-            <p className="text-blue-100 mb-8 text-lg">Masuk untuk mengakses promo eksklusif, melacak pesanan, dan mengelola profil Anda.</p>
+            <div className="inline-block px-4 py-1.5 bg-rose-600/10 text-rose-500 font-black text-[10px] rounded-full uppercase tracking-[0.2em] mb-6 border border-rose-600/20 backdrop-blur-sm">Selamat Datang Kembali</div>
+            <h2 className="text-4xl font-black mb-6 leading-tight tracking-tight">Kecantikan & Rasa Percaya Diri.</h2>
+            <p className="text-gray-400 mb-10 text-base font-medium leading-relaxed">Masuk untuk mengakses layanan konsultasi, promo eksklusif, dan kelola profil kecantikan Anda.</p>
             
-            <div className="flex -space-x-3">
-              {[
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-                "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
-                "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop"
-              ].map((src, i) => (
-                <img key={i} src={src} className="w-10 h-10 rounded-full border-2 border-blue-600 object-cover" alt="User" />
-              ))}
-              <div className="w-10 h-10 rounded-full border-2 border-blue-600 bg-blue-500 flex items-center justify-center text-xs font-bold text-white">9k+</div>
+            <div className="flex items-center gap-4 p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-md">
+              <div className="flex -space-x-3">
+                {[
+                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
+                  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
+                  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop"
+                ].map((src, i) => (
+                  <img key={i} src={src} className="w-10 h-10 rounded-full border-2 border-black object-cover" alt="User" />
+                ))}
+              </div>
+              <div>
+                <p className="text-xs font-black text-white">9,000+ Member</p>
+                <p className="text-[10px] text-gray-500 font-bold">Telah bergabung dengan AkuGlow</p>
+              </div>
             </div>
-            <p className="text-xs text-blue-200 font-medium mt-3">Pelanggan setia AkuGlow</p>
           </div>
         </div>
 
@@ -122,21 +125,21 @@ export default function LoginPage() {
 
           <form className="flex flex-col gap-5" onSubmit={handleLogin}>
             <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2">Alamat Email</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Alamat Email</label>
               <input 
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="nama@email.com" 
-                className="w-full border border-gray-200 rounded-2xl px-5 py-3.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all bg-gray-50 focus:bg-white" 
+                className="w-full border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
               />
             </div>
             
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-semibold text-gray-700">Password</label>
-                <Link to="/forgot-password" size="sm" className="text-xs font-bold text-blue-600 hover:underline">Lupa Password?</Link>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kata Sandi</label>
+                <Link to="/forgot-password" size="sm" className="text-[10px] font-black text-rose-600 hover:underline uppercase tracking-wider">Lupa Sandi?</Link>
               </div>
               <input 
                 type="password" 
@@ -144,22 +147,27 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="••••••••" 
-                className="w-full border border-gray-200 rounded-2xl px-5 py-3.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all bg-gray-50 focus:bg-white" 
+                className="w-full border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
               />
             </div>
             
-            <div className="flex items-center gap-2 mt-1">
-              <input type="checkbox" id="remember" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-              <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer select-none">Ingat saya di perangkat ini</label>
+            <div className="flex items-center gap-3 mt-1">
+              <input type="checkbox" id="remember" className="w-5 h-5 rounded-lg border-gray-200 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600" />
+              <label htmlFor="remember" className="text-xs text-gray-500 font-bold cursor-pointer select-none">Ingat saya di perangkat ini</label>
             </div>
             
-            <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-2xl transition-all mt-2 shadow-xl shadow-blue-600/20 flex justify-center items-center gap-2">
+            <button disabled={loading} className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white font-black py-4.5 rounded-2xl transition-all mt-4 shadow-xl shadow-gray-200 flex justify-center items-center gap-3 active:scale-[0.98]">
               {loading ? (
                 <>
-                  <svg className="animate-spin" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
                   Memproses...
                 </>
-              ) : 'Masuk Sekarang'}
+              ) : (
+                <>
+                  <span>Masuk Akun</span>
+                  <span className="material-symbols-outlined text-lg">login</span>
+                </>
+              )}
             </button>
             
             <div className="relative flex items-center py-2">
@@ -177,8 +185,8 @@ export default function LoginPage() {
               Google
             </button>
             
-            <p className="text-center text-sm text-gray-600 mt-4">
-              Belum punya akun? <Link to="/register" className="text-blue-600 font-bold hover:underline">Daftar gratis sekarang</Link>
+            <p className="text-center text-sm text-gray-500 mt-6 font-bold">
+              Belum punya akun? <Link to="/register" className="text-rose-600 font-black hover:underline underline-offset-4">Daftar sekarang</Link>
             </p>
           </form>
         </div>

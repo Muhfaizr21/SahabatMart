@@ -47,12 +47,11 @@ export default function ShopPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 12;
 
-  // Search State
-  const [searchTerm, setSearchTerm] = useState(searchParam || '');
+  // Search State - Synced with URL
+  const searchTerm = searchParam || '';
 
   useEffect(() => {
     setActiveCategory(catParam || 'Semua');
-    setSearchTerm(searchParam || '');
   }, [catParam, searchParam]);
 
   useEffect(() => {
@@ -180,7 +179,6 @@ export default function ShopPage() {
   }, [activeCategory, sortBy, priceRange, searchParam, selectedBrands, minRating]);
 
   const handleLocalSearch = (val) => {
-    setSearchTerm(val);
     setSearchParams(prev => {
         const newParams = new URLSearchParams(prev);
         if (val) newParams.set('search', val);
@@ -193,36 +191,52 @@ export default function ShopPage() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
-      {/* Mobile Sticky Filter Bar */}
-      <div className="lg:hidden sticky top-[104px] z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
+      {/* Mobile Sticky Filter & Search Bar */}
+      <div className="lg:hidden sticky top-[104px] z-40 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
         <div className="flex flex-col">
           {/* Category Pills Slider */}
-          <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto no-scrollbar scroll-smooth">
+          <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto no-scrollbar scroll-smooth border-b border-gray-50">
             {allCategories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border ${
+                className={`px-5 py-2 rounded-full text-[11px] font-black whitespace-nowrap transition-all border ${
                   activeCategory === cat
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
-                    : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300'
+                    ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-100'
+                    : 'bg-white border-gray-200 text-gray-500 hover:border-rose-300'
                 }`}
               >
                 {cat}
               </button>
             ))}
           </div>
-          {/* Quick Stats & Filter Toggle */}
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-50/50 border-t border-gray-50">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              {filtered.length} Produk <span className="mx-1">•</span> {activeCategory}
-            </p>
-            <button 
+          
+          {/* Search & Filter Controls */}
+          <div className="flex items-center gap-3 px-4 py-3">
+             <div className="relative flex-1 group">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black group-focus-within:text-rose-500 transition-colors">search</span>
+                <input 
+                  type="text"
+                  placeholder="Cari produk..."
+                  className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:bg-white focus:border-rose-500 transition-all text-xs font-bold"
+                  value={searchTerm}
+                  onChange={(e) => handleLocalSearch(e.target.value)}
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={() => handleLocalSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 p-1"
+                  >
+                    <span className="material-symbols-outlined text-sm font-black">close</span>
+                  </button>
+                )}
+             </div>
+             <button 
               onClick={() => setIsMobileFilterOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-black text-gray-700 shadow-sm active:scale-95 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-xs font-black text-gray-700 shadow-sm active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-sm">tune</span>
-              Filter & Urutkan
+              Filter
             </button>
           </div>
         </div>
@@ -342,31 +356,31 @@ export default function ShopPage() {
                  <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-100">
                     <button 
                       onClick={() => setViewMode('grid')}
-                      className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       <span className="material-symbols-outlined font-black text-xl">grid_view</span>
                     </button>
                     <button 
                       onClick={() => setViewMode('list')}
-                      className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       <span className="material-symbols-outlined font-black text-xl">view_list</span>
                     </button>
                  </div>
                  
-                 <div className="relative flex-1 min-w-[300px]">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black pointer-events-none">search</span>
+                 <div className="relative flex-1 min-w-[300px] group">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black pointer-events-none group-focus-within:text-rose-500 transition-colors">search</span>
                     <input 
                       type="text"
                       placeholder="Cari di toko ini..."
-                      className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-blue-500 transition-all text-sm font-bold"
+                      className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-rose-500 transition-all text-sm font-bold"
                       value={searchTerm}
                       onChange={(e) => handleLocalSearch(e.target.value)}
                     />
                     {searchTerm && (
                       <button 
                         onClick={() => handleLocalSearch('')}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 transition-colors"
                       >
                         <span className="material-symbols-outlined text-lg font-black">close</span>
                       </button>
@@ -379,34 +393,14 @@ export default function ShopPage() {
                  <select 
                    value={sortBy}
                    onChange={(e) => setSortBy(e.target.value)}
-                   className="bg-gray-50 border border-gray-100 text-gray-800 text-sm font-black px-6 py-3 rounded-2xl outline-none focus:border-blue-500 transition-all"
+                   className="bg-gray-50 border border-gray-100 text-gray-800 text-sm font-black px-6 py-3 rounded-2xl outline-none focus:border-rose-500 transition-all cursor-pointer"
                  >
                    {sortOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                  </select>
               </div>
             </div>
 
-            {/* Mobile Local Search Bar (Visible on Mobile) */}
-            <div className="lg:hidden mb-6">
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black pointer-events-none">search</span>
-                <input 
-                  type="text"
-                  placeholder="Cari di toko ini..."
-                  className="w-full pl-11 pr-11 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm font-bold shadow-sm"
-                  value={searchTerm}
-                  onChange={(e) => handleLocalSearch(e.target.value)}
-                />
-                {searchTerm && (
-                  <button 
-                    onClick={() => handleLocalSearch('')}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-lg font-black">close</span>
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* Mobile Local Search Bar - Now Integrated in Sticky Header above */}
 
             {/* Search Indicator */}
             {searchParam && (
@@ -434,11 +428,44 @@ export default function ShopPage() {
                     <div className="spinner-border text-blue-600"></div>
                     <p className="text-gray-500 mt-3">Memuat produk...</p>
                 </div>
-            ) : currentProducts.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
-                <div className="text-5xl mb-4">🔍</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Produk Tidak Ditemukan</h3>
-                <p className="text-gray-500 text-sm">Coba ubah filter atau kategori yang dipilih.</p>
+            ) : filtered.length === 0 ? (
+              <div className="py-20 text-center animate-in fade-in zoom-in duration-500">
+                <div className="relative inline-block mb-6">
+                   <div className="absolute inset-0 bg-rose-100 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+                   <span className="relative material-symbols-outlined text-7xl text-gray-200">inventory_2</span>
+                </div>
+                <h3 className="text-2xl font-black text-gray-800 mb-2">Produk Tidak Ditemukan</h3>
+                <p className="text-gray-500 font-bold mb-8 max-w-xs mx-auto">
+                  Maaf, kami tidak menemukan produk yang cocok dengan pencarian Anda.
+                </p>
+
+                {/* Smart Suggestion for Non-Product Searches */}
+                {(searchParam?.toLowerCase().includes('kontak') || searchParam?.toLowerCase().includes('hubungi') || searchParam?.toLowerCase().includes('bantuan')) && (
+                  <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
+                    <p className="text-rose-600 font-black text-sm mb-3">Mencari bantuan atau kontak kami?</p>
+                    <Link to="/contact" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                      <span className="material-symbols-outlined text-lg">support_agent</span>
+                      Hubungi AkuGlow Care
+                    </Link>
+                  </div>
+                )}
+                
+                {(searchParam?.toLowerCase().includes('tentang') || searchParam?.toLowerCase().includes('profil')) && (
+                  <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
+                    <p className="text-rose-600 font-black text-sm mb-3">Ingin tahu lebih banyak tentang kami?</p>
+                    <Link to="/about" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                      <span className="material-symbols-outlined text-lg">info</span>
+                      Tentang SahabatMart
+                    </Link>
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => setSearchParams({})}
+                  className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-sm hover:bg-black transition-all shadow-xl shadow-gray-200"
+                >
+                  Hapus Semua Filter
+                </button>
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">

@@ -26,10 +26,13 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState({ products: [], pages: [], brands: [] });
   const [userDropdown, setUserDropdown] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [wishCount, setWishCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState([]);
 
   const loggedIn = isAuthenticated();
   const user = getStoredUser();
@@ -87,6 +90,12 @@ export default function Navbar() {
     // Polling as safety net (lebih lambat karena sudah ada SSE)
     const interval = setInterval(fetchCounts, 60000);
     
+    // Fetch products once for global search
+    fetchJson(`${PUBLIC_API_BASE}/products`).then(res => {
+      const data = Array.isArray(res) ? res : (res.data || []);
+      setProducts(data);
+    });
+
     return () => {
       if (eventSource) eventSource.close();
       window.removeEventListener('cartUpdate', fetchCounts);
@@ -94,22 +103,74 @@ export default function Navbar() {
     };
   }, [location.pathname, user?.id]);
 
+  // List of Searchable Pages
+  const searchablePages = [
+    { label: 'Belanja Sekarang', href: '/shop', icon: 'shopping_bag', keywords: 'toko, produk, jualan, beli, katalog, shop, keranjang' },
+    { label: 'Tentang SahabatMart', href: '/about', icon: 'info', keywords: 'perusahaan, visi, misi, siapa kami, tentang, profil' },
+    { label: 'Hubungi Care', href: '/contact', icon: 'support_agent', keywords: 'bantuan, telepon, email, alamat, cs, support, kontak, hubungi, wa, whatsapp' },
+    { label: 'Kebijakan Privasi', href: '/privacy-policy', icon: 'security', keywords: 'aman, data, aturan, hukum' },
+    { label: 'Syarat & Ketentuan', href: '/terms-conditions', icon: 'gavel', keywords: 'perjanjian, aturan, hukum, user agreement' },
+    { label: 'Skin Journey', href: '/skin-journey', icon: 'auto_awesome', keywords: 'artikel, tips, edukasi, kecantikan' },
+    { label: 'Blog & Berita', href: '/blog', icon: 'article', keywords: 'berita, tips, artikel, info, edukasi, blog' },
+    { label: 'Keranjang Saya', href: '/cart', icon: 'shopping_cart', keywords: 'beli, bayar, checkout' },
+    { label: 'Profil Saya', href: '/profile', icon: 'person', keywords: 'akun, setting, pengaturan, alamat' },
+  ];
+
   useEffect(() => {
     const searchParam = new URLSearchParams(location.search).get('search');
-    if (searchParam) {
-      setSearchQuery(searchParam);
-    } else {
-      setSearchQuery('');
-    }
+    setSearchQuery(searchParam || '');
   }, [location.search]);
+
+  // Live Global Search Logic
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults({ products: [], pages: [], brands: [] });
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    
+    // 1. Filter Pages
+    const filteredPages = searchablePages.filter(p => 
+      p.label.toLowerCase().includes(query) || p.keywords.toLowerCase().includes(query)
+    );
+
+    // 2. Filter Products & Brands
+    const filteredProducts = products.filter(p => 
+      p.name?.toLowerCase().includes(query) || 
+      p.category?.toLowerCase().includes(query) || 
+      p.brand?.toLowerCase().includes(query)
+    ).slice(0, 5); // Limit to 5 for speed
+
+    const matchedBrands = Array.from(new Set(
+      products
+        .map(p => p.brand)
+        .filter(b => b && b.toLowerCase().includes(query))
+    )).slice(0, 3);
+
+    setSearchResults({
+      pages: filteredPages,
+      products: filteredProducts,
+      brands: matchedBrands
+    });
+  }, [searchQuery, products]);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      navigate('/shop');
+    if (!searchQuery.trim()) return;
+
+    // Smart Redirect: If first result is a Page, go there!
+    if (searchResults.pages.length > 0) {
+      navigate(searchResults.pages[0].href);
+      setSearchOpen(false);
+      setMenuOpen(false);
+      return;
     }
+
+    // Otherwise, go to Shop with search query
+    navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+    setSearchOpen(false);
+    setMenuOpen(false);
   };
 
   const clearSearch = () => {
@@ -163,8 +224,14 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-1.5 sm:gap-5">
-            {/* Mobile Search Toggle (Optional but helpful) */}
-            <button className="lg:hidden p-2 text-gray-500 hover:text-primary active:scale-90 transition-all" onClick={() => setMenuOpen(!menuOpen)}>
+            {/* Mobile Search Toggle */}
+            <button 
+              className={`lg:hidden p-2 active:scale-90 transition-all ${searchOpen ? 'text-primary' : 'text-gray-400'}`} 
+              onClick={() => {
+                setSearchOpen(!searchOpen);
+                setMenuOpen(false);
+              }}
+            >
               <SearchIcon />
             </button>
 
@@ -237,6 +304,16 @@ export default function Navbar() {
                 )}
               </button>
             )}
+            {/* Mobile Menu Toggle (Hamburger) */}
+            <button 
+              className={`lg:hidden p-2 active:scale-90 transition-all ${menuOpen ? 'text-primary' : 'text-gray-400'}`} 
+              onClick={() => {
+                setMenuOpen(!menuOpen);
+                setSearchOpen(false);
+              }}
+            >
+              {menuOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
           </div>
         </div>
 
@@ -270,53 +347,146 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Menu Overlay / Search Overlay */}
-        {menuOpen && (
-          <div className="lg:hidden fixed inset-0 top-[90px] z-[55] bg-black animate-in fade-in slide-in-from-top duration-300 overflow-y-auto pb-20 text-white">
-            <div className="px-6 py-6 space-y-6">
+        {/* Mobile Search Overlay - Now Truly Global */}
+        {searchOpen && (
+          <div className="lg:hidden fixed top-[60px] left-0 right-0 z-[55] bg-black/90 backdrop-blur-3xl border-b border-white/10 animate-in slide-in-from-top duration-300 shadow-2xl overflow-y-auto max-h-[80vh]">
+            <div className="px-5 py-6 space-y-6">
               <div className="relative">
                 <form onSubmit={handleSearch}>
                   <input 
+                    autoFocus
                     type="text" 
-                    placeholder="Apa yang kamu cari?" 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-base outline-none focus:border-primary focus:bg-white/10 transition-all shadow-sm text-white pr-12"
+                    placeholder="Cari produk, brand, atau bantuan..." 
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 text-base outline-none focus:border-primary focus:bg-white/15 transition-all text-white placeholder:text-gray-500 shadow-inner"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     {searchQuery && (
                       <button type="button" onClick={clearSearch} className="text-gray-500 hover:text-white p-1">
                         <CloseIcon />
                       </button>
                     )}
-                    <button type="submit" className="text-primary">
+                    <button type="submit" className="bg-primary p-2 rounded-xl text-white">
                       <SearchIcon />
                     </button>
                   </div>
                 </form>
               </div>
-              
-              <div className="grid grid-cols-1 gap-4">
-                <p className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Menu Navigasi</p>
+
+              {/* Live Results Display */}
+              {searchQuery.trim() && (
+                <div className="space-y-6 pb-4">
+                  {/* Results: Pages */}
+                  {searchResults.pages.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Halaman & Bantuan</p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {searchResults.pages.map(page => (
+                          <Link 
+                            key={page.href} 
+                            to={page.href} 
+                            className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all"
+                            onClick={() => setSearchOpen(false)}
+                          >
+                            <span className="material-symbols-outlined text-primary text-xl font-black">{page.icon}</span>
+                            <span className="text-sm font-bold text-gray-200">{page.label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results: Brands */}
+                  {searchResults.brands.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Merek (Brand)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {searchResults.brands.map(brand => (
+                          <button 
+                            key={brand}
+                            onClick={() => {
+                              navigate(`/shop?brand=${brand}`);
+                              setSearchOpen(false);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-xs font-black text-primary"
+                          >
+                            {brand}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results: Products */}
+                  {searchResults.products.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Produk Unggulan</p>
+                      <div className="space-y-2">
+                        {searchResults.products.map(prod => (
+                          <Link 
+                            key={prod.id} 
+                            to={`/product/${prod.id}`} 
+                            className="flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-white/5"
+                            onClick={() => setSearchOpen(false)}
+                          >
+                            <img src={prod.image_url} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-black text-white truncate">{prod.name}</p>
+                              <p className="text-[10px] font-bold text-gray-500">{prod.brand} • {prod.category}</p>
+                            </div>
+                            <span className="text-[10px] font-black text-primary px-2 py-1 bg-primary/10 rounded-lg">Rp{prod.price?.toLocaleString()}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Results Fallback */}
+                  {searchResults.pages.length === 0 && searchResults.products.length === 0 && searchResults.brands.length === 0 && (
+                    <div className="py-10 text-center">
+                      <span className="material-symbols-outlined text-4xl text-gray-600 mb-2">search_off</span>
+                      <p className="text-sm font-bold text-gray-500">Tidak menemukan hasil untuk "{searchQuery}"</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Backdrop for closing */}
+            <div className="fixed inset-0 top-[60px] -z-10 bg-black/40 backdrop-blur-sm" onClick={() => setSearchOpen(false)}></div>
+          </div>
+        )}
+
+        {/* Mobile Menu Overlay (Navigation) */}
+        {menuOpen && (
+          <div className="lg:hidden fixed inset-0 top-[60px] z-[55] bg-black animate-in fade-in slide-in-from-right duration-300 overflow-y-auto pb-20 text-white">
+            <div className="px-6 py-8 space-y-8">
+              <div className="grid grid-cols-1 gap-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2">Menu Utama</p>
                 {navLinks.map(link => (
                   <Link 
                     key={link.label} 
                     to={link.href} 
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-primary/20 text-base font-bold text-white transition-all border border-white/5" 
+                    className={`flex items-center justify-between p-4 rounded-2xl transition-all border ${location.pathname === link.href ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`} 
                     onClick={() => setMenuOpen(false)}
                   >
-                    {link.label}
+                    <span className="font-bold">{link.label}</span>
                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
                   </Link>
                 ))}
               </div>
 
               {!loggedIn && (
-                <div className="grid grid-cols-2 gap-3 pt-4">
-                  <Link to="/login" className="bg-primary text-white text-center py-3.5 rounded-2xl font-black text-sm shadow-lg shadow-primary-light/30" onClick={() => setMenuOpen(false)}>Masuk</Link>
-                  <Link to="/register" className="bg-white/10 text-white text-center py-3.5 rounded-2xl font-black text-sm border border-white/10" onClick={() => setMenuOpen(false)}>Daftar</Link>
+                <div className="grid grid-cols-2 gap-4 pt-4">
+                  <Link to="/login" className="bg-primary text-white text-center py-4 rounded-2xl font-black text-sm shadow-xl shadow-primary/20" onClick={() => setMenuOpen(false)}>Masuk</Link>
+                  <Link to="/register" className="bg-white/10 text-white text-center py-4 rounded-2xl font-black text-sm border border-white/10" onClick={() => setMenuOpen(false)}>Daftar</Link>
                 </div>
               )}
+
+              <div className="pt-8 border-t border-white/5 text-center">
+                <p className="text-xs text-gray-500 font-medium">Butuh bantuan?</p>
+                <Link to="/contact" className="text-primary font-black text-sm mt-1 inline-block" onClick={() => setMenuOpen(false)}>Hubungi AkuGlow Care</Link>
+              </div>
             </div>
           </div>
         )}

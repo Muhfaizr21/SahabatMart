@@ -37,8 +37,9 @@ func (s *AuthService) Register(email, password, fullName, phone, role, referralC
 	var uplineID *string
 	var resolvedUplineCode string
 	if referralCode != "" {
+		referralCode = strings.TrimSpace(strings.ToUpper(referralCode))
 		var upline models.AffiliateMember
-		if err := s.DB.Where("ref_code = ?", referralCode).First(&upline).Error; err == nil {
+		if err := s.DB.Where("UPPER(ref_code) = ?", referralCode).First(&upline).Error; err == nil {
 			uID := upline.ID
 			uplineID = &uID
 			resolvedUplineCode = upline.RefCode
@@ -209,8 +210,9 @@ func (s *AuthService) HandleGoogleUser(email, fullName, googleID, avatar, referr
 		var uplineID *string
 		var uplineCode string
 		if referralCode != "" {
+			referralCode = strings.TrimSpace(strings.ToUpper(referralCode))
 			var upline models.AffiliateMember
-			if err := s.DB.Where("ref_code = ?", referralCode).First(&upline).Error; err == nil {
+			if err := s.DB.Where("UPPER(ref_code) = ?", referralCode).First(&upline).Error; err == nil {
 				uID := upline.ID
 				uplineID = &uID
 				uplineCode = upline.RefCode

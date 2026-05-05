@@ -58,6 +58,8 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CouponPage from './pages/CouponPage';
 import InvoicePage from './pages/InvoicePage';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsConditions from './pages/TermsConditions';
 
 // New Components for AkuGlow Home Look
 import StatsSection from './components/StatsSection';
@@ -247,6 +249,8 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
           <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-conditions" element={<TermsConditions />} />
 
           {/* Akuglow Skin Journey */}
           {/* [Redirects for Legacy Skin Paths] */}

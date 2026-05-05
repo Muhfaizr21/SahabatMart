@@ -236,11 +236,14 @@ func (ac *AuthController) ForgotPassword(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	fmt.Printf("📩 Password reset requested for: %s\n", req.Email)
 	token, err := ac.Service.RequestPasswordReset(req.Email)
 	if err != nil {
+		fmt.Printf("❌ Failed to request reset for %s: %v\n", req.Email, err)
 		utils.JSONError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	fmt.Printf("✅ Reset token generated: %s\n", token)
 
 	// In production, token is sent via email. 
 	// For AkuGlow, we return it in response for debugging/demonstration if needed, 

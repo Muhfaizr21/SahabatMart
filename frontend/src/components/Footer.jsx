@@ -55,8 +55,8 @@ export default function Footer() {
               <li><Link to="/about" className="hover:text-primary transition-colors font-medium">Tentang Kami</Link></li>
               <li><Link to="/blog" className="hover:text-primary transition-colors font-medium">Blog</Link></li>
               <li><Link to="/contact" className="hover:text-primary transition-colors font-medium">Kontak Kami</Link></li>
-              <li><a href="#" className="hover:text-primary transition-colors font-medium">Kebijakan Privasi</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors font-medium">Syarat & Ketentuan</a></li>
+              <li><Link to="/privacy-policy" className="hover:text-primary transition-colors font-medium">Kebijakan Privasi</Link></li>
+              <li><Link to="/terms-conditions" className="hover:text-primary transition-colors font-medium">Syarat & Ketentuan</Link></li>
             </ul>
           </div>
 
