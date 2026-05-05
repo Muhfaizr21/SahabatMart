@@ -287,7 +287,7 @@ export default function SkinJourney() {
         Selamat! Kamu telah menyelesaikan program <span className="text-white font-bold">{journeyData?.program?.name}</span> selama {journeyData?.day_count} hari penuh dedikasi. Kulitmu kini lebih kuat, lebih sehat, dan lebih bercahaya.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
         <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-md">
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total Hari</p>
           <h3 className="text-3xl font-black text-white">{journeyData?.day_count}</h3>
@@ -297,10 +297,59 @@ export default function SkinJourney() {
           <h3 className="text-3xl font-black text-indigo-300">{journeyData?.warrior_level?.level_name}</h3>
         </div>
         <div className="p-8 rounded-[32px] bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md">
-          <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total EXP</p>
-          <h3 className="text-3xl font-black text-emerald-300">{journeyData?.warrior_level?.experience?.toLocaleString()}</h3>
+          <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Consistency</p>
+          <h3 className="text-3xl font-black text-emerald-300">{journeyData?.consistency_score}%</h3>
+        </div>
+        <div className="p-8 rounded-[32px] bg-rose-500/10 border border-rose-500/20 backdrop-blur-md">
+          <p className="text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total EXP</p>
+          <h3 className="text-3xl font-black text-rose-300">{journeyData?.warrior_level?.experience?.toLocaleString()}</h3>
         </div>
       </div>
+
+      {(journeyData?.first_photo || journeyData?.last_photo) && (
+        <div className="mb-16">
+          <h4 className="text-white font-black text-xl mb-8 flex items-center justify-center gap-3">
+             <span className="material-symbols-outlined text-rose-500">auto_awesome_motion</span>
+             YOUR SKIN EVOLUTION
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Before */}
+            <div className="space-y-4">
+              <div className="relative aspect-[3/4] rounded-[40px] overflow-hidden border-2 border-white/5 bg-slate-900 group">
+                {journeyData?.first_photo ? (
+                  <img src={journeyData.first_photo} alt="Before" className="w-full h-full object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all duration-700" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-700 italic px-10 text-center">
+                    <span className="material-symbols-outlined text-4xl mb-2 opacity-20">no_photography</span>
+                    <p className="text-xs">Foto awal tidak tersedia</p>
+                  </div>
+                )}
+                <div className="absolute top-6 left-6 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">START DAY</span>
+                </div>
+              </div>
+            </div>
+
+            {/* After */}
+            <div className="space-y-4">
+              <div className="relative aspect-[3/4] rounded-[40px] overflow-hidden border-4 border-rose-500/30 shadow-2xl shadow-rose-500/20 bg-slate-900 group">
+                {journeyData?.last_photo ? (
+                  <img src={journeyData.last_photo} alt="After" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-700 italic px-10 text-center">
+                    <span className="material-symbols-outlined text-4xl mb-2 opacity-20">no_photography</span>
+                    <p className="text-xs">Foto akhir tidak tersedia</p>
+                  </div>
+                )}
+                <div className="absolute top-6 right-6 px-4 py-2 bg-rose-500 backdrop-blur-md rounded-full shadow-lg">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">THE RESULT ✨</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="mt-8 text-slate-500 text-sm italic">"Perubahan kecil setiap hari menghasilkan perbedaan besar di akhir perjalanan."</p>
+        </div>
+      )}
 
       {journeyData?.voucher && (
         <div className="mb-12 p-8 rounded-[40px] bg-gradient-to-r from-amber-500/10 to-rose-500/10 border border-amber-500/20 relative overflow-hidden group">

@@ -128,6 +128,9 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		Recommendations   []models.SkinJourneyProductMapping `json:"recommendations,omitempty"`
 		CompletedStepsToday []uint                         `json:"completed_steps_today"`
 		IsCompleted       bool                              `json:"is_completed"`
+		FirstPhoto        string                            `json:"first_photo,omitempty"`
+		LastPhoto         string                            `json:"last_photo,omitempty"`
+		ConsistencyScore  int                               `json:"consistency_score"`
 	}
 
 	if pretest.ID != 0 {
@@ -231,6 +234,23 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 	if results.IsCompleted {
 		results.Voucher = "GLOWGRADUATE"
 		results.VoucherMessage = "SELAMAT! Kamu telah lulus Skin Journey. Gunakan kode GLOWGRADUATE untuk diskon 15% pada pembelian berikutnya sebagai hadiah kelulusanmu! 🎓✨"
+	}
+
+	// Fetch Photos for Before vs After
+	var firstProgress, lastProgress models.SkinJourneyProgress
+	sc.DB.Where("user_id = ?", userID).Order("created_at asc").First(&firstProgress)
+	sc.DB.Where("user_id = ?", userID).Order("created_at desc").First(&lastProgress)
+	
+	results.FirstPhoto = firstProgress.PhotoURL
+	results.LastPhoto = lastProgress.PhotoURL
+
+	// Calculate Consistency Score (mock for now or based on journal count)
+	var journalCount int64
+	sc.DB.Model(&models.SkinJourneyJournal{}).Where("user_id = ?", userID).Count(&journalCount)
+	// Example: total days since start vs journal count
+	if results.DayCount > 0 {
+		results.ConsistencyScore = int((journalCount * 100) / int64(results.DayCount))
+		if results.ConsistencyScore > 100 { results.ConsistencyScore = 100 }
 	}
 
 	results.RitualInstruction = cfgRitual.Value
