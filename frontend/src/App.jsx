@@ -218,10 +218,11 @@ function AppContent() {
   const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
 
   return (
-    <div className={`min-h-screen ${isPanel ? 'bg-[#0c1324]' : 'bg-white pb-16 lg:pb-0'}`}>
+    <div className={`min-h-screen flex flex-col ${isPanel ? 'bg-[#0c1324]' : 'bg-[#111827]'}`}>
       <ScrollToTop />
       <Toaster position="top-right" reverseOrder={false} />
       <NavbarManager />
+      <div className={`flex-1 ${isPanel ? '' : 'bg-white'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ShopPage />} />
@@ -327,7 +328,8 @@ function AppContent() {
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-        <FooterManager />
       </div>
+      <FooterManager />
+    </div>
   );
 }

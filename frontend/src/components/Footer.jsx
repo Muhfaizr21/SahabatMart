@@ -6,7 +6,7 @@ function CartIcon() {
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-400 pt-16 pb-8 mt-8">
+    <footer className="bg-gray-900 text-gray-400 pt-16 pb-24 lg:pb-8">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
