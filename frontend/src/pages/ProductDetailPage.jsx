@@ -5,7 +5,6 @@ import { isAuthenticated } from '../lib/auth';
 import { ShoppingBag } from 'lucide-react';
 import ReviewSection from '../components/ReviewSection';
 import RecommendedSection from '../components/RecommendedSection';
-import { useCart } from '../context/CartContext';
 
 function StarRating({ rating, size = 16 }) {
   return (
