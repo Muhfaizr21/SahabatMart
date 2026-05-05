@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchJson, API_BASE, formatImage } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 import toast from 'react-hot-toast';
+import { toPng } from 'html-to-image';
 
 export default function SkinJourney() {
   const user = getStoredUser();
+  const certificateRef = useRef(null);
   const [journeyData, setJourneyData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [journalText, setJournalText] = useState('');
   const [savingJournal, setSavingJournal] = useState(false);
+  const [history, setHistory] = useState([]); // Graduation history
+  const [activeCertificate, setActiveCertificate] = useState(null); // Data for cert download
   const [showQR, setShowQR] = useState(false);
   const [showTracker, setShowTracker] = useState(false);
   const [ritualActive, setRitualActive] = useState(false);
@@ -23,16 +27,25 @@ export default function SkinJourney() {
   const [showSelector, setShowSelector] = useState(false);
   const [programs, setPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
+  const videoRef = useRef(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [imageAlign, setImageAlign] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Filter states for Skin Journey chart
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(null);
 
   const currentWeekNumber = (() => {
-    if (!journeyData?.pretest?.created_at) return null;
-    const createdAt = new Date(journeyData.pretest.created_at);
-    if (isNaN(createdAt.getTime()) || createdAt.getFullYear() < 2000) return null;
-    const daysSince = Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24));
+    // Priority: Use started_at from the active program, fallback to pretest created_at
+    const startDateStr = journeyData?.program?.id ? journeyData.started_at : journeyData?.pretest?.created_at;
+    if (!startDateStr) return 1;
+    
+    const startDate = new Date(startDateStr);
+    if (isNaN(startDate.getTime()) || startDate.getFullYear() < 2000) return 1;
+    
+    const daysSince = Math.floor((Date.now() - startDate) / (1000 * 60 * 60 * 24));
     return Math.min(52, Math.max(1, Math.floor(daysSince / 7) + 1));
   })();
 
@@ -64,6 +77,12 @@ export default function SkinJourney() {
         });
         setCompletedSteps(completedMap);
       }
+
+      // Fetch History [Point 2]
+      try {
+        const histData = await fetchJson(`${API_BASE}/api/skin/history`);
+        setHistory(histData || []);
+      } catch (e) { console.error("History fetch error:", e); }
       
       setShowSelector(false);
     } catch (err) { 
@@ -84,6 +103,12 @@ export default function SkinJourney() {
     } finally {
       setLoadingPrograms(false);
     }
+  };
+
+  const formatSummary = (text) => {
+    if (!text) return '';
+    const formatted = text.replace(/\*\*(.*?)\*\*/g, '<b class="text-white font-black">$1</b>');
+    return { __html: formatted };
   };
 
   const handleSetProgram = async (programId) => {
@@ -151,6 +176,103 @@ export default function SkinJourney() {
     }
   };
 
+  const processAndValidateImage = async (file) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Standarisasi ukuran untuk AI (800x1000)
+          const targetWidth = 800;
+          const targetHeight = 1000;
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          
+          // Draw image to fit canvas
+          const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
+          const x = (targetWidth - img.width * scale) / 2;
+          const y = (targetHeight - img.height * scale) / 2;
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+          
+          // 1. Quality Gatekeeper: Luminance & Sharpness
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          let totalLuminance = 0;
+          
+          // Edge Detection (Simple Laplacian-like) for Blur Detection
+          let laplacianVar = 0;
+          const grayscale = new Float32Array(canvas.width * canvas.height);
+          
+          for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            const gray = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+            totalLuminance += gray;
+            grayscale[j] = gray;
+          }
+          
+          let diffSum = 0;
+          let count = 0;
+          // Optimasi: Loncat 2 pixel agar ringan di HP
+          for (let i = canvas.width + 1; i < grayscale.length - canvas.width - 1; i += 2) {
+             const val = Math.abs(
+               grayscale[i] * 4 - 
+               grayscale[i-1] - grayscale[i+1] - 
+               grayscale[i-canvas.width] - grayscale[i+canvas.width]
+             );
+             diffSum += val;
+             count++;
+          }
+          const sharpness = diffSum / count;
+          const avgLuminance = totalLuminance / (data.length / 4);
+          
+          console.log('Image Quality Check:', { sharpness, avgLuminance });
+
+          // Kita ubah dari "Blokir" menjadi "Peringatan" agar tidak kaku
+          if (avgLuminance < 25) {
+            toast("Fotonya terlihat agak gelap, AI mungkin kurang akurat. Coba cari cahaya lebih ya!", { icon: '⚠️' });
+          }
+          
+          if (sharpness < 1.5) {
+             toast("Fotonya terdeteksi agak buram. Pastikan kamera fokus agar hasil maksimal!", { icon: '⚠️' });
+          }
+
+          // Kita hanya blokir jika BENAR-BENAR ekstrem (misal layar hitam total atau blank)
+          if (avgLuminance < 5 || sharpness < 0.5) {
+            reject(new Error("Foto tidak terbaca. Pastikan kamera tidak tertutup dan ada cahaya."));
+            return;
+          }
+
+          // 2. Pre-Processing Enhancement (Auto-Enhance)
+          // Naikan kontras sedikit agar tekstur kulit lebih terlihat untuk AI
+          const contrast = 1.1; // 10% boost
+          const intercept = 128 * (1 - contrast);
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = data[i] * contrast + intercept;
+            data[i+1] = data[i+1] * contrast + intercept;
+            data[i+2] = data[i+2] * contrast + intercept;
+          }
+          ctx.putImageData(imageData, 0, 0);
+
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Gagal mengompres gambar"));
+          }, 'image/jpeg', 0.85);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("File gambar rusak atau tidak didukung"));
+      };
+    });
+  };
+
   const handleSaveProgress = async () => {
     if (alreadyUploadedThisWeek) {
       toast.error(`Kamu sudah upload progres minggu ke-${currentWeekNumber}! Tunggu minggu depan ya 💪`);
@@ -168,9 +290,21 @@ export default function SkinJourney() {
       };
 
       if (skinPhoto && !aiAnalysis) {
-        toast.loading('Menganalisis foto dengan AI...', { id: 'ai-analyze' });
+        const tid = toast.loading('Memproses & Mengoptimalkan Foto...', { id: 'ai-analyze' });
+        
+        let processedBlob;
+        try {
+          processedBlob = await processAndValidateImage(skinPhoto);
+        } catch (e) {
+          toast.error(e.message, { id: 'ai-analyze' });
+          setAnalyzing(false);
+          return;
+        }
+
+        toast.loading('Menganalisis dengan AI SahabatMart...', { id: 'ai-analyze' });
         const formData = new FormData();
-        formData.append('photo', skinPhoto);
+        formData.append('photo', processedBlob, 'processed_selfie.jpg');
+        
         const token = localStorage.getItem('token');
         const aiRes = await fetch(`${API_BASE}/api/skin/analyze`, {
           method: 'POST',
@@ -188,7 +322,7 @@ export default function SkinJourney() {
         }
         
         toast.success('✨ Analisis AI selesai!', { id: 'ai-analyze' });
-        return; // Berhenti di sini agar user bisa baca hasil AI
+        return;
       }
 
       const res = await fetchJson(`${API_BASE}/api/skin/progress`, {
@@ -205,6 +339,85 @@ export default function SkinJourney() {
       toast.error(err.message || 'Gagal menyimpan progres');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      setIsCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      toast.error('Gagal mengakses kamera');
+      setIsCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+    }
+    setIsCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoRef.current, 0, 0);
+    
+    canvas.toBlob((blob) => {
+      setSkinPhoto(blob);
+      stopCamera();
+    }, 'image/jpeg', 0.9);
+  };
+
+  const handleDownloadCertificate = async (historyItem = null) => {
+    // If historyItem is passed, we are downloading an old cert
+    if (historyItem) {
+      setActiveCertificate(historyItem);
+    } else {
+      setActiveCertificate(null);
+    }
+
+    // Small delay to let React update the hidden template
+    await new Promise(r => setTimeout(r, 100));
+
+    if (!certificateRef.current) return;
+    
+    const tid = toast.loading('Memproses sertifikat digital...');
+    try {
+      const element = certificateRef.current;
+      const dataUrl = await toPng(element, {
+        quality: 1,
+        pixelRatio: 2,
+        backgroundColor: '#0f172a',
+        cacheBust: true,
+        style: {
+          transform: 'scale(1)',
+        }
+      });
+      
+      const link = document.createElement('a');
+      const fileName = activeCertificate 
+        ? `Sertifikat-${activeCertificate.program_name}-${new Date().getTime()}.png`
+        : `Sertifikat-SkinJourney-${new Date().getTime()}.png`;
+        
+      link.download = fileName;
+      link.href = dataUrl;
+      link.click();
+      
+      toast.success('Sertifikat berhasil diunduh! ✨', { id: tid });
+    } catch (err) {
+      console.error("Download Error:", err);
+      toast.error(`Gagal mengunduh: ${err.message || 'Error teknis'}`, { id: tid });
+    } finally {
+      // Clear active certificate after a while
+      setTimeout(() => setActiveCertificate(null), 1000);
     }
   };
 
@@ -287,22 +500,22 @@ export default function SkinJourney() {
         Selamat! Kamu telah menyelesaikan program <span className="text-white font-bold">{journeyData?.program?.name}</span> selama {journeyData?.day_count} hari penuh dedikasi. Kulitmu kini lebih kuat, lebih sehat, dan lebih bercahaya.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-        <div className="p-8 rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-md">
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total Hari</p>
-          <h3 className="text-3xl font-black text-white">{journeyData?.day_count}</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
+        <div className="p-4 md:p-8 rounded-2xl md:rounded-[32px] bg-white/5 border border-white/10 backdrop-blur-md">
+          <p className="text-slate-500 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total Hari</p>
+          <h3 className="text-xl md:text-3xl font-black text-white">{journeyData?.day_count}</h3>
         </div>
-        <div className="p-8 rounded-[32px] bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md">
-          <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Final Rank</p>
-          <h3 className="text-3xl font-black text-indigo-300">{journeyData?.warrior_level?.level_name}</h3>
+        <div className="p-4 md:p-8 rounded-2xl md:rounded-[32px] bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md">
+          <p className="text-indigo-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] mb-2">Final Rank</p>
+          <h3 className="text-xl md:text-3xl font-black text-indigo-300">{journeyData?.warrior_level?.level_name}</h3>
         </div>
-        <div className="p-8 rounded-[32px] bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md">
-          <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Consistency</p>
-          <h3 className="text-3xl font-black text-emerald-300">{journeyData?.consistency_score}%</h3>
+        <div className="p-4 md:p-8 rounded-2xl md:rounded-[32px] bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-md">
+          <p className="text-emerald-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] mb-2">Consistency</p>
+          <h3 className="text-xl md:text-3xl font-black text-emerald-300">{journeyData?.consistency_score}%</h3>
         </div>
-        <div className="p-8 rounded-[32px] bg-rose-500/10 border border-rose-500/20 backdrop-blur-md">
-          <p className="text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total EXP</p>
-          <h3 className="text-3xl font-black text-rose-300">{journeyData?.warrior_level?.experience?.toLocaleString()}</h3>
+        <div className="p-4 md:p-8 rounded-2xl md:rounded-[32px] bg-rose-500/10 border border-rose-500/20 backdrop-blur-md">
+          <p className="text-rose-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] mb-2">Total EXP</p>
+          <h3 className="text-xl md:text-3xl font-black text-rose-300">{journeyData?.warrior_level?.experience?.toLocaleString()}</h3>
         </div>
       </div>
 
@@ -387,12 +600,14 @@ export default function SkinJourney() {
         </button>
         
         <button 
+          onClick={handleDownloadCertificate}
           className="w-full sm:w-auto px-10 py-5 bg-slate-800 border border-white/10 text-white font-black text-sm rounded-2xl hover:bg-slate-700 transition-all active:scale-95 flex items-center justify-center gap-3"
         >
           DOWNLOAD SERTIFIKAT
           <span className="material-symbols-outlined">download</span>
         </button>
       </div>
+
 
       <div className="mt-20 p-10 rounded-[48px] bg-gradient-to-br from-slate-900 to-black border border-white/5 text-left relative overflow-hidden">
         <div className="relative z-10">
@@ -600,20 +815,73 @@ export default function SkinJourney() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                       <label className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 block">Selfie Progres (Wajib)</label>
-                      <div className="relative group aspect-square rounded-3xl overflow-hidden bg-slate-800 border-2 border-dashed border-white/10 hover:border-rose-500/50 transition-colors">
-                        {skinPhoto ? (
-                          <img src={URL.createObjectURL(skinPhoto)} className="w-full h-full object-cover" />
+                      <div className="relative group aspect-square rounded-3xl overflow-hidden bg-slate-900 border-2 border-dashed border-white/10 hover:border-rose-500/50 transition-colors cursor-move">
+                        {isCameraActive ? (
+                          <div className="absolute inset-0 bg-black">
+                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-80">
+                               <div className="w-[60%] h-[75%] border-2 border-dashed border-rose-500 rounded-[150px/200px] relative">
+                                  <div className="absolute top-[35%] left-0 right-0 h-[1px] bg-rose-500/30" />
+                                  <div className="absolute bottom-[20%] left-1/4 right-1/4 h-[1px] bg-rose-500/30" />
+                               </div>
+                            </div>
+                            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                               <button onClick={capturePhoto} className="w-12 h-12 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/40"><span className="material-symbols-outlined">photo_camera</span></button>
+                               <button onClick={stopCamera} className="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center"><span className="material-symbols-outlined">close</span></button>
+                            </div>
+                          </div>
+                        ) : skinPhoto ? (
+                          <div 
+                            className="relative w-full h-full overflow-hidden"
+                            onMouseDown={(e) => { setIsDragging(true); setDragStart({ x: e.clientX - imageAlign.x, y: e.clientY - imageAlign.y }); }}
+                            onMouseMove={(e) => { if (isDragging) setImageAlign(prev => ({ ...prev, x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })); }}
+                            onMouseUp={() => setIsDragging(false)}
+                            onMouseLeave={() => setIsDragging(false)}
+                          >
+                            <img 
+                              src={URL.createObjectURL(skinPhoto)} 
+                              className="absolute pointer-events-none" 
+                              style={{ 
+                                transform: `translate(${imageAlign.x}px, ${imageAlign.y}px) scale(${imageAlign.scale})`,
+                                transition: isDragging ? 'none' : 'transform 0.1s'
+                              }}
+                            />
+                            {/* Face Mask Overlay Guide [Interactive] */}
+                            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-60">
+                               <div className="w-[60%] h-[75%] border-4 border-dashed border-rose-500 rounded-[150px/200px] relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                                  <div className="absolute top-[35%] left-0 right-0 h-[1px] bg-rose-500/50" />
+                                  <div className="absolute bottom-[20%] left-1/4 right-1/4 h-[1px] bg-rose-500/50" />
+                               </div>
+                               <div className="mt-4 flex flex-col items-center">
+                                 <p className="text-[8px] text-white font-black uppercase tracking-widest bg-rose-500 px-3 py-1 rounded-full mb-2">Geser & Zoom Foto Agar Pas</p>
+                                 <div className="flex gap-2 pointer-events-auto">
+                                    <button onClick={() => setImageAlign(prev => ({ ...prev, scale: Math.max(0.5, prev.scale - 0.1) }))} className="w-8 h-8 rounded-lg bg-black/60 text-white flex items-center justify-center"><span className="material-symbols-outlined text-sm">remove</span></button>
+                                    <button onClick={() => setImageAlign(prev => ({ ...prev, scale: Math.min(3, prev.scale + 0.1) }))} className="w-8 h-8 rounded-lg bg-black/60 text-white flex items-center justify-center"><span className="material-symbols-outlined text-sm">add</span></button>
+                                    <button onClick={() => { setSkinPhoto(null); setImageAlign({x:0, y:0, scale:1}); }} className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                 </div>
+                               </div>
+                            </div>
+                          </div>
                         ) : (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
-                            <span className="material-symbols-outlined text-4xl mb-2">add_a_photo</span>
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Pilih Foto</span>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                             <div className="flex gap-4">
+                                <button onClick={startCamera} className="w-16 h-16 rounded-3xl bg-rose-500/10 text-rose-500 flex flex-col items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
+                                   <span className="material-symbols-outlined mb-1">photo_camera</span>
+                                   <span className="text-[8px] font-black uppercase">Ambil</span>
+                                </button>
+                                <label className="w-16 h-16 rounded-3xl bg-white/5 text-slate-500 flex flex-col items-center justify-center hover:bg-white/10 transition-all cursor-pointer">
+                                   <span className="material-symbols-outlined mb-1">upload</span>
+                                   <span className="text-[8px] font-black uppercase">Upload</span>
+                                   <input type="file" accept="image/*" onChange={(e) => {
+                                      setSkinPhoto(e.target.files[0]);
+                                      setAiAnalysis(null);
+                                      setTrackerForm(prev => ({ ...prev, selfie_url: '' }));
+                                   }} className="hidden" />
+                                </label>
+                             </div>
+                             <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Pilih sumber foto</p>
                           </div>
                         )}
-                        <input type="file" accept="image/*" onChange={(e) => {
-                          setSkinPhoto(e.target.files[0]);
-                          setAiAnalysis(null);
-                          setTrackerForm(prev => ({ ...prev, selfie_url: '' }));
-                        }} className="absolute inset-0 opacity-0 cursor-pointer" />
                       </div>
                     </div>
                     <div className="space-y-6">
@@ -627,6 +895,11 @@ export default function SkinJourney() {
                         value={trackerForm.notes}
                         onChange={(e) => setTrackerForm({...trackerForm, notes: e.target.value})}
                       />
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                        <p className="text-amber-500 text-[9px] leading-relaxed italic">
+                          <span className="font-bold uppercase">Tips:</span> Gunakan pencahayaan matahari & pastikan wajah sejajar kamera agar fitur Before/After akurat.
+                        </p>
+                      </div>
 
                       {aiAnalysis && (
                         <div className="p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 animate-in zoom-in-95 duration-500">
@@ -637,7 +910,10 @@ export default function SkinJourney() {
                           <div className="space-y-4">
                             <div>
                               <p className="text-slate-400 text-[9px] uppercase font-bold mb-1">Kondisi Kulit</p>
-                              <p className="text-indigo-200 text-xs leading-relaxed italic">"{aiAnalysis.summary}"</p>
+                              <p 
+                                className="text-indigo-200 text-xs leading-relaxed italic"
+                                dangerouslySetInnerHTML={formatSummary(aiAnalysis.summary)}
+                              />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
@@ -745,6 +1021,44 @@ export default function SkinJourney() {
                  </div>
                )}
              </div>
+          </div>
+
+          {/* Riwayat Kelulusan [Point 3] */}
+          <div className="p-8 bg-slate-800/40 border border-emerald-500/10 rounded-[40px] backdrop-blur-xl">
+            <h3 className="text-white font-black text-lg mb-6 flex items-center gap-3">
+              <span className="material-symbols-outlined text-emerald-400">workspace_premium</span>
+              Riwayat Kelulusan
+            </h3>
+            {history?.length > 0 ? (
+              <div className="space-y-4">
+                {history.map((h, i) => (
+                  <div key={i} className="p-5 rounded-[28px] bg-slate-900/40 border border-white/5 flex items-center justify-between group hover:border-emerald-500/20 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                        <span className="material-symbols-outlined text-xl">verified</span>
+                      </div>
+                      <div>
+                        <p className="text-white text-[11px] font-black uppercase tracking-tight">{h.program_name}</p>
+                        <p className="text-slate-500 text-[9px] font-bold italic">{new Date(h.finished_at).toLocaleDateString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => handleDownloadCertificate(h)}
+                      className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl transition-all"
+                    >
+                      <span className="material-symbols-outlined text-lg">download</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-10 text-center border border-dashed border-white/5 rounded-3xl">
+                <span className="material-symbols-outlined text-slate-700 text-3xl mb-2">military_tech</span>
+                <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                  Selesaikan program pertamamu<br/>untuk mendapatkan sertifikat!
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Ritual Card */}
@@ -893,6 +1207,69 @@ export default function SkinJourney() {
           </div>
         </div>
       )}
+
+      {/* Hidden Certificate Template for Export [Always rendered] */}
+      <div className="fixed left-[-9999px] top-0 pointer-events-none">
+        <div 
+          ref={certificateRef}
+          className="w-[800px] h-[1000px] bg-[#0f172a] p-16 flex flex-col items-center justify-center text-center relative border-[16px] border-double border-rose-500/20"
+        >
+          {/* Decorative Elements */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-500/10 via-transparent to-transparent opacity-50" />
+          <div className="absolute top-10 left-10 w-24 h-24 border-t-4 border-l-4 border-rose-500/30" />
+          <div className="absolute bottom-10 right-10 w-24 h-24 border-b-4 border-r-4 border-rose-500/30" />
+          
+          <div className="relative z-10 w-full">
+            <div className="mb-12 flex justify-center">
+               <div className="w-24 h-24 bg-gradient-to-br from-rose-400 to-rose-600 rounded-[32px] flex items-center justify-center shadow-2xl shadow-rose-500/40">
+                  <span className="material-symbols-outlined text-5xl text-white">workspace_premium</span>
+               </div>
+            </div>
+
+            <h1 className="text-rose-500 text-xs font-black uppercase tracking-[0.4em] mb-4">Official Certification</h1>
+            <h2 className="text-white text-5xl font-black mb-8 italic tracking-tighter">Skin Journey <span className="text-rose-400">Excellence</span></h2>
+            
+            <div className="w-20 h-[2px] bg-white/20 mx-auto mb-10" />
+            <p className="text-slate-400 text-lg mb-2">Dengan bangga mempersembahkan kepada:</p>
+            <h3 className="text-white text-4xl font-black mb-12 uppercase tracking-tight underline decoration-rose-500/50 underline-offset-8">
+              {journeyData?.user_name || 'Sahabat Glow'}
+            </h3>
+            
+            <p className="text-slate-500 text-sm max-w-lg mx-auto leading-relaxed mb-16">
+              Telah menunjukkan dedikasi luar biasa dalam menyelesaikan program 
+              <span className="text-white font-bold mx-1">
+                {activeCertificate ? activeCertificate.program_name : journeyData?.program?.name}
+              </span> 
+              selama 
+              <span className="text-rose-400 font-bold mx-1">
+                {activeCertificate ? activeCertificate.day_count : journeyData?.day_count} Hari
+              </span>.
+            </p>
+
+            <div className="grid grid-cols-3 gap-8 mb-20 px-20">
+               <div>
+                  <div className="text-white font-black text-xl">{activeCertificate ? activeCertificate.day_count : journeyData?.day_count}</div>
+                  <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Total Hari</div>
+               </div>
+               <div>
+                  <div className="text-indigo-400 font-black text-xl">{activeCertificate ? activeCertificate.final_rank : journeyData?.warrior_level?.level_name}</div>
+                  <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Final Rank</div>
+               </div>
+               <div>
+                  <div className="text-rose-400 font-black text-xl">{activeCertificate ? 500 : (journeyData?.warrior_level?.experience || 0)}</div>
+                  <div className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">EXP Point</div>
+               </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-12">
+               <div className="text-center">
+                  <div className="w-32 h-[1px] bg-white/10 mb-2" />
+                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">SahabatMart AI System</div>
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

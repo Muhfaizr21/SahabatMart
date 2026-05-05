@@ -51,41 +51,69 @@ func (s *SkinAIService) getModel() string {
 	return "gpt-4o"
 }
 
-// getPrompt retrieves the analysis prompt from config
-func (s *SkinAIService) getPrompt() string {
+// getProductKnowledge dynamically reads the Akuglow product knowledge from DB.
+// This allows admins to update the knowledge base without redeploying the app.
+func (s *SkinAIService) getProductKnowledge() string {
 	var cfg models.PlatformConfig
-	if err := s.DB.Where("key = ?", "skin_ai_prompt").First(&cfg).Error; err == nil && cfg.Value != "" {
+	if err := s.DB.Where("key = ?", "skin_ai_product_knowledge").First(&cfg).Error; err == nil && cfg.Value != "" {
 		return cfg.Value
 	}
-	return defaultSkinPrompt
+	log.Println("⚠️ [SkinAI] 'skin_ai_product_knowledge' not found in DB, using empty knowledge base.")
+	return ""
 }
 
-const systemRole = `You are a professional skincare product recommendation engine for an e-commerce beauty platform called Akuglow. Your job is to analyze product photos or skin reference images to recommend appropriate skincare products. You must ALWAYS respond with valid JSON only — never refuse, never add explanations outside the JSON structure.`
+// buildSystemRole builds the final system role by injecting product knowledge
+// into the template from the stage config. Uses {{product_knowledge}} placeholder.
+func (s *SkinAIService) buildSystemRole(templateRole string) string {
+	knowledge := s.getProductKnowledge()
+	if knowledge == "" {
+		return templateRole
+	}
+	return strings.ReplaceAll(templateRole, "{{product_knowledge}}", knowledge)
+}
 
-const defaultSkinPrompt = `Analyze the skin condition visible in this image and return a JSON object with the following fields. This is for a skincare e-commerce recommendation system.
+// --- Prompt Templates ---
+// These are TEMPLATES only. Product knowledge is injected dynamically from DB.
+// Do NOT hardcode product details here. Use {{product_knowledge}} placeholder.
 
-Look carefully at:
-- Redness level (inflamed areas, flushed skin, irritation)
-- Acne/blemishes (pimples, blackheads, whiteheads, cysts visible)
-- Skin moisture (dry, oily, balanced appearance)
-- Overall skin health score
+const systemRoleTemplate = `Anda adalah "Sahabat Glow", AI Skincare Expert untuk platform Akuglow (SahabatMart).
+Analisis foto kulit wajah secara mendalam, teknis, dan empatis.
+Bahasa: Bahasa Indonesia yang hangat dan memotivasi.
 
-If the image does not show skin clearly, still return JSON with skin_score: 1 and explain in summary.
+=== PRODUCT KNOWLEDGE (DARI DATABASE) ===
+{{product_knowledge}}
+==========================================
 
-Return ONLY this JSON (no markdown, no extra text):
+ATURAN WAJIB:
+- Selalu rekomendasikan produk Akuglow yang SPESIFIK sesuai kondisi kulit yang terdeteksi.
+- Jelaskan MENGAPA bahan aktif spesifik dari produk itu cocok untuk kondisi kulitnya.
+- Respon HANYA dalam format JSON valid. DILARANG menambah teks di luar JSON.`
+
+const defaultPromptTemplate = `Analisis foto kulit wajah ini secara mendetail untuk sistem rekomendasi Akuglow.
+
+Identifikasi:
+1. Jenis & tingkat keparahan jerawat (meradang vs tidak meradang, jumlah estimasi)
+2. Kondisi skin barrier (tanda kemerahan, kulit tipis/perih, iritasi)
+3. Tingkat hidrasi (kering, dehidrasi, berminyak, kombinasi)
+4. Flek, hiperpigmentasi, atau bekas jerawat yang terlihat
+5. Tekstur kulit (halus, bruntusan, kasar, pori besar)
+
+Berdasarkan analisis DAN product knowledge Akuglow di atas, berikan rekomendasi yang SPESIFIK.
+
+Kembalikan HANYA JSON berikut (tanpa markdown, tanpa teks lain):
 {
-  "skin_score": <integer 1-10, where 10 is perfectly healthy skin>,
-  "emotion_score": <integer 1-10, where 10 is very positive/happy skin vibe>,
-  "redness": <integer 0-100, percentage of redness/inflammation>,
-  "acne_count": <integer, estimated number of visible blemishes/pimples>,
-  "moisture": <integer 0-100, skin hydration level percentage>,
-  "skin_type": "<one of: oily/dry/combination/normal/sensitive>",
-  "skin_tone": "<one of: fair/medium/tan/dark>",
-  "primary_concern": "<main skin concern in Indonesian language>",
-  "summary": "<2-3 sentences describing skin condition in Indonesian, empathetic tone>",
-  "recommendations": ["<product recommendation 1 in Indonesian>", "<product recommendation 2>", "<product recommendation 3>"],
-  "positive_notes": "<one positive observation about the skin in Indonesian>",
-  "healing_message": "<1-2 sentence motivational message in Indonesian>"
+  "skin_score": <integer 1-10, 10=sangat sehat>,
+  "emotion_score": <integer 1-10, 10=sangat positif>,
+  "redness": <integer 0-100, persentase kemerahan>,
+  "acne_count": <integer, estimasi jumlah jerawat/blemish>,
+  "moisture": <integer 0-100, tingkat hidrasi>,
+  "skin_type": "<oily/dry/combination/normal/sensitive>",
+  "skin_tone": "<fair/medium/tan/dark>",
+  "primary_concern": "<Masalah utama dalam Bahasa Indonesia, contoh: Jerawat Meradang & Barrier Rusak>",
+  "summary": "<3-4 kalimat analisis mendalam & empatis. Sebutkan kondisi barrier dan jelaskan mengapa produk Akuglow tertentu menjadi solusi kunci berdasarkan kandungannya.>",
+  "recommendations": ["Akuglow Gentle Brightening Facial Foam", "Akuglow Calming Barrier Moisturizer", "Akuglow Day Cream"],
+  "positive_notes": "<Satu observasi positif spesifik tentang kondisi kulit user>",
+  "healing_message": "<Pesan motivasi 1-2 kalimat yang mendukung user untuk konsisten dengan Akuglow>"
 }`
 
 // AnalyzeImageFromFile reads file and delegates to AnalyzeImageBytes
@@ -97,16 +125,21 @@ func (s *SkinAIService) AnalyzeImageFromFile(filePath string) (*models.SkinAnaly
 	return s.AnalyzeImageBytes(data)
 }
 
-// AnalyzeStage sends image bytes and context data to OpenAI Vision using dynamic stage config
+// AnalyzeStage sends image bytes and context data to OpenAI Vision using dynamic stage config.
+// Product knowledge is loaded from DB and injected into the system role at runtime.
 func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, imageData []byte) (*models.SkinAnalysisResult, error) {
 	var cfg models.SkinJourneyAIConfig
 	if err := s.DB.Where("stage = ?", stage).First(&cfg).Error; err != nil {
-		log.Printf("⚠️ [SkinAI] Stage config '%s' not found, using defaults", stage)
-		cfg.SystemRole = systemRole
-		cfg.PromptBody = defaultSkinPrompt
+		log.Printf("⚠️ [SkinAI] Stage config '%s' not found, using default templates", stage)
+		cfg.SystemRole = systemRoleTemplate
+		cfg.PromptBody = defaultPromptTemplate
 		cfg.Temperature = 0.1
 	}
 
+	// Inject product knowledge from DB into system role template
+	builtSystemRole := s.buildSystemRole(cfg.SystemRole)
+
+	// Replace any additional template parameters in the prompt body
 	prompt := cfg.PromptBody
 	for k, v := range params {
 		prompt = strings.ReplaceAll(prompt, "{{"+k+"}}", v)
@@ -114,11 +147,13 @@ func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, ima
 
 	aiEnabled := s.isAIEnabled()
 	if !aiEnabled {
+		log.Println("ℹ️ [SkinAI] AI disabled in config, using smart mock.")
 		return s.smartMockAnalysis(imageData), nil
 	}
 
 	apiKey := s.getAPIKey()
 	if apiKey == "" {
+		log.Println("ℹ️ [SkinAI] No API key configured, using smart mock.")
 		return s.smartMockAnalysis(imageData), nil
 	}
 
@@ -150,7 +185,7 @@ func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, ima
 		"messages": []map[string]interface{}{
 			{
 				"role":    "system",
-				"content": cfg.SystemRole,
+				"content": builtSystemRole,
 			},
 			{
 				"role":    "user",
@@ -172,6 +207,7 @@ func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, ima
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("⚠️ [SkinAI] HTTP error: %v. Falling back to smart mock.", err)
 		return s.smartMockAnalysis(imageData), nil
 	}
 	defer resp.Body.Close()
@@ -191,22 +227,22 @@ func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, ima
 	json.Unmarshal(respBody, &openAIResp)
 
 	if len(openAIResp.Choices) == 0 {
+		log.Println("⚠️ [SkinAI] No choices returned. Falling back to smart mock.")
 		return s.smartMockAnalysis(imageData), nil
 	}
 
 	content := openAIResp.Choices[0].Message.Content
 	log.Printf("🤖 [SkinAI] Raw OpenAI Content: %s", content)
-	
+
 	var result models.SkinAnalysisResult
 	if err := json.Unmarshal([]byte(content), &result); err != nil {
 		extracted := extractJSON(content)
-		log.Printf("🤖 [SkinAI] Extracted JSON: %s", extracted)
+		log.Printf("🤖 [SkinAI] Extracted JSON fallback: %s", extracted)
 		json.Unmarshal([]byte(extracted), &result)
 	}
 
-	// Safety Check: If JSON parsing failed or returned empty essential fields, fallback to smart mock
 	if result.Summary == "" {
-		log.Printf("⚠️ [SkinAI] AI returned empty summary, falling back to smart mock")
+		log.Printf("⚠️ [SkinAI] Empty summary after parse. Falling back to smart mock.")
 		return s.smartMockAnalysis(imageData), nil
 	}
 
@@ -220,94 +256,96 @@ func (s *SkinAIService) AnalyzeImageBytes(imageData []byte) (*models.SkinAnalysi
 	return s.AnalyzeStage("analysis", nil, imageData)
 }
 
-// smartMockAnalysis returns a realistic, varied analysis based on image characteristics
+// smartMockAnalysis returns a realistic analysis based on image characteristics.
+// Recommendations always reference Akuglow products for consistency.
+// The specific "hero" product is highlighted based on the detected skin condition.
 func (s *SkinAIService) smartMockAnalysis(imageData []byte) *models.SkinAnalysisResult {
-	// Use image size + content bytes to derive pseudo-random but consistent results
+	// Derive a pseudo-random but consistent seed from image bytes
 	size := len(imageData)
 	seed := int64(size)
 	if size > 100 {
-		// Mix in some actual byte values for variety
 		for i := 0; i < 10; i++ {
 			seed += int64(imageData[size/10*i]) * int64(i+1)
 		}
 	}
 	rng := rand.New(rand.NewSource(seed))
 
-	// Generate realistic but varied skin metrics
-	redness := 5 + rng.Intn(65)   // 5-70
-	moisture := 25 + rng.Intn(60)  // 25-85
-	acneCount := rng.Intn(15)       // 0-14
-	
-	// Skin score based on metrics (higher redness/acne = lower score)
-	skinScore := 10 - (redness/15) - (acneCount/4)
-	if skinScore < 1 { skinScore = 1 }
-	if skinScore > 10 { skinScore = 10 }
+	redness := 5 + rng.Intn(65)  // 5-70
+	moisture := 25 + rng.Intn(60) // 25-85
+	acneCount := rng.Intn(15)     // 0-14
 
-	// Dynamic content based on actual computed values
+	skinScore := 10 - (redness / 15) - (acneCount / 4)
+	if skinScore < 1 {
+		skinScore = 1
+	}
+	if skinScore > 10 {
+		skinScore = 10
+	}
+
 	skinTypes := []string{"oily", "combination", "normal", "dry", "sensitive"}
 	skinTones := []string{"fair", "medium", "tan", "dark"}
 	skinType := skinTypes[rng.Intn(len(skinTypes))]
 	skinTone := skinTones[rng.Intn(len(skinTones))]
 
+	// All cases recommend the full set, but highlight the HERO product for the condition
+	recs := []string{
+		"Akuglow Gentle Brightening Facial Foam",
+		"Akuglow Calming Barrier Moisturizer",
+		"Akuglow Day Cream",
+	}
+
 	var primaryConcern, summary, positiveNotes, healingMessage string
-	var recs []string
 
 	switch {
 	case redness > 50 && acneCount > 7:
-		primaryConcern = "Jerawat aktif dengan peradangan tinggi"
-		summary = fmt.Sprintf("Terdeteksi %d titik jerawat aktif dengan tingkat kemerahan %d%%. Kulit sedang dalam kondisi yang membutuhkan perhatian ekstra dan perawatan yang lembut.", acneCount, redness)
-		positiveNotes = "Kulit menunjukkan respons aktif yang berarti sistem imun bekerja dengan baik."
-		healingMessage = "Setiap jerawat yang sembuh adalah bukti kekuatan kulitmu. Kamu sudah di jalur yang benar! 💪"
-		recs = []string{
-			"Gunakan cleanser berbasis salicylic acid 2% pagi dan malam",
-			"Aplikasikan benzoyl peroxide 2.5% sebagai spot treatment di jerawat aktif",
-			"Hindari moisturizer berbahan dasar minyak, ganti dengan gel hyaluronic acid",
-		}
+		primaryConcern = "Jerawat Meradang & Skin Barrier Rusak"
+		summary = fmt.Sprintf(
+			"Terdeteksi sekitar %d titik jerawat meradang dengan tingkat kemerahan %d%%. Kondisi ini menunjukkan skin barrier sedang sangat lemah dan butuh recovery segera. HERO-mu adalah **Akuglow Calming Barrier Moisturizer** — kandungan Panthenol 5%%-nya bekerja sebagai anti-inflamasi kuat, sementara 5x Ceramide membantu membangun ulang lapisan pelindung kulitmu.",
+			acneCount, redness,
+		)
+		positiveNotes = "Kulitmu memiliki kemampuan regenerasi yang masih aktif — itu pertanda baik untuk proses penyembuhan."
+		healingMessage = "Jangan menyerah, Sahabat Glow! Jerawat ini hanya fase sementara. Fokus pada pemulihan barrier dulu, brightening menyusul setelahnya! 💪"
+
 	case redness > 35:
-		primaryConcern = "Kemerahan dan iritasi kulit"
-		summary = fmt.Sprintf("Terdeteksi kemerahan cukup tinggi (%d%%) dengan %d titik blemish. Kulit kemungkinan sedang dalam fase reaksi atau sensitif terhadap produk tertentu.", redness, acneCount)
-		positiveNotes = "Tekstur kulit dasar terlihat halus dan memiliki potensi untuk membaik dengan perawatan yang tepat."
-		healingMessage = "Kulitmu sedang berbicara padamu — dengarkan dan berikan apa yang dia butuhkan. Perbaikan sudah dimulai! 🌸"
-		recs = []string{
-			"Gunakan toner bebas alkohol dengan niacinamide untuk menenangkan kemerahan",
-			"Pakai sunscreen mineral SPF 50 setiap pagi untuk melindungi kulit sensitif",
-			"Kompres dingin 5 menit di area merah sebelum tidur",
-		}
+		primaryConcern = "Iritasi & Kemerahan — Barrier Sensitif"
+		summary = fmt.Sprintf(
+			"Kulit terlihat reaktif dengan kemerahan %d%%. Ini tanda kulit sedang dalam kondisi stres dan barrier-nya melemah. **Akuglow Calming Barrier Moisturizer** dengan 5x Ceramide akan membantu membangun kembali 'benteng' kulitmu, sementara Panthenol 5%% meredakan kemerahan dari dalam.",
+			redness,
+		)
+		positiveNotes = "Warna dasar kulitmu sebenarnya sangat cerah — potensi glowing-nya besar begitu barrier pulih!"
+		healingMessage = "Kulitmu lagi minta istirahat dari skincare keras. Berikan kedamaian lewat Akuglow, dan lihat perubahannya! 🌸"
+
 	case moisture < 40:
-		primaryConcern = "Kulit kering dan dehidrasi"
-		summary = fmt.Sprintf("Tingkat kelembapan kulit terdeteksi %d%%, menunjukkan kulit membutuhkan hidrasi yang lebih intensif. Kulit kering dapat memperburuk tampilan garis halus dan kerutan.", moisture)
-		positiveNotes = "Kulit tidak menunjukkan tanda-tanda peradangan aktif, yang merupakan dasar yang baik untuk perawatan hidrasi."
-		healingMessage = "Kulit yang terhidrasi adalah kulit yang bercahaya. Yuk mulai rutinitas hidrasi yang konsisten! 💧"
-		recs = []string{
-			"Gunakan serum hyaluronic acid dua kali sehari pada kulit yang masih lembap",
-			"Ganti moisturizer dengan formula yang lebih rich, mengandung ceramide",
-			"Minum minimal 8 gelas air per hari dan konsumsi makanan kaya omega-3",
-		}
+		primaryConcern = "Dehidrasi & Kulit Kusam"
+		summary = fmt.Sprintf(
+			"Tingkat kelembapan terdeteksi hanya %d%%. Kulit kusam dan terasa ketarik biasanya karena penumpukan sel kulit mati + kulit yang kekurangan air. **Akuglow Gentle Foam** dengan PHA-nya akan mengangkat sel mati secara lembut, lalu **Calming Barrier Moisturizer** (Hyaluronic + Ceramide + Squalane) mengunci kelembapannya.",
+			moisture,
+		)
+		positiveNotes = "Tekstur dasar kulitmu cukup rata — dengan hidrasi yang tepat, kulitmu bisa glowing dalam waktu singkat."
+		healingMessage = "Hidrasi adalah kunci glow. Yuk konsisten dengan Akuglow dan biarkan kulitmu menemukan kilau alaminya! 💧"
+
 	case acneCount > 5:
-		primaryConcern = "Jerawat sedang dan komedo"
-		summary = fmt.Sprintf("Terdeteksi sekitar %d titik blemish aktif. Kondisi ini umum terjadi dan dapat diatasi dengan rutinitas perawatan yang konsisten dan tepat.", acneCount)
-		positiveNotes = "Kulit menunjukkan tingkat kelembapan yang cukup baik, dan tidak ada tanda-tanda sensitifitas berlebihan."
-		healingMessage = "Jerawat bukan akhir dari segalanya — itu hanya babak sementara dalam perjalanan kulitmu yang indah. ✨"
-		recs = []string{
-			"Lakukan double cleansing (oil cleanser + foam cleanser) setiap malam",
-			"Gunakan retinol 0.025% 2-3x seminggu di malam hari untuk regenerasi kulit",
-			"Tambahkan niacinamide 10% untuk mengontrol sebum dan memperkecil pori",
-		}
+		primaryConcern = "Bruntusan & Komedo"
+		summary = fmt.Sprintf(
+			"Terdeteksi sekitar %d titik blemish/bruntusan. Ini umumnya terjadi karena pori tersumbat sel kulit mati. **Akuglow Gentle Foam** dengan PHA (Gluconolactone) adalah solusinya — mengeksfoliasi sel kulit mati secara ultra-lembut tanpa mengiritasi, dibantu brush silicone unik untuk membersihkan hingga ke dalam pori.",
+			acneCount,
+		)
+		positiveNotes = "Kadar minyak wajahmu cukup stabil dan tidak ada tanda-tanda inflamasi serius — ini modal bagus untuk kulit bersih!"
+		healingMessage = "Satu langkah kecil setiap hari membawa perubahan besar. Semangat rutinitas Akuglow-nya! ✨"
+
 	default:
-		primaryConcern = "Perawatan rutin & pencegahan"
-		summary = fmt.Sprintf("Kondisi kulit secara keseluruhan cukup baik dengan skor %d/10. Tingkat kelembapan %d%% dan kemerahan minimal menunjukkan kulit dalam kondisi sehat.", skinScore, moisture)
-		positiveNotes = "Kulit menunjukkan keseimbangan yang baik antara kadar minyak dan kelembapan alami."
-		healingMessage = "Kulit sehat adalah hasil dari konsistensi, bukan kesempurnaan. Terus pertahankan! 🌟"
-		recs = []string{
-			"Pertahankan rutinitas cleanser-toner-moisturizer-SPF setiap pagi",
-			"Lakukan eksfoliasi ringan 1-2x seminggu dengan AHA/BHA untuk regenerasi kulit",
-			"Konsumsi vitamin C dan antioksidan untuk menjaga kecerahan kulit dari dalam",
-		}
+		primaryConcern = "Maintenance — Jaga Barrier Tetap Sehat"
+		summary = fmt.Sprintf(
+			"Luar biasa! Skor kulitmu %d/10 dengan kondisi yang cukup stabil. Kulit sehat pun tetap butuh perlindungan harian. **Akuglow Day Cream** dengan UV Filter + Niacinamide + Arbutin menjaga kulitmu dari paparan sinar matahari yang bisa merusak barrier dan memicu flek.",
+			skinScore,
+		)
+		positiveNotes = "Skin barrier-mu terlihat sehat dan kuat — pertahankan dengan rutinitas yang konsisten!"
+		healingMessage = "Kulit sehat adalah investasi jangka panjang. Kamu sudah di jalur yang benar, Sahabat Glow! 🌟"
 	}
 
 	return &models.SkinAnalysisResult{
 		SkinScore:       skinScore,
-		EmotionScore:    rand.Intn(5) + 5, // 5-10
+		EmotionScore:    rng.Intn(5) + 5, // 5-10
 		Redness:         redness,
 		AcneCount:       acneCount,
 		Moisture:        moisture,
@@ -318,7 +356,7 @@ func (s *SkinAIService) smartMockAnalysis(imageData []byte) *models.SkinAnalysis
 		Recommendations: recs,
 		PositiveNotes:   positiveNotes,
 		HealingMessage:  healingMessage,
-		AIProvider:      "akuglow/smart-demo",
+		AIProvider:      "akuglow/smart-mock-v3",
 		IsMock:          true,
 	}
 }
