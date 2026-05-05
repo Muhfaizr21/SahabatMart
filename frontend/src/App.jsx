@@ -132,7 +132,12 @@ function HomePage() {
       <HeroSlider />
       <FeatureBar />
       <VoucherSection />
-      <RecommendedSection limit={10} title="Rekomendasi Untukmu ✨" subtitle="Berdasarkan apa yang sering kamu lihat dan sukai." />
+      <RecommendedSection 
+        limit={10} 
+        title="Rekomendasi Untukmu ✨" 
+        subtitle="Berdasarkan apa yang sering kamu lihat dan sukai." 
+        className="mt-10"
+      />
       <ProductSection />
       <PromoBanner />
     </>

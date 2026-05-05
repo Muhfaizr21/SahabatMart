@@ -3,7 +3,12 @@ import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 import { ProductCard } from './ProductSection';
 import { isAuthenticated } from '../lib/auth';
 
-export default function RecommendedSection({ limit = 5, title = "Rekomendasi Spesial ✨", subtitle = "Berdasarkan aktivitas dan minat Anda." }) {
+export default function RecommendedSection({ 
+  limit = 5, 
+  title = "Rekomendasi Spesial ✨", 
+  subtitle = "Berdasarkan aktivitas dan minat Anda.",
+  className = ""
+}) {
   const [recommended, setRecommended] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +29,7 @@ export default function RecommendedSection({ limit = 5, title = "Rekomendasi Spe
   if (!loading && recommended.length === 0) return null;
 
   return (
-    <section className="py-14 bg-gray-50/50">
+    <section className={`py-20 bg-transparent ${className}`}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-10 text-center md:text-left">
           <h2 className="text-2xl md:text-3xl font-black text-gray-900">{title}</h2>

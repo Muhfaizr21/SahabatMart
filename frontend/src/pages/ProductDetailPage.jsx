@@ -232,7 +232,7 @@ export default function ProductDetailPage() {
 
   return (
     <>
-    <main className="bg-gray-50/30 min-h-screen pb-20">
+    <main className="bg-gray-50/30 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:py-12 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
           
@@ -599,10 +599,14 @@ export default function ProductDetailPage() {
            </div>
         </div>
       </div>
+      
+      <RecommendedSection 
+        limit={5} 
+        title="Mungkin Kamu Juga Suka 💖" 
+        subtitle="Produk lain yang sesuai dengan selera kamu." 
+        className="mt-20 border-t border-gray-100/50"
+      />
     </main>
-    <div className="border-t border-gray-100 bg-gray-50/30">
-      <RecommendedSection limit={5} title="Mungkin Kamu Juga Suka 💖" subtitle="Produk lain yang sesuai dengan selera kamu." />
-    </div>
   </>
   );
 }

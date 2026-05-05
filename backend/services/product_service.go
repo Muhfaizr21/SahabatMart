@@ -170,7 +170,7 @@ func (s *ProductService) TrackInteraction(userID, productID, interactionType str
 
 // GetRecommendedProducts mengambil rekomendasi produk berbasis perilaku user (algoritma pencet)
 func (s *ProductService) GetRecommendedProducts(userID string, limit int) ([]models.Product, error) {
-	var recommended []models.Product
+	recommended := make([]models.Product, 0)
 
 	if userID != "" {
 		// 1. Ambil histori kategori & brand dari interaksi user terakhir
@@ -194,14 +194,18 @@ func (s *ProductService) GetRecommendedProducts(userID string, limit int) ([]mod
 			// 2. Cari produk dari kategori & brand tersebut yang belum pernah diklik user
 			var categories []string
 			for _, pref := range userPreferences {
-				categories = append(categories, pref.Category)
+				if pref.Category != "" {
+					categories = append(categories, pref.Category)
+				}
 			}
 
-			s.DB.Where("category IN ? AND status = ?", categories, "active").
-				Where("id NOT IN (SELECT product_id FROM user_interactions WHERE user_id = ?)", userID).
-				Order("rating DESC, created_at DESC").
-				Limit(limit).
-				Find(&recommended)
+			if len(categories) > 0 {
+				s.DB.Where("category IN ? AND status = ?", categories, "active").
+					Where("id NOT IN (SELECT product_id FROM user_interactions WHERE user_id = ?)", userID).
+					Order("rating DESC, created_at DESC").
+					Limit(limit).
+					Find(&recommended)
+			}
 		}
 	}
 
@@ -210,24 +214,24 @@ func (s *ProductService) GetRecommendedProducts(userID string, limit int) ([]mod
 		var popular []models.Product
 		needed := limit - len(recommended)
 		
-		excludeIDs := []string{"dummy-id"} // prevent empty slice error in NOT IN
+		var excludeIDs []string
 		for _, p := range recommended {
 			excludeIDs = append(excludeIDs, p.ID)
 		}
 
 		// Produk populer berdasarkan jumlah interaksi terbanyak secara global
-		s.DB.Raw(`
-			SELECT p.* 
-			FROM products p
-			LEFT JOIN (
-				SELECT product_id, COUNT(*) as total_views 
-				FROM user_interactions 
-				GROUP BY product_id
-			) stats ON p.id = stats.product_id
-			WHERE p.status = 'active' AND p.id NOT IN ?
-			ORDER BY COALESCE(stats.total_views, 0) DESC, p.rating DESC
-			LIMIT ?
-		`, excludeIDs, needed).Scan(&popular)
+		query := s.DB.Table("products").
+			Select("products.*, COALESCE(stats.total_views, 0) as view_count").
+			Joins("LEFT JOIN (SELECT product_id, COUNT(*) as total_views FROM user_interactions GROUP BY product_id) stats ON products.id = stats.product_id").
+			Where("products.status = ?", "active")
+
+		if len(excludeIDs) > 0 {
+			query = query.Where("products.id NOT IN ?", excludeIDs)
+		}
+
+		query.Order("view_count DESC, products.rating DESC").
+			Limit(needed).
+			Find(&popular)
 
 		recommended = append(recommended, popular...)
 	}
