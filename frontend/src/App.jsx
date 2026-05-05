@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
-import CategorySection from './components/CategorySection';
 import FeatureBar from './components/FeatureBar';
 import ProductSection from './components/ProductSection';
 import PromoBanner from './components/PromoBanner';
@@ -93,8 +92,8 @@ import AdminPOS from './pages/admin/POS';
 import AdminRBAC from './pages/admin/RBAC';
 import AdminRestock from './pages/admin/RestockModeration';
 import WishlistStats from './pages/admin/WishlistStats';
-import SkinPreTest from './pages/SkinPreTest';
-import SkinJourney from './pages/SkinJourney';
+import SkinPreTest from './pages/affiliate/SkinPreTest';
+import SkinJourney from './pages/affiliate/SkinJourney';
 
 import SkinJourneyAdmin from './pages/admin/SkinJourneyAdmin';
 import PusatInventory from './pages/admin/PusatInventory';
@@ -124,14 +123,16 @@ function FooterManager() {
   return <Footer />;
 }
 
+import RecommendedSection from './components/RecommendedSection';
+
 // ── Halaman Home ─────────────────────
 function HomePage() {
   return (
     <>
       <HeroSlider />
-      <CategorySection />
       <FeatureBar />
       <VoucherSection />
+      <RecommendedSection limit={10} title="Rekomendasi Untukmu ✨" subtitle="Berdasarkan apa yang sering kamu lihat dan sukai." />
       <ProductSection />
       <PromoBanner />
     </>
@@ -197,17 +198,25 @@ function ScrollToTop() {
 // ── App Root ─────────────────────
 export default function App() {
   useEffect(() => {
-    // [Sync Fix] Aktifkan pelacakan affiliate di setiap akses pertama
-    // Sesuai dokumen: "Sistem mencatat referral secara otomatis" dari URL ?ref=...
     captureAffiliate();
   }, []);
 
   return (
     <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  );
+}
+
+function AppContent() {
+  const location = useLocation();
+  const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
+
+  return (
+    <div className={`min-h-screen ${isPanel ? 'bg-[#0c1324]' : 'bg-white pb-16 lg:pb-0'}`}>
       <ScrollToTop />
       <Toaster position="top-right" reverseOrder={false} />
-      <div className="min-h-screen bg-white">
-        <NavbarManager />
+      <NavbarManager />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ShopPage />} />
@@ -231,8 +240,9 @@ export default function App() {
           <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
 
           {/* Akuglow Skin Journey */}
-          <Route path="/skin/pretest" element={<ProtectedRoute><SkinPreTest /></ProtectedRoute>} />
-          <Route path="/skin/journey" element={<ProtectedRoute><SkinJourney /></ProtectedRoute>} />
+          {/* [Redirects for Legacy Skin Paths] */}
+          <Route path="/skin/pretest" element={<Navigate to="/affiliate/skin/pretest" replace />} />
+          <Route path="/skin/journey" element={<Navigate to="/affiliate/skin/journey" replace />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
@@ -305,12 +315,14 @@ export default function App() {
             <Route path="community" element={<SkinCommunity />} />
             {/* [Sync Fix] Status Mitra route sesuai dokumen alur mitra Akuglow */}
             <Route path="status" element={<AffiliateStatus />} />
+            {/* Akuglow Skin Journey Integrated */}
+            <Route path="skin/pretest" element={<SkinPreTest />} />
+            <Route path="skin/journey" element={<SkinJourney />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <FooterManager />
       </div>
-    </BrowserRouter>
   );
 }

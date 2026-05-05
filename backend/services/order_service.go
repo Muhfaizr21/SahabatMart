@@ -163,6 +163,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				Status:         models.MOrderNew,
 				CourierCode:    requestedCourier,
 				CourierService: requestedService,
+				ServiceCode:    requestedService,
 				ShippingType:   requestedType,
 				ShippingCost:   groupShippingCost,
 				MerchantPayout: 0,
@@ -333,10 +334,11 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 
 // PresetCommissionEntry: Hasil kalkulasi komisi untuk 1 affiliate di 1 level jaringan
 type PresetCommissionEntry struct {
-	AffiliateID string
-	Level       int
-	Amount      float64
-	Rate        float64
+	AffiliateID  string
+	CommissionID string
+	Level        int
+	Amount       float64
+	Rate         float64
 }
 
 // CalculateCommissions menghitung distribusi komisi untuk satu order item.
@@ -529,12 +531,14 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			return results, err
 		}
 
-		results = append(results, PresetCommissionEntry{
-			AffiliateID: currentAffiliateID,
-			Level:       pl.Level,
-			Amount:      commAmt,
-			Rate:        pl.Rate,
-		})
+		entry := PresetCommissionEntry{
+			AffiliateID:  currentAffiliateID,
+			CommissionID: commRecord.ID,
+			Level:        pl.Level,
+			Amount:       commAmt,
+			Rate:         pl.Rate,
+		}
+		results = append(results, entry)
 
 		// Naik ke upline berikutnya
 		if aff.UplineID != nil {

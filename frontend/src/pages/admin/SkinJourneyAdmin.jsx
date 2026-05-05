@@ -12,6 +12,16 @@ export default function SkinJourneyAdmin() {
   const [allPosts, setAllPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pretests');
+  const [products, setProducts] = useState([]);
+  
+  // Dynamic Journey States
+  const [programs, setPrograms] = useState([]);
+  const [steps, setSteps] = useState([]);
+  const [routines, setRoutines] = useState([]);
+  const [mappings, setMappings] = useState([]);
+  const [aiConfigs, setAiConfigs] = useState([]);
+  const [journeyConfigs, setJourneyConfigs] = useState([]);
+  const [configSubTab, setConfigSubTab] = useState('programs');
   
   // Filtering, Selection & Pagination
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +47,26 @@ export default function SkinJourneyAdmin() {
       setEducations(e || []);
       setGroups(g || []);
       setAllPosts(ap || []);
+
+      // Load Config Data
+      const [pg, st, rt, mp, ai] = await Promise.all([
+        fetchJson(`${API_BASE}/api/admin/skin/programs`),
+        fetchJson(`${API_BASE}/api/admin/skin/steps`),
+        fetchJson(`${API_BASE}/api/admin/skin/routines`),
+        fetchJson(`${API_BASE}/api/admin/skin/product-mappings`),
+        fetchJson(`${API_BASE}/api/admin/skin/ai-configs`)
+      ]);
+      setPrograms(pg || []);
+      setSteps(st || []);
+      setRoutines(rt || []);
+      setMappings(mp || []);
+      setAiConfigs(ai || []);
+      
+      const sc = await fetchJson(`${API_BASE}/api/admin/configs?group=skin_journey`);
+      setJourneyConfigs(sc.data || []);
+
+      const prodRes = await fetchJson(`${API_BASE}/api/admin/products`);
+      setProducts(prodRes.data || []);
     } catch (err) {
       console.error("Admin Load Error:", err);
       toast.error('Gagal memuat data monitoring');
@@ -77,6 +107,20 @@ export default function SkinJourneyAdmin() {
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: '', description: '', icon: 'face' });
 
+  // Config Form States
+  const [showAddProgram, setShowAddProgram] = useState(false);
+  const [newProgram, setNewProgram] = useState({ name: '', description: '', level: 1 });
+  const [showAddStep, setShowAddStep] = useState(false);
+  const [newStep, setNewStep] = useState({ name: '', default_instruction: '' });
+  const [showAddRoutine, setShowAddRoutine] = useState(false);
+  const [newRoutine, setNewRoutine] = useState({ program_id: '', step_id: '', week: 1, time_of_day: 'am' });
+  const [showAddMapping, setShowAddMapping] = useState(false);
+  const [newMapping, setNewMapping] = useState({ product_id: '', step_type: '', skin_type: '', skin_concern: '', priority: 0 });
+  const [showAddPretest, setShowAddPretest] = useState(false);
+  const [newPretest, setNewPretest] = useState({ user_id: '', full_name: '', skin_type: 'Oily', skin_problem: 'Acne', skin_goal: 'Clear skin' });
+  const [selectedAI, setSelectedAI] = useState(null);
+  const [showEditAI, setShowEditAI] = useState(false);
+
   // Stats Calculations
   const stats = useMemo(() => ({
     total: pretests.length,
@@ -108,6 +152,125 @@ export default function SkinJourneyAdmin() {
       setShowAddGroup(false);
       loadData();
     } catch (err) { toast.error('Gagal membuat grup.'); }
+  };
+
+  const handleAddPretest = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/skin/pretest`, {
+        method: 'POST',
+        body: JSON.stringify(newPretest)
+      });
+      toast.success('Journey member berhasil didaftarkan!');
+      setShowAddPretest(false);
+      loadData();
+    } catch (err) { toast.error('Gagal menambah journey member'); }
+  };
+
+  const handleSaveProgram = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/programs/save`, {
+        method: 'POST',
+        body: JSON.stringify(newProgram)
+      });
+      toast.success('Program berhasil disimpan!');
+      setShowAddProgram(false);
+      loadData();
+    } catch (err) { toast.error('Gagal menyimpan program.'); }
+  };
+
+  const handleSaveStep = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/steps/save`, {
+        method: 'POST',
+        body: JSON.stringify(newStep)
+      });
+      toast.success('Step berhasil disimpan!');
+      setShowAddStep(false);
+      loadData();
+    } catch (err) { toast.error('Gagal menyimpan step.'); }
+  };
+
+  const handleSaveRoutine = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/routines/save`, {
+        method: 'POST',
+        body: JSON.stringify(newRoutine)
+      });
+      toast.success('Routine berhasil disimpan!');
+      setShowAddRoutine(false);
+      loadData();
+    } catch (err) { toast.error('Gagal menyimpan routine.'); }
+  };
+
+  const handleSaveMapping = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/product-mappings/save`, {
+        method: 'POST',
+        body: JSON.stringify(newMapping)
+      });
+      toast.success('Mapping berhasil disimpan!');
+      setShowAddMapping(false);
+      loadData();
+    } catch (err) { toast.error('Gagal menyimpan mapping.'); }
+  };
+
+  const handleUpdateAI = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/ai-configs/update`, {
+        method: 'POST',
+        body: JSON.stringify(selectedAI)
+      });
+      toast.success('Konfigurasi AI berhasil diperbarui!');
+      setShowEditAI(false);
+      loadData();
+    } catch (err) { toast.error('Gagal memperbarui AI.'); }
+  };
+
+  const handleSaveGeneralConfig = async () => {
+    try {
+      await fetchJson(`${API_BASE}/api/admin/configs/upsert`, {
+        method: 'POST',
+        body: JSON.stringify(journeyConfigs)
+      });
+      toast.success('Konfigurasi umum berhasil disimpan!');
+      loadData();
+    } catch (err) { toast.error('Gagal menyimpan konfigurasi.'); }
+  };
+
+  const handleDeleteProgram = async (id) => {
+    if (!window.confirm('Hapus program ini? Semua routine terkait juga akan terpengaruh.')) return;
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/programs/delete?id=${id}`, { method: 'DELETE' });
+      toast.success('Program dihapus.');
+      loadData();
+    } catch (err) { toast.error('Gagal menghapus.'); }
+  };
+
+  const handleDeleteStep = async (id) => {
+    if (!window.confirm('Hapus step ini?')) return;
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/steps/delete?id=${id}`, { method: 'DELETE' });
+      toast.success('Step dihapus.');
+      loadData();
+    } catch (err) { toast.error('Gagal menghapus.'); }
+  };
+
+  const handleDeleteRoutine = async (id) => {
+    if (!window.confirm('Hapus langkah ini dari routine?')) return;
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/routines/delete?id=${id}`, { method: 'DELETE' });
+      toast.success('Langkah routine dihapus.');
+      loadData();
+    } catch (err) { toast.error('Gagal menghapus.'); }
+  };
+
+  const handleDeleteMapping = async (id) => {
+    if (!window.confirm('Hapus mapping produk ini?')) return;
+    try {
+      await fetchJson(`${API_BASE}/api/admin/skin/product-mappings/delete?id=${id}`, { method: 'DELETE' });
+      toast.success('Mapping dihapus.');
+      loadData();
+    } catch (err) { toast.error('Gagal menghapus.'); }
   };
 
   const handleDeletePost = async (id) => {
@@ -181,6 +344,7 @@ export default function SkinJourneyAdmin() {
       { id: 'education', label: 'Education', icon: 'bx-book-content', count: educations.length },
       { id: 'community', label: 'Community Feed', icon: 'bx-chat', count: allPosts.length },
       { id: 'groups', label: 'Interest Groups', icon: 'bx-category', count: groups.length },
+      { id: 'config', label: 'Journey Config', icon: 'bx-cog', count: programs.length },
     ];
 
     return (
@@ -219,11 +383,22 @@ export default function SkinJourneyAdmin() {
     <div style={A.page} className="fade-in">
       <PageHeader title="Skin Journey Intelligence" subtitle="Advanced monitoring for member progress and community health.">
         <div style={{ display: 'flex', gap: 12 }}>
+          {activeTab === 'pretests' && (
+            <button style={A.btnPrimary} onClick={() => setShowAddPretest(true)}>+ New Journey</button>
+          )}
           {activeTab === 'education' && (
             <button style={A.btnPrimary} onClick={() => setShowAddEdu(true)}>+ New Article</button>
           )}
           {activeTab === 'groups' && (
             <button style={A.btnPrimary} onClick={() => setShowAddGroup(true)}>+ New Group</button>
+          )}
+          {activeTab === 'config' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {configSubTab === 'programs' && <button style={A.btnPrimary} onClick={() => setShowAddProgram(true)}>+ New Program</button>}
+              {configSubTab === 'steps' && <button style={A.btnPrimary} onClick={() => setShowAddStep(true)}>+ New Step</button>}
+              {configSubTab === 'routines' && <button style={A.btnPrimary} onClick={() => setShowAddRoutine(true)}>+ New Routine</button>}
+              {configSubTab === 'mappings' && <button style={A.btnPrimary} onClick={() => setShowAddMapping(true)}>+ New Mapping</button>}
+            </div>
           )}
           <button onClick={loadData} style={A.btnGhost}><i className="bx bx-refresh" /> Sync</button>
         </div>
@@ -434,29 +609,251 @@ export default function SkinJourneyAdmin() {
         </div>
       )}
 
-      {activeTab === 'groups' && (
+      {activeTab === 'config' && (
         <div style={A.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', gap: 12, overflowX: 'auto' }}>
+              {[
+                { id: 'programs', label: 'Programs' },
+                { id: 'steps', label: 'Steps' },
+                { id: 'routines', label: 'Routines' },
+                { id: 'mappings', label: 'Product Mappings' },
+                { id: 'ai', label: 'AI Prompt Config' },
+                { id: 'general', label: 'General Settings' }
+              ].map(s => (
+                <button 
+                  key={s.id} 
+                  onClick={() => setConfigSubTab(s.id)}
+                  style={{ 
+                    ...A.btnGhost, 
+                    background: configSubTab === s.id ? '#f1f5f9' : 'transparent',
+                    color: configSubTab === s.id ? '#0f172a' : '#64748b',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            {configSubTab !== 'ai' && (
+              <button 
+                onClick={() => {
+                  if (configSubTab === 'programs') setShowAddProgram(true);
+                  if (configSubTab === 'steps') setShowAddStep(true);
+                  if (configSubTab === 'routines') setShowAddRoutine(true);
+                  if (configSubTab === 'mappings') setShowAddMapping(true);
+                }}
+                style={{ ...A.btnPrimary, padding: '8px 20px', borderRadius: 12, fontSize: 11 }}
+              >
+                + NEW {configSubTab.toUpperCase()}
+              </button>
+            )}
+          </div>
+          
           <TablePanel>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ ...A.th, paddingLeft: 24 }}>GROUP NAME</th>
-                  <th style={A.th}>DESCRIPTION</th>
-                  <th style={A.th}>ICON</th>
-                  <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>CREATED AT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ ...A.td, paddingLeft: 24 }}><strong>{g.name}</strong></td>
-                    <td style={A.td}>{g.description}</td>
-                    <td style={A.td}><i className={`bx bx-${g.icon}`} style={{ fontSize: 20 }} /></td>
-                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>{new Date(g.created_at).toLocaleDateString()}</td>
+            <>
+            {configSubTab === 'programs' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...A.th, paddingLeft: 24 }}>PROGRAM NAME</th>
+                    <th style={A.th}>DESCRIPTION</th>
+                    <th style={A.th}>LEVEL</th>
+                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {programs.map((p, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ ...A.td, paddingLeft: 24 }}><strong>{p.name}</strong></td>
+                      <td style={A.td}>{p.description}</td>
+                      <td style={A.td}>{p.level}</td>
+                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                         <button onClick={() => handleDeleteProgram(p.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>DELETE</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {configSubTab === 'steps' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...A.th, paddingLeft: 24 }}>STEP NAME</th>
+                    <th style={A.th}>DEFAULT INSTRUCTION</th>
+                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {steps.map((s, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ ...A.td, paddingLeft: 24 }}><strong>{s.name}</strong></td>
+                      <td style={A.td}>{s.default_instruction}</td>
+                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                         <button onClick={() => handleDeleteStep(s.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>DELETE</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {configSubTab === 'routines' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...A.th, paddingLeft: 24 }}>PROGRAM</th>
+                    <th style={A.th}>STEP</th>
+                    <th style={A.th}>WEEK</th>
+                    <th style={A.th}>TIME</th>
+                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {routines.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ ...A.td, paddingLeft: 24 }}>{r.program?.name}</td>
+                      <td style={A.td}>{r.step?.name}</td>
+                      <td style={A.td}>Week {r.week}</td>
+                      <td style={A.td}>{r.time_of_day}</td>
+                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                         <button onClick={() => handleDeleteRoutine(r.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>REMOVE</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {configSubTab === 'mappings' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...A.th, paddingLeft: 24 }}>PRODUCT</th>
+                    <th style={A.th}>STEP TYPE</th>
+                    <th style={A.th}>SKIN TYPE</th>
+                    <th style={A.th}>PRIORITY</th>
+                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mappings.map((m, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ ...A.td, paddingLeft: 24 }}>{m.product?.name}</td>
+                      <td style={A.td}>{m.step_type}</td>
+                      <td style={A.td}>{m.skin_type || 'All'}</td>
+                      <td style={A.td}>{m.priority}</td>
+                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                         <button onClick={() => handleDeleteMapping(m.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>REMOVE</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {configSubTab === 'ai' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...A.th, paddingLeft: 24 }}>STAGE</th>
+                    <th style={A.th}>PROMPT PREVIEW</th>
+                    <th style={A.th}>TEMP</th>
+                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiConfigs.map((c, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ ...A.td, paddingLeft: 24 }}><strong>{c.stage}</strong></td>
+                      <td style={A.td}><div style={{ maxWidth: 300, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.prompt_body}</div></td>
+                      <td style={A.td}>{c.temperature}</td>
+                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                         <button onClick={() => { setSelectedAI(c); setShowEditAI(true); }} style={{ color: '#6366f1', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>EDIT PROMPT</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {configSubTab === 'general' && (
+              <div style={{ padding: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                  <div>
+                    <FieldLabel>Daily Affirmations (JSON Array)</FieldLabel>
+                    <textarea 
+                      style={{ ...A.input, height: 120, fontFamily: 'monospace', fontSize: 11 }} 
+                      value={journeyConfigs.find(c => c.key === 'skin_journey_affirmations')?.value || '[]'} 
+                      onChange={e => {
+                        const newConfigs = [...journeyConfigs];
+                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_affirmations');
+                        if (idx !== -1) newConfigs[idx].value = e.target.value;
+                        else newConfigs.push({ key: 'skin_journey_affirmations', value: e.target.value });
+                        setJourneyConfigs(newConfigs);
+                      }}
+                    />
+                    <p style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Example: ["Stay strong", "You are beautiful"]</p>
+                  </div>
+                  <div>
+                    <FieldLabel>Ritual 60-Detik Instruction</FieldLabel>
+                    <textarea 
+                      style={{ ...A.input, height: 120 }} 
+                      value={journeyConfigs.find(c => c.key === 'skin_journey_ritual_instruction')?.value || ''} 
+                      onChange={e => {
+                        const newConfigs = [...journeyConfigs];
+                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_ritual_instruction');
+                        if (idx !== -1) newConfigs[idx].value = e.target.value;
+                        else newConfigs.push({ key: 'skin_journey_ritual_instruction', value: e.target.value });
+                        setJourneyConfigs(newConfigs);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Day 25 Reward Voucher Code</FieldLabel>
+                    <input 
+                      style={A.input} 
+                      value={journeyConfigs.find(c => c.key === 'skin_journey_voucher_code')?.value || ''} 
+                      onChange={e => {
+                        const newConfigs = [...journeyConfigs];
+                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_voucher_code');
+                        if (idx !== -1) newConfigs[idx].value = e.target.value;
+                        else newConfigs.push({ key: 'skin_journey_voucher_code', value: e.target.value });
+                        setJourneyConfigs(newConfigs);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Day 25 Reward Message</FieldLabel>
+                    <input 
+                      style={A.input} 
+                      value={journeyConfigs.find(c => c.key === 'skin_journey_voucher_message')?.value || ''} 
+                      onChange={e => {
+                        const newConfigs = [...journeyConfigs];
+                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_voucher_message');
+                        if (idx !== -1) newConfigs[idx].value = e.target.value;
+                        else newConfigs.push({ key: 'skin_journey_voucher_message', value: e.target.value });
+                        setJourneyConfigs(newConfigs);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button 
+                    onClick={handleSaveGeneralConfig}
+                    style={{ ...A.btnPrimary, padding: '10px 32px' }}
+                  >
+                    SAVE GENERAL CONFIG
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           </TablePanel>
         </div>
       )}
@@ -489,6 +886,157 @@ export default function SkinJourneyAdmin() {
             <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
               <button style={{ ...A.btnGhost, flex: 1 }} onClick={() => setShowAddEdu(false)}>Cancel</button>
               <button style={{ ...A.btnPrimary, flex: 1 }} onClick={handleAddEdu}>Publish Article</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Journey Config Modals */}
+      {showAddProgram && (
+        <Modal title="Create New Skincare Program" onClose={() => setShowAddProgram(false)}>
+          <div style={{ padding: 24 }}>
+            <FieldLabel>Program Name</FieldLabel>
+            <input style={A.input} placeholder="e.g. Essential Glow" value={newProgram.name} onChange={e => setNewProgram({...newProgram, name: e.target.value})} />
+            <FieldLabel>Description</FieldLabel>
+            <textarea style={{...A.input, height: 100}} placeholder="What is this program about?" value={newProgram.description} onChange={e => setNewProgram({...newProgram, description: e.target.value})} />
+            <FieldLabel>Program Level</FieldLabel>
+            <input type="number" style={A.input} value={newProgram.level} onChange={e => setNewProgram({...newProgram, level: parseInt(e.target.value)})} />
+            <button onClick={handleSaveProgram} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Save Program</button>
+          </div>
+        </Modal>
+      )}
+
+      {showAddStep && (
+        <Modal title="Define Journey Step" onClose={() => setShowAddStep(false)}>
+          <div style={{ padding: 24 }}>
+            <FieldLabel>Step Name</FieldLabel>
+            <input style={A.input} placeholder="e.g. Double Cleansing" value={newStep.name} onChange={e => setNewStep({...newStep, name: e.target.value})} />
+            <FieldLabel>Default Instruction</FieldLabel>
+            <textarea style={{...A.input, height: 100}} placeholder="How should the user do this step?" value={newStep.default_instruction} onChange={e => setNewStep({...newStep, default_instruction: e.target.value})} />
+            <button onClick={handleSaveStep} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Create Step</button>
+          </div>
+        </Modal>
+      )}
+
+      {showAddRoutine && (
+        <Modal title="Add Step to Program" onClose={() => setShowAddRoutine(false)}>
+          <div style={{ padding: 24 }}>
+            <FieldLabel>Target Program</FieldLabel>
+            <select style={A.input} value={newRoutine.program_id} onChange={e => setNewRoutine({...newRoutine, program_id: e.target.value})}>
+              <option value="">Select Program</option>
+              {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <FieldLabel>Step to Add</FieldLabel>
+            <select style={A.input} value={newRoutine.step_id} onChange={e => setNewRoutine({...newRoutine, step_id: e.target.value})}>
+              <option value="">Select Step</option>
+              {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <FieldLabel>Target Week</FieldLabel>
+                <input type="number" style={A.input} value={newRoutine.week} onChange={e => setNewRoutine({...newRoutine, week: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <FieldLabel>Time of Day</FieldLabel>
+                <select style={A.input} value={newRoutine.time_of_day} onChange={e => setNewRoutine({...newRoutine, time_of_day: e.target.value})}>
+                  <option value="am">AM (Morning)</option>
+                  <option value="pm">PM (Night)</option>
+                  <option value="both">Both</option>
+                </select>
+              </div>
+            </div>
+            <button onClick={handleSaveRoutine} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Add to Routine</button>
+          </div>
+        </Modal>
+      )}
+
+      {showAddMapping && (
+        <Modal title="Product AI Mapping" onClose={() => setShowAddMapping(false)}>
+          <div style={{ padding: 24 }}>
+            <FieldLabel>Select Product</FieldLabel>
+            <select style={A.input} value={newMapping.product_id} onChange={e => setNewMapping({...newMapping, product_id: e.target.value})}>
+              <option value="">Choose Product</option>
+              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <FieldLabel>Step Type (Internal ID)</FieldLabel>
+            <input style={A.input} placeholder="e.g. Cleanser, Serum, etc." value={newMapping.step_type} onChange={e => setNewMapping({...newMapping, step_type: e.target.value})} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <FieldLabel>Skin Type</FieldLabel>
+                <select style={A.input} value={newMapping.skin_type} onChange={e => setNewMapping({...newMapping, skin_type: e.target.value})}>
+                  <option value="">All Types</option>
+                  <option value="Oily">Oily</option>
+                  <option value="Dry">Dry</option>
+                  <option value="Sensitive">Sensitive</option>
+                  <option value="Combination">Combination</option>
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Skin Concern</FieldLabel>
+                <select style={A.input} value={newMapping.skin_concern} onChange={e => setNewMapping({...newMapping, skin_concern: e.target.value})}>
+                  <option value="">All Concerns</option>
+                  <option value="Acne">Acne</option>
+                  <option value="Dullness">Dullness</option>
+                  <option value="Aging">Aging</option>
+                  <option value="Redness">Redness</option>
+                </select>
+              </div>
+            </div>
+            <FieldLabel>Recommendation Priority (Higher = Preferred)</FieldLabel>
+            <input type="number" style={A.input} value={newMapping.priority} onChange={e => setNewMapping({...newMapping, priority: parseInt(e.target.value)})} />
+            <button onClick={handleSaveMapping} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Save Mapping</button>
+          </div>
+        </Modal>
+      )}
+
+      {showEditAI && selectedAI && (
+        <Modal title={`Configure AI Stage: ${selectedAI.stage}`} onClose={() => setShowEditAI(false)}>
+          <div style={{ padding: 24 }}>
+            <FieldLabel>Prompt Template</FieldLabel>
+            <textarea style={{...A.input, height: 250, fontFamily: 'monospace', fontSize: 12}} value={selectedAI.prompt_body} onChange={e => setSelectedAI({...selectedAI, prompt_body: e.target.value})} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <FieldLabel>Temperature</FieldLabel>
+                <input type="number" step="0.1" style={A.input} value={selectedAI.temperature} onChange={e => setSelectedAI({...selectedAI, temperature: parseFloat(e.target.value)})} />
+              </div>
+              <div>
+                <FieldLabel>Max Tokens</FieldLabel>
+                <input type="number" style={A.input} value={selectedAI.max_tokens} onChange={e => setSelectedAI({...selectedAI, max_tokens: parseInt(e.target.value)})} />
+              </div>
+            </div>
+            <button onClick={handleUpdateAI} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Update AI Configuration</button>
+          </div>
+        </Modal>
+      )}
+      {/* Modal Add Pretest */}
+      {showAddPretest && (
+        <Modal show={showAddPretest} onClose={() => setShowAddPretest(false)} title="Register New Journey Member">
+          <div style={{ padding: '0 24px 24px' }}>
+            <FieldLabel>User ID (UUID)</FieldLabel>
+            <input style={A.input} value={newPretest.user_id} onChange={e => setNewPretest({...newPretest, user_id: e.target.value})} placeholder="e.g. 07032ac6-..." />
+            
+            <FieldLabel>Full Name</FieldLabel>
+            <input style={A.input} value={newPretest.full_name} onChange={e => setNewPretest({...newPretest, full_name: e.target.value})} />
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <FieldLabel>Skin Type</FieldLabel>
+                <select style={A.input} value={newPretest.skin_type} onChange={e => setNewPretest({...newPretest, skin_type: e.target.value})}>
+                  <option>Oily</option><option>Dry</option><option>Sensitive</option><option>Combination</option><option>Normal</option>
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Primary Problem</FieldLabel>
+                <input style={A.input} value={newPretest.skin_problem} onChange={e => setNewPretest({...newPretest, skin_problem: e.target.value})} />
+              </div>
+            </div>
+            
+            <FieldLabel>Skin Goal</FieldLabel>
+            <textarea style={{ ...A.input, height: 80 }} value={newPretest.skin_goal} onChange={e => setNewPretest({...newPretest, skin_goal: e.target.value})} />
+            
+            <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+              <button style={{ ...A.btnGhost, flex: 1 }} onClick={() => setShowAddPretest(false)}>Cancel</button>
+              <button style={{ ...A.btnPrimary, flex: 1 }} onClick={handleAddPretest}>Create Journey Record</button>
             </div>
           </div>
         </Modal>

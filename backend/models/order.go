@@ -114,6 +114,7 @@ type OrderMerchantGroup struct {
 	ShippingType    string              `gorm:"type:varchar(20);default:'expedition'" json:"shipping_type"` // pickup, expedition
 	CourierCode     string              `gorm:"type:varchar(50)" json:"courier_code"`
 	CourierService  string              `gorm:"type:varchar(50)" json:"courier_service"`
+	ServiceCode     string              `gorm:"type:varchar(50)" json:"service_code"`
 	TrackingNumber  string              `gorm:"type:varchar(100)" json:"tracking_number"`
 	BiteshipOrderID string              `gorm:"type:varchar(100)" json:"biteship_order_id"` // External Reference
 	ShippedAt       *time.Time          `json:"shipped_at"`

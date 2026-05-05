@@ -88,25 +88,8 @@ Return ONLY this JSON (no markdown, no extra text):
   "healing_message": "<1-2 sentence motivational message in Indonesian>"
 }`
 
-type SkinAnalysisResult struct {
-	SkinScore       int      `json:"skin_score"`       // Skala 1-10
-	EmotionScore    int      `json:"emotion_score"`    // Skala 1-10
-	Redness         int      `json:"redness"`          // 0-100%
-	AcneCount       int      `json:"acne_count"`       // Jumlah blemish
-	Moisture        int      `json:"moisture"`         // 0-100%
-	SkinType        string   `json:"skin_type"`
-	SkinTone        string   `json:"skin_tone"`
-	PrimaryConcern  string   `json:"primary_concern"`
-	Summary         string   `json:"summary"`
-	Recommendations []string `json:"recommendations"`
-	PositiveNotes   string   `json:"positive_notes"`
-	HealingMessage  string   `json:"healing_message"`
-	AIProvider      string   `json:"ai_provider"`
-	IsMock          bool     `json:"is_mock"`
-}
-
 // AnalyzeImageFromFile reads file and delegates to AnalyzeImageBytes
-func (s *SkinAIService) AnalyzeImageFromFile(filePath string) (*SkinAnalysisResult, error) {
+func (s *SkinAIService) AnalyzeImageFromFile(filePath string) (*models.SkinAnalysisResult, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membaca file: %w", err)
@@ -114,98 +97,90 @@ func (s *SkinAIService) AnalyzeImageFromFile(filePath string) (*SkinAnalysisResu
 	return s.AnalyzeImageBytes(data)
 }
 
-// AnalyzeImageBytes sends image bytes to OpenAI Vision and returns analysis
-func (s *SkinAIService) AnalyzeImageBytes(imageData []byte) (*SkinAnalysisResult, error) {
-	aiEnabled := s.isAIEnabled()
-	log.Printf("🔍 [SkinAI] AI enabled: %v, image size: %d bytes", aiEnabled, len(imageData))
+// AnalyzeStage sends image bytes and context data to OpenAI Vision using dynamic stage config
+func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, imageData []byte) (*models.SkinAnalysisResult, error) {
+	var cfg models.SkinJourneyAIConfig
+	if err := s.DB.Where("stage = ?", stage).First(&cfg).Error; err != nil {
+		log.Printf("⚠️ [SkinAI] Stage config '%s' not found, using defaults", stage)
+		cfg.SystemRole = systemRole
+		cfg.PromptBody = defaultSkinPrompt
+		cfg.Temperature = 0.1
+	}
 
+	prompt := cfg.PromptBody
+	for k, v := range params {
+		prompt = strings.ReplaceAll(prompt, "{{"+k+"}}", v)
+	}
+
+	aiEnabled := s.isAIEnabled()
 	if !aiEnabled {
-		log.Println("⚠️ [SkinAI] AI disabled in config. Using smart demo mode.")
 		return s.smartMockAnalysis(imageData), nil
 	}
 
 	apiKey := s.getAPIKey()
 	if apiKey == "" {
-		log.Println("❌ [SkinAI] No API key configured. Using smart demo mode.")
 		return s.smartMockAnalysis(imageData), nil
 	}
-	log.Printf("✅ [SkinAI] Using API key: %s...", apiKey[:min(20, len(apiKey))])
 
 	model := s.getModel()
-	log.Printf("✅ [SkinAI] Using model: %s", model)
+	b64Image := ""
+	if imageData != nil {
+		b64Image = base64.StdEncoding.EncodeToString(imageData)
+	}
 
-	b64Image := base64.StdEncoding.EncodeToString(imageData)
+	contentParts := []map[string]interface{}{
+		{
+			"type": "text",
+			"text": prompt,
+		},
+	}
+
+	if b64Image != "" {
+		contentParts = append(contentParts, map[string]interface{}{
+			"type": "image_url",
+			"image_url": map[string]string{
+				"url":    "data:image/jpeg;base64," + b64Image,
+				"detail": "high",
+			},
+		})
+	}
 
 	payload := map[string]interface{}{
 		"model": model,
 		"messages": []map[string]interface{}{
 			{
 				"role":    "system",
-				"content": systemRole,
+				"content": cfg.SystemRole,
 			},
 			{
-				"role": "user",
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": s.getPrompt(),
-					},
-					{
-						"type": "image_url",
-						"image_url": map[string]string{
-							"url":    "data:image/jpeg;base64," + b64Image,
-							"detail": "high",
-						},
-					},
-				},
+				"role":    "user",
+				"content": contentParts,
 			},
 		},
-		"max_tokens":  1200,
-		"temperature": 0.1,
+		"max_tokens":  1500,
+		"temperature": cfg.Temperature,
 		"response_format": map[string]string{
 			"type": "json_object",
 		},
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("gagal serialize payload: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("gagal buat request: %w", err)
-	}
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	log.Println("📡 [SkinAI] Sending request to OpenAI...")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("❌ [SkinAI] Network error: %v. Falling back to smart demo.", err)
 		return s.smartMockAnalysis(imageData), nil
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
-	log.Printf("📨 [SkinAI] OpenAI response status: %d", resp.StatusCode)
-
 	if resp.StatusCode != 200 {
-		log.Printf("❌ [SkinAI] OpenAI API error %d: %s", resp.StatusCode, string(respBody))
-		var errResp struct {
-			Error struct {
-				Message string `json:"message"`
-				Code    string `json:"code"`
-			} `json:"error"`
-		}
-		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error.Message != "" {
-			return nil, fmt.Errorf("OpenAI error (%s): %s", errResp.Error.Code, errResp.Error.Message)
-		}
-		return nil, fmt.Errorf("OpenAI API mengembalikan status %d", resp.StatusCode)
+		return nil, fmt.Errorf("OpenAI API error: %s", string(respBody))
 	}
 
-	// Parse OpenAI response envelope
 	var openAIResp struct {
 		Choices []struct {
 			Message struct {
@@ -213,54 +188,40 @@ func (s *SkinAIService) AnalyzeImageBytes(imageData []byte) (*SkinAnalysisResult
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := json.Unmarshal(respBody, &openAIResp); err != nil || len(openAIResp.Choices) == 0 {
-		log.Printf("⚠️ [SkinAI] Failed to parse OpenAI envelope: %v", err)
+	json.Unmarshal(respBody, &openAIResp)
+
+	if len(openAIResp.Choices) == 0 {
 		return s.smartMockAnalysis(imageData), nil
 	}
 
 	content := openAIResp.Choices[0].Message.Content
-	log.Printf("📝 [SkinAI] AI raw content (first 200 chars): %s", truncate(content, 200))
-
-	// Detect refusal — use strings.Contains with lowercased content for robustness
-	lower := strings.ToLower(content)
-	refusalPhrases := []string{
-		"i'm sorry", "i am sorry", "i cannot", "i can't", "i can not",
-		"cannot help", "can't help", "unable to", "not able to",
-		"i won't", "i will not", "against my", "not appropriate",
-		"i don't", "i do not", "violates",
-	}
-	for _, phrase := range refusalPhrases {
-		if strings.Contains(lower, phrase) {
-			log.Printf("⚠️ [SkinAI] AI refused request ('%s'). Using smart demo mode.", phrase)
-			return s.smartMockAnalysis(imageData), nil
-		}
-	}
-
-	// Parse the JSON result
-	var result SkinAnalysisResult
+	log.Printf("🤖 [SkinAI] Raw OpenAI Content: %s", content)
+	
+	var result models.SkinAnalysisResult
 	if err := json.Unmarshal([]byte(content), &result); err != nil {
 		extracted := extractJSON(content)
-		if err2 := json.Unmarshal([]byte(extracted), &result); err2 != nil {
-			log.Printf("⚠️ [SkinAI] Could not parse AI JSON: %v. Using smart demo mode.", err2)
-			return s.smartMockAnalysis(imageData), nil
-		}
+		log.Printf("🤖 [SkinAI] Extracted JSON: %s", extracted)
+		json.Unmarshal([]byte(extracted), &result)
 	}
 
-	// Validate result has meaningful data
-	if result.SkinScore == 0 && result.Summary == "" {
-		log.Printf("⚠️ [SkinAI] AI returned empty result. Using smart demo mode.")
+	// Safety Check: If JSON parsing failed or returned empty essential fields, fallback to smart mock
+	if result.Summary == "" {
+		log.Printf("⚠️ [SkinAI] AI returned empty summary, falling back to smart mock")
 		return s.smartMockAnalysis(imageData), nil
 	}
 
 	result.AIProvider = "openai/" + model
 	result.IsMock = false
-
-	log.Printf("✅ [SkinAI] Real AI analysis done. Score: %d, Redness: %d%%, Acne: %d", result.SkinScore, result.Redness, result.AcneCount)
 	return &result, nil
 }
 
+// AnalyzeImageBytes is kept for backward compatibility, now uses AnalyzeStage
+func (s *SkinAIService) AnalyzeImageBytes(imageData []byte) (*models.SkinAnalysisResult, error) {
+	return s.AnalyzeStage("analysis", nil, imageData)
+}
+
 // smartMockAnalysis returns a realistic, varied analysis based on image characteristics
-func (s *SkinAIService) smartMockAnalysis(imageData []byte) *SkinAnalysisResult {
+func (s *SkinAIService) smartMockAnalysis(imageData []byte) *models.SkinAnalysisResult {
 	// Use image size + content bytes to derive pseudo-random but consistent results
 	size := len(imageData)
 	seed := int64(size)
@@ -344,7 +305,7 @@ func (s *SkinAIService) smartMockAnalysis(imageData []byte) *SkinAnalysisResult 
 		}
 	}
 
-	return &SkinAnalysisResult{
+	return &models.SkinAnalysisResult{
 		SkinScore:       skinScore,
 		EmotionScore:    rand.Intn(5) + 5, // 5-10
 		Redness:         redness,

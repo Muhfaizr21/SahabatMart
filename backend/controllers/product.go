@@ -80,3 +80,47 @@ func (pc *ProductController) SubmitReview(w http.ResponseWriter, r *http.Request
 
 	utils.JSONResponse(w, http.StatusCreated, map[string]string{"message": "Ulasan berhasil dikirim"})
 }
+
+// POST /api/public/products/track
+func (pc *ProductController) TrackInteraction(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ProductID string `json:"product_id"`
+		Type      string `json:"type"` // view, click
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Data tidak valid")
+		return
+	}
+
+	userID := ""
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		// Try to extract user_id if token is present, but don't fail if not
+		// For simplicity, we can also check context if middleware is used
+		if val := r.Context().Value("user_id"); val != nil {
+			userID = val.(string)
+		}
+	}
+
+	if err := pc.ProductService.TrackInteraction(userID, req.ProductID, req.Type); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "tracked"})
+}
+
+// GET /api/public/products/recommended
+func (pc *ProductController) GetRecommendations(w http.ResponseWriter, r *http.Request) {
+	userID := ""
+	if val := r.Context().Value("user_id"); val != nil {
+		userID = val.(string)
+	}
+
+	products, err := pc.ProductService.GetRecommendedProducts(userID, 8)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, products)
+}

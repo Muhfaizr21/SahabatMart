@@ -115,16 +115,23 @@ export async function uploadFile(url, file, fieldName = 'image') {
 export function formatImage(path) {
   const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; // Premium Placeholder
   if (!path || path === "") return fallback;
-  if (path.startsWith('http')) return path;
-  if (path.startsWith('photo-')) {
-    // Exact format for Unsplash source
-    return `https://images.unsplash.com/${path}?auto=format&fit=crop&q=80&w=800`;
+  
+  // Protection: Strip broken/temp tunnel domains if present
+  let cleanPath = path;
+  if (typeof path === 'string' && path.includes('trycloudflare.com')) {
+    cleanPath = path.split('trycloudflare.com').pop();
   }
-  if (!path.includes('/') && !path.includes('.')) {
+
+  if (cleanPath.startsWith('http')) return cleanPath;
+  if (cleanPath.startsWith('photo-')) {
+    // Exact format for Unsplash source
+    return `https://images.unsplash.com/${cleanPath}?auto=format&fit=crop&q=80&w=800`;
+  }
+  if (!cleanPath.includes('/') && !cleanPath.includes('.')) {
     // Probably a broken ID or partial path
     return fallback;
   }
-  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  return `${API_BASE}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
 }
 
 /**

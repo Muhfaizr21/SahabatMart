@@ -303,6 +303,17 @@ type AffiliateClick struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// UserInteraction mencatat interaksi user (pencet/view) untuk algoritma rekomendasi
+type UserInteraction struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    string    `gorm:"type:uuid;index" json:"user_id"`
+	ProductID string    `gorm:"type:uuid;index" json:"product_id"`
+	Type      string    `gorm:"type:varchar(50);default:'view'" json:"type"` // view, click, cart
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (UserInteraction) TableName() string { return "user_interactions" }
+
 // Region data wilayah (Province, City, etc)
 type Region struct {
 	ID       uint   `gorm:"primaryKey" json:"id"`

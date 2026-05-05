@@ -631,3 +631,13 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Safe Area for Mobile Bottom Nav */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  nav.fixed.bottom-0 {
+    padding-bottom: calc(0.625rem + env(safe-area-inset-bottom));
+  }
+  .pb-16 {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}

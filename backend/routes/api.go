@@ -265,10 +265,16 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	
 	// Skin Journey (Akuglow)
 	mux.HandleFunc("/api/skin/pretest", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.SubmitPreTest))
+	mux.HandleFunc("/api/skin/programs", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetPrograms))
 	mux.HandleFunc("/api/skin/journey", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetJourneyData))
 	mux.HandleFunc("/api/skin/journal", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostDailyJournal))
 	mux.HandleFunc("/api/skin/progress", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.PostWeeklyProgress))
 	mux.HandleFunc("/api/skin/analyze", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.AnalyzeSkinPhoto))
+	mux.HandleFunc("/api/skin/set-program", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.SetUserProgram))
+	mux.HandleFunc("/api/skin/routine", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetUserRoutine))
+	mux.HandleFunc("/api/skin/complete-step", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.MarkStepComplete))
+	mux.HandleFunc("/api/skin/recommend-programs", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetProgramRecommendations))
+	mux.HandleFunc("/api/skin/usage-instructions", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetProductUsageInstructions))
 	// Community Features
 	mux.HandleFunc("/api/skin/community/groups", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetCommunityGroups))
 	mux.HandleFunc("/api/skin/community", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetCommunityFeed))
@@ -289,6 +295,19 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/skin/education", adminOnly(skinCtrl.AdminGetAllEducation))
 	mux.HandleFunc("/api/admin/skin/education/create", adminOnly(skinCtrl.AdminCreateEducation))
 	mux.HandleFunc("/api/admin/skin/education/delete", adminOnly(skinCtrl.AdminDeleteEducation))
+
+	// Dynamic Journey Config
+	mux.HandleFunc("/api/admin/skin/programs", adminOnly(skinCtrl.AdminGetPrograms))
+	mux.HandleFunc("/api/admin/skin/programs/save", adminOnly(skinCtrl.AdminSaveProgram))
+	mux.HandleFunc("/api/admin/skin/programs/delete", adminOnly(skinCtrl.AdminDeleteProgram))
+	mux.HandleFunc("/api/admin/skin/steps", adminOnly(skinCtrl.AdminGetSteps))
+	mux.HandleFunc("/api/admin/skin/steps/save", adminOnly(skinCtrl.AdminSaveStep))
+	mux.HandleFunc("/api/admin/skin/routines", adminOnly(skinCtrl.AdminGetRoutines))
+	mux.HandleFunc("/api/admin/skin/routines/save", adminOnly(skinCtrl.AdminSaveRoutine))
+	mux.HandleFunc("/api/admin/skin/product-mappings", adminOnly(skinCtrl.AdminGetProductMappings))
+	mux.HandleFunc("/api/admin/skin/product-mappings/save", adminOnly(skinCtrl.AdminSaveProductMapping))
+	mux.HandleFunc("/api/admin/skin/ai-configs", adminOnly(skinCtrl.AdminGetAIConfigs))
+	mux.HandleFunc("/api/admin/skin/ai-configs/update", adminOnly(skinCtrl.AdminUpdateAIConfig))
 
 	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
@@ -468,6 +487,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/products/detail", adminCtrl.GetPublicProductDetail)
 	mux.HandleFunc("/api/public/products", adminCtrl.GetPublicProducts)
 	mux.HandleFunc("/api/public/products/reviews", productCtrl.GetReviews)
+	mux.HandleFunc("/api/public/products/track", productCtrl.TrackInteraction)
+	mux.HandleFunc("/api/public/products/recommended", productCtrl.GetRecommendations)
 	mux.HandleFunc("/api/public/membership-tiers", tierCtrl.GetPublicTiers)
 	
 	// Real-time Notifications

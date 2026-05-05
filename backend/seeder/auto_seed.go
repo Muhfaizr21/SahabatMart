@@ -61,4 +61,10 @@ func AutoSeedCriticalData(db *gorm.DB) {
 
 	// [Platform Settings] Ensure default configs exist
 	SeedConfigs(db)
+	
+	// [Skin Journey] Auto-seed programs and steps
+	SeedSkinJourney(db)
+
+	// [AkuGlow Products] Auto-seed products from official store
+	SeedAkuglowProducts(db)
 }

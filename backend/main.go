@@ -11,7 +11,6 @@ import (
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/seeder"
 	"flag"
-	"time"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -34,7 +33,7 @@ func ConnectDB() {
 		&models.Category{}, &models.Product{}, &models.ProductVariant{}, &models.ProductTierCommission{},
 		&models.Order{}, &models.OrderMerchantGroup{}, &models.OrderItem{},
 		&models.Cart{}, &models.CartItem{},
-		&models.AffiliateClick{}, &models.PlatformConfig{},
+		&models.AffiliateClick{}, &models.UserInteraction{}, &models.PlatformConfig{},
 		&models.Brand{}, &models.Attribute{}, &models.Voucher{},
 		&models.Dispute{}, &models.LogisticChannel{}, &models.Region{},
 		&models.BlogPost{}, &models.Banner{},
@@ -53,35 +52,17 @@ func ConnectDB() {
 		// Akuglow Skin Journey
 		&models.SkinPreTest{}, &models.SkinProgress{}, &models.SkinJournal{}, &models.SkinWarriorLevel{},
 		&models.SkinEducation{}, &models.SkinCommunityGroup{}, &models.SkinCommunityPost{}, &models.SkinCommunityComment{},
+		&models.SkinJourneyProgram{}, &models.SkinJourneyStep{}, &models.SkinJourneyRoutine{},
+		&models.SkinJourneyProductMapping{}, &models.SkinJourneyAIConfig{}, &models.UserSkinJourney{},
+		&models.SkinStepLog{},
 		&models.PasswordReset{},
 		// Commission Preset System (Multi-Level)
 		&models.CommissionPreset{}, &models.CommissionPresetLevel{},
 		&models.TierCommissionPreset{}, &models.TierCommissionPresetItem{},
 	)
 	
-	// [Migration Fixes] Run startup migrations to fix schema issues
-	// Fix 1: cancelled_by dari uuid ke varchar agar bisa menyimpan "system"
-	DB.Exec("ALTER TABLE orders ALTER COLUMN cancelled_by TYPE varchar(100) USING cancelled_by::varchar(100)")
-	// Fix 2: Perbaiki constraint keranjang agar mendukung multi-merchant & metadata berbeda
-	DB.Exec("ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_cart_id_product_variant_id_key")
-	DB.Exec("DROP INDEX IF EXISTS idx_cart_items_cart_id_product_variant_id_key")
-	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_composite_v2 ON cart_items (cart_id, product_variant_id, merchant_id, COALESCE(metadata, ''))")
-	
-	// [Akuglow Rebranding] Auto-update platform strings in DB
-	DB.Model(&models.PlatformConfig{}).Where("key = ?", "platform_name").Update("value", "AkuGlow")
-	DB.Model(&models.PlatformConfig{}).Where("value LIKE ?", "%AkuGlow%").
-		Update("value", gorm.Expr("REPLACE(value, 'AkuGlow', 'AkuGlow')"))
-	DB.Model(&models.Merchant{}).Where("store_name LIKE ?", "%AkuGlow%").
-		Update("store_name", gorm.Expr("REPLACE(store_name, 'AkuGlow', 'AkuGlow')"))
-    DB.Model(&models.User{}).Where("email LIKE ?", "%akugrow.com%").
-		Update("email", gorm.Expr("REPLACE(email, 'akugrow.com', 'akuglow.com')"))
-		
-	// [Akuglow Rebranding] Auto-fix vouchers with zero expiry date to make them visible
-	DB.Model(&models.Voucher{}).Where("(status = ? OR status = ?) AND (expiry_date < ? OR expiry_date IS NULL)", "active", "expired", time.Now()).
-		Updates(map[string]interface{}{
-			"status":      "active",
-			"expiry_date": time.Now().Add(2160 * time.Hour), // Fix to 90 days from now
-		})
+	// [Migration Fixes] Migrasi manual/one-time dipindahkan ke seeder jika diperlukan.
+	// Menjalankan ALTER TABLE setiap restart menyebabkan lock database.
 
 	// Seed Sample Education for testing
 	var count int64

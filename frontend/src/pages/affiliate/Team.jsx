@@ -14,16 +14,20 @@ export default function TeamPerformance() {
   const [eligibility, setEligibility] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ current_page: 1, total_pages: 1, total_items: 0 });
 
   const loadStats = async () => {
     setLoading(true);
     setError(null);
     try {
       const [teamRes, eligRes] = await Promise.all([
-        fetchJson(`${AFFILIATE_API_BASE}/team-stats`),
+        fetchJson(`${AFFILIATE_API_BASE}/team-stats?search=${search}&page=${page}`),
         fetchJson(`${AFFILIATE_API_BASE}/merchant-eligibility`).catch(() => null),
       ]);
       setStats(teamRes);
+      if (teamRes.pagination) setPagination(teamRes.pagination);
       if (eligRes) setEligibility(eligRes);
     } catch (err) {
       setError(err.message || 'Gagal memuat data tim');
@@ -32,9 +36,17 @@ export default function TeamPerformance() {
     }
   };
 
-  useEffect(() => { loadStats(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (page !== 1) setPage(1);
+      else loadStats();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  if (loading) return (
+  useEffect(() => { loadStats(); }, [page]);
+
+  if (loading && !stats) return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="text-center">
         <div className="w-12 h-12 rounded-full border-4 border-purple-500/30 border-t-purple-400 animate-spin mx-auto mb-4" />
@@ -187,19 +199,31 @@ export default function TeamPerformance() {
 
       {/* Team Table */}
       <div className="rounded-2xl overflow-hidden" style={cardStyle}>
-        <div className="flex justify-between items-center p-6 border-b border-white/5">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-white/5 gap-4">
           <div>
             <h3 className="text-white font-bold font-['Plus_Jakarta_Sans']">Daftar Anggota Tim</h3>
             <p className="text-slate-400 text-xs mt-0.5">
-              {stats?.total_downlines || 0} total · <span className="text-green-400">{activeMitra} aktif</span> 30 hari ini
+              {pagination.total_items || 0} hasil ditemukan · <span className="text-green-400">{activeMitra} aktif</span> 30 hari ini
             </p>
           </div>
-          <button
-            onClick={loadStats}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-          >
-            <span className="material-symbols-outlined">refresh</span>
-          </button>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-grow md:w-64">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+              <input 
+                type="text" 
+                placeholder="Cari nama atau User ID..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50 transition-all"
+              />
+            </div>
+            <button
+              onClick={loadStats}
+              className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition-all"
+            >
+              <span className="material-symbols-outlined text-xl">refresh</span>
+            </button>
+          </div>
         </div>
 
         {!stats?.downlines?.length ? (
@@ -215,7 +239,7 @@ export default function TeamPerformance() {
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  {['Nama Mitra', 'Status', 'Bergabung', 'Omset Pribadi'].map(h => (
+                  {['Nama Mitra', 'Level', 'Status', 'Direferensikan Oleh', 'Bergabung', 'Omset Pribadi'].map(h => (
                     <th key={h} className="text-left px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] whitespace-nowrap">
                       {h}
                     </th>
@@ -233,7 +257,11 @@ export default function TeamPerformance() {
                       <div className="flex items-center gap-3">
                         <div
                           className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black flex-shrink-0"
-                          style={{ background: 'linear-gradient(135deg, #7c3aed, #b76dff)' }}
+                          style={{ 
+                            background: m.level === 1 
+                              ? 'linear-gradient(135deg, #7c3aed, #b76dff)' 
+                              : 'linear-gradient(135deg, #475569, #64748b)'
+                          }}
                         >
                           {(m.full_name || 'M').charAt(0).toUpperCase()}
                         </div>
@@ -242,6 +270,18 @@ export default function TeamPerformance() {
                           <p className="text-[10px] text-slate-500 font-mono">{m.user_id?.slice(0, 8)}…</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span 
+                        className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                        style={{ 
+                          background: m.level === 1 ? '#b76dff20' : '#47556930',
+                          color: m.level === 1 ? '#b76dff' : '#94a3b8',
+                          border: m.level === 1 ? '1px solid #b76dff30' : '1px solid #47556940'
+                        }}
+                      >
+                        Lvl {m.level}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -256,6 +296,17 @@ export default function TeamPerformance() {
                         {m.status === 'active' ? 'Aktif' : 'Pending'}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-slate-300 font-medium">{m.referrer_name || 'Sistem'}</span>
+                        {m.level > 1 && (
+                          <span className="text-[9px] text-slate-500 italic mt-0.5 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[10px]">subdirectory_arrow_right</span>
+                            Jaringan ke-{m.level-1}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-xs text-slate-400">
                       {new Date(m.joined_at).toLocaleDateString('id-ID', {
                         day: '2-digit', month: 'short', year: 'numeric'
@@ -268,6 +319,31 @@ export default function TeamPerformance() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {pagination.total_pages > 1 && (
+          <div className="flex items-center justify-between p-6 border-t border-white/5">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              Halaman {pagination.current_page} dari {pagination.total_pages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
+              >
+                Kembali
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(pagination.total_pages, p + 1))}
+                disabled={page >= pagination.total_pages}
+                className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
+              >
+                Selanjutnya
+              </button>
+            </div>
           </div>
         )}
       </div>

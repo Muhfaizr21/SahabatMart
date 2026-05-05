@@ -299,6 +299,8 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 		if merchantTier.MinMonthlyTurnover > 0 {
 			reqTurnover = merchantTier.MinMonthlyTurnover
 		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Printf("⚠️ CheckMerchantEligibility Error: %v", err)
 	}
 
 	isEligible = activeMitra >= int64(reqMitra) && monthlyTurnover >= reqTurnover

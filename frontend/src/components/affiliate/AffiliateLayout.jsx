@@ -10,11 +10,12 @@ import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 // (* Merchant Area muncul dinamis hanya jika role = merchant)
 const menuItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/affiliate', end: true },
+  { name: 'Skin Journey', icon: 'face', path: '/affiliate/skin/journey' },
   { name: 'Dompet & Penarikan', icon: 'account_balance_wallet', path: '/affiliate/withdrawals' },
-  // Merchant Area: injected dynamically for merchant role users (line ~137)
+  { name: 'Riwayat Komisi', icon: 'payments', path: '/affiliate/commissions' },
   { name: 'Profil Saya', icon: 'person_outline', path: '/affiliate/settings' },
   { name: 'Omset Tim', icon: 'monitoring', path: '/affiliate/stats' },
-  { name: 'Pesanan Saya', icon: 'receipt_long', path: '/profile' }, // Link ke profil buyer (pesanan)
+  { name: 'Pesanan Saya', icon: 'receipt_long', path: '/profile' }, 
   { name: 'Status Mitra', icon: 'workspace_premium', path: '/affiliate/status' },
   { name: 'Team', icon: 'groups', path: '/affiliate/team' },
   { name: 'Edukasi Bisnis', icon: 'school', path: '/affiliate/education' },
@@ -24,34 +25,52 @@ const menuItems = [
   { name: 'Materi Promo', icon: 'campaign', path: '/affiliate/marketing' },
   { name: 'Voucher', icon: 'local_offer', path: '/affiliate/vouchers' },
   { name: 'Komunitas', icon: 'forum', path: '/affiliate/community' },
-  { name: 'Belanja Yuk', icon: 'shopping_basket', path: '/' },
+  { name: 'Kembali Ke Toko', icon: 'shopping_basket', path: '/', end: true },
 ];
 
-const SidebarLink = ({ item, collapsed }) => (
-  <NavLink
-    to={item.path}
-    end={item.end}
-    className={({ isActive }) =>
-      `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${isActive
-        ? 'active bg-gradient-to-r from-purple-500/20 to-transparent text-purple-300 border-l-4 border-purple-400'
-        : 'text-slate-400 hover:text-white hover:bg-white/5'
-      }`
+const SidebarLink = ({ item, collapsed }) => {
+  const location = useLocation();
+  
+  // Custom active logic to handle query params (e.g., ?tab=journey)
+  const isActive = (() => {
+    const [itemPath, itemSearch] = item.path.split('?');
+    
+    // Handle home and root affiliate strictly
+    if (itemPath === '/' || itemPath === '/affiliate') {
+      return location.pathname === itemPath;
     }
-    title={collapsed ? item.name : ''}
-  >
-    <span
-      className="material-symbols-outlined flex-shrink-0"
-      style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}
+
+    // For other paths, use exact match for better precision in this layout
+    // especially since we have sub-modules like /affiliate/skin/journey and /affiliate/stats
+    return location.pathname === itemPath;
+  })();
+
+  return (
+    <NavLink
+      to={item.path}
+      end={item.end}
+      className={() =>
+        `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${isActive
+          ? 'active bg-gradient-to-r from-purple-500/20 to-transparent text-purple-300 border-l-4 border-purple-400'
+          : 'text-slate-400 hover:text-white hover:bg-white/5'
+        }`
+      }
+      title={collapsed ? item.name : ''}
     >
-      {item.icon}
-    </span>
-    {!collapsed && (
-      <span className="text-[13px] font-semibold tracking-wider uppercase whitespace-nowrap">
-        {item.name}
+      <span
+        className="material-symbols-outlined flex-shrink-0"
+        style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}
+      >
+        {item.icon}
       </span>
-    )}
-  </NavLink>
-);
+      {!collapsed && (
+        <span className="text-[13px] font-semibold tracking-wider uppercase whitespace-nowrap">
+          {item.name}
+        </span>
+      )}
+    </NavLink>
+  );
+};
 
 const AffiliateLayout = () => {
   const user = getStoredUser();

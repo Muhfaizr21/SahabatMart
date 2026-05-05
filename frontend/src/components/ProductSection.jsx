@@ -15,7 +15,7 @@ function StarRating({ rating }) {
   );
 }
 
-function ProductCard({ product }) {
+export function ProductCard({ product }) {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [wishlisting, setWishlisting] = useState(false);
@@ -83,6 +83,12 @@ function ProductCard({ product }) {
       });
       window.dispatchEvent(new Event('cartUpdate'));
       window.dispatchEvent(new Event('openCart'));
+
+      // [Akuglow AI Recommendation] Track Interaction
+      fetchJson(`${PUBLIC_API_BASE}/products/track`, {
+        method: 'POST',
+        body: JSON.stringify({ product_id: product.id, type: 'click' })
+      }).catch(() => {});
     } catch (err) {
       alert(err.message);
     } finally {

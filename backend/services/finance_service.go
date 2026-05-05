@@ -4,6 +4,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/repositories"
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,408 +17,298 @@ type FinanceService struct {
 }
 
 func NewFinanceService(db *gorm.DB) *FinanceService {
+	notif := NewNotificationService(db)
 	return &FinanceService{
-		Repo:         repositories.NewFinanceRepository(db),
 		DB:           db,
-		Notification: NewNotificationService(db),
+		Repo:         repositories.NewFinanceRepository(db),
+		Notification: notif,
 	}
 }
 
-func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerType models.WalletOwnerType, txType models.WalletTransactionType, amount float64, refID, refType, description string, settleAt *time.Time) error {
-	wallet, err := s.Repo.GetWalletWithLock(ownerID, ownerType)
-	if err != nil {
-		return err
-	}
-
-	balanceBefore := wallet.Balance
-	pendingBefore := wallet.PendingBalance
-
-	switch txType {
-	case models.TxSaleRevenue, models.TxCommissionEarned:
-		wallet.PendingBalance += amount
-		wallet.TotalEarned += amount
-	case models.TxWithdrawalRequest:
-		if wallet.Balance < amount {
-			return fmt.Errorf("saldo tidak mencukupi")
-		}
-		wallet.Balance -= amount
-		wallet.PendingBalance += amount // Pindahkan ke pending (escrow penarikan)
-	case models.TxWithdrawalCompleted:
-		if wallet.PendingBalance >= amount {
-			wallet.PendingBalance -= amount
-		}
-		wallet.TotalWithdrawn += amount
-	case models.TxWithdrawalRejected:
-		if wallet.PendingBalance >= amount {
-			wallet.PendingBalance -= amount
-		}
-		wallet.Balance += amount
-	case models.TxRefundDeduction, models.TxCommissionReversed, models.TxSaleRevenueReversed:
-		if wallet.PendingBalance >= amount {
-			wallet.PendingBalance -= amount
-		} else {
-			wallet.Balance -= amount
-		}
-		wallet.TotalEarned -= amount
-	default:
-		wallet.Balance += amount
-	}
-
-	if err := tx.Save(wallet).Error; err != nil {
-		return err
-	}
-
-	var refPtr *string
-	if refID != "" {
-		refPtr = &refID
-	}
-
-	txn := &models.WalletTransaction{
-		WalletID:             wallet.ID,
-		Type:                 txType,
-		Amount:               amount,
-		BalanceBefore:        balanceBefore,
-		BalanceAfter:         wallet.Balance,
-		PendingBefore:        pendingBefore,
-		PendingAfter:         wallet.PendingBalance,
-		Description:          description,
-		ReferenceID:          refPtr,
-		ReferenceType:        refType,
-		TargetSettlementDate: settleAt,
-	}
-
-	return tx.Create(txn).Error
-}
-
-// DistributeFunds membagi dana ke Merchant dan Affiliate saat pesanan dibayar
 func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 	var order models.Order
 	if err := tx.Preload("MerchantGroups").First(&order, "id = ?", orderID).Error; err != nil {
 		return err
 	}
-
+	
 	// 0. [Financial Audit] Record TOTAL Inflow to HQ Cash Account
-	// Every cent paid by the buyer enters the platform's bank account first.
-	totalInflow := order.GrandTotal
-	inflowDesc := fmt.Sprintf("Pembayaran Pesanan %s (Total Inflow)", order.OrderNumber)
-	if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, totalInflow, order.ID, "order", inflowDesc, nil); err != nil {
+	descInflow := fmt.Sprintf("Pembayaran Pesanan #%s", order.OrderNumber)
+	if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, order.GrandTotal, order.ID, "order", descInflow, nil); err != nil {
 		return err
 	}
 
-	// 1. Distribute ke Merchant Portions (Distributor Cut)
+	orderSvc := NewOrderService(tx)
+	
 	for _, group := range order.MerchantGroups {
-		// [Financial Audit Fix] Distribution Logic based on Reseller Model
-		pusatID := "00000000-0000-0000-0000-000000000000"
+		// 1. Merchant Payout
+		var merchant models.Merchant
+		if err := tx.First(&merchant, "id = ?", group.MerchantID).Error; err != nil {
+			return err
+		}
+
+		actualPayout := group.MerchantPayout
+		settleDate := time.Now().Add(24 * time.Hour) 
 		
-		if group.MerchantID != pusatID {
-			// [Audit Fix] Intelligent Discount Burden Distribution
-			merchantDiscShare := group.Discount * 0.5 // Default: bagi dua untuk Voucher Platform
-
-			// Jika voucher dimiliki spesifik oleh merchant ini, merchant tanggung 100%
-			if order.VoucherID != nil {
-				var v models.Voucher
-				if err := tx.First(&v, *order.VoucherID).Error; err == nil {
-					if v.MerchantID != nil && *v.MerchantID == group.MerchantID {
-						merchantDiscShare = group.Discount
-					}
-				}
-			}
-
-			// [Financial Integrity Fix] Use the pre-calculated MerchantPayout from OrderService
-			// This ensures synchronization between what was promised at checkout and what is distributed.
-			
-			// 1. Ambil jatah Merchant (Revenue - Fees)
-			actualPayout := group.MerchantPayout - merchantDiscShare
-			if actualPayout < 0 { actualPayout = 0 }
-			
-			if actualPayout > 0 {
-				desc := fmt.Sprintf("Hasil Penjualan order %s", order.OrderNumber)
-				// Settlement target: 7 hari untuk merchant
-				settleDate := time.Now().AddDate(0, 0, 7)
-				if err := s.ProcessTransaction(tx, group.MerchantID, models.WalletMerchant, models.TxSaleRevenue, actualPayout, order.ID, "order", desc, &settleDate); err != nil {
-					return err
-				}
-			}
-
-			// 2. HQ (Pusat) - Tidak perlu mencatat TxSaleRevenue tambahan untuk HQ di sini
-			// karena kita sudah mencatat TOTAL INFLOW di langkah (0) ke system-hq.
-			// Keuntungan bersih HQ secara otomatis tersisa di saldo system-hq 
-			// setelah semua payout merchant & affiliate dibayarkan nanti.
-			
-			// 3. Catat record subsidi jika terjadi kerugian diskon untuk keperluan audit (opsional)
-			// Namun jangan menambah/mengurangi saldo pusat lagi agar tidak double count inflow.
-		} else {
-			// [MODEL PUSAT] HQ menanggung 100% diskon karena mereka pemilik stok
-			hqPayout := group.MerchantPayout
-			if hqPayout < 0 { hqPayout = 0 }
-
-			desc := fmt.Sprintf("Penjualan Langsung Pusat: %s (Potong diskon 100%%)", order.OrderNumber)
-			if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, hqPayout, order.ID, "order", desc, nil); err != nil {
-				return err
-			}
+		descPayout := fmt.Sprintf("Penjualan Produk (Pesanan #%s)", order.OrderNumber)
+		if err := s.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxSaleRevenue, actualPayout, order.ID, "order", descPayout, &settleDate); err != nil {
+			return err
 		}
 
-		// Platform Fee tetap ditarik ke wallet platform
-		if group.PlatformFee > 0 {
-			pfDesc := fmt.Sprintf("Platform Fee: %s", order.OrderNumber)
-			if err := s.ProcessTransaction(tx, models.AdminID, models.WalletAdmin, models.TxPlatformFee, group.PlatformFee, order.ID, "order", pfDesc, nil); err != nil {
-				return err
-			}
-		}
-	}
-
-	// 3. Distribute ke Affiliate (jika ada)
-	if order.AffiliateID != nil && *order.AffiliateID != "" {
+		// 2. Affiliate Commission Distribution
 		var orderItems []models.OrderItem
-		tx.Where("order_id = ?", order.ID).Find(&orderItems)
-
-		orderSvc := NewOrderService(tx)
+		// Filter items by Group ID to avoid double-counting
+		tx.Where("order_id = ? AND order_merchant_group_id = ?", order.ID, group.ID).Find(&orderItems)
 		
 		for _, item := range orderItems {
-			// A. Coba distribusi via Preset (Multi-Level)
-			entries, err := orderSvc.DistributePresetCommissions(tx, order, item, *order.AffiliateID)
-			
-			if err == nil && len(entries) > 0 {
-				// Distribute wallet credit untuk tiap level preset
-				for _, entry := range entries {
-					desc := fmt.Sprintf("Komisi Level %d (Preset): %s", entry.Level, order.OrderNumber)
-					holdDays := 7
-					var aff models.AffiliateMember
-					if err := tx.Preload("Tier").Where("id = ?", entry.AffiliateID).First(&aff).Error; err == nil && aff.Tier != nil {
-						holdDays = aff.Tier.CommissionHoldDays
-					}
-					settleDate := time.Now().AddDate(0, 0, holdDays)
+			if order.AffiliateID != nil && *order.AffiliateID != "" {
+				entries, err := orderSvc.DistributePresetCommissions(tx, order, item, *order.AffiliateID)
+				
+				if err == nil && len(entries) > 0 {
+					for _, ent := range entries {
+						var member models.AffiliateMember
+						if err := tx.First(&member, "id = ?", ent.AffiliateID).Error; err != nil {
+							continue
+						}
 
-					if err := s.ProcessTransaction(tx, entry.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, entry.Amount, order.ID, "order", desc, &settleDate); err != nil {
-						return err
+						descComm := fmt.Sprintf("Komisi Affiliate Lvl %d - %s (Pesanan #%s)", ent.Level, item.ProductName, order.OrderNumber)
+						
+						holdDays := 3 
+						if err := tx.Preload("Tier").First(&member, "id = ?", ent.AffiliateID).Error; err == nil {
+							if member.Tier != nil {
+								holdDays = member.Tier.CommissionHoldDays
+							}
+						}
+						settleAt := time.Now().AddDate(0, 0, holdDays)
+
+						// Use ent.CommissionID as ref for status tracking
+						if err := s.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxCommissionEarned, ent.Amount, ent.CommissionID, "affiliate_commission", descComm, &settleAt); err != nil {
+							return err
+						}
 					}
-					_ = s.Notification.Push(entry.AffiliateID, "affiliate", "commission_earned",
-						fmt.Sprintf("Komisi Level %d Masuk! 🎉", entry.Level),
-						fmt.Sprintf("Anda mendapat komisi Rp%.0f (Level %d) dari pesanan %s", entry.Amount, entry.Level, order.OrderNumber),
-						"/affiliate/commissions")
+					continue 
 				}
-			} else {
-				// B. Fallback ke Komisi Standar / Tier Matrix untuk item ini
-				affAmt, _, _, _, err := orderSvc.CalculateCommissions(tx, item, order.AffiliateID, item.MerchantID)
-				if err == nil && affAmt > 0 {
-					desc := fmt.Sprintf("Komisi Affiliate (Standard): %s", order.OrderNumber)
-					holdDays := 7
-					var aff models.AffiliateMember
-					if err := tx.Preload("Tier").Where("id = ?", *order.AffiliateID).First(&aff).Error; err == nil && aff.Tier != nil {
-						holdDays = aff.Tier.CommissionHoldDays
-					}
-					settleDate := time.Now().AddDate(0, 0, holdDays)
+			}
 
-					if err := s.ProcessTransaction(tx, *order.AffiliateID, models.WalletAffiliate, models.TxCommissionEarned, affAmt, order.ID, "order", desc, &settleDate); err != nil {
+			// Fallback ke Global/Default
+			if group.AffiliateCommission > 0 && order.AffiliateID != nil {
+				var member models.AffiliateMember
+				if err := tx.First(&member, "id = ?", *order.AffiliateID).Error; err == nil {
+					descFallback := fmt.Sprintf("Komisi Affiliate (Pesanan #%s)", order.OrderNumber)
+					if err := s.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxCommissionEarned, group.AffiliateCommission, order.ID, "order_fallback_comm", descFallback, nil); err != nil {
 						return err
 					}
-					_ = s.Notification.Push(*order.AffiliateID, "affiliate", "commission_earned", "Komisi Baru!",
-						fmt.Sprintf("Anda mendapatkan komisi Rp%.0f dari pesanan %s", affAmt, order.OrderNumber),
-						fmt.Sprintf("/affiliate/transactions?ref=%s", order.ID))
 				}
 			}
 		}
-	}
-	
-	// Notifikasi ke Merchant (dengan info jatah yang benar)
-	for _, group := range order.MerchantGroups {
-		actualPayout := group.MerchantPayout
-		
-		pusatID := "00000000-0000-0000-0000-000000000000"
-		if group.MerchantID != pusatID {
-			merchantDiscShare := group.Discount * 0.5
-			if order.VoucherID != nil {
-				var v models.Voucher
-				if err := tx.First(&v, *order.VoucherID).Error; err == nil {
-					if v.MerchantID != nil && *v.MerchantID == group.MerchantID {
-						merchantDiscShare = group.Discount
-					}
-				}
-			}
-			actualPayout -= merchantDiscShare
-			if actualPayout < 0 { actualPayout = 0 }
-		}
 
-		_ = s.Notification.Push(group.MerchantID, "merchant", "order_paid", "Pesanan Dibayar", 
-			fmt.Sprintf("Pesanan %s telah dibayar. Hasil penjualan Rp%.2f masuk ke saldo tertunda.", order.OrderNumber, actualPayout), 
-			fmt.Sprintf("/merchant/orders/%s", order.ID))
+		// 3. Platform Revenue
+		revenue := group.PlatformFee
+		if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPlatformFee, revenue, order.ID, "order", "Pendapatan Layanan (Platform Fee)", nil); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
-// ReverseDistribution menarik kembali dana yang sudah dibagikan jika pesanan dibatalkan/refund
-func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error {
-	// Temukan semua transaksi wallet terkait order ini yang belum cair (pending)
-	var txs []models.WalletTransaction
-	if err := tx.Where("reference_id = ? AND reference_type = ? AND is_settled = ?", orderID, "order", false).Find(&txs).Error; err != nil {
+func (s *FinanceService) GetWallet(ownerID string, ownerType models.WalletOwnerType) (*models.Wallet, error) {
+	return s.Repo.GetWalletWithLock(ownerID, ownerType)
+}
+
+func (s *FinanceService) ReleaseEscrow(tx *gorm.DB, ownerID string, ownerType models.WalletOwnerType, amount float64, refID string, desc string) error {
+	return s.ProcessTransaction(tx, ownerID, ownerType, models.TxSaleRevenue, amount, refID, "escrow_release", desc, nil)
+}
+
+func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerType models.WalletOwnerType, txType models.WalletTransactionType, amount float64, refID string, refType string, desc string, settleDate *time.Time) error {
+	var wallet models.Wallet
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("owner_id = ? AND owner_type = ?", ownerID, ownerType).FirstOrCreate(&wallet, models.Wallet{
+		OwnerID: ownerID, OwnerType: ownerType, Balance: 0, IsActive: true,
+	}).Error; err != nil {
 		return err
 	}
 
-	for _, txn := range txs {
-		// Jika transaksi ini adalah penambahan saldo (SaleRevenue atau CommissionEarned)
-		if txn.Type == models.TxSaleRevenue || txn.Type == models.TxCommissionEarned || txn.Type == models.TxPlatformFee {
-			var wallet models.Wallet
-			if err := tx.First(&wallet, txn.WalletID).Error; err != nil {
-				continue
-			}
-
-			// Tentukan tipe reversal-nya
-			revType := models.TxSaleRevenueReversed
-			if txn.Type == models.TxCommissionEarned {
-				revType = models.TxCommissionReversed
-			}
-
-			desc := fmt.Sprintf("Pembatalan Dana: %s (Ref: %s)", txn.Description, orderID)
-			// Tarik kembali dana menggunakan ProcessTransaction dengan nilai negatif (atau gunakan case deduksi)
-			if err := s.ProcessTransaction(tx, wallet.OwnerID, wallet.OwnerType, revType, txn.Amount, orderID, "order_reversal", desc, nil); err != nil {
-				return err
-			}
-		}
+	oldBalance := wallet.Balance
+	oldPending := wallet.PendingBalance
+	isPending := false
+	if settleDate != nil && settleDate.After(time.Now()) {
+		isPending = true
 	}
 
-	return nil
+	if isPending {
+		wallet.PendingBalance += amount
+	} else {
+		wallet.Balance += amount
+	}
+
+	if amount > 0 {
+		wallet.TotalEarned += amount
+	}
+
+	if err := tx.Save(&wallet).Error; err != nil {
+		return err
+	}
+
+	txn := &models.WalletTransaction{
+		WalletID:      wallet.ID,
+		Type:          txType,
+		Amount:        amount,
+		BalanceBefore: oldBalance,
+		BalanceAfter:  wallet.Balance,
+		PendingBefore: oldPending,
+		PendingAfter:  wallet.PendingBalance,
+		Description:   desc,
+		ReferenceID:   &refID,
+		ReferenceType: refType,
+		IsSettled:     !isPending,
+		CreatedAt:     time.Now(),
+	}
+
+	if isPending {
+		txn.TargetSettlementDate = settleDate
+	} else {
+		now := time.Now()
+		txn.SettledAt = &now
+	}
+
+	return tx.Create(txn).Error
 }
 
-// ManualAdjustment memungkinkan Admin mengintervensi saldo secara manual (Credit/Debit)
-func (s *FinanceService) ManualAdjustment(adminID string, targetID string, ownerType models.WalletOwnerType, amount float64, note string) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		txType := models.TxAdjustment
-		desc := fmt.Sprintf("Penyesuaian Admin (%s): %s", adminID, note)
-		
-		return s.ProcessTransaction(tx, targetID, ownerType, txType, amount, adminID, "admin_adjustment", desc, nil)
-	})
-}
-
-// MovePendingToAvailable... (previous code)
-func (s *FinanceService) ProcessSettlements() (int64, error) {
-	var settledCount int64
+func (s *FinanceService) ProcessSettlements() (int, error) {
+	count := 0
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		var txs []models.WalletTransaction
-		// Hardening: Gabungkan dengan tabel orders untuk memastikan status order valid (tidak sengketa/dibekukan)
-		// Kita hanya mencairkan transaksi yang ReferenceType-nya 'order' DAN order tersebut sudah 'completed'
-		err := tx.Table("wallet_transactions").
-			Select("wallet_transactions.*").
-			Joins("JOIN orders ON orders.id = wallet_transactions.reference_id").
-			Where("wallet_transactions.pending_after > wallet_transactions.pending_before").
-			Where("wallet_transactions.is_settled = ?", false).
-			Where("wallet_transactions.target_settlement_date < ?", time.Now()). // Ganti delay kaku 7 hari dengan target date
-			Where("wallet_transactions.reference_type = ?", "order").
-			Where("orders.status = ?", models.OrderCompleted). // Hanya yang sudah selesai
-			Find(&txs).Error
+		now := time.Now()
+		
+		err := tx.Where("is_settled = ? AND target_settlement_date <= ?", false, now).Find(&txs).Error
 		if err != nil {
 			return err
 		}
 
 		for _, txn := range txs {
 			var wallet models.Wallet
-			if err := tx.First(&wallet, "id = ?", txn.WalletID).Error; err != nil {
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&wallet, "id = ?", txn.WalletID).Error; err != nil {
 				continue
 			}
 
-			// Pindahkan dari pending ke balance
-			amount := txn.Amount
-			wallet.PendingBalance -= amount
-			wallet.Balance += amount
-
+			wallet.PendingBalance -= txn.Amount
+			wallet.Balance += txn.Amount
+			
 			if err := tx.Save(&wallet).Error; err != nil {
 				return err
 			}
 
-			// Update transaction status (Idempotency)
-			now := time.Now()
 			txn.IsSettled = true
 			txn.SettledAt = &now
+			txn.BalanceAfter = wallet.Balance
+			txn.PendingAfter = wallet.PendingBalance
+			
 			if err := tx.Save(&txn).Error; err != nil {
 				return err
 			}
 
-			// Update Affiliate Commissions status jika reference adalah order
-			if txn.ReferenceType == "order" && wallet.OwnerType == models.WalletAffiliate {
-				tx.Model(&models.AffiliateCommission{}).
-					Where("order_id = ? AND affiliate_id = ?", txn.ReferenceID, wallet.OwnerID).
-					Updates(map[string]interface{}{
-						"status":  models.CommissionPaid,
-						"paid_at": &now,
-					})
-				
-				// Notifikasi pencairan komisi
-				_ = s.Notification.Push(wallet.OwnerID, "affiliate", "commission_settled", "Komisi Cair!", 
-					fmt.Sprintf("Komisi dari pesanan %s sebesar Rp%.2f sudah masuk ke saldo utama.", txn.ReferenceID, amount), "/affiliate/wallet")
+			// [SYNC] Update AffiliateCommission status if applicable
+			if txn.ReferenceType == "affiliate_commission" && txn.ReferenceID != nil {
+				tx.Model(&models.AffiliateCommission{}).Where("id = ?", *txn.ReferenceID).Update("status", models.CommissionApproved)
 			}
 			
-			if wallet.OwnerType == models.WalletMerchant {
-				_ = s.Notification.Push(wallet.OwnerID, "merchant", "payout_settled", "Saldo Cair", 
-					fmt.Sprintf("Dana Rp%.2f dari pesanan %s sudah masuk ke saldo utama.", amount, txn.ReferenceID), "/merchant/wallet")
-			}
-			settledCount++
+			count++
+			log.Printf("[Settlement] Processed txn %s for wallet %s (Amount: %.2f)", txn.ID, wallet.ID, txn.Amount)
 		}
+
 		return nil
 	})
-	return settledCount, err
+	return count, err
 }
 
-// ReleaseEscrow secara langsung menarik dana dari Pending ke Available Balance
-func (s *FinanceService) ReleaseEscrow(tx *gorm.DB, ownerID string, ownerType models.WalletOwnerType, amount float64, refID, desc string) error {
-	wallet, err := s.Repo.GetWalletWithLock(ownerID, ownerType)
-	if err != nil {
+func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error {
+	var txs []models.WalletTransaction
+	
+	// Direct order transactions
+	if err := tx.Where("reference_id = ? AND reference_type IN ('order', 'order_fallback_comm')", orderID).Find(&txs).Error; err != nil {
 		return err
 	}
 
-	if wallet.PendingBalance < amount {
-		amount = wallet.PendingBalance // safety fallback
+	// Commission transactions
+	var commTxs []models.WalletTransaction
+	// Since both are UUIDs in DB, simple join is best
+	tx.Raw(`SELECT wt.* FROM wallet_transactions wt 
+		    JOIN affiliate_commissions ac ON wt.reference_id = ac.id 
+			WHERE ac.order_id = ? AND wt.reference_type = 'affiliate_commission'`, orderID).Scan(&commTxs)
+	
+	txs = append(txs, commTxs...)
+
+	for _, txn := range txs {
+		var wallet models.Wallet
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&wallet, "id = ?", txn.WalletID).Error; err != nil {
+			continue
+		}
+
+		if txn.IsSettled {
+			wallet.Balance -= txn.Amount
+		} else {
+			wallet.PendingBalance -= txn.Amount
+		}
+		
+		if txn.Amount > 0 {
+			wallet.TotalEarned -= txn.Amount
+		}
+
+		if err := tx.Save(&wallet).Error; err != nil {
+			return err
+		}
+
+		revType := models.WalletTransactionType(string(txn.Type) + "_reversed")
+		if txn.Type == models.TxCommissionEarned {
+			revType = models.TxCommissionReversed
+		} else if txn.Type == models.TxSaleRevenue {
+			revType = models.TxSaleRevenueReversed
+		} else if txn.Type == models.TxPlatformFee {
+			revType = models.TxPlatformFeeReversed
+		}
+
+		revTxn := &models.WalletTransaction{
+			WalletID:      wallet.ID,
+			Type:          revType,
+			Amount:        -txn.Amount,
+			BalanceBefore: wallet.Balance + (func() float64 { if txn.IsSettled { return txn.Amount } else { return 0 } }()),
+			BalanceAfter:  wallet.Balance,
+			PendingBefore: wallet.PendingBalance + (func() float64 { if !txn.IsSettled { return txn.Amount } else { return 0 } }()),
+			PendingAfter:  wallet.PendingBalance,
+			Description:   fmt.Sprintf("Pembalikan: %s", txn.Description),
+			ReferenceID:   txn.ReferenceID,
+			ReferenceType: "order_reversal",
+			IsSettled:     true,
+			CreatedAt:     time.Now(),
+		}
+		now := time.Now()
+		revTxn.SettledAt = &now
+
+		if err := tx.Create(revTxn).Error; err != nil {
+			return err
+		}
 	}
 
-	balanceBefore := wallet.Balance
-	pendingBefore := wallet.PendingBalance
+	// [SYNC] Mark all commissions for this order as cancelled
+	tx.Model(&models.AffiliateCommission{}).Where("order_id = ?", orderID).Update("status", models.CommissionCancelled)
 
-	wallet.PendingBalance -= amount
-	wallet.Balance += amount
-
-	if err := tx.Save(wallet).Error; err != nil {
-		return err
-	}
-
-	var refPtr *string
-	if refID != "" {
-		refPtr = &refID
-	}
-
-	txn := &models.WalletTransaction{
-		WalletID:      wallet.ID,
-		Type:          models.TxAdjustment,
-		Amount:        amount,
-		BalanceBefore: balanceBefore,
-		BalanceAfter:  wallet.Balance,
-		PendingBefore: pendingBefore,
-		PendingAfter:  wallet.PendingBalance,
-		Description:   desc,
-		ReferenceID:   refPtr,
-		ReferenceType: "order_escrow",
-	}
-
-	return tx.Create(txn).Error
+	return nil
 }
 
-func (s *FinanceService) SyncPlatformLedger() (map[string]interface{}, error) {
-	var results struct {
-		TotalBalance   float64 `gorm:"column:total_balance"`
-		TotalPending   float64 `gorm:"column:total_pending"`
-		TotalEarned    float64 `gorm:"column:total_earned"`
-		TotalWithdrawn float64 `gorm:"column:total_withdrawn"`
-	}
+type PlatformLedger struct {
+	TotalAssets     float64
+	MerchantPending float64
+	AffiliatePending float64
+	AdminBalance    float64
+}
 
-	err := s.DB.Table("wallets").Select("SUM(balance) as total_balance, SUM(pending_balance) as total_pending, SUM(total_earned) as total_earned, SUM(total_withdrawn) as total_withdrawn").Scan(&results).Error
-	if err != nil {
-		return nil, err
-	}
-
-	platformLiquidity := results.TotalBalance + results.TotalPending
-
-	return map[string]interface{}{
-		"total_user_balance":       results.TotalBalance,
-		"total_user_pending":       results.TotalPending,
-		"total_platform_liquidity": platformLiquidity,
-		"sync_status":              "healthy",
-		"checked_at":               time.Now(),
-	}, nil
+func (s *FinanceService) SyncPlatformLedger() (*PlatformLedger, error) {
+	var ledger PlatformLedger
+	
+	s.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletAdmin).Select("COALESCE(SUM(balance), 0)").Scan(&ledger.AdminBalance)
+	s.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletMerchant).Select("COALESCE(SUM(pending_balance), 0)").Scan(&ledger.MerchantPending)
+	s.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletAffiliate).Select("COALESCE(SUM(pending_balance), 0)").Scan(&ledger.AffiliatePending)
+	
+	ledger.TotalAssets = ledger.AdminBalance + ledger.MerchantPending + ledger.AffiliatePending
+	
+	return &ledger, nil
 }

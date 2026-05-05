@@ -175,9 +175,15 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 		// 4. Handle Wallet Payment
 		if paymentMethod == "wallet" {
 			financeSvc := NewFinanceService(s.DB)
+			// [CRITICAL FIX] Get UserID
+			var merchant models.Merchant
+			if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
+				return err
+			}
+
 			// Deduct balance
 			desc := fmt.Sprintf("Pembayaran Restock / Kulakan: %s", req.ID)
-			err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -totalAmount, req.ID, "restock_request", desc, nil)
+			err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxRestockPayment, -totalAmount, req.ID, "restock_request", desc, nil)
 			if err != nil {
 				return fmt.Errorf("saldo tidak mencukupi untuk pembayaran wallet: %v", err)
 			}
@@ -359,16 +365,19 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
+		// [CRITICAL FIX] Get Merchant to find UserID
+		var merchant models.Merchant
+		if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
+			return err
+		}
+
 		if err := tx.Create(payout).Error; err != nil {
 			return err
 		}
 		
 		desc := fmt.Sprintf("Penarikan Dana / Payout PID:%s", payout.ID)
-		if payout.ID == "" {
-			desc = "Penarikan Dana / Payout"
-		}
-
-		err = financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxWithdrawalRequest, amount, payout.ID, "payout_request", desc, nil)
+		// [CRITICAL FIX] Use UserID and negative amount
+		err = financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalRequest, -amount, payout.ID, "payout_request", desc, nil)
 		if err != nil {
 			return err
 		}
@@ -620,7 +629,12 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 		
 		// Debit Merchant
 		descPay := fmt.Sprintf("Pembayaran Kulakan: %s", req.ID)
-		if err := financeSvc.ProcessTransaction(tx, merchantID, models.WalletMerchant, models.TxRestockPayment, -req.TotalPrice, req.ID, "restock", descPay, nil); err != nil {
+		// [CRITICAL FIX] Get UserID
+		var merchant models.Merchant
+		if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
+			return err
+		}
+		if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxRestockPayment, -req.TotalPrice, req.ID, "restock", descPay, nil); err != nil {
 			return err
 		}
 

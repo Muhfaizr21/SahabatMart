@@ -24,6 +24,7 @@ const (
 	TxWithdrawalCompleted WalletTransactionType = "withdrawal_completed"
 	TxWithdrawalRejected  WalletTransactionType = "withdrawal_rejected"
 	TxPlatformFee         WalletTransactionType = "platform_fee"
+	TxPlatformFeeReversed WalletTransactionType = "platform_fee_reversed"
 	TxRefundDeduction     WalletTransactionType = "refund_deduction"
 	TxBonus               WalletTransactionType = "bonus"
 	TxAdjustment          WalletTransactionType = "adjustment"

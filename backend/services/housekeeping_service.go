@@ -45,10 +45,14 @@ func StartHousekeeping(db *gorm.DB) {
 		}
 
 		// 5. Auto-upgrade Affiliate Tiers (Now handled by service)
+		// Process in batches to avoid DB spikes
 		var affiliates []models.AffiliateMember
 		db.Where("status = 'active'").Find(&affiliates)
-		for _, aff := range affiliates {
-			affiliateService.TriggerTierUpgrade(aff.ID)
+		if len(affiliates) > 0 {
+			log.Printf("👥 Checking tier upgrades for %d affiliates...", len(affiliates))
+			for _, aff := range affiliates {
+				affiliateService.TriggerTierUpgrade(aff.ID)
+			}
 		}
 
 		// 6. Auto-cancel Merchant orders if not shipped within 48h

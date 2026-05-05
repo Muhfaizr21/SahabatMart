@@ -17,6 +17,23 @@ type SkinPreTest struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
+type SkinAnalysisResult struct {
+	SkinScore       int      `json:"skin_score"`       // Skala 1-10
+	EmotionScore    int      `json:"emotion_score"`    // Skala 1-10
+	Redness         int      `json:"redness"`          // 0-100%
+	AcneCount       int      `json:"acne_count"`       // Jumlah blemish
+	Moisture        int      `json:"moisture"`         // 0-100%
+	SkinType        string   `json:"skin_type"`
+	SkinTone        string   `json:"skin_tone"`
+	PrimaryConcern  string   `json:"primary_concern"`
+	Summary         string   `json:"summary"`
+	Recommendations []string `json:"recommendations"`
+	PositiveNotes   string   `json:"positive_notes"`
+	HealingMessage  string   `json:"healing_message"`
+	AIProvider      string   `json:"ai_provider"`
+	IsMock          bool     `json:"is_mock"`
+}
+
 // SkinProgress - Tracking mingguan selfie & kondisi emosional
 type SkinProgress struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
@@ -28,6 +45,7 @@ type SkinProgress struct {
 	RednessScore   int       `json:"redness_score"`   // Hasil Analisis AI (%)
 	AcneCount      int       `json:"acne_count"`      // Hasil Analisis AI (Jumlah)
 	Notes          string    `gorm:"type:text" json:"notes"`
+	AllowMarketing bool      `gorm:"default:false" json:"allow_marketing"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -91,6 +109,87 @@ type SkinCommunityComment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (SkinCommunityGroup) TableName() string   { return "skin_community_groups" }
-func (SkinCommunityPost) TableName() string    { return "skin_community_posts" }
-func (SkinCommunityComment) TableName() string { return "skin_community_comments" }
+// --- DYNAMIC JOURNEY CONFIGURATION (ADMIN MANAGED) ---
+
+// SkinJourneyProgram - Program type (Essential, Advanced, Intensive)
+type SkinJourneyProgram struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"type:varchar(100);not null" json:"name"` // Essential Basic, Advanced, Intensive
+	Description string    `gorm:"type:text" json:"description"`
+	Level       int       `json:"level"` // 1: Essential, 2: Advanced, 3: Intensive
+	StepCount   int       `json:"step_count"`
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// SkinJourneyStep - Individual step definition (e.g., Cleanse, Tone)
+type SkinJourneyStep struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"type:varchar(100);not null" json:"name"` // Cleanse, Tone, Serum, etc.
+	Icon         string    `gorm:"type:varchar(50)" json:"icon"`
+	Description  string    `gorm:"type:text" json:"description"`
+	Order        int       `json:"order"`
+	IsActive     bool      `gorm:"default:true" json:"is_active"`
+}
+
+// SkinJourneyRoutine - Link Program -> Step + Timing
+type SkinJourneyRoutine struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	ProgramID   uint      `gorm:"index" json:"program_id"`
+	StepID      uint      `gorm:"index" json:"step_id"`
+	Step        SkinJourneyStep `gorm:"foreignKey:StepID" json:"step"`
+	TimeOfDay   string    `gorm:"type:varchar(20)" json:"time_of_day"` // morning, evening, both, weekly
+	DurationMin int       `json:"duration_min"`
+	Instructions string    `gorm:"type:text" json:"instructions"` // Markdown instructions
+}
+
+// SkinJourneyProductMapping - Dynamic product recommendation logic
+type SkinJourneyProductMapping struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	ProductID   string    `gorm:"type:uuid;index" json:"product_id"`
+	Product     Product   `gorm:"foreignKey:ProductID" json:"product"`
+	SkinType    string    `gorm:"type:varchar(50)" json:"skin_type"`    // oily, dry, etc.
+	SkinConcern string    `gorm:"type:varchar(100)" json:"skin_concern"` // acne, dark spots, etc.
+	StepType    string    `gorm:"type:varchar(50)" json:"step_type"`    // matches SkinJourneyStep.Name
+	Priority    int       `gorm:"default:0" json:"priority"`
+}
+
+// SkinJourneyAIConfig - Dynamic Prompts for AI Analysis & Recommendations
+type SkinJourneyAIConfig struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Stage       string    `gorm:"type:varchar(50);uniqueIndex" json:"stage"` // analysis, set_program, recommendation, cara_pakai
+	PromptTitle string    `gorm:"type:varchar(200)" json:"prompt_title"`
+	PromptBody  string    `gorm:"type:text" json:"prompt_body"`
+	SystemRole  string    `gorm:"type:text" json:"system_role"`
+	Temperature float64   `gorm:"default:0.1" json:"temperature"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// UserSkinJourney - User's active program and progress
+type UserSkinJourney struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	UserID          string    `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	ProgramID       uint      `json:"program_id"`
+	Program         SkinJourneyProgram `gorm:"foreignKey:ProgramID" json:"program"`
+	CurrentWeek     int       `gorm:"default:1" json:"current_week"`
+	StartedAt       time.Time `json:"started_at"`
+	IsCompleted     bool      `gorm:"default:false" json:"is_completed"`
+	SkinProfileJSON string    `gorm:"type:text" json:"skin_profile_json"` // Stores AI results
+}
+
+// SkinStepLog - Mencatat penyelesaian langkah rutin harian
+type SkinStepLog struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    string    `gorm:"type:uuid;not null;index" json:"user_id"`
+	RoutineID uint      `gorm:"index" json:"routine_id"`
+	Completed bool      `gorm:"default:true" json:"completed"`
+	CreatedAt time.Time `gorm:"index" json:"created_at"` // Digunakan untuk filter hari ini
+}
+
+func (SkinJourneyProgram) TableName() string        { return "skin_journey_programs" }
+func (SkinJourneyStep) TableName() string           { return "skin_journey_steps" }
+func (SkinJourneyRoutine) TableName() string        { return "skin_journey_routines" }
+func (SkinJourneyProductMapping) TableName() string { return "skin_journey_product_mappings" }
+func (SkinJourneyAIConfig) TableName() string       { return "skin_journey_ai_configs" }
+func (UserSkinJourney) TableName() string           { return "user_skin_journeys" }
+func (SkinStepLog) TableName() string               { return "skin_step_logs" }

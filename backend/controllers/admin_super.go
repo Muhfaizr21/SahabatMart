@@ -738,19 +738,20 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 		SELECT u.id, u.email, u.status, up.full_name, u.role,
 		       am.ref_code, mt.name AS tier_name, mt.color AS tier_color, mt.level AS tier_level,
 		       mt.base_commission_rate AS comm_rate,
-		       am.total_earned, am.total_withdrawn, am.total_clicks, am.total_conversions,
+		       w.total_earned, w.total_withdrawn, am.total_clicks, am.total_conversions,
 		       am.bank_name, am.status AS aff_status, am.created_at AS joined_at,
-		       GREATEST(am.total_earned - am.total_withdrawn, 0) AS balance,
+		       w.balance,
 		       COALESCE(ats.team_turnover, 0) AS team_turnover,
 		       COALESCE(ats.monthly_turnover, 0) AS monthly_turnover,
 		       COALESCE(ats.team_downlines, 0) AS team_downlines
 		FROM users u
 		LEFT JOIN user_profiles up ON up.user_id = u.id
 		INNER JOIN affiliate_members am ON am.user_id = u.id
+		LEFT JOIN wallets w ON w.owner_id = u.id AND w.owner_type = 'affiliate'
 		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
 		LEFT JOIN affiliate_turnover_snapshots ats ON ats.affiliate_id = am.id
 		WHERE ` + whereClause + `
-		ORDER BY am.total_earned DESC
+		ORDER BY w.total_earned DESC
 		LIMIT ? OFFSET ?
 	`
 	args = append(args, limit, offset)
@@ -2262,7 +2263,12 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 				return fmt.Errorf("affiliate withdrawal not found")
 			}
 
-			// Map status
+			// [CRITICAL FIX] Get UserID from AffiliateMember
+			var member models.AffiliateMember
+			if err := tx.First(&member, "id = ?", wd.AffiliateID).Error; err != nil {
+				return fmt.Errorf("affiliate member not found")
+			}
+
 			newStatus := req.Status
 			if newStatus == "paid" {
 				newStatus = "completed"
@@ -2278,21 +2284,23 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 			}
 
 			if newStatus == "completed" {
-				desc := fmt.Sprintf("Penarikan Komisi Berhasil: %s", req.Note)
-				if err := financeSvc.ProcessTransaction(tx, wd.AffiliateID, models.WalletAffiliate, models.TxWithdrawalCompleted, wd.Amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
+				// Record audit/history transaction for user (already deducted in Request)
+				desc := fmt.Sprintf("Penarikan Komisi Berhasil (Final): %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxWithdrawalCompleted, 0, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
 					return err
 				}
 				tx.Model(&models.AffiliateMember{}).Where("id = ?", wd.AffiliateID).
 					Update("total_withdrawn", gorm.Expr("total_withdrawn + ?", wd.Amount))
 				
-				// [Financial Sync] Deduct from Platform (HQ) Wallet
+				// [Financial Sync] Record Outflow from Platform (HQ) Wallet
 				platformDesc := fmt.Sprintf("Pembayaran Payout Affiliate %s: %s", wd.AffiliateID, wd.ID)
 				if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -wd.Amount, wd.ID, "payout_outflow", platformDesc, nil); err != nil {
 					return err
 				}
 			} else if newStatus == "rejected" {
-				desc := fmt.Sprintf("Penarikan Komisi Ditolak: %s", req.Note)
-				if err := financeSvc.ProcessTransaction(tx, wd.AffiliateID, models.WalletAffiliate, models.TxWithdrawalRejected, wd.Amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
+				// [CRITICAL FIX] Refund the money to user wallet
+				desc := fmt.Sprintf("Penarikan Komisi Ditolak (Refund): %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxWithdrawalRejected, wd.Amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
 					return err
 				}
 			}
@@ -2301,6 +2309,13 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 			if err := tx.First(&payout, "id = ?", req.PayoutID).Error; err != nil {
 				return fmt.Errorf("payout request not found")
 			}
+
+			// [CRITICAL FIX] Get UserID from Merchant
+			var merchant models.Merchant
+			if err := tx.First(&merchant, "id = ?", payout.MerchantID).Error; err != nil {
+				return fmt.Errorf("merchant not found")
+			}
+
 			payout.Status = req.Status
 			payout.Note = req.Note
 			payout.ProcessedAt = &now
@@ -2310,21 +2325,20 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 			}
 
 			if req.Status == "paid" {
-				desc := fmt.Sprintf("Penarikan Merchant Berhasil: %s", req.Note)
-				if err := financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalCompleted, payout.Amount, payout.ID, "payout_request", desc, nil); err != nil {
+				desc := fmt.Sprintf("Penarikan Merchant Berhasil (Final): %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalCompleted, 0, payout.ID, "payout_request", desc, nil); err != nil {
 					return err
 				}
 				
-				// [Financial Sync] Deduct from Platform (HQ) Wallet
+				// [Financial Sync] Record Outflow from Platform (HQ) Wallet
 				platformDesc := fmt.Sprintf("Pembayaran Payout Merchant %s: %s", payout.MerchantID, payout.ID)
 				if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -payout.Amount, payout.ID, "payout_outflow", platformDesc, nil); err != nil {
 					return err
 				}
-			} else if req.Status == "approved" {
-				// Approved only changes status in DB, no movement because it's already in PendingBalance
 			} else if req.Status == "rejected" {
-				desc := fmt.Sprintf("Penarikan Merchant Ditolak: %s", req.Note)
-				if err := financeSvc.ProcessTransaction(tx, payout.MerchantID, models.WalletMerchant, models.TxWithdrawalRejected, payout.Amount, payout.ID, "payout_request", desc, nil); err != nil {
+				// [CRITICAL FIX] Refund the money to user wallet
+				desc := fmt.Sprintf("Penarikan Merchant Ditolak (Refund): %s", req.Note)
+				if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalRejected, payout.Amount, payout.ID, "payout_request", desc, nil); err != nil {
 					return err
 				}
 			}
@@ -2529,8 +2543,15 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 		if req.Status == "refund_approved" {
 			finance := services.NewFinanceService(ac.DB)
 			desc := fmt.Sprintf("Refund Sengketa: %s", dispute.OrderID)
+			
+			// [CRITICAL FIX] Get UserID from Merchant
+			var merchant models.Merchant
+			if err := tx.First(&merchant, "id = ?", dispute.MerchantID).Error; err != nil {
+				return err
+			}
+
 			// Deduct from merchant pending/balance
-			if err := finance.ProcessTransaction(tx, dispute.MerchantID, models.WalletMerchant, models.TxRefundDeduction, dispute.Amount, fmt.Sprintf("%d", dispute.ID), "dispute", desc, nil); err != nil {
+			if err := finance.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxRefundDeduction, dispute.Amount, fmt.Sprintf("%d", dispute.ID), "dispute", desc, nil); err != nil {
 				return err
 			}
 			
@@ -2546,7 +2567,14 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 		} else if req.Status == "rejected" {
 			finance := services.NewFinanceService(ac.DB)
 			desc := fmt.Sprintf("Sengketa Ditolak, Dana Diteruskan: %s", dispute.OrderID)
-			if err := finance.ReleaseEscrow(tx, dispute.MerchantID, models.WalletMerchant, dispute.Amount, fmt.Sprintf("%d", dispute.ID), desc); err != nil {
+			
+			// [CRITICAL FIX] Get UserID from Merchant
+			var merchant models.Merchant
+			if err := tx.First(&merchant, "id = ?", dispute.MerchantID).Error; err != nil {
+				return err
+			}
+
+			if err := finance.ReleaseEscrow(tx, merchant.UserID, models.WalletMerchant, dispute.Amount, fmt.Sprintf("%d", dispute.ID), desc); err != nil {
 				return err
 			}
 			// Update Order status back to Completed so the funds are no longer heavily contested

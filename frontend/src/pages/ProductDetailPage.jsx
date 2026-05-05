@@ -4,6 +4,8 @@ import { PUBLIC_API_BASE, BUYER_API_BASE, fetchJson, formatImage } from '../lib/
 import { isAuthenticated } from '../lib/auth';
 import { ShoppingBag } from 'lucide-react';
 import ReviewSection from '../components/ReviewSection';
+import RecommendedSection from '../components/RecommendedSection';
+import { useCart } from '../context/CartContext';
 
 function StarRating({ rating, size = 16 }) {
   return (
@@ -111,6 +113,12 @@ export default function ProductDetailPage() {
           const productList = Array.isArray(pd) ? pd : (pd.data || []);
           const filtered = productList.filter(p => String(p.id) !== String(productData.id) && p.category === productData.category).slice(0, 4);
           setRelated(filtered);
+
+          // [Akuglow AI Recommendation] Track Interaction
+          fetchJson(`${PUBLIC_API_BASE}/products/track`, {
+            method: 'POST',
+            body: JSON.stringify({ product_id: productData.id, type: 'view' })
+          }).catch(e => console.error('Tracking failed:', e));
         }
       } catch (err) {
         console.error(err);
@@ -153,6 +161,12 @@ export default function ProductDetailPage() {
       });
       window.dispatchEvent(new Event('cartUpdate'));
       window.dispatchEvent(new Event('openCart'));
+
+      // [Akuglow AI Recommendation] Track Interaction
+      fetchJson(`${PUBLIC_API_BASE}/products/track`, {
+        method: 'POST',
+        body: JSON.stringify({ product_id: product.id, type: 'click' })
+      }).catch(() => {});
     } catch (err) {
       alert('Gagal menambah ke keranjang: ' + err.message);
       setAddedToCart(false);
@@ -218,6 +232,7 @@ export default function ProductDetailPage() {
   );
 
   return (
+    <>
     <main className="bg-gray-50/30 min-h-screen pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:py-12 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
@@ -546,7 +561,7 @@ export default function ProductDetailPage() {
            
            <div className="max-w-4xl">
              {activeTab === 'Deskripsi' && (
-                <div className="text-gray-500 leading-loose text-lg font-medium space-y-6">
+                <div className="text-slate-600 leading-relaxed text-base sm:text-lg whitespace-pre-wrap">
                     {product.description || 'Tidak ada deskripsi detail untuk produk ini.'}
                 </div>
              )}
@@ -586,5 +601,9 @@ export default function ProductDetailPage() {
         </div>
       </div>
     </main>
+    <div className="border-t border-gray-100 bg-gray-50/30">
+      <RecommendedSection limit={5} title="Mungkin Kamu Juga Suka 💖" subtitle="Produk lain yang sesuai dengan selera kamu." />
+    </div>
+  </>
   );
 }

@@ -47,6 +47,8 @@ func SeedAll(db *gorm.DB) {
 		"skin_pre_tests", "skin_progress", "skin_journals", 
 		"skin_community_posts", "skin_community_comments", "skin_community_likes",
 		"skin_community_groups", "skin_educations",
+		"skin_journey_programs", "skin_journey_steps", "skin_journey_routines",
+		"skin_journey_product_mappings", "skin_journey_ai_configs", "user_skin_journeys",
 		"inventories", "restock_requests", "restock_items",
 		"product_tier_commissions", "product_variants", "products", "vouchers", "banners",
 		"affiliate_members", "membership_tiers", "categories", "brands",
@@ -61,19 +63,19 @@ func SeedAll(db *gorm.DB) {
 	fmt.Println("  -> Database Cleaned & Schema Adjusted.")
 
 	// 1. Seed Categories
-	categories := seedCategories(db)
+	_ = seedCategories(db)
 
 	// 2. Seed Membership Tiers
 	seedTiers(db)
 
 	// 3. Seed Users & Merchants
-	merchants := seedUsers(db)
+	_ = seedUsers(db)
 
 	// 4. Seed Suppliers
 	suppliers := seedSuppliers(db)
 
-	// 5. Seed 40 Products
-	seedProducts(db, categories, merchants, suppliers)
+	// 5. Seed Official Akuglow Products
+	SeedAkuglowProducts(db)
 
 	// 6. Finalize Warehouse (Master Inventory & Stock Mutations)
 	finalizeWarehouse(db, suppliers)
@@ -88,6 +90,9 @@ func SeedAll(db *gorm.DB) {
 
 	// 8. Mega Simulation (200+ Users & Real Activity)
 	SeedRealWorldData(db)
+
+	// 9. Akuglow Skin Journey Dynamic Data
+	SeedSkinJourney(db)
 
 	fmt.Println("✅ Seeding Completed! 200+ Users created with full ecosystem activity.")
 }

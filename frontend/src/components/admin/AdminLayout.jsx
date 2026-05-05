@@ -83,12 +83,7 @@ const rawMenu = [
   },
 
   { type: 'label', text: 'Sistem & Keamanan' },
-  {
-    type: 'item', name: 'Skin Journey', icon: 'bx-leaf',
-    children: [
-      { name: 'Monitoring Jurnal', path: '/admin/skin-journey', perm: 'view_analytics' },
-    ]
-  },
+  { type: 'item', name: 'Skin Journey', icon: 'bx-leaf', path: '/admin/skin-journey', perm: 'view_analytics' },
   { type: 'item', name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit', perm: 'settings_view' },
   { type: 'item', name: 'Logistik & Kurir', icon: 'bxs-truck', path: '/admin/logistics', perm: 'settings_view' },
   { type: 'item', name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security', perm: 'settings_view' },

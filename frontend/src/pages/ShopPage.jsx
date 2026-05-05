@@ -189,17 +189,51 @@ export default function ShopPage() {
     }, { replace: true });
   };
 
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
   return (
     <main className="bg-gray-50 min-h-screen">
-      {/* Page Header Removed */}
+      {/* Mobile Sticky Filter Bar */}
+      <div className="lg:hidden sticky top-[104px] z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex flex-col">
+          {/* Category Pills Slider */}
+          <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto no-scrollbar scroll-smooth">
+            {allCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border ${
+                  activeCategory === cat
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
+                    : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* Quick Stats & Filter Toggle */}
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50/50 border-t border-gray-50">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              {filtered.length} Produk <span className="mx-1">•</span> {activeCategory}
+            </p>
+            <button 
+              onClick={() => setIsMobileFilterOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-black text-gray-700 shadow-sm active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">tune</span>
+              Filter & Urutkan
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar Filter */}
-          <aside className="lg:w-64 flex-shrink-0 space-y-6">
-            {/* Category */}
+          {/* Desktop Sidebar Filter (Hidden on Mobile) */}
+          <aside className="hidden lg:block lg:w-64 flex-shrink-0 space-y-6">
             <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-              <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2">
+              <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
                 <span className="w-1 h-4 bg-blue-600 rounded-full"></span>
                 Kategori
               </h3>
@@ -225,9 +259,8 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {/* Price Range */}
             <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-              <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2">
+              <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
                 <span className="w-1 h-4 bg-blue-600 rounded-full"></span>
                 Rentang Harga
               </h3>
@@ -252,33 +285,8 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {/* Category Filter (Sidebar Sync) */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Kategori</h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                {allCategories.map(cat => (
-                  <label key={cat} className="flex items-center gap-3 cursor-pointer group">
-                    <div className="relative flex items-center justify-center">
-                      <input 
-                        type="radio" 
-                        name="category_filter"
-                        checked={activeCategory === cat}
-                        onChange={() => setActiveCategory(cat)}
-                        className="peer appearance-none w-5 h-5 border-2 border-gray-200 rounded-full checked:border-blue-600 transition-all"
-                      />
-                      <div className="absolute w-2.5 h-2.5 bg-blue-600 rounded-full scale-0 peer-checked:scale-100 transition-transform"></div>
-                    </div>
-                    <span className={`text-sm transition-colors ${activeCategory === cat ? 'text-blue-700 font-bold' : 'text-gray-600 group-hover:text-gray-900 font-medium'}`}>
-                      {cat}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Rating Filter */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Rating</h3>
+              <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Rating</h3>
               <div className="space-y-3">
                 {[5,4,3,2,1].map(r => (
                   <label key={r} className="flex items-center gap-3 cursor-pointer group">
@@ -300,57 +308,36 @@ export default function ShopPage() {
                     </div>
                   </label>
                 ))}
-                {minRating > 0 && (
-                  <button 
-                    onClick={() => setMinRating(0)}
-                    className="text-[10px] text-red-500 font-bold hover:underline mt-2 ml-8"
-                  >
-                    Reset Rating
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Brands */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Brand</h3>
+              <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Brand</h3>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                {allBrands.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic">Tidak ada brand tersedia</p>
-                ) : (
-                  allBrands.map(brand => (
-                    <label key={brand} className="flex items-center gap-3 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        className="accent-blue-600 w-4 h-4 rounded" 
-                        checked={selectedBrands.includes(brand)}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedBrands(prev => [...prev, brand]);
-                          else setSelectedBrands(prev => prev.filter(b => b !== brand));
-                        }}
-                      />
-                      <span className={`text-sm transition-colors ${selectedBrands.includes(brand) ? 'text-blue-700 font-bold' : 'text-gray-600 group-hover:text-gray-900 font-medium'}`}>
-                        {brand}
-                      </span>
-                    </label>
-                  ))
-                )}
+                {allBrands.map(brand => (
+                  <label key={brand} className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      className="accent-blue-600 w-4 h-4 rounded" 
+                      checked={selectedBrands.includes(brand)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedBrands(prev => [...prev, brand]);
+                        else setSelectedBrands(prev => prev.filter(b => b !== brand));
+                      }}
+                    />
+                    <span className={`text-sm transition-colors ${selectedBrands.includes(brand) ? 'text-blue-700 font-bold' : 'text-gray-600 group-hover:text-gray-900 font-medium'}`}>
+                      {brand}
+                    </span>
+                  </label>
+                ))}
               </div>
-              {selectedBrands.length > 0 && (
-                <button 
-                  onClick={() => setSelectedBrands([])}
-                  className="text-[10px] text-red-500 font-bold hover:underline mt-4"
-                >
-                  Reset Brand
-                </button>
-              )}
             </div>
           </aside>
 
           {/* Main Content */}
           <div className="flex-1">
-            {/* Toolbar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-sm">
+            {/* Desktop Toolbar (Hidden on Mobile) */}
+            <div className="hidden lg:flex items-center justify-between gap-6 mb-10 bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-sm">
               <div className="flex items-center gap-6">
                  <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-100">
                     <button 
@@ -367,8 +354,7 @@ export default function ShopPage() {
                     </button>
                  </div>
                  
-                 {/* Local Search Input */}
-                 <div className="relative flex-1 min-w-[200px] lg:min-w-[300px]">
+                 <div className="relative flex-1 min-w-[300px]">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black">search</span>
                     <input 
                       type="text"
@@ -377,19 +363,11 @@ export default function ShopPage() {
                       value={searchTerm}
                       onChange={(e) => handleLocalSearch(e.target.value)}
                     />
-                    {searchTerm && (
-                      <button 
-                        onClick={() => handleLocalSearch('')}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg font-black">close</span>
-                      </button>
-                    )}
                  </div>
               </div>
 
               <div className="flex items-center gap-4">
-                 <p className="text-sm font-bold text-gray-400 hidden lg:block">Urutkan:</p>
+                 <p className="text-sm font-bold text-gray-400">Urutkan:</p>
                  <select 
                    value={sortBy}
                    onChange={(e) => setSortBy(e.target.value)}
@@ -397,6 +375,20 @@ export default function ShopPage() {
                  >
                    {sortOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                  </select>
+              </div>
+            </div>
+
+            {/* Mobile Local Search Bar (Visible on Mobile) */}
+            <div className="lg:hidden mb-6">
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black">search</span>
+                <input 
+                  type="text"
+                  placeholder="Cari di toko ini..."
+                  className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl outline-none focus:border-blue-500 transition-all text-sm font-bold shadow-sm"
+                  value={searchTerm}
+                  onChange={(e) => handleLocalSearch(e.target.value)}
+                />
               </div>
             </div>
 
@@ -619,6 +611,113 @@ export default function ShopPage() {
           </div>
         </div>
       </div>
+      {/* Mobile Filter Modal */}
+      {isMobileFilterOpen && (
+        <div className="fixed inset-0 z-[100] lg:hidden">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileFilterOpen(false)}></div>
+          
+          {/* Modal Content */}
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-xl font-black text-gray-900">Filter & Urutkan</h2>
+                <button onClick={() => setIsMobileFilterOpen(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+                  <span className="material-symbols-outlined font-black">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-10 pb-10">
+                {/* Sort Section */}
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Urutkan Produk</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {sortOptions.map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => setSortBy(opt)}
+                        className={`py-3 px-4 rounded-2xl text-xs font-bold transition-all border ${
+                          sortBy === opt ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Price Section */}
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rentang Harga</h3>
+                  <div className="space-y-3">
+                    {priceRanges.map((range, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPriceRange(i)}
+                        className={`w-full text-left py-4 px-5 rounded-2xl text-sm font-bold transition-all border ${
+                          priceRange === i ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rating Section */}
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rating Minimal</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {[5,4,3,2,1].map(r => (
+                      <button
+                        key={r}
+                        onClick={() => setMinRating(prev => prev === r ? 0 : r)}
+                        className={`py-3 px-5 rounded-2xl flex items-center gap-2 transition-all border ${
+                          minRating === r ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
+                        }`}
+                      >
+                        <span className="text-xs font-black">{r}</span>
+                        <StarRating rating={r} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Brand Section */}
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Pilih Brand</h3>
+                  <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 no-scrollbar">
+                    {allBrands.map(brand => (
+                      <button
+                        key={brand}
+                        onClick={() => {
+                          if (selectedBrands.includes(brand)) setSelectedBrands(prev => prev.filter(b => b !== brand));
+                          else setSelectedBrands(prev => [...prev, brand]);
+                        }}
+                        className={`py-3 px-4 rounded-2xl text-[11px] font-bold transition-all border text-center ${
+                          selectedBrands.includes(brand) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {brand}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-6 border-t border-gray-100 mt-4">
+                <button 
+                  onClick={() => setIsMobileFilterOpen(false)}
+                  className="w-full bg-[#0A0A0B] text-white py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
+                >
+                  Tampilkan {filtered.length} Produk
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

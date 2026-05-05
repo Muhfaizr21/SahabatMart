@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 

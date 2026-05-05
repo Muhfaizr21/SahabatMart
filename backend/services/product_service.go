@@ -157,3 +157,80 @@ func (s *ProductService) SyncAllInventories() (int64, error) {
 	}
 	return count, nil
 }
+
+// TrackInteraction mencatat interaksi user (view/pencet)
+func (s *ProductService) TrackInteraction(userID, productID, interactionType string) error {
+	interaction := models.UserInteraction{
+		UserID:    userID,
+		ProductID: productID,
+		Type:      interactionType,
+	}
+	return s.DB.Create(&interaction).Error
+}
+
+// GetRecommendedProducts mengambil rekomendasi produk berbasis perilaku user (algoritma pencet)
+func (s *ProductService) GetRecommendedProducts(userID string, limit int) ([]models.Product, error) {
+	var recommended []models.Product
+
+	if userID != "" {
+		// 1. Ambil histori kategori & brand dari interaksi user terakhir
+		var userPreferences []struct {
+			Category string
+			Brand    string
+			Freq     int
+		}
+
+		s.DB.Raw(`
+			SELECT p.category, p.brand, COUNT(*) as freq
+			FROM user_interactions ui
+			JOIN products p ON ui.product_id = p.id
+			WHERE ui.user_id = ?
+			GROUP BY p.category, p.brand
+			ORDER BY freq DESC
+			LIMIT 5
+		`, userID).Scan(&userPreferences)
+
+		if len(userPreferences) > 0 {
+			// 2. Cari produk dari kategori & brand tersebut yang belum pernah diklik user
+			var categories []string
+			for _, pref := range userPreferences {
+				categories = append(categories, pref.Category)
+			}
+
+			s.DB.Where("category IN ? AND status = ?", categories, "active").
+				Where("id NOT IN (SELECT product_id FROM user_interactions WHERE user_id = ?)", userID).
+				Order("rating DESC, created_at DESC").
+				Limit(limit).
+				Find(&recommended)
+		}
+	}
+
+	// 3. Jika rekomendasi masih kosong atau kurang (user baru/anonim), ambil produk populer
+	if len(recommended) < limit {
+		var popular []models.Product
+		needed := limit - len(recommended)
+		
+		excludeIDs := []string{"dummy-id"} // prevent empty slice error in NOT IN
+		for _, p := range recommended {
+			excludeIDs = append(excludeIDs, p.ID)
+		}
+
+		// Produk populer berdasarkan jumlah interaksi terbanyak secara global
+		s.DB.Raw(`
+			SELECT p.* 
+			FROM products p
+			LEFT JOIN (
+				SELECT product_id, COUNT(*) as total_views 
+				FROM user_interactions 
+				GROUP BY product_id
+			) stats ON p.id = stats.product_id
+			WHERE p.status = 'active' AND p.id NOT IN ?
+			ORDER BY COALESCE(stats.total_views, 0) DESC, p.rating DESC
+			LIMIT ?
+		`, excludeIDs, needed).Scan(&popular)
+
+		recommended = append(recommended, popular...)
+	}
+
+	return recommended, nil
+}

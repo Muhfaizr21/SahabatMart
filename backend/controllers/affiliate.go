@@ -58,34 +58,39 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	affiliate, clicks, err := ac.Service.GetDashboardStats(affiliateID)
-	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data dashboard")
+	// 1. Ambil data affiliate dan user id
+	var affiliateMember models.AffiliateMember
+	if err := ac.DB.Preload("Tier").First(&affiliateMember, "id = ?", affiliateID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Data affiliate tidak ditemukan")
+		return
+	}
+	userID := affiliateMember.UserID
+
+	// 2. Ambil data Wallet sebagai source of truth finansial
+	var wallet models.Wallet
+	if err := ac.DB.Where("owner_id = ? AND owner_type = ?", userID, models.WalletAffiliate).FirstOrCreate(&wallet, models.Wallet{
+		OwnerID:   userID,
+		OwnerType: models.WalletAffiliate,
+		Balance:   0,
+		IsActive:  true,
+	}).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data dompet")
 		return
 	}
 
-	// [Sync Fix] Total komisi by status (approved = bisa tarik, pending = dalam hold, paid = sudah cair)
-	var approvedCommission, pendingCommission, paidCommission float64
-	ac.DB.Model(&models.AffiliateCommission{}).
-		Where("affiliate_id = ? AND status = 'approved'", affiliateID).
-		Select("COALESCE(SUM(amount), 0)").Scan(&approvedCommission)
-	ac.DB.Model(&models.AffiliateCommission{}).
-		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
-		Select("COALESCE(SUM(amount), 0)").Scan(&pendingCommission)
-	ac.DB.Model(&models.AffiliateCommission{}).
-		Where("affiliate_id = ? AND status = 'paid'", affiliateID).
-		Select("COALESCE(SUM(amount), 0)").Scan(&paidCommission)
+	// 3. Unify Counts dengan logic Eligibility Service (Real-time)
+	isEligible, activeMitraCount, teamTurnover, reqMitra, reqTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
 
-	// [Sync Fix] Total order dari orders table (bukan commission count)
-	var totalOrders, totalOrdersPending int64
-	ac.DB.Model(&models.Order{}).
-		Where("affiliate_id = ? AND status NOT IN ?", affiliateID, []string{"cancelled", "expired"}).
-		Count(&totalOrders)
-	ac.DB.Model(&models.Order{}).
-		Where("affiliate_id = ? AND status = 'pending_payment'", affiliateID).
-		Count(&totalOrdersPending)
+	// 4. Hitung Order Stats (Total & Pending)
+	var totalOrders, pendingOrders int64
+	ac.DB.Model(&models.Order{}).Where("affiliate_id = ? AND status NOT IN ('cancelled', 'expired')", affiliateID).Count(&totalOrders)
+	ac.DB.Model(&models.Order{}).Where("affiliate_id = ? AND status = 'pending_payment'", affiliateID).Count(&pendingOrders)
 
-	// Monthly commission chart (last 6 months)
+	// 5. Total Downline (Semua, bukan cuma yang aktif)
+	var totalDownline int64
+	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownline)
+
+	// 6. Data Grafik Bulanan (6 bulan terakhir)
 	type MonthlyData struct {
 		Month      string  `json:"month"`
 		Commission float64 `json:"commission"`
@@ -104,78 +109,41 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		ORDER BY DATE_TRUNC('month', created_at) ASC
 	`, affiliateID).Scan(&monthlyData)
 
-	// Recent commissions
-	type RecentComm struct {
-		ID          string    `json:"id"`
-		OrderID     string    `json:"order_id"`
-		ProductName string    `json:"product_name"`
-		Amount      float64   `json:"amount"`
-		Status      string    `json:"status"`
-		CreatedAt   time.Time `json:"created_at"`
-	}
-	var recentCommissions []RecentComm
+	// 7. Komisi Terbaru
+	var recentCommissions []map[string]interface{}
 	ac.DB.Raw(`
-		SELECT ac.id, ac.order_id, 
-		       COALESCE(p.name, 'Produk') AS product_name,
-		       ac.amount, ac.status, ac.created_at
+		SELECT ac.id, ac.amount, ac.status, ac.created_at, p.name as product_name, ac.order_id
 		FROM affiliate_commissions ac
-		LEFT JOIN products p ON p.id::text = ac.product_id::text
+		LEFT JOIN products p ON p.id = ac.product_id
 		WHERE ac.affiliate_id = ?
 		ORDER BY ac.created_at DESC
 		LIMIT 5
 	`, affiliateID).Scan(&recentCommissions)
 
-	// [Sync Fix] Use Wallet as Single Source of Truth
-	var wallet models.Wallet
-	ac.DB.Where("owner_id = ? AND owner_type = ?", affiliateID, models.WalletAffiliate).First(&wallet)
-
-	// Available balance is now directly from Wallet
-	availableBalance := wallet.Balance
-	pendingCommission = wallet.PendingBalance
-
-	// [Sync Fix] Total downline — cari by id, bukan user_id
-	var totalDownline int64
-	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownline)
-
-	// Fetch next tier requirements for dynamic progress bar
-	var nextTier models.MembershipTier
-	reqMitra := 10
-	reqTurnover := 0.0
-	if affiliate.MembershipTierID > 0 {
-		var currentTier models.MembershipTier
-		if err := ac.DB.First(&currentTier, "id = ?", affiliate.MembershipTierID).Error; err == nil {
-			if err := ac.DB.Where("level > ? AND is_active = true", currentTier.Level).Order("level ASC").First(&nextTier).Error; err == nil {
-				reqMitra = nextTier.MinActiveMitra
-				reqTurnover = nextTier.MinMonthlyTurnover
-			} else {
-				// Sudah tier maksimum
-				reqMitra = currentTier.MinActiveMitra
-				reqTurnover = currentTier.MinMonthlyTurnover
-			}
-		}
-	}
-
+	// 8. Final Response
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"affiliate": affiliate,
+		"status":    "success",
+		"affiliate": affiliateMember,
 		"stats": map[string]interface{}{
-			"total_clicks":         clicks,
+			"balance":              wallet.Balance,
+			"pending_commission":   wallet.PendingBalance,
+			"total_commission":     wallet.TotalEarned,
+			"paid_commission":      wallet.TotalWithdrawn,
+			"approved_commission":  wallet.TotalEarned - wallet.TotalWithdrawn,
+			"total_clicks":         affiliateMember.TotalClicks,
 			"total_orders":         totalOrders,
-			"total_orders_pending": totalOrdersPending,
-			// Komisi
-			"total_commission":     approvedCommission + pendingCommission + paidCommission,
-			"approved_commission":  approvedCommission,
-			"pending_commission":   pendingCommission,
-			"paid_commission":      paidCommission,
-			"balance":              availableBalance,
-			// Tim
+			"total_orders_pending": pendingOrders,
 			"total_downline":       totalDownline,
-			"active_mitra_count":   affiliate.ActiveMitraCount,
-			"team_monthly_turnover": affiliate.TeamMonthlyTurnover,
-			"next_tier_req_mitra":  reqMitra,
+			"active_mitra_count":   activeMitraCount,
+			"active_mitra":         activeMitraCount, // Alias for Stats.jsx
+			"team_monthly_turnover": teamTurnover,
+			"monthly_turnover":      teamTurnover,    // Alias for Stats.jsx
+			"next_tier_req_mitra":    reqMitra,
 			"next_tier_req_turnover": reqTurnover,
+			"is_eligible":          isEligible,
 		},
-		"monthly_data":       monthlyData,
 		"recent_commissions": recentCommissions,
+		"monthly_data":       monthlyData,
 	})
 }
 
@@ -436,22 +404,10 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Calculate available balance (approved earnings - withdrawn/in-flight)
-	var totalApproved, totalInFlight float64
-	ac.DB.Model(&models.AffiliateCommission{}).
-		Where("affiliate_id = ? AND status = 'approved'", affiliateID).
-		Select("COALESCE(SUM(amount), 0)").Scan(&totalApproved)
-	ac.DB.Raw(`SELECT COALESCE(SUM(amount), 0) FROM affiliate_withdrawals WHERE affiliate_id = ? AND status IN ('pending','processed')`, affiliateID).Scan(&totalInFlight)
-
-	availableBalance := totalApproved - totalInFlight
-
 	// Minimum withdrawal amount (from config, tier or default 50000)
 	configSvc := services.NewConfigService(ac.DB)
 	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
-	
 	if affiliate.Tier != nil && affiliate.Tier.MinWithdrawalAmount > 0 {
-		// Tier setting takes precedence if it's stricter? 
-		// Actually usually config is global, let's take the higher one.
 		if affiliate.Tier.MinWithdrawalAmount > minWithdrawal {
 			minWithdrawal = affiliate.Tier.MinWithdrawalAmount
 		}
@@ -462,22 +418,45 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if req.Amount > availableBalance {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Saldo tidak mencukupi. Saldo tersedia: Rp %.0f", availableBalance))
-		return
-	}
+	// [CRITICAL FIX] Use Wallet for balance check & deduction
+	financeSvc := services.NewFinanceService(ac.DB)
+	var wd models.AffiliateWithdrawal
+	
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Get Wallet with Lock
+		wallet, err := financeSvc.GetWallet(affiliate.UserID, models.WalletAffiliate)
+		if err != nil {
+			return fmt.Errorf("gagal mendapatkan data dompet")
+		}
 
-	// Create withdrawal using model
-	wd := models.AffiliateWithdrawal{
-		AffiliateID:       affiliateID,
-		Amount:            req.Amount,
-		BankName:          affiliate.BankName,
-		BankAccountNumber: affiliate.BankAccountNumber,
-		BankAccountName:   affiliate.BankAccountName,
-		Status:            "pending",
-	}
-	if err := ac.DB.Create(&wd).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat permintaan penarikan")
+		if wallet.Balance < req.Amount {
+			return fmt.Errorf("saldo tidak mencukupi. Saldo tersedia: Rp %.0f", wallet.Balance)
+		}
+
+		// 2. Create withdrawal record
+		wd = models.AffiliateWithdrawal{
+			AffiliateID:       affiliateID,
+			Amount:            req.Amount,
+			BankName:          affiliate.BankName,
+			BankAccountNumber: affiliate.BankAccountNumber,
+			BankAccountName:   affiliate.BankAccountName,
+			Status:            "pending",
+		}
+		if err := tx.Create(&wd).Error; err != nil {
+			return err
+		}
+
+		// 3. Deduct from wallet immediately (Request phase)
+		desc := fmt.Sprintf("Permintaan Penarikan: %s", wd.ID)
+		if err := financeSvc.ProcessTransaction(tx, affiliate.UserID, models.WalletAffiliate, models.TxWithdrawalRequest, -req.Amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -580,30 +559,87 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get downlines list
+	// Pagination & Search params
+	page := utils.QueryInt(r, "page", 1)
+	limit := utils.QueryInt(r, "limit", 10)
+	search := r.URL.Query().Get("search")
+	offset := (page - 1) * limit
+
+	// Get full downlines list using Recursive CTE
 	type DownlineRow struct {
-		UserID    string    `json:"user_id"`
-		FullName  string    `json:"full_name"`
-		Status    string    `json:"status"`
-		JoinedAt  time.Time `json:"joined_at"`
-		Turnover  float64   `json:"turnover"`
+		UserID       string    `json:"user_id"`
+		FullName     string    `json:"full_name"`
+		Status       string    `json:"status"`
+		JoinedAt     time.Time `json:"joined_at"`
+		Turnover     float64   `json:"turnover"`
+		Level        int       `json:"level"`
+		ReferrerName string    `json:"referrer_name"`
 	}
 	var downlines []DownlineRow
+	
+	searchQuery := "%" + search + "%"
+	
+	// Query with Recursive CTE to get all levels + Filter + Pagination
 	ac.DB.Raw(`
-		SELECT am.user_id, up.full_name, am.status, am.created_at as joined_at,
+		WITH RECURSIVE team AS (
+			-- Anchor: Direct downlines (Level 1)
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, am.status, am.created_at, 
+			       1 as level, CAST('Anda' AS VARCHAR(150)) as referrer_name
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			WHERE am.upline_id = ?
+			
+			UNION ALL
+			
+			-- Recursive member: Indirect downlines (Level 2+)
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, am.status, am.created_at, 
+			       t.level + 1, CAST(t.full_name AS VARCHAR(150)) as referrer_name
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			JOIN team t ON am.upline_id = t.id
+			WHERE t.level < 10 
+		)
+		SELECT t.user_id, t.full_name, t.status, t.created_at as joined_at,
+		       t.level, t.referrer_name,
 		       COALESCE(SUM(o.subtotal), 0) as turnover
-		FROM affiliate_members am
-		LEFT JOIN user_profiles up ON up.user_id = am.user_id
-		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
-		WHERE am.upline_id = ?
-		GROUP BY am.user_id, up.full_name, am.status, am.created_at
-		ORDER BY am.created_at DESC
-	`, affiliateID).Scan(&downlines)
+		FROM team t
+		LEFT JOIN orders o ON o.affiliate_id = t.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
+		WHERE t.full_name ILIKE ? OR t.user_id::text ILIKE ?
+		GROUP BY t.user_id, t.full_name, t.status, t.created_at, t.level, t.referrer_name
+		ORDER BY t.level ASC, t.created_at DESC
+		LIMIT ? OFFSET ?
+	`, affiliateID, searchQuery, searchQuery, limit, offset).Scan(&downlines)
+
+	// Count total filtered
+	var totalFiltered int64
+	ac.DB.Raw(`
+		WITH RECURSIVE team AS (
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, 1 as level
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			WHERE am.upline_id = ?
+			UNION ALL
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, t.level + 1
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			JOIN team t ON am.upline_id = t.id
+			WHERE t.level < 10
+		)
+		SELECT COUNT(*) FROM team WHERE full_name ILIKE ? OR user_id::text ILIKE ?
+	`, affiliateID, searchQuery, searchQuery).Scan(&totalFiltered)
+
+	totalPages := (totalFiltered + int64(limit) - 1) / int64(limit)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_downlines": totalDownlines,
 		"team_turnover":   teamTurnover,
 		"downlines":       downlines,
+		"pagination": map[string]interface{}{
+			"current_page":   page,
+			"limit":          limit,
+			"total_items":    totalFiltered,
+			"total_pages":    totalPages,
+		},
 	})
 }
 
