@@ -233,10 +233,10 @@ export default function SkinJourneyAdmin() {
     try {
       // Save all related details (Phases, Benefits, etc.)
       const promises = [
-        ...phaseData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/phase/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
-        ...benefitData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/benefit/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
-        ...warningData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/warning/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
-        ...faqData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/faq/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...phaseData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/phases/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...benefitData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/benefits/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...warningData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/warnings/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...faqData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/faqs/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
       ];
       await Promise.all(promises);
       toast.success("Flow 2: Detailed Descriptions Saved!");
@@ -247,7 +247,7 @@ export default function SkinJourneyAdmin() {
   const handleSaveFlow3And4 = async () => {
     try {
       const promises = productStepData.map(item => {
-        return fetchJson(`${API_BASE}/api/admin/skin/programs/product-step/save`, {
+        return fetchJson(`${API_BASE}/api/admin/skin/programs/product-steps/save`, {
           method: 'POST',
           body: JSON.stringify({
             ...item,

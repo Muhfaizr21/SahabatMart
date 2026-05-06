@@ -1012,10 +1012,10 @@ func (sc *SkinController) AdminGetProgramDetail(w http.ResponseWriter, r *http.R
 	}
 	var program models.SkinJourneyProgram
 	err := sc.DB.
-		Preload("Phases", func(db *gorm.DB) *gorm.DB { return db.Order("`order` asc") }).
-		Preload("Benefits", func(db *gorm.DB) *gorm.DB { return db.Order("`order` asc") }).
-		Preload("Warnings", func(db *gorm.DB) *gorm.DB { return db.Order("`order` asc") }).
-		Preload("FAQs", func(db *gorm.DB) *gorm.DB { return db.Order("`order` asc") }).
+		Preload("Phases", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("Benefits", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("Warnings", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("FAQs", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
 		Preload("ProductSteps", func(db *gorm.DB) *gorm.DB { return db.Order("step_number asc") }).
 		Preload("ProductSteps.Product").
 		First(&program, id).Error
@@ -1234,7 +1234,7 @@ func (sc *SkinController) AdminDeleteProductStep(w http.ResponseWriter, r *http.
 
 func (sc *SkinController) AdminGetSteps(w http.ResponseWriter, r *http.Request) {
 	var list []models.SkinJourneyStep
-	sc.DB.Where("is_active = ?", true).Order("`order` asc").Find(&list)
+	sc.DB.Where("is_active = ?", true).Order("\"order\" asc").Find(&list)
 	utils.JSONResponse(w, http.StatusOK, list)
 }
 
