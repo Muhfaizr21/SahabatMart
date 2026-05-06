@@ -247,23 +247,43 @@ export default function SkinJourneyAdmin() {
   const handleSaveFlow3And4 = async () => {
     try {
       const promises = productStepData.map(item => {
+        // Prepare clean payload for backend
+        const payload = {
+          id: item.id || 0,
+          program_id: activeProgram.id,
+          product_id: item.product_id,
+          step_number: parseInt(item.step_number) || 0,
+          step_name: item.step_name,
+          phase: item.phase || 'both',
+          frequency: item.frequency || 'daily',
+          purpose: item.purpose || '',
+          amount_text: item.amount_text || '',
+          amount_note: item.amount_note || '',
+          step_by_step_json: typeof item.step_by_step_json === 'string' ? item.step_by_step_json : JSON.stringify(item.step_by_step_json || []),
+          tips_json: typeof item.tips_json === 'string' ? item.tips_json : JSON.stringify(item.tips_json || []),
+          visual_refs_json: typeof item.visual_refs_json === 'string' ? item.visual_refs_json : JSON.stringify(item.visual_refs_json || []),
+          common_mistakes_json: typeof item.common_mistakes_json === 'string' ? item.common_mistakes_json : JSON.stringify(item.common_mistakes_json || []),
+          mechanism_explain: item.mechanism_explain || '',
+          wait_time_secs: parseInt(item.wait_time_secs) || 0,
+          additional_notes: item.additional_notes || '',
+          order: item.order || 0
+        };
+
         return fetchJson(`${API_BASE}/api/admin/skin/programs/product-steps/save`, {
           method: 'POST',
-          body: JSON.stringify({
-            ...item,
-            program_id: activeProgram.id,
-            step_by_step_json: typeof item.step_by_step_json === 'string' ? item.step_by_step_json : JSON.stringify(item.step_by_step_json),
-            tips_json: typeof item.tips_json === 'string' ? item.tips_json : JSON.stringify(item.tips_json),
-            visual_refs_json: typeof item.visual_refs_json === 'string' ? item.visual_refs_json : JSON.stringify(item.visual_refs_json),
-          })
+          body: JSON.stringify(payload)
         });
       });
+      
       await Promise.all(promises);
       toast.success("Flow 3 & 4: Products & Instructions Saved!");
       setWizardStep(0);
       setActiveProgram(null);
       loadData();
-    } catch (err) { toast.error("Gagal simpan Flow 3/4"); }
+    } catch (err) { 
+      console.error("Save Flow 3/4 Error:", err);
+      toast.error(`Gagal simpan Flow 3/4: ${err.message}`); 
+    }
   };
 
   const handleDeleteProgram = async (id) => {
@@ -911,26 +931,26 @@ export default function SkinJourneyAdmin() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
                         <div>
                           <FieldLabel>Dosage/Amount</FieldLabel>
-                          <input style={A.input} placeholder="e.g. Seukuran biji jagung" value={ps.dosage_amount} onChange={e => {
-                            const newPS = [...productStepData]; newPS[idx].dosage_amount = e.target.value; setProductStepData(newPS);
+                          <input style={A.input} placeholder="e.g. Seukuran biji jagung" value={ps.amount_text} onChange={e => {
+                            const newPS = [...productStepData]; newPS[idx].amount_text = e.target.value; setProductStepData(newPS);
                           }} />
                         </div>
                         <div>
-                          <FieldLabel>Wait Time (Min)</FieldLabel>
-                          <input type="number" style={A.input} value={ps.wait_time_minutes} onChange={e => {
-                            const newPS = [...productStepData]; newPS[idx].wait_time_minutes = parseInt(e.target.value); setProductStepData(newPS);
+                          <FieldLabel>Wait Time (Secs)</FieldLabel>
+                          <input type="number" style={A.input} value={ps.wait_time_secs} onChange={e => {
+                            const newPS = [...productStepData]; newPS[idx].wait_time_secs = parseInt(e.target.value); setProductStepData(newPS);
                           }} />
                         </div>
                         <div>
                           <FieldLabel>Mechanism</FieldLabel>
-                          <input style={A.input} placeholder="e.g. Keratolytic" value={ps.mechanism} onChange={e => {
-                            const newPS = [...productStepData]; newPS[idx].mechanism = e.target.value; setProductStepData(newPS);
+                          <input style={A.input} placeholder="e.g. Keratolytic" value={ps.mechanism_explain} onChange={e => {
+                            const newPS = [...productStepData]; newPS[idx].mechanism_explain = e.target.value; setProductStepData(newPS);
                           }} />
                         </div>
                       </div>
-                      <FieldLabel>Pro Tips</FieldLabel>
-                      <textarea style={{ ...A.input, height: 60 }} placeholder="Tips khusus untuk user..." value={ps.pro_tips} onChange={e => {
-                        const newPS = [...productStepData]; newPS[idx].pro_tips = e.target.value; setProductStepData(newPS);
+                      <FieldLabel>Pro Tips / Additional Notes</FieldLabel>
+                      <textarea style={{ ...A.input, height: 60 }} placeholder="Tips khusus untuk user..." value={ps.additional_notes} onChange={e => {
+                        const newPS = [...productStepData]; newPS[idx].additional_notes = e.target.value; setProductStepData(newPS);
                       }} />
                     </div>
                   ))}
