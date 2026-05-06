@@ -209,7 +209,7 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 
 		// [Akuglow Sync] Notify Admin
 		if s.Notif != nil {
-			adminID := "00000000-0000-0000-0000-000000000001"
+			adminID := models.AdminID
 			s.Notif.Push(adminID, "admin", "restock_requested", "🛒 Permintaan Kulakan Baru", 
 				fmt.Sprintf("Merchant %s mengajukan permintaan kulakan baru (%d item).", merchantID, totalQty), 
 				"/admin/merchants/restock")

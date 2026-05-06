@@ -1,30 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { A, PageHeader, FieldLabel } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
 const API = ADMIN_API_BASE;
-
-/* ─── Shared Style Tokens ────────────────────────────────── */
-const S = {
-  page: { fontFamily: "'Inter', sans-serif", maxWidth: 900, margin: '0 auto', paddingTop: 20 },
-  label: { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 6 },
-  input: { width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', transition: 'border 0.2s' },
-  select: { width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', appearance: 'auto' },
-  textarea: { width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, color: '#334155', background: '#f8fafc', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' },
-  card: { background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' },
-  sectionTitle: { fontSize: 12, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.6px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 },
-  divider: { height: 1, background: '#f1f5f9', margin: '24px 0' },
-  btnPrimary: { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, border: 'none', background: '#4361ee', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s' },
-  btnSecondary: { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 14, fontWeight: 600, cursor: 'pointer', textDecoration: 'none' },
-};
-
-const FormField = ({ label, children }) => (
-  <div>
-    <label style={S.label}>{label}</label>
-    {children}
-  </div>
-);
 
 export default function AdminAddProduct() {
   const navigate = useNavigate();
@@ -73,7 +53,6 @@ export default function AdminAddProduct() {
   }, []);
 
   const handleAttrChange = (name, val, checked) => {
-    console.log(`Attribute Change: ${name} -> ${val} (Checked: ${checked})`);
     setSelectedAttrs(prev => {
       const currentVals = Array.isArray(prev[name]) ? prev[name] : [];
       let nextVals;
@@ -83,10 +62,7 @@ export default function AdminAddProduct() {
         nextVals = currentVals.filter(v => v !== val);
       }
       const next = { ...prev, [name]: nextVals };
-      
-      // Sync with main product state using functional update
       setP(pPrev => ({ ...pPrev, attributes: JSON.stringify(next) }));
-      
       return next;
     });
   };
@@ -94,29 +70,51 @@ export default function AdminAddProduct() {
   const handleUpload = async (e, type = 'main') => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran gambar maksimal 5MB');
+      return;
+    }
+
     setUploading(true);
     const formData = new FormData();
     formData.append('image', file);
+
     try {
       const resp = await fetch(`${API}/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: formData
       });
-      const data = await resp.json();
-      if (data.url) {
+      
+      if (!resp.ok) {
+        throw new Error(`HTTP Error ${resp.status}`);
+      }
+      
+      const responseData = await resp.json();
+      // FIX: Handle nested JSONResponse wrapper from Go backend
+      const uploadedUrl = responseData?.data?.url || responseData?.url;
+
+      if (uploadedUrl) {
         if (type === 'main') {
-           setP(prev => ({ ...prev, image: data.url }));
+           setP(prev => ({ ...prev, image: uploadedUrl }));
         } else {
            setGallery(prev => {
-             const next = [...prev, data.url];
+             const next = [...prev, uploadedUrl];
              setP(pPrev => ({ ...pPrev, images: JSON.stringify(next) }));
              return next;
            });
         }
+        toast.success('Gambar berhasil diunggah');
+      } else {
+        throw new Error(responseData.message || 'Gagal mengunggah gambar');
       }
-    } catch (err) { alert('Upload gagal: ' + err.message); }
-    finally { setUploading(false); }
+    } catch (err) { 
+      toast.error('Upload gagal: ' + err.message); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
   const removeGalleryImage = (idx) => {
@@ -129,6 +127,9 @@ export default function AdminAddProduct() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!p.name) return toast.error('Nama produk wajib diisi!');
+    if (!p.price || p.price <= 0) return toast.error('Harga jual tidak boleh nol!');
+
     setSaving(true);
     fetchJson(`${API}/products/add`, {
       method: 'POST',
@@ -145,118 +146,144 @@ export default function AdminAddProduct() {
     .finally(() => setSaving(false));
   };
 
-  const focusStyle = { borderColor: '#818cf8' };
-
   return (
-    <div style={S.page} className="fade-in pb-5">
-      {/* Breadcrumb */}
-      <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
-        <Link to="/admin/products" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>Katalog Produk</Link>
-        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 20 }} />
-        <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>Tambah Produk Baru</span>
+    <div style={{ ...A.page, maxWidth: 900, margin: '0 auto', paddingBottom: 40 }} className="fade-in">
+      <style>{`
+        .form-card {
+          background: #fff; border-radius: 16px; border: 1px solid #e2e8f0; 
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden;
+        }
+        .form-body { padding: 32px; }
+        .section-title {
+          font-size: 13px; font-weight: 800; color: #64748b; letter-spacing: 0.5px; 
+          text-transform: uppercase; display: flex; align-items: center; gap: 8px; margin-bottom: 20px;
+        }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .form-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .form-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .divider { height: 1px; background: #f1f5f9; margin: 32px 0; }
+        
+        .attr-pill {
+           display: flex; align-items: center; gap: 8px; cursor: pointer; 
+           font-size: 13px; font-weight: 600; color: #64748b;
+           background: #fff; padding: 8px 16px; border-radius: 12px; transition: all 0.2s;
+           border: 1.5px solid #e2e8f0;
+        }
+        .attr-pill.active {
+           color: #4361ee; background: rgba(67, 97, 238, 0.05);
+           border-color: #4361ee; box-shadow: 0 2px 4px rgba(67, 97, 238, 0.1);
+        }
+
+        .toggle-switch {
+          position: relative; display: inline-block; width: 50px; height: 26px; flex-shrink: 0;
+        }
+        .toggle-slider {
+          position: absolute; cursor: pointer; inset: 0; border-radius: 26px; transition: 0.3s; background: #e2e8f0;
+        }
+        .toggle-slider::before {
+          content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; 
+          border-radius: 50%; background: #fff; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .toggle-switch input:checked + .toggle-slider { background: #10b981; }
+        .toggle-switch input:checked + .toggle-slider::before { left: 27px; }
+
+        @media (max-width: 768px) {
+          .form-body { padding: 20px; }
+          .form-grid, .form-grid-3, .form-grid-4 { grid-template-columns: 1fr; gap: 16px; }
+          .form-card { border-radius: 12px; }
+        }
+      `}</style>
+
+      {/* Breadcrumb & Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        <Link to="/admin/products" style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color='#4361ee'} onMouseLeave={e => e.target.style.color='#0f172a'}>
+          <i className="bx bx-left-arrow-alt" style={{ marginRight: 8, verticalAlign: 'middle' }}/> 
+          Katalog
+        </Link>
+        <i className="bx bx-chevron-right" style={{ color: '#cbd5e1', fontSize: 24 }} />
+        <span style={{ fontSize: 16, color: '#64748b', fontWeight: 600 }}>Tambah Produk</span>
       </div>
 
-      <div style={S.card}>
-        {/* Card Header */}
-        <div style={{ padding: '20px 28px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #4361ee, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#fff' }}>
+      <div className="form-card">
+        <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg, #4361ee, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#fff', boxShadow: '0 4px 10px rgba(67, 97, 238, 0.2)' }}>
             <i className="bx bx-package" />
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Konfigurasi Produk Baru</div>
-            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>Publikasi langsung ke toko · Isi semua detail dengan lengkap</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Konfigurasi Produk Baru</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Publikasi langsung ke toko & set konfigurasi affiliate</div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: 28 }}>
+        <form onSubmit={handleSubmit} className="form-body">
           {/* Basic Info */}
-          <div style={S.sectionTitle}>
-            <i className="bx bx-info-circle" style={{ fontSize: 15 }} /> Informasi Dasar
-          </div>
-          <div style={{ display: 'grid', gap: 18 }}>
-            <FormField label="Nama Produk Lengkap">
-              <input style={S.input} type="text" placeholder="Contoh: Apple MacBook M3 Pro 14-inch" required
-                value={p.name} onChange={e => setP(prev => ({ ...prev, name: e.target.value }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
-            <FormField label="Deskripsi Produk">
-              <textarea style={{ ...S.textarea, minHeight: 90 }} rows={3} placeholder="Jelaskan fitur, spesifikasi, dan keunggulan produk..."
-                value={p.description} onChange={e => setP(prev => ({ ...prev, description: e.target.value }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
+          <div className="section-title"><i className="bx bx-info-circle" /> Informasi Dasar</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div>
+              <FieldLabel>Nama Produk Lengkap</FieldLabel>
+              <input style={A.input} type="text" placeholder="Contoh: Apple MacBook M3 Pro 14-inch" required
+                value={p.name} onChange={e => setP(prev => ({ ...prev, name: e.target.value }))} />
+            </div>
+            <div>
+              <FieldLabel>Deskripsi Produk</FieldLabel>
+              <textarea style={{ ...A.textarea, minHeight: 100 }} rows={4} placeholder="Jelaskan fitur, spesifikasi, dan keunggulan produk..."
+                value={p.description} onChange={e => setP(prev => ({ ...prev, description: e.target.value }))} />
+            </div>
           </div>
 
-          <div style={S.divider} />
+          <div className="divider" />
 
           {/* Classification */}
-          <div style={S.sectionTitle}>
-            <i className="bx bx-category" style={{ fontSize: 15 }} /> Klasifikasi & Inventori
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 18 }}>
-            <FormField label="Kategori">
-              <select style={S.select} value={p.category} onChange={e => setP(prev => ({ ...prev, category: e.target.value }))}>
+          <div className="section-title"><i className="bx bx-category" /> Klasifikasi & Inventori</div>
+          <div className="form-grid-4">
+            <div>
+              <FieldLabel>Kategori</FieldLabel>
+              <select style={A.select} value={p.category} onChange={e => setP(prev => ({ ...prev, category: e.target.value }))}>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
-            </FormField>
-            <FormField label="Merek / Brand">
-              <select style={S.select} value={p.brand} onChange={e => setP(prev => ({ ...prev, brand: e.target.value }))}>
+            </div>
+            <div>
+              <FieldLabel>Merek / Brand</FieldLabel>
+              <select style={A.select} value={p.brand} onChange={e => setP(prev => ({ ...prev, brand: e.target.value }))}>
                 <option value="">— Tanpa Brand —</option>
                 {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
-            </FormField>
-            <FormField label="SKU / Kode Barcode">
-              <input style={S.input} type="text" placeholder="Scan atau input SKU..."
-                value={p.sku} onChange={e => setP(prev => ({ ...prev, sku: e.target.value }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
-            <FormField label="Stok Tersedia">
-              <input style={S.input} type="number" min={0} value={p.stock}
-                onChange={e => setP(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
-            <FormField label="Berat Produk (Gram)">
-              <input style={S.input} type="number" min={0} value={p.weight}
-                onChange={e => setP(prev => ({ ...prev, weight: parseInt(e.target.value) || 0 }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
+            </div>
+            <div>
+              <FieldLabel>SKU / Kode Barcode</FieldLabel>
+              <input style={A.input} type="text" placeholder="Kode Unik SKU..."
+                value={p.sku} onChange={e => setP(prev => ({ ...prev, sku: e.target.value }))} />
+            </div>
+            <div>
+              <FieldLabel>Berat (Gram)</FieldLabel>
+              <input style={A.input} type="number" min={0} value={p.weight} placeholder="0"
+                onChange={e => setP(prev => ({ ...prev, weight: parseInt(e.target.value) || 0 }))} />
+            </div>
           </div>
 
           {/* Dynamic Attributes */}
           {attrs.length > 0 && (
             <>
-              <div style={S.divider} />
-              <div style={{ ...S.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="bx bx-list-check" style={{ fontSize: 15 }} /> Atribut Produk (Dinamis)
-                </div>
-                <button type="button" onClick={() => window.location.href='/admin/attributes'} 
-                  style={{ padding: '4px 12px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 11, cursor: 'pointer', color: '#4361ee', fontWeight: 600 }}>
-                  <i className="bx bx-cog" style={{ marginRight: 4 }} /> Kelola Master
-                </button>
+              <div className="divider" />
+              <div className="section-title" style={{ justifyContent: 'space-between' }}>
+                <span><i className="bx bx-list-check" /> Atribut Produk (Dinamis)</span>
+                <Link to="/admin/attributes" style={{ padding: '6px 14px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 11, color: '#4361ee', fontWeight: 700, textDecoration: 'none' }}>
+                  <i className="bx bx-cog" /> Master Atribut
+                </Link>
               </div>
-              <div style={{ display: 'grid', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {attrs.map(a => (
-                  <div key={a.id}>
-                    <label style={S.label}>{a.name}</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, background: '#f8fafc', padding: '12px 16px', borderRadius: 12, border: '1.5px solid #e2e8f0' }}>
+                  <div key={a.id} style={{ background: '#f8fafc', padding: '16px', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                    <FieldLabel style={{ marginBottom: 12, color: '#334155' }}>{a.name}</FieldLabel>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                       {a.values?.split(',').map((v, idx) => {
                         const val = v.trim();
                         const isChecked = Array.isArray(selectedAttrs[a.name]) && selectedAttrs[a.name].includes(val);
                         return (
-                          <label key={`${a.id}-${val}-${idx}`} className="form-check-label" 
-                            style={{ 
-                              display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', 
-                              fontSize: 12, fontWeight: 600, 
-                              color: isChecked ? '#4361ee' : '#64748b',
-                              background: isChecked ? 'rgba(67, 97, 238, 0.06)' : '#fff',
-                              padding: '6px 14px', borderRadius: 10, transition: 'all 0.2s',
-                              border: `1.5px solid ${isChecked ? '#4361ee' : '#e2e8f0'}`,
-                              boxShadow: isChecked ? '0 2px 4px rgba(67, 97, 238, 0.1)' : 'none'
-                            }}>
-                            <input type="checkbox" checked={isChecked} onChange={e => handleAttrChange(a.name, val, e.target.checked)} 
-                              style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
-                            {isChecked && <i className="bx bx-check-circle" style={{ fontSize: 14 }} />}
-                            <span>{val}</span>
+                          <label key={`${a.id}-${val}-${idx}`} className={`attr-pill ${isChecked ? 'active' : ''}`}>
+                            <input type="checkbox" checked={isChecked} onChange={e => handleAttrChange(a.name, val, e.target.checked)} style={{ display: 'none' }} />
+                            {isChecked && <i className="bx bx-check-circle" style={{ fontSize: 16 }} />}
+                            {val}
                           </label>
                         );
                       })}
@@ -267,152 +294,169 @@ export default function AdminAddProduct() {
             </>
           )}
 
-          <div style={S.divider} />
+          <div className="divider" />
 
           {/* Media & Price */}
-          <div style={S.sectionTitle}>
-            <i className="bx bx-dollar-circle" style={{ fontSize: 15 }} /> Harga & Media
+          <div className="section-title"><i className="bx bx-dollar-circle" /> Harga & Media</div>
+          <div className="form-grid-3">
+            <div>
+              <FieldLabel>Harga Jual (IDR)</FieldLabel>
+              <input style={{ ...A.input, fontWeight: 800, color: '#4361ee', fontSize: 16 }} type="number" min={0} value={p.price}
+                onChange={e => setP(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))} />
+            </div>
+            <div>
+              <FieldLabel>Harga Coret (Diskon/Opsional)</FieldLabel>
+              <input style={A.input} type="number" placeholder="0" min={0}
+                value={p.old_price} onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))} />
+            </div>
+            <div>
+              <FieldLabel>Modal / COGS (IDR)</FieldLabel>
+              <input style={{ ...A.input, color: '#ef4444', fontWeight: 700 }} type="number" min={0} value={p.cogs}
+                onChange={e => setP(prev => ({ ...prev, cogs: parseFloat(e.target.value) || 0 }))} />
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 18, alignItems: 'start' }}>
-            <FormField label="Harga Jual (IDR)">
-              <input style={{ ...S.input, fontWeight: 700, color: '#4361ee' }} type="number" min={0} value={p.price}
-                onChange={e => setP(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
-            <FormField label="Harga Coret (Diskon/Opsional)">
-              <input style={S.input} type="text" placeholder="Contoh: 150000"
-                value={p.old_price} onChange={e => setP(prev => ({ ...prev, old_price: parseFloat(e.target.value) || 0 }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
-            <FormField label="Modal Awal / COGS (IDR)">
-              <input style={{ ...S.input, color: '#ef4444', fontWeight: 600 }} type="number" min={0} value={p.cogs}
-                onChange={e => setP(prev => ({ ...prev, cogs: parseFloat(e.target.value) || 0 }))}
-                onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-            </FormField>
-            <FormField label="Foto Utama">
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input style={{ ...S.input, flex: 1 }} type="text" placeholder="https://..." value={p.image}
-                  onChange={e => setP(prev => ({ ...prev, image: e.target.value }))}
-                  onFocus={e => e.target.style.borderColor = '#818cf8'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#64748b', fontSize: 20 }}>
-                  {uploading ? <div className="spinner-border spinner-border-sm" /> : <i className="bx bx-upload" />}
-                  <input type="file" className="d-none" accept="image/*" onChange={e => handleUpload(e, 'main')} />
-                </label>
-              </div>
+          
+          <div style={{ marginTop: 20 }}>
+            <FieldLabel>Foto Utama Produk</FieldLabel>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {p.image && (
-                <img src={formatImage(p.image)} alt="" style={{ marginTop: 10, width: 80, height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                <div style={{ padding: 4, border: '2px solid #e2e8f0', borderRadius: 12, background: '#fff' }}>
+                  <img src={formatImage(p.image)} alt="" style={{ width: 80, height: 80, borderRadius: 8, objectFit: 'cover' }} />
+                </div>
               )}
-            </FormField>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input style={{ ...A.input, flex: 1 }} type="text" placeholder="https:// atau Upload..." value={p.image}
+                    onChange={e => setP(prev => ({ ...prev, image: e.target.value }))} />
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#4361ee', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='#eef2ff'} onMouseLeave={e => e.currentTarget.style.background='#f8fafc'}>
+                    {uploading ? <i className="bx bx-loader-alt bx-spin" style={{ fontSize: 20 }} /> : <i className="bx bx-upload" style={{ fontSize: 20 }} />}
+                    <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'main')} />
+                  </label>
+                </div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>Format: JPG, PNG, WEBP. Maks: 5MB.</div>
+              </div>
+            </div>
           </div>
 
-          <div style={S.divider} />
+          <div style={{ marginTop: 24 }}>
+            <FieldLabel>Galeri Produk / Slider (Opsional)</FieldLabel>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+              {gallery.map((img, idx) => (
+                <div key={idx} style={{ position: 'relative', width: 80, height: 80, borderRadius: 10, overflow: 'hidden', border: '1.5px solid #e2e8f0' }}>
+                  <img src={formatImage(img)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button type="button" onClick={() => removeGalleryImage(idx)} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: 'rgba(239,68,68,0.9)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <i className="bx bx-x" style={{ fontSize: 16 }} />
+                  </button>
+                </div>
+              ))}
+              <label style={{ width: 80, height: 80, borderRadius: 10, border: '2px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', background: '#f8fafc', transition: 'all 0.2s' }} onMouseEnter={e => {e.currentTarget.style.borderColor='#4361ee'; e.currentTarget.style.color='#4361ee';}} onMouseLeave={e => {e.currentTarget.style.borderColor='#cbd5e1'; e.currentTarget.style.color='#64748b';}}>
+                {uploading ? <i className="bx bx-loader-alt bx-spin" style={{ fontSize: 24 }} /> : <i className="bx bx-image-add" style={{ fontSize: 26 }} />}
+                <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Tambah</span>
+                <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'gallery')} />
+              </label>
+            </div>
+          </div>
+
+          <div className="divider" />
 
           {/* Commission Configuration */}
-          <div style={S.sectionTitle}>
-            <i className="bx bx-trending-up" style={{ fontSize: 15 }} /> Struktur Komisi & Insentif
-          </div>
-          <div style={{ background: '#f0f9ff', padding: 24, borderRadius: 16, border: '1.5px solid #bae6fd', marginBottom: 28 }}>
-             <p style={{ fontSize: 12, color: '#0369a1', fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <i className="bx bx-info-circle" /> Atur komisi khusus untuk produk ini. Jika diisi, angka ini akan mengabaikan aturan komisi tier/global.
-             </p>
-             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18 }}>
-                <FormField label="Komisi Afiliasi (%)">
-                  <input style={S.input} type="number" step="0.01" placeholder="Contoh: 10" 
+          <div className="section-title"><i className="bx bx-trending-up" /> Struktur Komisi & Afiliasi</div>
+          <div style={{ background: '#f0f9ff', padding: 24, borderRadius: 16, border: '1.5px solid #bae6fd' }}>
+             <div style={{ display: 'flex', gap: 10, marginBottom: 20, padding: '12px 16px', background: '#e0f2fe', borderRadius: 10, color: '#0369a1', fontWeight: 600, fontSize: 13, alignItems: 'center' }}>
+                <i className="bx bx-info-circle" style={{ fontSize: 18 }} /> 
+                Isi form ini untuk memberikan komisi khusus pada produk ini (mengabaikan aturan global).
+             </div>
+             
+             <div className="form-grid">
+                <div>
+                  <FieldLabel>Komisi Afiliasi Reguler (%)</FieldLabel>
+                  <input style={A.input} type="number" step="0.01" placeholder="Misal: 10" 
                     value={p.base_affiliate_fee} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee: parseFloat(e.target.value) || 0 }))} />
-                </FormField>
-                <FormField label="Komisi Afiliasi (Nominal Rp)">
-                  <input style={S.input} type="number" placeholder="Contoh: 25000" 
+                </div>
+                <div>
+                  <FieldLabel>Atau Nominal Rupiah (Rp)</FieldLabel>
+                  <input style={A.input} type="number" placeholder="Misal: 25000" 
                     value={p.base_affiliate_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee_nominal: parseFloat(e.target.value) || 0 }))} />
-                </FormField>
-                <FormField label="Fee Distribusi Merchant (%)">
-                  <input style={S.input} type="number" step="0.01" placeholder="Contoh: 5" 
+                </div>
+                <div>
+                  <FieldLabel>Fee Distribusi Agen (%)</FieldLabel>
+                  <input style={A.input} type="number" step="0.01" placeholder="Misal: 5" 
                     value={p.base_distribution_fee} onChange={e => setP(prev => ({ ...prev, base_distribution_fee: parseFloat(e.target.value) || 0 }))} />
-                </FormField>
-                 <FormField label="Fee Distribusi Merchant (Rp)">
-                  <input style={S.input} type="number" placeholder="Contoh: 15000" 
+                </div>
+                <div>
+                  <FieldLabel>Atau Nominal Rupiah (Rp)</FieldLabel>
+                  <input style={A.input} type="number" placeholder="Misal: 15000" 
                     value={p.base_distribution_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_distribution_fee_nominal: parseFloat(e.target.value) || 0 }))} />
-                </FormField>
+                </div>
              </div>
 
-             {/* Preset Selector */}
-             <div style={{ marginTop: 24 }}>
-                <FormField label="Preset Komisi Multi-Level (Upline)">
+             <div className="divider" style={{ background: '#bae6fd' }} />
+
+             <div className="form-grid">
+                <div>
+                  <FieldLabel>Preset Komisi Upline (MLM)</FieldLabel>
                   <select
                     value={p.commission_preset_id || ''}
                     onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
-                    style={{ ...S.select, borderColor: '#7c3aed' }}
+                    style={{ ...A.select, borderColor: '#7c3aed', background: '#fff' }}
                   >
-                    <option value="">-- Tidak Pakai Preset (Gunakan Tier Default) --</option>
+                    <option value="">-- Gunakan Hierarki Default --</option>
                     {presets.filter(pr => pr.is_active).map(pr => (
                       <option key={pr.id} value={pr.id}>{pr.name}</option>
                     ))}
                   </select>
-                  <p style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                    Distribusi komisi berjenjang ke upline (MLM Style).
-                  </p>
-                </FormField>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Distribusi komisi berjenjang ke upline mitra.</div>
+                </div>
 
-                <div style={{ height: 16 }} />
-
-                <FormField label="Preset Komisi Tier (Matrix)">
+                <div>
+                  <FieldLabel>Preset Membership Tier (Matrix)</FieldLabel>
                   <select
                     value={p.tier_commission_preset_id || ''}
                     onChange={e => setP(prev => ({ ...prev, tier_commission_preset_id: e.target.value || null }))}
-                    style={{ ...S.select, borderColor: '#10b981' }}
+                    style={{ ...A.select, borderColor: '#10b981', background: '#fff' }}
                   >
-                    <option value="">-- Tidak Pakai Preset (Gunakan Rate Produk) --</option>
+                    <option value="">-- Gunakan Rate Produk Default --</option>
                     {tierPresets.filter(pr => pr.is_active).map(pr => (
                       <option key={pr.id} value={pr.id}>{pr.name}</option>
                     ))}
                   </select>
-                  <p style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                    Atur rate komisi yang berbeda untuk setiap jenjang membership mitra.
-                  </p>
-                </FormField>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Atur rate komisi berbeda untuk Reseller / Agen / VIP.</div>
+                </div>
              </div>
           </div>
 
-          <div style={S.divider} />
+          <div className="divider" />
 
           {/* Publish Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderRadius: 12, background: p.status === 'active' ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${p.status === 'active' ? '#bbf7d0' : '#e2e8f0'}`, transition: 'all 0.2s' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <i className={`bx ${p.status === 'active' ? 'bx-globe' : 'bx-hide'}`} style={{ fontSize: 22, color: p.status === 'active' ? '#16a34a' : '#94a3b8' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderRadius: 14, background: p.status === 'active' ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${p.status === 'active' ? '#bbf7d0' : '#e2e8f0'}`, transition: 'all 0.3s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: p.status === 'active' ? '#dcfce7' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className={`bx ${p.status === 'active' ? 'bx-check-shield' : 'bx-hide'}`} style={{ fontSize: 24, color: p.status === 'active' ? '#16a34a' : '#64748b' }} />
+              </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: p.status === 'active' ? '#166534' : '#475569' }}>
-                  {p.status === 'active' ? 'Aktif & Tampil di Toko' : 'Simpan sebagai Draft'}
+                <div style={{ fontSize: 15, fontWeight: 800, color: p.status === 'active' ? '#166534' : '#475569' }}>
+                  {p.status === 'active' ? 'Publikasikan ke Toko' : 'Simpan ke Draft'}
                 </div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                  {p.status === 'active' ? 'Produk akan langsung terlihat oleh pembeli' : 'Produk tidak akan ditampilkan ke publik'}
+                <div style={{ fontSize: 12, color: p.status === 'active' ? '#15803d' : '#94a3b8', marginTop: 2 }}>
+                  {p.status === 'active' ? 'Pelanggan bisa langsung membeli produk ini' : 'Produk ini akan disembunyikan dari aplikasi'}
                 </div>
               </div>
             </div>
-            <label style={{ position: 'relative', display: 'inline-block', width: 52, height: 28, flexShrink: 0 }}>
-              <input type="checkbox" style={{ opacity: 0, width: 0, height: 0 }}
+            <label className="toggle-switch">
+              <input type="checkbox" style={{ display: 'none' }}
                 checked={p.status === 'active'} onChange={e => setP({ ...p, status: e.target.checked ? 'active' : 'taken_down' })} />
-              <span style={{
-                position: 'absolute', cursor: 'pointer', inset: 0, borderRadius: 28, transition: '0.3s',
-                background: p.status === 'active' ? '#22c55e' : '#e2e8f0',
-              }}>
-                <span style={{
-                  position: 'absolute', left: p.status === 'active' ? 26 : 3, top: 3,
-                  width: 22, height: 22, borderRadius: '50%', background: '#fff', transition: '0.3s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                }} />
-              </span>
+              <span className="toggle-slider"></span>
             </label>
           </div>
 
           {/* Submit */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 28 }}>
-            <button type="submit" style={S.btnPrimary} disabled={saving}
-              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-              {saving ? <div className="spinner-border spinner-border-sm" style={{ width: 18, height: 18 }} /> : <i className="bx bx-save" style={{ fontSize: 18 }} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 32, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
+            <button type="submit" style={{ ...A.btnPrimary, fontSize: 15, padding: '12px 28px' }} disabled={saving}>
+              {saving ? <i className="bx bx-loader-alt bx-spin" style={{ fontSize: 20 }} /> : <i className="bx bx-save" style={{ fontSize: 20 }} />}
               {saving ? 'Menyimpan...' : 'Simpan & Publikasikan'}
             </button>
-            <Link to="/admin/products" style={S.btnSecondary}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
-              Batal
+            <Link to="/admin/products" style={{ ...A.btnGhost, padding: '12px 24px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+              Batalkan
             </Link>
           </div>
         </form>

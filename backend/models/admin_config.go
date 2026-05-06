@@ -247,15 +247,26 @@ type Attribute struct {
 }
 
 // Voucher diskon platform atau merchant
+// VoucherType:
+//   platform     - Voucher umum berlaku untuk semua produk
+//   first_order  - Voucher pembelian pertama (1x pakai per user)
+//   group        - Voucher hanya untuk group/kategori produk tertentu
+//   product      - Voucher spesifik untuk produk tertentu
+//   cart_value   - Voucher berlaku jika nilai keranjang mencapai ambang tertentu
 type Voucher struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	MerchantID    *string   `gorm:"type:uuid;index" json:"merchant_id"` // NULL jika platform voucher
 	Code          string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"code"`
 	Title         string    `gorm:"type:varchar(100)" json:"title"`
 	Description   string    `gorm:"type:text" json:"description"`
-	DiscountType  string    `gorm:"type:varchar(20);default:'fixed'" json:"discount_type"` // "percent", "fixed"
+	VoucherType   string    `gorm:"type:varchar(30);default:'platform'" json:"voucher_type"` // platform, first_order, group, product, cart_value
+	DiscountType  string    `gorm:"type:varchar(20);default:'fixed'" json:"discount_type"`  // percent, fixed
 	DiscountValue float64   `gorm:"type:decimal(15,2)" json:"discount_value"`
-	MinOrder      float64   `gorm:"type:decimal(15,2)" json:"min_order"`
+	MaxDiscount   float64   `gorm:"type:decimal(15,2);default:0" json:"max_discount"` // Batas maksimal potongan (untuk type percent)
+	MinOrder      float64   `gorm:"type:decimal(15,2)" json:"min_order"`             // Minimum nilai keranjang
+	CartMinValue  float64   `gorm:"type:decimal(15,2);default:0" json:"cart_min_value"` // Untuk tipe cart_value
+	TargetGroup   string    `gorm:"type:varchar(100)" json:"target_group"`           // Untuk tipe group: nama kategori
+	TargetProduct string    `gorm:"type:text" json:"target_product"`                 // Untuk tipe product: comma-separated product_id
 	Quota         int       `gorm:"default:0" json:"quota"`
 	Used          int       `gorm:"default:0" json:"used"`
 	Status        string    `gorm:"type:varchar(20);default:'active'" json:"status"`

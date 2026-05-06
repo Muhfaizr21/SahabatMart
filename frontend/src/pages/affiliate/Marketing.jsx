@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 export default function MarketingMaterials() {
@@ -40,6 +40,21 @@ export default function MarketingMaterials() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const getEmbedUrl = (url) => {
+    if (!url) return '';
+    const isYoutube = url.includes('youtube.com') || url.includes('youtu.be');
+    if (isYoutube) {
+      let videoId = '';
+      if (url.includes('v=')) {
+        videoId = url.split('v=')[1].split('&')[0];
+      } else {
+        videoId = url.split('/').pop().split('?')[0];
+      }
+      return `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&mute=0`;
+    }
+    return formatImage(url);
+  };
+
   const handleCopyCode = (asset) => {
     const refCode = affiliate?.affiliate?.ref_code || 'AG-PROMO';
     const promoLink = `${window.location.origin}?ref=${refCode}`;
@@ -52,6 +67,39 @@ export default function MarketingMaterials() {
     setCopied(asset.id);
     toast.success('Link & Caption disalin!');
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleDownload = async (asset) => {
+    const url = formatImage(asset.file_url);
+    const isYoutube = asset.file_url.includes('youtube.com') || asset.file_url.includes('youtu.be');
+
+    if (isYoutube) {
+      window.open(asset.file_url, '_blank');
+      return;
+    }
+
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      
+      // Extract filename or generate one
+      const ext = asset.file_url.split('.').pop().split('?')[0] || 'file';
+      link.download = `${asset.title.replace(/\s+/g, '_')}.${ext}`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success('Unduhan dimulai!');
+    } catch (error) {
+      console.error('Download failed', error);
+      // Fallback
+      window.open(url, '_blank');
+    }
   };
 
   if (loading) return (
@@ -83,8 +131,18 @@ export default function MarketingMaterials() {
                     </div>
                     <p className="text-slate-400 text-[10px] font-medium italic leading-relaxed line-clamp-4">" {asset.caption} "</p>
                  </div>
+               ) : asset.type === 'video' ? (
+                 (asset.file_url.includes('youtube.com') || asset.file_url.includes('youtu.be')) ? (
+                    <iframe 
+                       src={getEmbedUrl(asset.file_url)} 
+                       className="w-full h-full border-0 absolute inset-0" 
+                       allowFullScreen 
+                    />
+                 ) : (
+                    <video src={formatImage(asset.file_url)} controls className="w-full h-full object-cover absolute inset-0 bg-black" />
+                 )
                ) : (
-                 <img src={asset.file_url} alt={asset.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
+                 <img src={formatImage(asset.file_url)} alt={asset.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
                )}
                
                <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest text-purple-400 border border-purple-500/30">
@@ -118,14 +176,12 @@ export default function MarketingMaterials() {
                     Lihat Full Teks
                   </button>
                 ) : (
-                  <a 
-                    href={asset.file_url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="w-full bg-slate-800 text-slate-300 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700"
+                  <button 
+                    onClick={() => handleDownload(asset)}
+                    className="w-full bg-slate-800 text-slate-300 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700 flex items-center justify-center gap-2"
                   >
-                    Download ⬇️
-                  </a>
+                    { (asset.file_url.includes('youtube.com') || asset.file_url.includes('youtu.be')) ? 'Buka YouTube ↗️' : 'Download ⬇️' }
+                  </button>
                 )}
               </div>
             </div>

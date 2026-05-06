@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 	"gorm.io/gorm"
 )
@@ -85,6 +86,29 @@ func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// [CRITICAL] Reset user journey status for a fresh start
+	// Ensure the record exists and is fully reset
+	var journey models.UserSkinJourney
+	if err := sc.DB.Where("user_id = ?", userID).First(&journey).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			sc.DB.Create(&models.UserSkinJourney{
+				UserID: userID, ProgramID: 0, IsCompleted: false, StartedAt: time.Now(), CurrentWeek: 1,
+			})
+		}
+	} else {
+		sc.DB.Model(&journey).Updates(map[string]interface{}{
+			"is_completed": false,
+			"program_id":   0, // Reset to no program
+			"current_week": 1,
+			"started_at":   time.Now(),
+			"skin_profile_json": "{}", // Clear old AI profile
+		})
+	}
+
+	// [Point 2] Clear all previous progress logs to ensure a truly fresh start
+	sc.DB.Exec("DELETE FROM skin_step_logs WHERE user_id = ?", userID)
+	sc.DB.Exec("DELETE FROM skin_progresses WHERE user_id = ?", userID)
+
 	utils.JSONResponse(w, http.StatusOK, pretest)
 }
 
@@ -131,6 +155,7 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		FirstPhoto        string                            `json:"first_photo,omitempty"`
 		LastPhoto         string                            `json:"last_photo,omitempty"`
 		ConsistencyScore  int                               `json:"consistency_score"`
+		UserName          string                            `json:"user_name"`
 	}
 
 	if pretest.ID != 0 {
@@ -139,10 +164,26 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		sc.DB.Where("user_id = ?", userID).Order("created_at desc").First(&results.PreTest)
 	}
 
+	// Fetch User Name for synchronization (Priority: PreTest > UserProfile)
+	results.UserName = results.PreTest.FullName
+	if results.UserName == "" {
+		var profile models.UserProfile
+		if err := sc.DB.Where("user_id = ?", userID).First(&profile).Error; err == nil {
+			results.UserName = profile.FullName
+		}
+	}
+	if results.UserName == "" {
+		results.UserName = "Sahabat Glow" // Fallback default
+	}
+
 	// Fetch active program
 	var userJourney models.UserSkinJourney
 	if err := sc.DB.Preload("Program").Where("user_id = ?", userID).Order("id desc").First(&userJourney).Error; err == nil {
-		results.Program = &userJourney.Program
+		log.Printf("🔍 [SkinJourney] Data fetch for user %s: ProgramID=%d, IsCompleted=%v", userID, userJourney.ProgramID, userJourney.IsCompleted)
+		if userJourney.ProgramID != 0 {
+			results.Program = &userJourney.Program
+		}
+		results.IsCompleted = userJourney.IsCompleted // Sync status
 		
 		// Fetch Routines for this program
 		sc.DB.Preload("Step").Where("program_id = ?", userJourney.ProgramID).Find(&results.Routines)
@@ -163,7 +204,13 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		sc.DB.Model(&results.PreTest).Update("barcode_token", results.PreTest.BarcodeToken)
 	}
 
-	sc.DB.Where("user_id = ?", userID).Order("week_number desc").Find(&results.ProgressLogs)
+	// Filter logs and journals based on the start date of the CURRENT program
+	startTime := userJourney.StartedAt
+	if startTime.IsZero() {
+		startTime = results.PreTest.CreatedAt
+	}
+
+	sc.DB.Where("user_id = ? AND created_at >= ?", userID, startTime).Order("week_number desc").Find(&results.ProgressLogs)
 	
 	// Sanitize ProgressLogs (Fix W0 issue in old data)
 	for i := range results.ProgressLogs {
@@ -172,19 +219,16 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	sc.DB.Where("user_id = ?", userID).Order("created_at desc").Find(&results.Journals)
+	sc.DB.Where("user_id = ? AND created_at >= ?", userID, startTime).Order("created_at desc").Find(&results.Journals)
 	sc.DB.Where("user_id = ?", userID).Limit(1).Find(&results.WarriorLevel)
 	sc.DB.Order("day_target asc").Find(&results.Education)
 
-	// Hitung hari berdasarkan kalender (Bukan selisih 24 jam)
-	if results.PreTest.ID != 0 {
-		startDate := results.PreTest.CreatedAt.Truncate(24 * time.Hour)
+	// Hitung hari berdasarkan StartedAt program aktif (Bukan pretest)
+	if !startTime.IsZero() {
+		startDate := startTime.Truncate(24 * time.Hour)
 		nowDate := time.Now().Truncate(24 * time.Hour)
 		days := int(nowDate.Sub(startDate).Hours()/24) + 1
 		results.DayCount = days
-
-		// Keep IsCompleted based strictly on the persisted DB status (User Triggered)
-		results.IsCompleted = userJourney.IsCompleted
 	} else {
 		results.DayCount = 1
 	}
@@ -232,21 +276,30 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 
 	// Completion Reward (Voucher Kelulusan)
 	if results.IsCompleted {
-		results.Voucher = "GLOWGRADUATE"
-		results.VoucherMessage = "SELAMAT! Kamu telah lulus Skin Journey. Gunakan kode GLOWGRADUATE untuk diskon 15% pada pembelian berikutnya sebagai hadiah kelulusanmu! 🎓✨"
+		var cfgGradVoucher, cfgGradMsg models.PlatformConfig
+		sc.DB.Where("key = ?", "skin_journey_grad_voucher_code").First(&cfgGradVoucher)
+		sc.DB.Where("key = ?", "skin_journey_grad_voucher_message").First(&cfgGradMsg)
+
+		results.Voucher = cfgGradVoucher.Value
+		if results.Voucher == "" { results.Voucher = "GLOWGRADUATE" }
+		
+		results.VoucherMessage = cfgGradMsg.Value
+		if results.VoucherMessage == "" { 
+			results.VoucherMessage = "SELAMAT! Kamu telah lulus Skin Journey. Gunakan kode GLOWGRADUATE untuk diskon 15% pada pembelian berikutnya sebagai hadiah kelulusanmu! 🎓✨" 
+		}
 	}
 
 	// Fetch Photos for Before vs After
-	var firstProgress, lastProgress models.SkinJourneyProgress
+	var firstProgress, lastProgress models.SkinProgress
 	sc.DB.Where("user_id = ?", userID).Order("created_at asc").First(&firstProgress)
 	sc.DB.Where("user_id = ?", userID).Order("created_at desc").First(&lastProgress)
 	
-	results.FirstPhoto = firstProgress.PhotoURL
-	results.LastPhoto = lastProgress.PhotoURL
+	results.FirstPhoto = firstProgress.SelfieURL
+	results.LastPhoto = lastProgress.SelfieURL
 
-	// Calculate Consistency Score (mock for now or based on journal count)
+	// Calculate Consistency Score (based on journal count since program start)
 	var journalCount int64
-	sc.DB.Model(&models.SkinJourneyJournal{}).Where("user_id = ?", userID).Count(&journalCount)
+	sc.DB.Model(&models.SkinJournal{}).Where("user_id = ? AND created_at >= ?", userID, startTime).Count(&journalCount)
 	// Example: total days since start vs journal count
 	if results.DayCount > 0 {
 		results.ConsistencyScore = int((journalCount * 100) / int64(results.DayCount))
@@ -499,21 +552,50 @@ func (sc *SkinController) SetUserProgram(w http.ResponseWriter, r *http.Request)
 	}
 
 	userID, _ := r.Context().Value("user_id").(string)
+	
+	// [CRITICAL FIX] Use direct Table update to ensure boolean synchronization
 	var userJourney models.UserSkinJourney
-	sc.DB.Where("user_id = ?", userID).First(&userJourney)
-
-	userJourney.UserID = userID
-	userJourney.ProgramID = input.ProgramID
-	userJourney.StartedAt = time.Now()
-	userJourney.CurrentWeek = 1
-	userJourney.IsCompleted = false
-
-	if err := sc.DB.Save(&userJourney).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan program")
-		return
+	err := sc.DB.Where("user_id = ?", userID).First(&userJourney).Error
+	
+	updateData := map[string]interface{}{
+		"program_id":   input.ProgramID,
+		"started_at":   time.Now(),
+		"current_week": 1,
+		"is_completed": false,
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Program berhasil diatur!"})
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			log.Printf("🆕 [SkinJourney] Creating fresh journey for user %s", userID)
+			userJourney = models.UserSkinJourney{
+				UserID:      userID,
+				ProgramID:   input.ProgramID,
+				StartedAt:   time.Now(),
+				CurrentWeek: 1,
+				IsCompleted: false,
+			}
+			if err := sc.DB.Create(&userJourney).Error; err != nil {
+				utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat journey baru")
+				return
+			}
+		} else {
+			utils.JSONError(w, http.StatusInternalServerError, "Database error")
+			return
+		}
+	} else {
+		log.Printf("🔄 [SkinJourney] Forcing reset of existing journey for user %s to program %d", userID, input.ProgramID)
+		// Use Table().Where() to bypass model instance issues
+		if err := sc.DB.Table("user_skin_journeys").Where("user_id = ?", userID).Updates(updateData).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui program")
+			return
+		}
+	}
+
+	// [Point 3] Wipe all logs for this user to prevent state pollution from old programs
+	sc.DB.Where("user_id = ?", userID).Delete(&models.SkinStepLog{})
+	sc.DB.Where("user_id = ?", userID).Delete(&models.SkinProgress{})
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Program berhasil diaktifkan! ✨"})
 }
 
 // MarkStepComplete - Menandai langkah rutin sebagai selesai harian
@@ -809,31 +891,12 @@ func (sc *SkinController) AdminCreateGroup(w http.ResponseWriter, r *http.Reques
 	utils.JSONResponse(w, http.StatusCreated, group)
 }
 
-// --- DYNAMIC JOURNEY ADMIN CRUD ---
-
-func (sc *SkinController) AdminGetPrograms(w http.ResponseWriter, r *http.Request) {
-	var list []models.SkinJourneyProgram
-	sc.DB.Find(&list)
-	utils.JSONResponse(w, http.StatusOK, list)
-}
-
-func (sc *SkinController) AdminSaveProgram(w http.ResponseWriter, r *http.Request) {
-	var item models.SkinJourneyProgram
-	json.NewDecoder(r.Body).Decode(&item)
-	sc.DB.Save(&item)
-	utils.JSONResponse(w, http.StatusOK, item)
-}
-
-func (sc *SkinController) AdminDeleteProgram(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	sc.DB.Delete(&models.SkinJourneyProgram{}, id)
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
-}
+// --- DYNAMIC JOURNEY ADMIN CRUD (see Flow implementations below) ---
 
 // FinishJourney - User manually marks program as completed
 func (sc *SkinController) FinishJourney(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value("user_id").(string)
-	
+
 	var userJourney models.UserSkinJourney
 	if err := sc.DB.Where("user_id = ?", userID).First(&userJourney).Error; err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Journey tidak ditemukan")
@@ -850,42 +913,49 @@ func (sc *SkinController) FinishJourney(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Selamat! Program kamu telah selesai! ✨"})
+	sc.DB.Preload("Program").First(&userJourney, userJourney.ID)
+
+	var warrior models.SkinWarriorLevel
+	sc.DB.Where("user_id = ?", userID).First(&warrior)
+
+	history := models.UserSkinJourneyHistory{
+		UserID:          userID,
+		ProgramID:       userJourney.ProgramID,
+		ProgramName:     userJourney.Program.Name,
+		StartedAt:       userJourney.StartedAt,
+		FinishedAt:      time.Now(),
+		DayCount:        int(time.Since(userJourney.StartedAt).Hours()/24) + 1,
+		FinalRank:       warrior.LevelName,
+		SkinProfileJSON: userJourney.SkinProfileJSON,
+	}
+	var totalSteps, completedSteps int64
+	sc.DB.Model(&models.SkinJourneyRoutine{}).Where("program_id = ?", userJourney.ProgramID).Count(&totalSteps)
+	expectedTotalSteps := int64(history.DayCount) * totalSteps
+	sc.DB.Model(&models.SkinStepLog{}).Where("user_id = ? AND created_at >= ?", userID, userJourney.StartedAt).Count(&completedSteps)
+	if expectedTotalSteps > 0 {
+		history.ConsistencyScore = int((float64(completedSteps) / float64(expectedTotalSteps)) * 100)
+		if history.ConsistencyScore > 100 { history.ConsistencyScore = 100 }
+	}
+	sc.DB.Create(&history)
+	sc.DB.Model(&warrior).Update("experience", warrior.Experience+500)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{
+		"message": "Selamat! Program kamu telah selesai! Kamu mendapatkan +500 XP Kelulusan! 🎓✨",
+	})
 }
 
-func (sc *SkinController) AdminGetSteps(w http.ResponseWriter, r *http.Request) {
-	var list []models.SkinJourneyStep
-	sc.DB.Order("\"order\" asc").Find(&list)
-	utils.JSONResponse(w, http.StatusOK, list)
+// GetUserHistories - Ambil riwayat program yang sudah selesai untuk user saat ini
+func (sc *SkinController) GetUserHistories(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value("user_id").(string)
+	var histories []models.UserSkinJourneyHistory
+	sc.DB.Where("user_id = ?", userID).Order("finished_at desc").Find(&histories)
+	utils.JSONResponse(w, http.StatusOK, histories)
 }
 
-func (sc *SkinController) AdminSaveStep(w http.ResponseWriter, r *http.Request) {
-	var item models.SkinJourneyStep
-	json.NewDecoder(r.Body).Decode(&item)
-	sc.DB.Save(&item)
-	utils.JSONResponse(w, http.StatusOK, item)
-}
-
-func (sc *SkinController) AdminGetRoutines(w http.ResponseWriter, r *http.Request) {
-	programID := r.URL.Query().Get("program_id")
-	var list []models.SkinJourneyRoutine
-	query := sc.DB.Preload("Step")
-	if programID != "" { query = query.Where("program_id = ?", programID) }
-	query.Find(&list)
-	utils.JSONResponse(w, http.StatusOK, list)
-}
-
-func (sc *SkinController) AdminSaveRoutine(w http.ResponseWriter, r *http.Request) {
-	var item models.SkinJourneyRoutine
-	json.NewDecoder(r.Body).Decode(&item)
-	sc.DB.Save(&item)
-	utils.JSONResponse(w, http.StatusOK, item)
-}
-
-func (sc *SkinController) AdminGetProductMappings(w http.ResponseWriter, r *http.Request) {
-	var list []models.SkinJourneyProductMapping
-	sc.DB.Preload("Product").Find(&list)
-	utils.JSONResponse(w, http.StatusOK, list)
+func (sc *SkinController) AdminGetHistories(w http.ResponseWriter, r *http.Request) {
+	var histories []models.UserSkinJourneyHistory
+	sc.DB.Order("finished_at desc").Find(&histories)
+	utils.JSONResponse(w, http.StatusOK, histories)
 }
 
 func (sc *SkinController) AdminSaveProductMapping(w http.ResponseWriter, r *http.Request) {
@@ -907,9 +977,310 @@ func (sc *SkinController) AdminUpdateAIConfig(w http.ResponseWriter, r *http.Req
 	sc.DB.Save(&item)
 	utils.JSONResponse(w, http.StatusOK, item)
 }
-// GetPrograms - Ambil semua program yang tersedia
+
+// GetPrograms - Ambil semua program yang tersedia (untuk user)
 func (sc *SkinController) GetPrograms(w http.ResponseWriter, r *http.Request) {
 	var programs []models.SkinJourneyProgram
-	sc.DB.Where("is_active = ?", true).Order("level asc").Find(&programs)
+	sc.DB.Where("is_active = ? AND status = ?", true, "active").Order("level asc").
+		Preload("Phases").Preload("Benefits").Preload("Warnings").Preload("FAQs").Preload("ProductSteps.Product").
+		Find(&programs)
 	utils.JSONResponse(w, http.StatusOK, programs)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FLOW 1 — BUAT PROGRAM (Enhanced Admin CRUD)
+// ═══════════════════════════════════════════════════════════════
+
+// AdminGetPrograms - List all programs with status filter
+func (sc *SkinController) AdminGetPrograms(w http.ResponseWriter, r *http.Request) {
+	statusFilter := r.URL.Query().Get("status") // draft, active, archived
+	var list []models.SkinJourneyProgram
+	q := sc.DB.Order("created_at desc")
+	if statusFilter != "" {
+		q = q.Where("status = ?", statusFilter)
+	}
+	q.Find(&list)
+	utils.JSONResponse(w, http.StatusOK, list)
+}
+
+// AdminGetProgramDetail - Get full program with all sub-records (phases, benefits, warnings, faqs, product steps)
+func (sc *SkinController) AdminGetProgramDetail(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Program ID diperlukan")
+		return
+	}
+	var program models.SkinJourneyProgram
+	err := sc.DB.
+		Preload("Phases", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("Benefits", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("Warnings", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("FAQs", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" asc") }).
+		Preload("ProductSteps", func(db *gorm.DB) *gorm.DB { return db.Order("step_number asc") }).
+		Preload("ProductSteps.Product").
+		First(&program, id).Error
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Program tidak ditemukan")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, program)
+}
+
+// AdminSaveProgram - Create or update program (FLOW 1)
+func (sc *SkinController) AdminSaveProgram(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyProgram
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+	if item.Name == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Nama program wajib diisi")
+		return
+	}
+	// Generate slug from name if not set
+	if item.Slug == "" {
+		ts := time.Now().Unix()
+		item.Slug = fmt.Sprintf("%s-%d", sanitizeSlug(item.Name), ts)
+	}
+	if item.Status == "" {
+		item.Status = "draft"
+	}
+	// Get admin user from context
+	if userID, ok := r.Context().Value("user_id").(string); ok && item.CreatedBy == "" {
+		item.CreatedBy = userID
+	}
+	item.UpdatedAt = time.Now()
+	if err := sc.DB.Save(&item).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan program: "+err.Error())
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Program berhasil disimpan",
+		"data":    item,
+		"progress": map[string]interface{}{
+			"completed": []string{"✅ Flow 1: Program Created"},
+			"next":      "Flow 2: Add Detailed Description",
+		},
+	})
+}
+
+// AdminDeleteProgram - Delete program and all sub-records
+func (sc *SkinController) AdminDeleteProgram(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ID diperlukan")
+		return
+	}
+	sc.DB.Where("program_id = ?", id).Delete(&models.SkinJourneyPhase{})
+	sc.DB.Where("program_id = ?", id).Delete(&models.SkinJourneyBenefit{})
+	sc.DB.Where("program_id = ?", id).Delete(&models.SkinJourneyWarning{})
+	sc.DB.Where("program_id = ?", id).Delete(&models.SkinJourneyFAQ{})
+	sc.DB.Where("program_id = ?", id).Delete(&models.SkinJourneyProductStep{})
+	sc.DB.Delete(&models.SkinJourneyProgram{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Program dan semua data terkait berhasil dihapus"})
+}
+
+// AdminPublishProgram - Change program status to active
+func (sc *SkinController) AdminPublishProgram(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if err := sc.DB.Model(&models.SkinJourneyProgram{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"status": "active", "is_active": true, "updated_at": time.Now()}).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mempublish program")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Program berhasil dipublish dan siap digunakan user"})
+}
+
+// AdminArchiveProgram - Change program status to archived
+func (sc *SkinController) AdminArchiveProgram(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Model(&models.SkinJourneyProgram{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"status": "archived", "is_active": false, "updated_at": time.Now()})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Program diarsipkan"})
+}
+
+// sanitizeSlug - convert name to url-friendly slug
+func sanitizeSlug(name string) string {
+	result := ""
+	for _, ch := range strings.ToLower(name) {
+		if (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') {
+			result += string(ch)
+		} else if ch == ' ' || ch == '-' {
+			result += "-"
+		}
+	}
+	return result
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FLOW 2 — PENJELASAN DETAIL (Phases, Benefits, Warnings, FAQs)
+// ═══════════════════════════════════════════════════════════════
+
+func (sc *SkinController) AdminSavePhase(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyPhase
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format tidak valid")
+		return
+	}
+	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	sc.DB.Save(&item)
+	utils.JSONResponse(w, http.StatusOK, item)
+}
+
+func (sc *SkinController) AdminDeletePhase(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyPhase{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+func (sc *SkinController) AdminSaveBenefit(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyBenefit
+	json.NewDecoder(r.Body).Decode(&item)
+	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	sc.DB.Save(&item)
+	utils.JSONResponse(w, http.StatusOK, item)
+}
+
+func (sc *SkinController) AdminDeleteBenefit(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyBenefit{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+func (sc *SkinController) AdminSaveWarning(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyWarning
+	json.NewDecoder(r.Body).Decode(&item)
+	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	sc.DB.Save(&item)
+	utils.JSONResponse(w, http.StatusOK, item)
+}
+
+func (sc *SkinController) AdminDeleteWarning(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyWarning{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+func (sc *SkinController) AdminSaveFAQ(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyFAQ
+	json.NewDecoder(r.Body).Decode(&item)
+	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	sc.DB.Save(&item)
+	utils.JSONResponse(w, http.StatusOK, item)
+}
+
+func (sc *SkinController) AdminDeleteFAQ(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyFAQ{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FLOW 3 & 4 — PRODUCT STEPS WITH USAGE INSTRUCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+func (sc *SkinController) AdminGetProductSteps(w http.ResponseWriter, r *http.Request) {
+	programID := r.URL.Query().Get("program_id")
+	if programID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "program_id diperlukan")
+		return
+	}
+	var steps []models.SkinJourneyProductStep
+	sc.DB.Where("program_id = ?", programID).Preload("Product").Order("step_number asc").Find(&steps)
+	utils.JSONResponse(w, http.StatusOK, steps)
+}
+
+func (sc *SkinController) AdminSaveProductStep(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyProductStep
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format tidak valid")
+		return
+	}
+	if item.ProgramID == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "program_id wajib diisi")
+		return
+	}
+	if item.StepName == "" {
+		utils.JSONError(w, http.StatusBadRequest, "step_name wajib diisi")
+		return
+	}
+	if err := sc.DB.Save(&item).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan product step: "+err.Error())
+		return
+	}
+	// Reload with product info
+	sc.DB.Preload("Product").First(&item, item.ID)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Product step berhasil disimpan",
+		"data":    item,
+	})
+}
+
+func (sc *SkinController) AdminDeleteProductStep(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ID diperlukan")
+		return
+	}
+	sc.DB.Delete(&models.SkinJourneyProductStep{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Product step dihapus"})
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEGACY ADMIN CRUD (Steps, Routines, Mappings — Delete methods)
+// ═══════════════════════════════════════════════════════════════
+
+func (sc *SkinController) AdminGetSteps(w http.ResponseWriter, r *http.Request) {
+	var list []models.SkinJourneyStep
+	sc.DB.Where("is_active = ?", true).Order("\"order\" asc").Find(&list)
+	utils.JSONResponse(w, http.StatusOK, list)
+}
+
+func (sc *SkinController) AdminSaveStep(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyStep
+	json.NewDecoder(r.Body).Decode(&item)
+	sc.DB.Save(&item)
+	utils.JSONResponse(w, http.StatusOK, item)
+}
+
+func (sc *SkinController) AdminDeleteStep(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyStep{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Step dihapus"})
+}
+
+func (sc *SkinController) AdminGetRoutines(w http.ResponseWriter, r *http.Request) {
+	programID := r.URL.Query().Get("program_id")
+	var list []models.SkinJourneyRoutine
+	q := sc.DB.Preload("Step")
+	if programID != "" { q = q.Where("program_id = ?", programID) }
+	q.Find(&list)
+	utils.JSONResponse(w, http.StatusOK, list)
+}
+
+func (sc *SkinController) AdminSaveRoutine(w http.ResponseWriter, r *http.Request) {
+	var item models.SkinJourneyRoutine
+	json.NewDecoder(r.Body).Decode(&item)
+	sc.DB.Save(&item)
+	utils.JSONResponse(w, http.StatusOK, item)
+}
+
+func (sc *SkinController) AdminDeleteRoutine(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyRoutine{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Routine dihapus"})
+}
+
+func (sc *SkinController) AdminGetProductMappings(w http.ResponseWriter, r *http.Request) {
+	var list []models.SkinJourneyProductMapping
+	sc.DB.Preload("Product").Find(&list)
+	utils.JSONResponse(w, http.StatusOK, list)
+}
+
+func (sc *SkinController) AdminDeleteProductMapping(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	sc.DB.Delete(&models.SkinJourneyProductMapping{}, id)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Mapping dihapus"})
 }

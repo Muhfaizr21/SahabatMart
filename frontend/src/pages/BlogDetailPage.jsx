@@ -111,7 +111,13 @@ export default function BlogDetailPage() {
               
               <div 
                 className="article-content text-gray-700 leading-[1.8] text-lg md:text-xl font-medium space-y-8"
-                dangerouslySetInnerHTML={{ __html: blog.content?.replace(/\n/g, '<br />') }}
+                dangerouslySetInnerHTML={{ 
+                  __html: (blog.content || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br />') 
+                }} 
               />
             </article>
 

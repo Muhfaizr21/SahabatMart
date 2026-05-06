@@ -49,7 +49,19 @@ export default function SkinJourney() {
     return Math.min(52, Math.max(1, Math.floor(daysSince / 7) + 1));
   })();
 
-  const alreadyUploadedThisWeek = false; // TEMPORARILY DISABLED FOR TESTING
+  // Toggle this for production vs testing
+  const TESTING_MODE = true; 
+  
+  const alreadyUploadedThisWeek = !TESTING_MODE && (journeyData?.progress_logs?.some(log => {
+    const logDate = new Date(log.created_at);
+    const now = new Date();
+    const getWeek = (date) => {
+      const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+      const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+      return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+    };
+    return getWeek(logDate) === getWeek(now) && logDate.getFullYear() === now.getFullYear();
+  }) || false);
 
   useEffect(() => {
     let interval = null;
@@ -107,7 +119,15 @@ export default function SkinJourney() {
 
   const formatSummary = (text) => {
     if (!text) return '';
-    const formatted = text.replace(/\*\*(.*?)\*\*/g, '<b class="text-white font-black">$1</b>');
+    // XSS Protection: Escape HTML tags first
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+    // Then apply safe formatting
+    const formatted = escaped.replace(/\*\*(.*?)\*\*/g, '<b class="text-white font-black">$1</b>');
     return { __html: formatted };
   };
 
@@ -315,9 +335,16 @@ export default function SkinJourney() {
         if (!aiRes.ok) throw new Error(aiJson?.message || 'Gagal menganalisis foto');
 
         const aiResult = aiJson?.data ?? aiJson;
-        if (aiResult?.skin_score) progressForm.skin_score = aiResult.skin_score;
         setAiAnalysis(aiResult);
-        if (aiResult?.photo_url) {
+
+        if (aiResult?.skin_score || aiResult?.emotion_score) {
+          setTrackerForm(prev => ({ 
+            ...prev, 
+            skin_score: aiResult.skin_score || prev.skin_score, 
+            emotional_score: aiResult.emotion_score || aiResult.emotional_score || prev.emotional_score,
+            selfie_url: aiResult.photo_url || prev.selfie_url 
+          }));
+        } else if (aiResult?.photo_url) {
           setTrackerForm(prev => ({ ...prev, selfie_url: aiResult.photo_url }));
         }
         
@@ -341,6 +368,13 @@ export default function SkinJourney() {
       setAnalyzing(false);
     }
   };
+
+  // Auto-trigger AI Analysis as soon as photo is captured/selected
+  useEffect(() => {
+    if (skinPhoto && !aiAnalysis && !analyzing && showTracker) {
+      handleSaveProgress();
+    }
+  }, [skinPhoto, showTracker, aiAnalysis, analyzing]);
 
   const startCamera = async () => {
     try {
@@ -372,6 +406,8 @@ export default function SkinJourney() {
     
     canvas.toBlob((blob) => {
       setSkinPhoto(blob);
+      setAiAnalysis(null);
+      setTrackerForm(prev => ({ ...prev, selfie_url: '' }));
       stopCamera();
     }, 'image/jpeg', 0.9);
   };
@@ -885,23 +921,64 @@ export default function SkinJourney() {
                       </div>
                     </div>
                     <div className="space-y-6">
-                      <div>
-                        <label className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 block text-center">Bagaimana Kulitmu? ({trackerForm.skin_score}/10)</label>
-                        <input type="range" min="1" max="10" value={trackerForm.skin_score} onChange={(e) => setTrackerForm({...trackerForm, skin_score: parseInt(e.target.value)})} className="w-full accent-rose-500" />
-                      </div>
-                      <textarea 
-                        className="w-full p-5 bg-slate-800 border border-white/10 rounded-2xl text-white text-sm focus:border-rose-500 outline-none h-32"
-                        placeholder="Ada keluhan atau perubahan signifikan?"
-                        value={trackerForm.notes}
-                        onChange={(e) => setTrackerForm({...trackerForm, notes: e.target.value})}
-                      />
+                      {!skinPhoto ? (
+                        <div className="h-full flex flex-col items-center justify-center py-12 text-center">
+                           <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                             <span className="material-symbols-outlined text-slate-600 text-3xl">photo_camera</span>
+                           </div>
+                           <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                             Ambil atau Upload Foto<br />untuk Menganalisis Kondisi Kulit
+                           </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {analyzing ? (
+                            <div className="py-12 text-center">
+                               <div className="inline-block w-10 h-10 border-4 border-rose-500/20 border-t-rose-500 rounded-full animate-spin mb-4"></div>
+                               <p className="text-rose-400 text-[10px] font-black uppercase tracking-widest animate-pulse">Sedang Menganalisis Kondisi Kulitmu...</p>
+                            </div>
+                          ) : aiAnalysis ? (
+                            <>
+                              <div>
+                                <label className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 block text-center">
+                                  Bagaimana Kulitmu? ({trackerForm.skin_score}/10)
+                                </label>
+                                <input 
+                                  type="range" 
+                                  min="1" 
+                                  max="10" 
+                                  value={trackerForm.skin_score} 
+                                  onChange={(e) => setTrackerForm({...trackerForm, skin_score: parseInt(e.target.value)})} 
+                                  className="w-full accent-rose-500" 
+                                />
+                              </div>
+                              <textarea 
+                                className="w-full p-5 bg-slate-800 border border-white/10 rounded-2xl text-white text-sm focus:border-rose-500 outline-none h-32"
+                                placeholder="Ada keluhan atau perubahan signifikan?"
+                                value={trackerForm.notes}
+                                onChange={(e) => setTrackerForm({...trackerForm, notes: e.target.value})}
+                              />
+                            </>
+                          ) : (
+                            <div className="py-12 text-center bg-white/5 rounded-3xl border border-dashed border-white/10">
+                               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">Foto Siap Dianalisis</p>
+                               <button 
+                                 onClick={handleSaveProgress}
+                                 className="px-8 py-3 bg-rose-500 hover:bg-rose-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20"
+                               >
+                                 Mulai Analisis AI
+                               </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
                         <p className="text-amber-500 text-[9px] leading-relaxed italic">
                           <span className="font-bold uppercase">Tips:</span> Gunakan pencahayaan matahari & pastikan wajah sejajar kamera agar fitur Before/After akurat.
                         </p>
                       </div>
 
-                      {aiAnalysis && (
+                      {aiAnalysis && skinPhoto && (
                         <div className="p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 animate-in zoom-in-95 duration-500">
                           <div className="flex items-center gap-3 mb-4">
                             <span className="material-symbols-outlined text-indigo-400">psychology</span>
@@ -955,7 +1032,7 @@ export default function SkinJourney() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                       <span className="px-3 py-1 bg-rose-500/10 text-rose-400 rounded-lg text-[10px] font-black">Score: {log.skin_score}</span>
+                       <span className="px-3 py-1 bg-rose-500/10 text-rose-400 rounded-lg text-[10px] font-black">Score: {log.skin_score}/10</span>
                     </div>
                   </div>
                 ))}

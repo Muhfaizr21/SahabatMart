@@ -87,15 +87,21 @@ Explain why this program fits the user's profile.`,
 		db.Where("stage = ?", cfg.Stage).FirstOrCreate(&cfg)
 	}
 
-	// 2. Seed Programs
+	// 2. Seed Programs (status=active so they appear in user-facing list)
 	programs := []models.SkinJourneyProgram{
-		{Name: "Essential Basic", Description: "Pilihan tepat untuk pemula atau gaya hidup sibuk. Fokus pada perawatan dasar: Cleansing, Hydrating, & Protecting.", Level: 1, StepCount: 3, DurationDays: 28},
-		{Name: "Advanced", Description: "Perawatan lebih mendalam untuk masalah kulit moderat. Menambahkan serum dan perawatan khusus.", Level: 2, StepCount: 5, DurationDays: 30},
-		{Name: "Intensive", Description: "Program komprehensif untuk hasil maksimal pada masalah kulit kompleks. 7 langkah perawatan lengkap pagi dan malam.", Level: 3, StepCount: 7, DurationDays: 30},
+		{Name: "Essential Basic", Slug: "essential-basic", Category: "general", Level: 1, StepCount: 3, DurationDays: 28, DurationWeeks: 4, Status: "active", IsActive: true,
+			ExpectedOutcome: "Kulit bersih, terhidrasi, dan terlindungi dari sinar UV. Barrier kulit mulai membaik.",
+		},
+		{Name: "Advanced", Slug: "advanced", Category: "general", Level: 2, StepCount: 5, DurationDays: 30, DurationWeeks: 4, Status: "active", IsActive: true,
+			ExpectedOutcome: "Masalah kulit moderat berkurang signifikan. Serum aktif bekerja optimal pada barrier yang sudah terjaga.",
+		},
+		{Name: "Intensive", Slug: "intensive", Category: "general", Level: 3, StepCount: 7, DurationDays: 30, DurationWeeks: 4, Status: "active", IsActive: true,
+			ExpectedOutcome: "Transformasi kulit menyeluruh. Jerawat aktif berkurang, barrier kuat, warna merata.",
+		},
 	}
 
 	for _, p := range programs {
-		db.Where("name = ?", p.Name).FirstOrCreate(&p)
+		db.Where("slug = ?", p.Slug).FirstOrCreate(&p)
 	}
 
 	// 3. Seed Steps

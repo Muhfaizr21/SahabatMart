@@ -110,7 +110,12 @@ export default function OrderSuccessPage() {
                           {ins.steps.map((step, sidx) => (
                             <li key={sidx} className="text-[11px] text-gray-600 leading-relaxed flex gap-2">
                               <span className="font-bold text-blue-400">{sidx + 1}.</span>
-                              <span dangerouslySetInnerHTML={{ __html: step }} />
+                              <span dangerouslySetInnerHTML={{ 
+                                __html: (step || '')
+                                  .replace(/&/g, '&amp;')
+                                  .replace(/</g, '&lt;')
+                                  .replace(/>/g, '&gt;')
+                              }} />
                             </li>
                           ))}
                         </ul>

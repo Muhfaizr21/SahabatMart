@@ -136,11 +136,12 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 		if origin == "" {
 			// Ambil BiteshipAreaID dari Merchant Pusat sebagai fallback
 			var pusat models.Merchant
-			bc.DB.First(&pusat, "id = ?", "00000000-0000-0000-0000-000000000000")
+			bc.DB.First(&pusat, "id = ?", models.PusatID)
 			if pusat.BiteshipAreaID != "" {
 				origin = pusat.BiteshipAreaID
 			} else {
-				origin = "IDNP3CL10" // Fallback terakhir jika pusat pun kosong
+				configSvc := services.NewConfigService(bc.DB)
+				origin = configSvc.Get("default_biteship_area_id", "IDNP3CL10") // Fallback terakhir
 			}
 		}
 

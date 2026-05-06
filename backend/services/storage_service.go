@@ -27,7 +27,11 @@ func (s *StorageService) SaveImage(file multipart.File, header *multipart.FileHe
 		return "", err
 	}
 
-	filename := fmt.Sprintf("%d-%s.webp", time.Now().Unix(), strings.ReplaceAll(header.Filename, " ", "_"))
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".webp" // Fallback
+	}
+	filename := fmt.Sprintf("%d-%s%s", time.Now().Unix(), strings.TrimSuffix(strings.ReplaceAll(header.Filename, " ", "_"), ext), ext)
 	filePath := filepath.Join(s.UploadDir, filename)
 
 	out, err := os.Create(filePath)

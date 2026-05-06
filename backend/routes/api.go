@@ -38,7 +38,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	tierCtrl := controllers.NewMembershipTierController(db)
 
 	// Middleware
-	cors := corsMiddleware
+	cors := CorsMiddleware
 	recover := recoverMiddleware
 
 	// [Monster Feature] Dynamic Role Middleware with DB Sync
@@ -272,6 +272,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/skin/analyze", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.AnalyzeSkinPhoto))
 	mux.HandleFunc("/api/skin/set-program", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.SetUserProgram))
 	mux.HandleFunc("/api/skin/finish-program", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.FinishJourney))
+	mux.HandleFunc("/api/skin/history", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetUserHistories))
 	mux.HandleFunc("/api/skin/routine", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetUserRoutine))
 	mux.HandleFunc("/api/skin/complete-step", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.MarkStepComplete))
 	mux.HandleFunc("/api/skin/recommend-programs", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetProgramRecommendations))
@@ -293,6 +294,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/skin/pretests", adminOnly(skinCtrl.AdminGetAllPreTests))
 	mux.HandleFunc("/api/admin/skin/journals", adminOnly(skinCtrl.AdminGetAllJournals))
 	mux.HandleFunc("/api/admin/skin/progress", adminOnly(skinCtrl.AdminGetAllProgress))
+	mux.HandleFunc("/api/admin/skin/histories", adminOnly(skinCtrl.AdminGetHistories))
 	mux.HandleFunc("/api/admin/skin/education", adminOnly(skinCtrl.AdminGetAllEducation))
 	mux.HandleFunc("/api/admin/skin/education/create", adminOnly(skinCtrl.AdminCreateEducation))
 	mux.HandleFunc("/api/admin/skin/education/delete", adminOnly(skinCtrl.AdminDeleteEducation))
@@ -309,6 +311,33 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/skin/product-mappings/save", adminOnly(skinCtrl.AdminSaveProductMapping))
 	mux.HandleFunc("/api/admin/skin/ai-configs", adminOnly(skinCtrl.AdminGetAIConfigs))
 	mux.HandleFunc("/api/admin/skin/ai-configs/update", adminOnly(skinCtrl.AdminUpdateAIConfig))
+
+	// ── FLOW 1: Program CRUD ──────────────────────────────────────────────────
+	mux.HandleFunc("/api/admin/skin/programs/detail", adminOnly(skinCtrl.AdminGetProgramDetail))
+
+	// ── FLOW 2: Program Details (Phases, Benefits, Warnings, FAQs) ───────────
+	mux.HandleFunc("/api/admin/skin/programs/phases/save", adminOnly(skinCtrl.AdminSavePhase))
+	mux.HandleFunc("/api/admin/skin/programs/phases/delete", adminOnly(skinCtrl.AdminDeletePhase))
+	mux.HandleFunc("/api/admin/skin/programs/benefits/save", adminOnly(skinCtrl.AdminSaveBenefit))
+	mux.HandleFunc("/api/admin/skin/programs/benefits/delete", adminOnly(skinCtrl.AdminDeleteBenefit))
+	mux.HandleFunc("/api/admin/skin/programs/warnings/save", adminOnly(skinCtrl.AdminSaveWarning))
+	mux.HandleFunc("/api/admin/skin/programs/warnings/delete", adminOnly(skinCtrl.AdminDeleteWarning))
+	mux.HandleFunc("/api/admin/skin/programs/faqs/save", adminOnly(skinCtrl.AdminSaveFAQ))
+	mux.HandleFunc("/api/admin/skin/programs/faqs/delete", adminOnly(skinCtrl.AdminDeleteFAQ))
+
+	// ── FLOW 3 & 4: Product Steps with Instructions ───────────────────────────
+	mux.HandleFunc("/api/admin/skin/programs/product-steps", adminOnly(skinCtrl.AdminGetProductSteps))
+	mux.HandleFunc("/api/admin/skin/programs/product-steps/save", adminOnly(skinCtrl.AdminSaveProductStep))
+	mux.HandleFunc("/api/admin/skin/programs/product-steps/delete", adminOnly(skinCtrl.AdminDeleteProductStep))
+
+	// ── Publish / Archive program ─────────────────────────────────────────────
+	mux.HandleFunc("/api/admin/skin/programs/publish", adminOnly(skinCtrl.AdminPublishProgram))
+	mux.HandleFunc("/api/admin/skin/programs/archive", adminOnly(skinCtrl.AdminArchiveProgram))
+
+	// Legacy step/routine/mapping deletes (previously missing)
+	mux.HandleFunc("/api/admin/skin/steps/delete", adminOnly(skinCtrl.AdminDeleteStep))
+	mux.HandleFunc("/api/admin/skin/routines/delete", adminOnly(skinCtrl.AdminDeleteRoutine))
+	mux.HandleFunc("/api/admin/skin/product-mappings/delete", adminOnly(skinCtrl.AdminDeleteProductMapping))
 
 	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
@@ -514,7 +543,7 @@ func recoverMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func CorsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("🌐 [%s] %s", r.Method, r.URL.Path)
 		w.Header().Set("Access-Control-Allow-Origin", "*")

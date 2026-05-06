@@ -36,7 +36,7 @@ func NewAdminController(db *gorm.DB) *AdminController {
 		Service: services.NewAdminService(db, audit, notif),
 		Audit:   audit,
 		Notif:   notif,
-		Storage: services.NewStorageService("http://localhost:8080", "uploads"),
+		Storage: services.NewStorageService("", "uploads"),
 	}
 }
 
@@ -2862,49 +2862,65 @@ func (ac *AdminController) GetPublicVouchers(w http.ResponseWriter, r *http.Requ
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": vouchers})
 }
 
-// CheckVoucher validates a voucher code for a specific amount
+// CheckVoucher validates a voucher code with full type-based logic
 func (ac *AdminController) CheckVoucher(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	subtotalStr := r.URL.Query().Get("subtotal")
-	
+	buyerID := r.URL.Query().Get("buyer_id")
+	productIDsStr := r.URL.Query().Get("product_ids")
+	categoriesStr := r.URL.Query().Get("categories")
+
 	if code == "" {
 		utils.JSONError(w, http.StatusBadRequest, "Kode voucher wajib diisi")
 		return
 	}
 
-	var voucher models.Voucher
-	err := ac.DB.Where("code = ?", code).First(&voucher).Error
-	if err != nil {
-		utils.JSONError(w, http.StatusNotFound, "Kode voucher tidak valid atau tidak ditemukan")
-		return
-	}
-
-	if voucher.Status != "active" {
-		utils.JSONError(w, http.StatusBadRequest, "Voucher ini sedang tidak aktif")
-		return
-	}
-
-	now := time.Now()
-	if !voucher.ExpiryDate.IsZero() && voucher.ExpiryDate.Before(now) {
-		utils.JSONError(w, http.StatusBadRequest, "Voucher ini sudah kedaluwarsa")
-		return
-	}
-
-	if voucher.Quota > 0 && voucher.Used >= voucher.Quota {
-		utils.JSONError(w, http.StatusBadRequest, "Kupon ini sudah mencapai batas pemakaian")
-		return
+	// Try to get buyer_id from JWT token (more secure than query param)
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if claims, err := utils.ParseJWT(tokenStr); err == nil {
+			buyerID = claims.UserID
+		}
 	}
 
 	var subtotal float64
 	fmt.Sscanf(subtotalStr, "%f", &subtotal)
-	if subtotal < voucher.MinOrder {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Voucher ini hanya berlaku untuk minimal belanja Rp%s", utils.FormatIDR(voucher.MinOrder)))
+
+	// Parse product_ids and categories from query
+	var productIDs, categories []string
+	if productIDsStr != "" {
+		for _, id := range strings.Split(productIDsStr, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				productIDs = append(productIDs, id)
+			}
+		}
+	}
+	if categoriesStr != "" {
+		for _, c := range strings.Split(categoriesStr, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				categories = append(categories, c)
+			}
+		}
+	}
+
+	voucherSvc := services.NewVoucherService(ac.DB)
+	result, err := voucherSvc.Validate(services.VoucherValidateRequest{
+		Code:       code,
+		BuyerID:    buyerID,
+		Subtotal:   subtotal,
+		ProductIDs: productIDs,
+		Categories: categories,
+	})
+	if err != nil {
+		utils.JSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"data":   voucher,
+		"status":          "success",
+		"data":            result.Voucher,
+		"discount_amount": result.DiscountAmount,
+		"message":         result.Message,
 	})
 }
 

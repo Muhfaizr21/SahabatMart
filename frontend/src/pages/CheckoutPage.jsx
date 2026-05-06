@@ -131,11 +131,16 @@ export default function CheckoutPage() {
   const subtotal = cart.items?.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0) || 0;
   const shipping = 0;
   
-  // Calculate Discount
+  // Calculate Discount — utamakan nilai dari server (sudah memperhitungkan max_discount)
   let discount = 0;
   if (appliedVoucher) {
-    if (appliedVoucher.discount_type === 'percent') {
+    if (appliedVoucher.server_discount_amount != null) {
+      discount = appliedVoucher.server_discount_amount;
+    } else if (appliedVoucher.discount_type === 'percent') {
       discount = subtotal * (appliedVoucher.discount_value / 100);
+      if (appliedVoucher.max_discount > 0 && discount > appliedVoucher.max_discount) {
+        discount = appliedVoucher.max_discount;
+      }
     } else {
       discount = appliedVoucher.discount_value;
     }
@@ -147,11 +152,29 @@ export default function CheckoutPage() {
     if (!voucherCode) return;
     setCheckingVoucher(true);
     try {
-      // fetchJson auto-strips the response, so 'res' IS the voucher object
-      const res = await fetchJson(`${PUBLIC_API_BASE}/vouchers/check?code=${voucherCode}&subtotal=${subtotal}`);
+      const token = localStorage.getItem('token');
+      
+      // Kumpulkan konteks keranjang untuk validasi tipe voucher
+      const productIDs = cart.items?.map(i => i.product_id).filter(Boolean).join(',') || '';
+      const categories = [...new Set(cart.items?.map(i => i.product?.category).filter(Boolean))].join(',') || '';
+
+      const params = new URLSearchParams({
+        code: voucherCode,
+        subtotal: subtotal.toString(),
+        ...(productIDs && { product_ids: productIDs }),
+        ...(categories && { categories }),
+      });
+
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetchJson(`${PUBLIC_API_BASE}/vouchers/check?${params}`, { headers });
+
       if (res && res.data) {
-        setAppliedVoucher(res.data);
-        console.log("Voucher applied successfully:", res.data);
+        // Simpan discount_amount dari server jika tersedia
+        const voucherData = {
+          ...res.data,
+          server_discount_amount: res.discount_amount || null,
+        };
+        setAppliedVoucher(voucherData);
       } else {
         throw new Error("Format voucher tidak dikenali");
       }

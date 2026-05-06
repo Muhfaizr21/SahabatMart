@@ -60,10 +60,12 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		tx.Where("order_id = ? AND order_merchant_group_id = ?", order.ID, group.ID).Find(&orderItems)
 		
 		for _, item := range orderItems {
+			presetDistributed := false
 			if order.AffiliateID != nil && *order.AffiliateID != "" {
 				entries, err := orderSvc.DistributePresetCommissions(tx, order, item, *order.AffiliateID)
 				
 				if err == nil && len(entries) > 0 {
+					presetDistributed = true
 					for _, ent := range entries {
 						var member models.AffiliateMember
 						if err := tx.First(&member, "id = ?", ent.AffiliateID).Error; err != nil {
@@ -85,17 +87,40 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 							return err
 						}
 					}
-					continue 
 				}
 			}
 
-			// Fallback ke Global/Default
-			if group.AffiliateCommission > 0 && order.AffiliateID != nil {
+			// Fallback ke Global/Default jika tidak menggunakan preset
+			if !presetDistributed && item.CommissionAmount > 0 && order.AffiliateID != nil {
 				var member models.AffiliateMember
 				if err := tx.First(&member, "id = ?", *order.AffiliateID).Error; err == nil {
-					descFallback := fmt.Sprintf("Komisi Affiliate (Pesanan #%s)", order.OrderNumber)
-					if err := s.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxCommissionEarned, group.AffiliateCommission, order.ID, "order_fallback_comm", descFallback, nil); err != nil {
-						return err
+					descFallback := fmt.Sprintf("Komisi Affiliate - %s (Pesanan #%s)", item.ProductName, order.OrderNumber)
+					
+					holdDays := 3
+					if err := tx.Preload("Tier").First(&member, "id = ?", *order.AffiliateID).Error; err == nil {
+						if member.Tier != nil {
+							holdDays = member.Tier.CommissionHoldDays
+						}
+					}
+					settleAt := time.Now().AddDate(0, 0, holdDays)
+
+					// Create AffiliateCommission record so it appears in the dashboard
+					commRecord := models.AffiliateCommission{
+						AffiliateID: *order.AffiliateID,
+						OrderID:     order.ID,
+						OrderItemID: item.ID,
+						ProductID:   item.ProductID,
+						MerchantID:  item.MerchantID,
+						GrossAmount: item.Subtotal,
+						RateApplied: item.CommissionRate, // This might be 0 if we use nominal, but it's fine for tracking
+						Amount:      item.CommissionAmount,
+						Status:      models.CommissionPending,
+						HoldUntil:   &settleAt,
+					}
+					if err := tx.Create(&commRecord).Error; err == nil {
+						if err := s.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxCommissionEarned, item.CommissionAmount, commRecord.ID, "affiliate_commission", descFallback, &settleAt); err != nil {
+							return err
+						}
 					}
 				}
 			}

@@ -21,7 +21,7 @@ func NewAffiliateService(db *gorm.DB, notif *NotificationService) *AffiliateServ
 // completedOrderStatuses adalah status pesanan yang dianggap sudah valid untuk perhitungan omset
 var completedOrderStatuses = []string{"paid", "processing", "ready_to_ship", "shipped", "delivered", "completed"}
 
-func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua string, subID1, subID2, subID3 string) (*models.AffiliateMember, error) {
+func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua string, subID1, subID2, subID3 string, linkCode string) (*models.AffiliateMember, error) {
 	var affiliate models.AffiliateMember
 	if err := s.DB.Where("ref_code = ?", refCode).First(&affiliate).Error; err != nil {
 		return nil, err
@@ -29,8 +29,9 @@ func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua strin
 
 	// Fraud Shield: Cek anomali jumlah klik dari IP yang sama dalam durasi singkat
 	var recentClicks int64
+	cutoff := time.Now().Add(-5 * time.Minute)
 	s.DB.Model(&models.AffiliateClick{}).
-		Where("ip_address = ? AND created_at > NOW() - INTERVAL '5 minutes'", ip).
+		Where("ip_address = ? AND created_at > ?", ip, cutoff).
 		Count(&recentClicks)
 
 	isFraud := recentClicks > 50 // Threshold proteksi bot
@@ -49,6 +50,16 @@ func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua strin
 	}
 	s.DB.Create(&click)
 	
+	// Record specific custom link click if linkCode is provided
+	if linkCode != "" && !isFraud {
+		s.DB.Model(&models.AffiliateLink{}).
+			Where("short_code = ?", linkCode).
+			Update("clicks_count", gorm.Expr("clicks_count + 1"))
+		
+		// If we wanted to track AffiliateClickLog, we could do it here,
+		// but updating the link clicks_count is the primary requirement for the UI.
+	}
+
 	return &affiliate, nil
 }
 
@@ -150,17 +161,20 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 						storeName = "Merchant " + user.ID[:8]
 					}
 
+					configSvc := NewConfigService(tx)
+					defaultArea := configSvc.Get("default_biteship_area_id", "IDNP3CL10")
+					defaultCouriers := configSvc.Get("default_couriers", "jne,tiki,sicepat,jnt")
+
 					newMerchant := models.Merchant{
-						UserID:     user.ID,
-						StoreName:  storeName,
-						Slug:       fmt.Sprintf("store-%s", user.ID[:8]),
-						Status:     "active",
-						IsVerified: true,
-						City:       profile.City,
-						JoinedAt:   time.Now(),
-						// Fallback: Default ke Jakarta Pusat agar shipping rate tidak error
-						BiteshipAreaID: "IDNP3CL10", 
-						EnabledCouriers: "jne,tiki,sicepat,jnt",
+						UserID:          user.ID,
+						StoreName:       storeName,
+						Slug:            fmt.Sprintf("store-%s", user.ID[:8]),
+						Status:          "active",
+						IsVerified:      true,
+						City:            profile.City,
+						JoinedAt:        time.Now(),
+						BiteshipAreaID:  defaultArea,
+						EnabledCouriers: defaultCouriers,
 					}
 					if err := tx.Create(&newMerchant).Error; err != nil {
 						return err
@@ -225,10 +239,16 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 	var allDescendantIDs []string
 	query := `
 		WITH RECURSIVE subordinates AS (
-			SELECT id FROM affiliate_members WHERE upline_id = ?
+			SELECT id, 1 as depth, ARRAY[id::text] as path 
+			FROM affiliate_members 
+			WHERE upline_id = ?
+			
 			UNION ALL
-			SELECT a.id FROM affiliate_members a
+			
+			SELECT a.id, s.depth + 1, s.path || a.id::text 
+			FROM affiliate_members a
 			INNER JOIN subordinates s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
 		SELECT id FROM subordinates
 	`
@@ -270,10 +290,16 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 	var allDescendantIDs []string
 	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
-			SELECT id FROM affiliate_members WHERE upline_id = ?
+			SELECT id, 1 as depth, ARRAY[id::text] as path 
+			FROM affiliate_members 
+			WHERE upline_id = ?
+			
 			UNION ALL
-			SELECT a.id FROM affiliate_members a
+			
+			SELECT a.id, s.depth + 1, s.path || a.id::text 
+			FROM affiliate_members a
 			INNER JOIN subordinates s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
 		SELECT id FROM subordinates
 	`, affiliateID).Scan(&allDescendantIDs)
@@ -516,6 +542,23 @@ func (s *AffiliateService) LinkUpline(userID, refCode string) error {
 	// Cegah self-referral
 	if upline.UserID == userID {
 		return fmt.Errorf("tidak bisa menggunakan kode referral sendiri")
+	}
+
+	// Cegah circular referral (A -> B -> A)
+	var isCircular bool
+	query := `
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a
+			INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT EXISTS(SELECT 1 FROM subordinates WHERE id = ?)
+	`
+	s.DB.Raw(query, userAff.ID, upline.ID).Scan(&isCircular)
+
+	if isCircular {
+		return fmt.Errorf("tidak bisa menggunakan kode referral dari downline Anda sendiri")
 	}
 
 	return s.DB.Transaction(func(tx *gorm.DB) error {

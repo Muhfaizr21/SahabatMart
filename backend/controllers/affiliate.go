@@ -37,8 +37,9 @@ func (ac *AffiliateController) TrackClick(w http.ResponseWriter, r *http.Request
 	sub1 := r.URL.Query().Get("sub1")
 	sub2 := r.URL.Query().Get("sub2")
 	sub3 := r.URL.Query().Get("sub3")
+	lc := r.URL.Query().Get("lc")
 
-	affiliate, err := ac.Service.TrackClick(refCode, productID, r.Referer(), r.RemoteAddr, r.UserAgent(), sub1, sub2, sub3)
+	affiliate, err := ac.Service.TrackClick(refCode, productID, r.Referer(), r.RemoteAddr, r.UserAgent(), sub1, sub2, sub3, lc)
 	if err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Affiliate tidak ditemukan")
 		return
@@ -181,8 +182,12 @@ func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Req
 		query = query.Where("ac.status = ?", status)
 	}
 
-	var rows []CommRow
-	query.Order("ac.created_at DESC").Limit(200).Scan(&rows)
+	rows := []CommRow{}
+	if err := query.Order("ac.created_at DESC").Limit(200).Scan(&rows).Error; err != nil {
+		fmt.Printf("[GetCommissions Error] %v\n", err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data komisi dari database")
+		return
+	}
 
 	// [Sync Fix] Calculate Summary for UI
 	var summary struct {
@@ -321,14 +326,15 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 	var rows []ProductRow
 	ac.DB.Raw(`
 		SELECT p.id, p.name, p.price, p.image, p.category, 
-		       'Official Store' as store_name,
-		       COALESCE(cc.fee_percent, 0.00) AS comm_rate,
+		       COALESCE(m.store_name, 'Official Store') as store_name,
+		       COALESCE(NULLIF(p.base_affiliate_fee, 0), cc.fee_percent, 0.00) AS comm_rate,
 		       COALESCE(SUM(oi.quantity), 0) AS total_sold
 		FROM products p
+		LEFT JOIN merchants m ON m.id = p.merchant_id
 		LEFT JOIN category_commissions cc ON LOWER(cc.category_name) = LOWER(p.category)
 		LEFT JOIN order_items oi ON oi.product_id = p.id
 		WHERE p.status = 'active'
-		GROUP BY p.id, p.name, p.price, p.image, p.category, cc.fee_percent
+		GROUP BY p.id, p.name, p.price, p.image, p.category, m.store_name, p.base_affiliate_fee, cc.fee_percent
 		ORDER BY total_sold DESC
 		LIMIT 50
 	`).Scan(&rows)
@@ -395,6 +401,16 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 	var affiliate models.AffiliateMember
 	if err := ac.DB.Preload("Tier").Where("id = ?", affiliateID).First(&affiliate).Error; err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Affiliate tidak ditemukan")
+		return
+	}
+
+	// [CRITICAL FIX] Prevent withdrawal spam
+	var existingPending int64
+	ac.DB.Model(&models.AffiliateWithdrawal{}).
+		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
+		Count(&existingPending)
+	if existingPending > 0 {
+		utils.JSONError(w, http.StatusTooManyRequests, "Anda masih memiliki pengajuan penarikan yang sedang diproses.")
 		return
 	}
 
@@ -689,8 +705,8 @@ func (ac *AffiliateController) GetLeaderboard(w http.ResponseWriter, r *http.Req
 		LEFT JOIN user_profiles up ON up.user_id = am.user_id
 		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
 		LEFT JOIN orders o ON o.affiliate_id = am.id AND o.status IN ('paid','shipped','completed')
-		WHERE am.status = 'active'
-		GROUP BY am.id, up.full_name, mt.name
+		WHERE am.status = 'active' AND am.total_earned > 0
+		GROUP BY am.id, up.full_name, mt.name, mt.color
 		ORDER BY am.total_earned DESC
 		LIMIT 10
 	`).Scan(&entries)

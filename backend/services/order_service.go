@@ -178,7 +178,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				item.OrderID = order.ID
 				item.OrderMerchantGroupID = group.ID
 
-				affAmt, distAmt, platAmt, _, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
+				affAmt, distAmt, platAmt, cogs, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
 
 				var inventory models.Inventory
 				inventoryMerchantID := merchantID
@@ -213,6 +213,18 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					return err
 				}
 
+				// [Sync Fix] Also decrement stock in Master Catalog (Product)
+				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+					UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+					return err
+				}
+
+				item.PlatformFeeAmount = platAmt
+				item.CommissionAmount = affAmt
+				item.DistributionFeeAmount = distAmt
+				item.MerchantAmount = (item.Subtotal - platAmt - affAmt)
+				item.COGS = cogs
+
 				if err := tx.Create(&item).Error; err != nil {
 					return err
 				}
@@ -241,7 +253,39 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		order.TotalCommission = totalCommission
 		order.TotalWeight = totalWeight
 		order.VoucherCode = shippingInfo.VoucherCode
-		order.TotalDiscount = shippingInfo.TotalDiscount
+		
+		// [Security & Sync] Re-validate voucher on server-side to prevent spoofing
+		if order.VoucherCode != "" {
+			voucherSvc := NewVoucherService(tx)
+			
+			// Collect ProductIDs and Categories for validation
+			var productIDs, categories []string
+			for _, item := range items {
+				productIDs = append(productIDs, item.ProductID)
+				// Fetch category if not already in items (already fetched in loop above)
+				var p models.Product
+				tx.Select("category").First(&p, "id = ?", item.ProductID)
+				categories = append(categories, p.Category)
+			}
+
+			valResult, err := voucherSvc.Validate(VoucherValidateRequest{
+				Code:       order.VoucherCode,
+				BuyerID:    buyerID,
+				Subtotal:   totalSubtotal,
+				ProductIDs: productIDs,
+				Categories: categories,
+			})
+
+			if err != nil {
+				return fmt.Errorf("voucher error: %v", err)
+			}
+
+			order.VoucherID = &valResult.Voucher.ID
+			order.TotalDiscount = valResult.DiscountAmount
+		} else {
+			order.TotalDiscount = 0
+		}
+
 		order.GrandTotal = order.Subtotal + order.TotalShippingCost - order.TotalDiscount
 		if order.GrandTotal < 0 {
 			order.GrandTotal = 0
@@ -251,11 +295,19 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 			return err
 		}
 
+		// [Voucher] Increment usage counter if voucher was applied
+		if order.VoucherCode != "" {
+			voucherSvc := NewVoucherService(tx)
+			if err := voucherSvc.IncrementUsage(tx, order.VoucherCode); err != nil {
+				log.Printf("⚠️ Failed to increment voucher usage for %s: %v", order.VoucherCode, err)
+			}
+		}
+
 		return nil
 	})
 
 	if err == nil {
-		adminID := "00000000-0000-0000-0000-000000000001"
+		adminID := models.AdminID
 		_ = s.Notification.Push(adminID, "admin", "order_new", "Pesanan Baru Masuk!", 
 			fmt.Sprintf("Pesanan %s menunggu pembayaran.", order.OrderNumber), 
 			fmt.Sprintf("/admin/orders/detail/%s", order.ID))
@@ -306,7 +358,7 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 		}
 
 		// [NOTIF] Kirim ke Admin Topbar (Pembayaran Masuk)
-		adminID := "00000000-0000-0000-0000-000000000001"
+		adminID := models.AdminID
 		_ = s.Notification.Push(adminID, "admin", "payment_received", "Pembayaran Diterima!", 
 			fmt.Sprintf("Pembayaran untuk pesanan %s telah divalidasi.", order.OrderNumber), 
 			fmt.Sprintf("/admin/orders/detail/%s", order.ID))
@@ -359,12 +411,9 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	} else if err := db.Where("category_name = ?", product.Category).First(&catComm).Error; err == nil {
 		platRate = catComm.FeePercent / 100.0
 	} else {
+		// Standardize: Assume input is percentage (e.g. 5 = 5% = 0.05)
 		rawFee := s.ConfigService.GetFloat("default_platform_fee", 5.0)
-		if rawFee < 1 && rawFee > 0 {
-			platRate = rawFee
-		} else {
-			platRate = rawFee / 100.0
-		}
+		platRate = rawFee / 100.0
 	}
 	platAmt = subtotal * platRate
 
@@ -438,14 +487,9 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 						if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
 							affAmt = subtotal * tier.BaseCommissionRate
 						} else {
-							// Final fallback from Admin Config with normalization
+							// Standardize: Assume input is percentage (e.g. 3 = 3% = 0.03)
 							rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
-							var affRate float64
-							if rawComm < 1 && rawComm > 0 {
-								affRate = rawComm
-							} else {
-								affRate = rawComm / 100.0
-							}
+							affRate := rawComm / 100.0
 							affAmt = subtotal * affRate
 						}
 					}
@@ -507,7 +551,7 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 		}
 
 		// Hitung hold period berdasarkan tier affiliate
-		holdDays := 7
+		holdDays := s.ConfigService.GetInt("default_commission_hold_days", 7)
 		var tier models.MembershipTier
 		if err := tx.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
 			holdDays = tier.CommissionHoldDays

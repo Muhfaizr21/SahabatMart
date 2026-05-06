@@ -40,7 +40,7 @@ export default function AffiliateCommissions() {
       const res = await fetchJson(url);
       
       // Update data based on new response structure { data: [], summary: {} }
-      const list = Array.isArray(res.data) ? res.data : [];
+      const list = Array.isArray(res?.data) ? res.data : [];
       setCommissions(list);
 
       if (res.summary) {

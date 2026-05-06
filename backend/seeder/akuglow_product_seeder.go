@@ -49,7 +49,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Price:       149500,
 			Category:    "Body Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/dna-salmon-3.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/dna-salmon-3-300x300.webp",
 			Stock:       1000,
 			Weight:      200,
 			Status:      "active",
@@ -65,7 +65,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Price:       119700,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/Calming-barier-4.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/Calming-barier-4-300x300.webp",
 			Stock:       1000,
 			Weight:      50,
 			Status:      "active",
@@ -82,7 +82,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			OldPrice:    100000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/night-cream-boster-3.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/night-cream-boster-3-300x300.webp",
 			Stock:       1000,
 			Weight:      15,
 			Status:      "active",
@@ -99,7 +99,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			OldPrice:    150000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/daycream-2.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/daycream-2-300x300.webp",
 			Stock:       1000,
 			Weight:      15,
 			Status:      "active",
@@ -115,7 +115,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Price:       99500,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/night-cream-boster-3.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/night-cream-boster-3-300x300.webp",
 			Stock:       1000,
 			Weight:      15,
 			Status:      "active",
@@ -131,7 +131,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Price:       85000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/facial-foam-4.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/facial-foam-4-300x300.webp",
 			Stock:       1000,
 			Weight:      100,
 			Status:      "active",
@@ -147,7 +147,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Price:       75000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/toner-3.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/face-toner-2-300x300.webp",
 			Stock:       1000,
 			Weight:      100,
 			Status:      "active",
@@ -163,7 +163,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Price:       274500,
 			Category:    "Package",
 			Brand:       "AkuGlow",
-			Image:       "https://akuglow.com/wp-content/uploads/2025/10/paketan-1.webp",
+			Image:       "https://akuglow.com/wp-content/uploads/2025/10/paketan-1-300x300.webp",
 			Stock:       1000,
 			Weight:      500,
 			Status:      "active",
@@ -198,7 +198,8 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			db.Create(&p)
 			existing = p
 		} else {
-			db.Model(&existing).Updates(p)
+			// Update gambar saja untuk kali ini agar sinkron dengan link baru
+			db.Model(&existing).Update("image", p.Image)
 		}
 
 		// Create Standard Variant

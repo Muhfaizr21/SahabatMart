@@ -42,10 +42,10 @@ function ActionDropdown({ product, onToggle, onDelete, onViewQR }) {
           {/* Backdrop */}
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
           <div style={{
-            position: 'absolute', right: 0, top: '110%', zIndex: 50,
+            position: 'absolute', right: 0, top: 'calc(100% + 5px)', zIndex: 100,
             background: '#fff', borderRadius: 14, border: '1px solid #f1f5f9',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.12)', minWidth: 180, overflow: 'hidden',
-            animation: 'dropIn 0.15s ease',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.15)', minWidth: 190, overflow: 'hidden',
+            animation: 'dropIn 0.2s cubic-bezier(0, 0, 0.2, 1)',
           }}>
             <Link
               to={`/admin/products/edit?id=${product.id}`}
@@ -308,13 +308,17 @@ export default function AdminProductList() {
               {products.map((p, idx) => {
                 const sCfg = STATUS_CFG[p.status];
                 const isSelected = selectedIds.includes(p.id);
+                const isLast = idx === products.length - 1;
                 return (
                   <tr key={p.id}
-                    style={{ background: isSelected ? '#f5f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa') }}
+                    style={{ 
+                      background: isSelected ? '#f5f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa'),
+                      borderBottom: isLast ? 'none' : '1px solid #f8fafc'
+                    }}
                     onMouseEnter={e => !isSelected && (e.currentTarget.style.background = '#f8fafc')}
                     onMouseLeave={e => !isSelected && (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
                   >
-                    <td style={{ ...A.td, paddingLeft: 24 }}>
+                    <td style={{ ...A.td, paddingLeft: 24, paddingBottom: isLast ? 100 : 16 }}>
                       <input 
                         type="checkbox" 
                         checked={isSelected} 
@@ -322,14 +326,17 @@ export default function AdminProductList() {
                         style={{ width: 17, height: 17, cursor: 'pointer' }}
                       />
                     </td>
-                    {/* Product */}
-                    <td style={{ ...A.td }}>
+                    {/* ... (rest of the row cells will use the same padding logic if needed, but the checkbox cell is enough to push the container height) ... */}
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       <Link to={`/admin/products/edit?id=${p.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
                         <div style={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
                           <img
-                            src={formatImage(p.image) || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'P')}&background=eef2ff&color=6366f1&size=80`}
+                            src={formatImage(p.image)}
                             alt={p.name}
                             style={{ width: '100%', height: '100%', borderRadius: 10, objectFit: 'cover', border: '1px solid #f1f5f9', transition: 'transform 0.2s' }}
+                            onError={(e) => { 
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'P')}&background=eef2ff&color=6366f1&size=80&font-size=0.45&bold=true`;
+                            }}
                           />
                         </div>
                         <div>
@@ -346,43 +353,36 @@ export default function AdminProductList() {
                         </div>
                       </Link>
                     </td>
-                    {/* Merchant */}
-                    <td style={A.td}>
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: '#eff6ff', color: '#2563eb', fontSize: 12, fontWeight: 700 }}>
                         <i className="bx bx-store" style={{ fontSize: 13 }} />{p.store_name || 'Platform'}
                       </span>
                     </td>
-                    {/* Category */}
-                    <td style={A.td}>
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       <span style={{ fontSize: 13, color: '#475569' }}>{p.category || '—'}</span>
                     </td>
-                    {/* Weight */}
-                    <td style={A.td}>
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       <span style={{ fontSize: 13, color: p.weight > 0 ? '#475569' : '#ef4444', fontWeight: p.weight > 0 ? 400 : 800 }}>
                         {p.weight || 0}g
                       </span>
                     </td>
-                    {/* Price */}
-                    <td style={A.td}>
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>{idr(p.price)}</div>
                       {p.old_price > p.price && (
                         <div style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>{idr(p.old_price)}</div>
                       )}
                     </td>
-                    {/* Status */}
-                    <td style={A.td}>
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       {p.stock <= 0 ? (
                         <span style={statusBadge('out_of_stock')}>Stok Habis</span>
                       ) : (
                         <span style={statusBadge(p.status)}>{sCfg?.label || p.status}</span>
                       )}
                     </td>
-                    {/* Date */}
-                    <td style={A.td}>
+                    <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{fmtDate(p.created_at)}</div>
                     </td>
-                    {/* Actions */}
-                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right', paddingBottom: isLast ? 100 : 16 }}>
                       <ActionDropdown product={p} onToggle={toggle} onDelete={del} onViewQR={setShowQR} />
                     </td>
                   </tr>
@@ -392,11 +392,11 @@ export default function AdminProductList() {
           </table>
         )}
         {!loading && products.length > 0 && (
-          <div style={{ padding: '12px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12.5, color: '#94a3b8' }}>
-              Total <strong style={{ color: '#475569' }}>{products.length}</strong> produk
+          <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
+            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
+              Menampilkan <strong style={{ color: '#0f172a' }}>{products.length}</strong> produk terbaik Anda
             </span>
-            <span style={{ fontSize: 11, color: '#cbd5e1' }}>Updated {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>Terakhir diperbarui {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         )}
       </TablePanel>

@@ -9,6 +9,7 @@ export default function AdminPromo() {
   const [formData, setFormData] = useState({ id: 0, title: '', description: '', type: 'image', category: 'Instagram', file_url: '', caption: '', is_active: true });
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const loadData = () => {
     setLoading(true);
@@ -19,6 +20,40 @@ export default function AdminPromo() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('image', file);
+
+    try {
+      const resp = await fetch(`${ADMIN_API_BASE}/upload`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: fd
+      });
+      if (!resp.ok) throw new Error('Upload gagal');
+      
+      const responseData = await resp.json();
+      const uploadedUrl = responseData?.data?.url || responseData?.url;
+      
+      if (uploadedUrl) {
+        setFormData(prev => ({ ...prev, file_url: uploadedUrl }));
+        toast.success('Gambar berhasil diunggah');
+      } else {
+        throw new Error('Format response tidak valid');
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -90,11 +125,22 @@ export default function AdminPromo() {
                  <option value="copywriting">✍️ Copywriting Text</option>
               </select>
 
-              <FieldLabel>URL File / Image</FieldLabel>
-              <input style={A.input} value={formData.file_url} onChange={e => setFormData({ ...formData, file_url: e.target.value })} required />
+              {formData.type !== 'copywriting' && (
+                <>
+                  <FieldLabel>{formData.type === 'video' ? 'URL Video YouTube / Upload MP4' : 'URL Gambar / Upload Image'}</FieldLabel>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input style={{ ...A.input, flex: 1 }} placeholder="https://..." value={formData.file_url} onChange={e => setFormData({ ...formData, file_url: e.target.value })} required />
+                    <label style={{ ...A.btnLight, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, margin: 0, padding: '0 16px', height: 42, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {uploading ? <i className="bx bx-loader-alt bx-spin" /> : <i className="bx bx-upload" />}
+                      {uploading ? 'Upload...' : 'Pilih File'}
+                      <input type="file" accept={formData.type === 'video' ? "video/*" : "image/*"} onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
+                    </label>
+                  </div>
+                </>
+              )}
 
-              <FieldLabel>Caption / Konten Text</FieldLabel>
-              <textarea style={{ ...A.textarea, height: 80 }} value={formData.caption} onChange={e => setFormData({ ...formData, caption: e.target.value })} />
+              <FieldLabel>{formData.type === 'copywriting' ? 'Isi Teks Copywriting' : 'Caption Tambahan (Opsional)'}</FieldLabel>
+              <textarea style={{ ...A.textarea, height: 120 }} value={formData.caption} onChange={e => setFormData({ ...formData, caption: e.target.value })} required={formData.type === 'copywriting'} />
 
               <button type="submit" disabled={saving} style={A.btnPrimary}>{saving ? 'Saving...' : 'Simpan Promo'}</button>
            </form>

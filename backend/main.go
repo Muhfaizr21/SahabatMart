@@ -54,7 +54,11 @@ func ConnectDB() {
 		&models.SkinEducation{}, &models.SkinCommunityGroup{}, &models.SkinCommunityPost{}, &models.SkinCommunityComment{},
 		&models.SkinJourneyProgram{}, &models.SkinJourneyStep{}, &models.SkinJourneyRoutine{},
 		&models.SkinJourneyProductMapping{}, &models.SkinJourneyAIConfig{}, &models.UserSkinJourney{},
-		&models.SkinStepLog{},
+		&models.UserSkinJourneyHistory{}, &models.SkinStepLog{},
+		// Flow 2: Detail program sub-models
+		&models.SkinJourneyPhase{}, &models.SkinJourneyBenefit{}, &models.SkinJourneyWarning{}, &models.SkinJourneyFAQ{},
+		// Flow 3 & 4: Product steps with instructions
+		&models.SkinJourneyProductStep{},
 		&models.PasswordReset{},
 		// Commission Preset System (Multi-Level)
 		&models.CommissionPreset{}, &models.CommissionPresetLevel{},
@@ -110,10 +114,13 @@ func main() {
 	ConnectDB()
 
 	shouldSeed := flag.Bool("seed", false, "Populate database with sample data")
+	shouldSeedChain := flag.Bool("seed-chain", false, "Populate database with 5-level affiliate chain")
 	flag.Parse()
 
 	if *shouldSeed {
 		seeder.SeedAll(DB)
+	} else if *shouldSeedChain {
+		seeder.SeedAffiliateChain(DB)
 	} else {
 		// Auto-seed critical data even without --seed flag
 		seeder.AutoSeedCriticalData(DB)
@@ -127,7 +134,8 @@ func main() {
 	// Serve Static Files (Uploaded Images)
 	fileServer := http.FileServer(http.Dir("./uploads"))
 	mux := http.NewServeMux()
-	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fileServer))
+	// Apply CORS to uploads too
+	mux.Handle("/uploads/", routes.CorsMiddleware(http.StripPrefix("/uploads/", fileServer)))
 	mux.Handle("/", handler)
 
 	port := getEnv("PORT", "8080")

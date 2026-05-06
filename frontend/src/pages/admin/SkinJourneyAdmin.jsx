@@ -7,6 +7,7 @@ export default function SkinJourneyAdmin() {
   const [pretests, setPretests] = useState([]);
   const [journals, setJournals] = useState([]);
   const [progress, setProgress] = useState([]);
+  const [histories, setHistories] = useState([]);
   const [educations, setEducations] = useState([]);
   const [groups, setGroups] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
@@ -14,7 +15,22 @@ export default function SkinJourneyAdmin() {
   const [activeTab, setActiveTab] = useState('pretests');
   const [products, setProducts] = useState([]);
   
-  // Dynamic Journey States
+  // 4-Flow Admin Architecture States
+  const [activeProgram, setActiveProgram] = useState(null);
+  const [wizardStep, setWizardStep] = useState(0); // 0: List, 1: Basic, 2: Details, 3: Products, 4: Instructions
+  
+  // Flow Data States
+  const [progData, setProgData] = useState({
+    name: '', slug: '', category: 'Acne Treatment', target_skin_type: [], target_concerns: [], 
+    duration_weeks: 4, expected_outcome: '', ai_score_focus: [], status: 'draft', level: 1
+  });
+  const [phaseData, setPhaseData] = useState([]);
+  const [benefitData, setBenefitData] = useState([]);
+  const [warningData, setWarningData] = useState([]);
+  const [faqData, setFaqData] = useState([]);
+  const [productStepData, setProductStepData] = useState([]);
+
+  // Dynamic Journey States (Legacy Support/Monitoring)
   const [programs, setPrograms] = useState([]);
   const [steps, setSteps] = useState([]);
   const [routines, setRoutines] = useState([]);
@@ -33,13 +49,14 @@ export default function SkinJourneyAdmin() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [p, j, pr, e, g, ap] = await Promise.all([
+      const [p, j, pr, e, g, ap, hp] = await Promise.all([
         fetchJson(`${API_BASE}/api/admin/skin/pretests`),
         fetchJson(`${API_BASE}/api/admin/skin/journals`),
         fetchJson(`${API_BASE}/api/admin/skin/progress`),
         fetchJson(`${API_BASE}/api/admin/skin/education`),
         fetchJson(`${API_BASE}/api/skin/community/groups`),
-        fetchJson(`${API_BASE}/api/skin/community`)
+        fetchJson(`${API_BASE}/api/skin/community`),
+        fetchJson(`${API_BASE}/api/admin/skin/histories`)
       ]);
       setPretests(p || []);
       setJournals(j || []);
@@ -47,6 +64,7 @@ export default function SkinJourneyAdmin() {
       setEducations(e || []);
       setGroups(g || []);
       setAllPosts(ap || []);
+      setHistories(hp || []);
 
       // Load Config Data
       const [pg, st, rt, mp, ai] = await Promise.all([
@@ -166,75 +184,86 @@ export default function SkinJourneyAdmin() {
     } catch (err) { toast.error('Gagal menambah journey member'); }
   };
 
-  const handleSaveProgram = async () => {
+  // --- 4-FLOW ADMIN HANDLERS ---
+  
+  const handleEditProgramFlow = async (p) => {
     try {
-      await fetchJson(`${API_BASE}/api/admin/skin/programs/save`, {
-        method: 'POST',
-        body: JSON.stringify(newProgram)
+      setLoading(true);
+      const detail = await fetchJson(`${API_BASE}/api/admin/skin/programs/detail?id=${p.id}`);
+      setActiveProgram(detail);
+      setProgData({
+        ...detail,
+        target_skin_type: detail.target_skin_type ? JSON.parse(detail.target_skin_type) : [],
+        target_concerns: detail.target_concerns ? JSON.parse(detail.target_concerns) : [],
+        ai_score_focus: detail.ai_score_focus ? JSON.parse(detail.ai_score_focus) : [],
       });
-      toast.success('Program berhasil disimpan!');
-      setShowAddProgram(false);
-      loadData();
-    } catch (err) { toast.error('Gagal menyimpan program.'); }
+      setPhaseData(detail.phases || []);
+      setBenefitData(detail.benefits || []);
+      setWarningData(detail.warnings || []);
+      setFaqData(detail.faqs || []);
+      setProductStepData(detail.product_steps || []);
+      setWizardStep(1);
+    } catch (err) {
+      toast.error("Gagal memuat detail program");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveStep = async () => {
+  const handleSaveFlow1 = async () => {
     try {
-      await fetchJson(`${API_BASE}/api/admin/skin/steps/save`, {
+      const payload = {
+        ...progData,
+        target_skin_type: JSON.stringify(progData.target_skin_type),
+        target_concerns: JSON.stringify(progData.target_concerns),
+        ai_score_focus: JSON.stringify(progData.ai_score_focus),
+      };
+      const res = await fetchJson(`${API_BASE}/api/admin/skin/programs/save`, {
         method: 'POST',
-        body: JSON.stringify(newStep)
+        body: JSON.stringify(payload)
       });
-      toast.success('Step berhasil disimpan!');
-      setShowAddStep(false);
+      setActiveProgram(res);
+      toast.success("Flow 1: Program Initiation Saved!");
+      setWizardStep(2);
       loadData();
-    } catch (err) { toast.error('Gagal menyimpan step.'); }
+    } catch (err) { toast.error("Gagal simpan Flow 1"); }
   };
 
-  const handleSaveRoutine = async () => {
+  const handleSaveFlow2 = async () => {
     try {
-      await fetchJson(`${API_BASE}/api/admin/skin/routines/save`, {
-        method: 'POST',
-        body: JSON.stringify(newRoutine)
-      });
-      toast.success('Routine berhasil disimpan!');
-      setShowAddRoutine(false);
-      loadData();
-    } catch (err) { toast.error('Gagal menyimpan routine.'); }
+      // Save all related details (Phases, Benefits, etc.)
+      const promises = [
+        ...phaseData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/phase/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...benefitData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/benefit/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...warningData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/warning/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+        ...faqData.map(item => fetchJson(`${API_BASE}/api/admin/skin/programs/faq/save`, { method: 'POST', body: JSON.stringify({...item, program_id: activeProgram.id}) })),
+      ];
+      await Promise.all(promises);
+      toast.success("Flow 2: Detailed Descriptions Saved!");
+      setWizardStep(3);
+    } catch (err) { toast.error("Gagal simpan Flow 2 detail"); }
   };
 
-  const handleSaveMapping = async () => {
+  const handleSaveFlow3And4 = async () => {
     try {
-      await fetchJson(`${API_BASE}/api/admin/skin/product-mappings/save`, {
-        method: 'POST',
-        body: JSON.stringify(newMapping)
+      const promises = productStepData.map(item => {
+        return fetchJson(`${API_BASE}/api/admin/skin/programs/product-step/save`, {
+          method: 'POST',
+          body: JSON.stringify({
+            ...item,
+            program_id: activeProgram.id,
+            step_by_step_json: typeof item.step_by_step_json === 'string' ? item.step_by_step_json : JSON.stringify(item.step_by_step_json),
+            tips_json: typeof item.tips_json === 'string' ? item.tips_json : JSON.stringify(item.tips_json),
+            visual_refs_json: typeof item.visual_refs_json === 'string' ? item.visual_refs_json : JSON.stringify(item.visual_refs_json),
+          })
+        });
       });
-      toast.success('Mapping berhasil disimpan!');
-      setShowAddMapping(false);
+      await Promise.all(promises);
+      toast.success("Flow 3 & 4: Products & Instructions Saved!");
+      setWizardStep(0);
+      setActiveProgram(null);
       loadData();
-    } catch (err) { toast.error('Gagal menyimpan mapping.'); }
-  };
-
-  const handleUpdateAI = async () => {
-    try {
-      await fetchJson(`${API_BASE}/api/admin/skin/ai-configs/update`, {
-        method: 'POST',
-        body: JSON.stringify(selectedAI)
-      });
-      toast.success('Konfigurasi AI berhasil diperbarui!');
-      setShowEditAI(false);
-      loadData();
-    } catch (err) { toast.error('Gagal memperbarui AI.'); }
-  };
-
-  const handleSaveGeneralConfig = async () => {
-    try {
-      await fetchJson(`${API_BASE}/api/admin/configs/upsert`, {
-        method: 'POST',
-        body: JSON.stringify(journeyConfigs)
-      });
-      toast.success('Konfigurasi umum berhasil disimpan!');
-      loadData();
-    } catch (err) { toast.error('Gagal menyimpan konfigurasi.'); }
+    } catch (err) { toast.error("Gagal simpan Flow 3/4"); }
   };
 
   const handleDeleteProgram = async (id) => {
@@ -341,6 +370,7 @@ export default function SkinJourneyAdmin() {
   const renderTabs = () => {
     const tabs = [
       { id: 'pretests', label: 'Members', icon: 'bx-group', count: pretests.length },
+      { id: 'histories', label: 'Graduated', icon: 'bx-award', count: histories.length },
       { id: 'education', label: 'Education', icon: 'bx-book-content', count: educations.length },
       { id: 'community', label: 'Community Feed', icon: 'bx-chat', count: allPosts.length },
       { id: 'groups', label: 'Interest Groups', icon: 'bx-category', count: groups.length },
@@ -543,6 +573,54 @@ export default function SkinJourneyAdmin() {
         </div>
       )}
 
+      {activeTab === 'histories' && (
+        <div style={A.card}>
+          <TablePanel>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ ...A.th, paddingLeft: 24 }}>GRADUATE</th>
+                  <th style={A.th}>PROGRAM</th>
+                  <th style={A.th}>DURASI</th>
+                  <th style={A.th}>CONSISTENCY</th>
+                  <th style={A.th}>FINAL RANK</th>
+                  <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>DATE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {histories.length === 0 ? (
+                  <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Belum ada member yang lulus.</td></tr>
+                ) : histories.map((h, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ ...A.td, paddingLeft: 24 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{h.user_id.substring(0,8)}...</div>
+                    </td>
+                    <td style={A.td}>
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>{h.program_name}</span>
+                    </td>
+                    <td style={A.td}>{h.day_count} Hari</td>
+                    <td style={A.td}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, width: 60, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${h.consistency_score}%`, background: '#10b981' }} />
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981' }}>{h.consistency_score}%</span>
+                      </div>
+                    </td>
+                    <td style={A.td}>
+                      <span style={{ padding: '4px 8px', borderRadius: 6, background: '#fef3c7', color: '#d97706', fontSize: 10, fontWeight: 800 }}>{h.final_rank}</span>
+                    </td>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right', fontSize: 11, color: '#94a3b8' }}>
+                      {new Date(h.finished_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TablePanel>
+        </div>
+      )}
+
       {/* Modal View Detail Journey */}
       {renderMemberModal()}
 
@@ -611,250 +689,259 @@ export default function SkinJourneyAdmin() {
 
       {activeTab === 'config' && (
         <div style={A.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9' }}>
-            <div style={{ display: 'flex', gap: 12, overflowX: 'auto' }}>
-              {[
-                { id: 'programs', label: 'Programs' },
-                { id: 'steps', label: 'Steps' },
-                { id: 'routines', label: 'Routines' },
-                { id: 'mappings', label: 'Product Mappings' },
-                { id: 'ai', label: 'AI Prompt Config' },
-                { id: 'general', label: 'General Settings' }
-              ].map(s => (
-                <button 
-                  key={s.id} 
-                  onClick={() => setConfigSubTab(s.id)}
-                  style={{ 
-                    ...A.btnGhost, 
-                    background: configSubTab === s.id ? '#f1f5f9' : 'transparent',
-                    color: configSubTab === s.id ? '#0f172a' : '#64748b',
-                    fontSize: 12,
-                    fontWeight: 800,
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
-            {configSubTab !== 'ai' && (
-              <button 
-                onClick={() => {
-                  if (configSubTab === 'programs') setShowAddProgram(true);
-                  if (configSubTab === 'steps') setShowAddStep(true);
-                  if (configSubTab === 'routines') setShowAddRoutine(true);
-                  if (configSubTab === 'mappings') setShowAddMapping(true);
-                }}
-                style={{ ...A.btnPrimary, padding: '8px 20px', borderRadius: 12, fontSize: 11 }}
-              >
-                + NEW {configSubTab.toUpperCase()}
-              </button>
-            )}
-          </div>
-          
-          <TablePanel>
+          {wizardStep === 0 ? (
             <>
-            {configSubTab === 'programs' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...A.th, paddingLeft: 24 }}>PROGRAM NAME</th>
-                    <th style={A.th}>DESCRIPTION</th>
-                    <th style={A.th}>LEVEL</th>
-                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {programs.map((p, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ ...A.td, paddingLeft: 24 }}><strong>{p.name}</strong></td>
-                      <td style={A.td}>{p.description}</td>
-                      <td style={A.td}>{p.level}</td>
-                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                         <button onClick={() => handleDeleteProgram(p.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>DELETE</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {configSubTab === 'steps' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...A.th, paddingLeft: 24 }}>STEP NAME</th>
-                    <th style={A.th}>DEFAULT INSTRUCTION</th>
-                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {steps.map((s, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ ...A.td, paddingLeft: 24 }}><strong>{s.name}</strong></td>
-                      <td style={A.td}>{s.default_instruction}</td>
-                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                         <button onClick={() => handleDeleteStep(s.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>DELETE</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {configSubTab === 'routines' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...A.th, paddingLeft: 24 }}>PROGRAM</th>
-                    <th style={A.th}>STEP</th>
-                    <th style={A.th}>WEEK</th>
-                    <th style={A.th}>TIME</th>
-                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {routines.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ ...A.td, paddingLeft: 24 }}>{r.program?.name}</td>
-                      <td style={A.td}>{r.step?.name}</td>
-                      <td style={A.td}>Week {r.week}</td>
-                      <td style={A.td}>{r.time_of_day}</td>
-                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                         <button onClick={() => handleDeleteRoutine(r.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>REMOVE</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {configSubTab === 'mappings' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...A.th, paddingLeft: 24 }}>PRODUCT</th>
-                    <th style={A.th}>STEP TYPE</th>
-                    <th style={A.th}>SKIN TYPE</th>
-                    <th style={A.th}>PRIORITY</th>
-                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mappings.map((m, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ ...A.td, paddingLeft: 24 }}>{m.product?.name}</td>
-                      <td style={A.td}>{m.step_type}</td>
-                      <td style={A.td}>{m.skin_type || 'All'}</td>
-                      <td style={A.td}>{m.priority}</td>
-                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                         <button onClick={() => handleDeleteMapping(m.id)} style={{ color: '#ef4444', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>REMOVE</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {configSubTab === 'ai' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...A.th, paddingLeft: 24 }}>STAGE</th>
-                    <th style={A.th}>PROMPT PREVIEW</th>
-                    <th style={A.th}>TEMP</th>
-                    <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {aiConfigs.map((c, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ ...A.td, paddingLeft: 24 }}><strong>{c.stage}</strong></td>
-                      <td style={A.td}><div style={{ maxWidth: 300, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.prompt_body}</div></td>
-                      <td style={A.td}>{c.temperature}</td>
-                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                         <button onClick={() => { setSelectedAI(c); setShowEditAI(true); }} style={{ color: '#6366f1', fontWeight: 800, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer' }}>EDIT PROMPT</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {configSubTab === 'general' && (
-              <div style={{ padding: 24 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                  <div>
-                    <FieldLabel>Daily Affirmations (JSON Array)</FieldLabel>
-                    <textarea 
-                      style={{ ...A.input, height: 120, fontFamily: 'monospace', fontSize: 11 }} 
-                      value={journeyConfigs.find(c => c.key === 'skin_journey_affirmations')?.value || '[]'} 
-                      onChange={e => {
-                        const newConfigs = [...journeyConfigs];
-                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_affirmations');
-                        if (idx !== -1) newConfigs[idx].value = e.target.value;
-                        else newConfigs.push({ key: 'skin_journey_affirmations', value: e.target.value });
-                        setJourneyConfigs(newConfigs);
-                      }}
-                    />
-                    <p style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Example: ["Stay strong", "You are beautiful"]</p>
-                  </div>
-                  <div>
-                    <FieldLabel>Ritual 60-Detik Instruction</FieldLabel>
-                    <textarea 
-                      style={{ ...A.input, height: 120 }} 
-                      value={journeyConfigs.find(c => c.key === 'skin_journey_ritual_instruction')?.value || ''} 
-                      onChange={e => {
-                        const newConfigs = [...journeyConfigs];
-                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_ritual_instruction');
-                        if (idx !== -1) newConfigs[idx].value = e.target.value;
-                        else newConfigs.push({ key: 'skin_journey_ritual_instruction', value: e.target.value });
-                        setJourneyConfigs(newConfigs);
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Day 25 Reward Voucher Code</FieldLabel>
-                    <input 
-                      style={A.input} 
-                      value={journeyConfigs.find(c => c.key === 'skin_journey_voucher_code')?.value || ''} 
-                      onChange={e => {
-                        const newConfigs = [...journeyConfigs];
-                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_voucher_code');
-                        if (idx !== -1) newConfigs[idx].value = e.target.value;
-                        else newConfigs.push({ key: 'skin_journey_voucher_code', value: e.target.value });
-                        setJourneyConfigs(newConfigs);
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>Day 25 Reward Message</FieldLabel>
-                    <input 
-                      style={A.input} 
-                      value={journeyConfigs.find(c => c.key === 'skin_journey_voucher_message')?.value || ''} 
-                      onChange={e => {
-                        const newConfigs = [...journeyConfigs];
-                        const idx = newConfigs.findIndex(c => c.key === 'skin_journey_voucher_message');
-                        if (idx !== -1) newConfigs[idx].value = e.target.value;
-                        else newConfigs.push({ key: 'skin_journey_voucher_message', value: e.target.value });
-                        setJourneyConfigs(newConfigs);
-                      }}
-                    />
-                  </div>
-                </div>
-                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button 
-                    onClick={handleSaveGeneralConfig}
-                    style={{ ...A.btnPrimary, padding: '10px 32px' }}
-                  >
-                    SAVE GENERAL CONFIG
-                  </button>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9' }}>
+                <h3 style={{ fontSize: 16, fontWeight: 900 }}>Program Skin Journey Builder</h3>
+                <button style={A.btnPrimary} onClick={() => {
+                  setProgData({ name: '', slug: '', category: 'Acne Treatment', target_skin_type: [], target_concerns: [], duration_weeks: 4, expected_outcome: '', ai_score_focus: [], status: 'draft', level: 1 });
+                  setPhaseData([]); setBenefitData([]); setWarningData([]); setFaqData([]); setProductStepData([]);
+                  setWizardStep(1);
+                }}>+ CREATE NEW PROGRAM</button>
               </div>
-            )}
+              <TablePanel>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...A.th, paddingLeft: 24 }}>PROGRAM NAME</th>
+                      <th style={A.th}>CATEGORY</th>
+                      <th style={A.th}>STATUS</th>
+                      <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {programs.map((p, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ ...A.td, paddingLeft: 24 }}><strong>{p.name}</strong></td>
+                        <td style={A.td}>{p.category}</td>
+                        <td style={A.td}><span style={statusBadge(p.status)}>{p.status}</span></td>
+                        <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                          <button onClick={() => handleEditProgramFlow(p)} style={{ ...A.btnGhost, color: '#6366f1', marginRight: 8 }}>EDIT FLOW</button>
+                          <button onClick={() => handleDeleteProgram(p.id)} style={{ ...A.btnGhost, color: '#ef4444' }}>DELETE</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TablePanel>
             </>
-          </TablePanel>
+          ) : (
+            <div style={{ padding: 32 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 32, justifyContent: 'center' }}>
+                {[1, 2, 3, 4].map(s => (
+                  <div key={s} style={{ 
+                    display: 'flex', alignItems: 'center', gap: 8, 
+                    color: wizardStep >= s ? '#6366f1' : '#94a3b8',
+                    fontWeight: 800, fontSize: 12
+                  }}>
+                    <div style={{ 
+                      width: 24, height: 24, borderRadius: '50%', 
+                      background: wizardStep >= s ? '#6366f1' : '#f1f5f9',
+                      color: wizardStep >= s ? 'white' : '#94a3b8',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{s}</div>
+                    Flow {s}
+                    {s < 4 && <div style={{ width: 40, height: 2, background: wizardStep > s ? '#6366f1' : '#f1f5f9' }} />}
+                  </div>
+                ))}
+              </div>
+
+              {wizardStep === 1 && (
+                <div className="fade-in">
+                  <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 24 }}>FLOW 1: BIKIN PROGRAM (Inisiasi)</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                    <div>
+                      <FieldLabel>Program Name</FieldLabel>
+                      <input style={A.input} placeholder="e.g. Acne-Free Express 4 Weeks" value={progData.name} onChange={e => setProgData({...progData, name: e.target.value})} />
+                    </div>
+                    <div>
+                      <FieldLabel>Category</FieldLabel>
+                      <select style={A.input} value={progData.category} onChange={e => setProgData({...progData, category: e.target.value})}>
+                        {['Acne Treatment', 'Anti-Aging', 'Brightening', 'Hydration', 'Sensitivity', 'General'].map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel>Duration (Weeks)</FieldLabel>
+                      <input type="number" style={A.input} value={progData.duration_weeks} onChange={e => setProgData({...progData, duration_weeks: parseInt(e.target.value)})} />
+                    </div>
+                    <div>
+                      <FieldLabel>Level</FieldLabel>
+                      <input type="number" style={A.input} value={progData.level} onChange={e => setProgData({...progData, level: parseInt(e.target.value)})} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <FieldLabel>Expected Outcome</FieldLabel>
+                      <textarea style={{ ...A.input, height: 80 }} value={progData.expected_outcome} onChange={e => setProgData({...progData, expected_outcome: e.target.value})} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button style={A.btnGhost} onClick={() => setWizardStep(0)}>Cancel</button>
+                    <button style={A.btnPrimary} onClick={handleSaveFlow1}>Next: Flow 2 Details</button>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 2 && (
+                <div className="fade-in">
+                  <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 24 }}>FLOW 2: PENJELASAN DETAIL</h3>
+                  
+                  {/* Phases Section */}
+                  <div style={{ marginBottom: 32 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 800 }}>Timeline Phases</h4>
+                      <button style={{ ...A.btnGhost, color: '#6366f1' }} onClick={() => setPhaseData([...phaseData, { phase_number: phaseData.length + 1, title: '', description: '', expectations: '' }])}>+ ADD PHASE</button>
+                    </div>
+                    {phaseData.map((p, idx) => (
+                      <div key={idx} style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 12 }}>
+                          <input type="number" style={A.input} placeholder="Wk" value={p.phase_number} onChange={e => {
+                            const newP = [...phaseData]; newP[idx].phase_number = parseInt(e.target.value); setPhaseData(newP);
+                          }} />
+                          <input style={A.input} placeholder="Phase Title" value={p.title} onChange={e => {
+                            const newP = [...phaseData]; newP[idx].title = e.target.value; setPhaseData(newP);
+                          }} />
+                          <input style={A.input} placeholder="Expectations" value={p.expectations} onChange={e => {
+                            const newP = [...phaseData]; newP[idx].expectations = e.target.value; setPhaseData(newP);
+                          }} />
+                        </div>
+                        <textarea style={{ ...A.input, height: 60, marginTop: 8 }} placeholder="Phase Description" value={p.description} onChange={e => {
+                          const newP = [...phaseData]; newP[idx].description = e.target.value; setPhaseData(newP);
+                        }} />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Benefits & Warnings */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 800 }}>Benefits</h4>
+                        <button style={{ ...A.btnGhost, color: '#6366f1' }} onClick={() => setBenefitData([...benefitData, { title: '', description: '', icon: '🎯' }])}>+ ADD</button>
+                      </div>
+                      {benefitData.map((b, idx) => (
+                        <div key={idx} style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
+                          <input style={{ ...A.input, width: 40 }} value={b.icon} onChange={e => {
+                            const newB = [...benefitData]; newB[idx].icon = e.target.value; setBenefitData(newB);
+                          }} />
+                          <input style={A.input} placeholder="Benefit Title" value={b.title} onChange={e => {
+                            const newB = [...benefitData]; newB[idx].title = e.target.value; setBenefitData(newB);
+                          }} />
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 800 }}>Warnings</h4>
+                        <button style={{ ...A.btnGhost, color: '#ef4444' }} onClick={() => setWarningData([...warningData, { title: '', description: '', type: 'danger', badge: 'PENTING' }])}>+ ADD</button>
+                      </div>
+                      {warningData.map((w, idx) => (
+                        <div key={idx} style={{ marginBottom: 8 }}>
+                          <input style={A.input} placeholder="Warning Title" value={w.title} onChange={e => {
+                            const newW = [...warningData]; newW[idx].title = e.target.value; setWarningData(newW);
+                          }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
+                    <button style={A.btnGhost} onClick={() => setWizardStep(1)}>Back</button>
+                    <button style={A.btnPrimary} onClick={handleSaveFlow2}>Next: Flow 3 Products</button>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 3 && (
+                <div className="fade-in">
+                  <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 24 }}>FLOW 3: PRODUK YANG DIPAKAI</h3>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                    <button style={A.btnPrimary} onClick={() => setProductStepData([...productStepData, { product_id: '', step_name: '', step_number: productStepData.length+1, phase: 'both', frequency: 'daily' }])}>+ ADD PRODUCT STEP</button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {productStepData.map((ps, idx) => (
+                      <div key={idx} style={{ padding: 20, border: '1px solid #e2e8f0', borderRadius: 12, background: '#f8fafc' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', gap: 16 }}>
+                          <div>
+                            <FieldLabel>Step #</FieldLabel>
+                            <input type="number" style={A.input} value={ps.step_number} onChange={e => {
+                              const newPS = [...productStepData]; newPS[idx].step_number = parseInt(e.target.value); setProductStepData(newPS);
+                            }} />
+                          </div>
+                          <div>
+                            <FieldLabel>Step Name</FieldLabel>
+                            <input style={A.input} placeholder="e.g. Cleansing" value={ps.step_name} onChange={e => {
+                              const newPS = [...productStepData]; newPS[idx].step_name = e.target.value; setProductStepData(newPS);
+                            }} />
+                          </div>
+                          <div>
+                            <FieldLabel>Select Product</FieldLabel>
+                            <select style={A.input} value={ps.product_id} onChange={e => {
+                              const newPS = [...productStepData]; newPS[idx].product_id = e.target.value; setProductStepData(newPS);
+                            }}>
+                              <option value="">Choose Product</option>
+                              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <FieldLabel>Phase</FieldLabel>
+                            <select style={A.input} value={ps.phase} onChange={e => {
+                              const newPS = [...productStepData]; newPS[idx].phase = e.target.value; setProductStepData(newPS);
+                            }}>
+                              <option value="both">Both (AM & PM)</option>
+                              <option value="morning">Morning Only</option>
+                              <option value="evening">Evening Only</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
+                    <button style={A.btnGhost} onClick={() => setWizardStep(2)}>Back</button>
+                    <button style={A.btnPrimary} onClick={() => setWizardStep(4)}>Next: Flow 4 Instructions</button>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 4 && (
+                <div className="fade-in">
+                  <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 24 }}>FLOW 4: CARA PAKAI (Instruksi Detail)</h3>
+                  {productStepData.map((ps, idx) => (
+                    <div key={idx} style={{ padding: 24, border: '1px solid #6366f1', borderRadius: 16, marginBottom: 24, background: 'white' }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#6366f1', marginBottom: 16 }}>STEP {ps.step_number}: {ps.step_name} ({products.find(p => p.id === ps.product_id)?.name})</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                        <div>
+                          <FieldLabel>Dosage/Amount</FieldLabel>
+                          <input style={A.input} placeholder="e.g. Seukuran biji jagung" value={ps.dosage_amount} onChange={e => {
+                            const newPS = [...productStepData]; newPS[idx].dosage_amount = e.target.value; setProductStepData(newPS);
+                          }} />
+                        </div>
+                        <div>
+                          <FieldLabel>Wait Time (Min)</FieldLabel>
+                          <input type="number" style={A.input} value={ps.wait_time_minutes} onChange={e => {
+                            const newPS = [...productStepData]; newPS[idx].wait_time_minutes = parseInt(e.target.value); setProductStepData(newPS);
+                          }} />
+                        </div>
+                        <div>
+                          <FieldLabel>Mechanism</FieldLabel>
+                          <input style={A.input} placeholder="e.g. Keratolytic" value={ps.mechanism} onChange={e => {
+                            const newPS = [...productStepData]; newPS[idx].mechanism = e.target.value; setProductStepData(newPS);
+                          }} />
+                        </div>
+                      </div>
+                      <FieldLabel>Pro Tips</FieldLabel>
+                      <textarea style={{ ...A.input, height: 60 }} placeholder="Tips khusus untuk user..." value={ps.pro_tips} onChange={e => {
+                        const newPS = [...productStepData]; newPS[idx].pro_tips = e.target.value; setProductStepData(newPS);
+                      }} />
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
+                    <button style={A.btnGhost} onClick={() => setWizardStep(3)}>Back</button>
+                    <button style={{ ...A.btnPrimary, background: '#10b981', borderColor: '#10b981' }} onClick={handleSaveFlow3And4}>PUBLISH COMPLETE PROGRAM 🧬</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1010,7 +1097,7 @@ export default function SkinJourneyAdmin() {
       )}
       {/* Modal Add Pretest */}
       {showAddPretest && (
-        <Modal show={showAddPretest} onClose={() => setShowAddPretest(false)} title="Register New Journey Member">
+        <Modal onClose={() => setShowAddPretest(false)} title="Register New Journey Member">
           <div style={{ padding: '0 24px 24px' }}>
             <FieldLabel>User ID (UUID)</FieldLabel>
             <input style={A.input} value={newPretest.user_id} onChange={e => setNewPretest({...newPretest, user_id: e.target.value})} placeholder="e.g. 07032ac6-..." />

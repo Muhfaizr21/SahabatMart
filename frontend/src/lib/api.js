@@ -1,6 +1,5 @@
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-
-export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+export const API_BASE = (RAW_API_BASE && RAW_API_BASE !== '/') ? RAW_API_BASE.replace(/\/+$/, '') : 'http://localhost:8080';
 export const AUTH_API_BASE = `${API_BASE}/api/auth`;
 export const PUBLIC_API_BASE = `${API_BASE}/api/public`;
 export const ADMIN_API_BASE = `${API_BASE}/api/admin`;
@@ -54,7 +53,7 @@ export async function fetchJson(url, options = {}) {
     
     // Pelindung Rekursif: Mengupas lapisan 'success' hanya jika itu double-wrapping murni
     // Jangan mengupas jika ada metadata penting seperti 'total', 'page', atau 'limit'
-    while (result && result.status === 'success' && result.data !== undefined && !result.total && !result.page) {
+    while (result && result.status === 'success' && result.data !== undefined && result.total === undefined && result.page === undefined) {
       result = result.data;
     }
     
@@ -113,25 +112,25 @@ export async function uploadFile(url, file, fieldName = 'image') {
 
 // Fungsi yang hilang dan menyebabkan error
 export function formatImage(path) {
-  const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; // Premium Placeholder
-  if (!path || path === "") return fallback;
+  const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80";
+  if (!path) return fallback;
   
-  // Protection: Strip broken/temp tunnel domains if present
-  let cleanPath = path;
-  if (typeof path === 'string' && path.includes('trycloudflare.com')) {
-    cleanPath = path.split('trycloudflare.com').pop();
-  }
+  // 1. If it's already a full URL (external, blob, or data), return as is
+  if (path.startsWith('blob:') || path.startsWith('data:')) return path;
+  if (path.startsWith('http') && !path.includes('localhost') && !path.includes('127.0.0.1')) return path;
 
-  if (cleanPath.startsWith('http')) return cleanPath;
+  // 2. Clean the path: remove domain if it accidentally exists, and leading slashes
+  let cleanPath = path.replace(/^https?:\/\/[^\/]+/, ''); // Remove protocol and domain
+  cleanPath = cleanPath.replace(/^\/+/, ''); // Remove leading slashes
+  
+  // 3. Handle Unsplash shorthand
   if (cleanPath.startsWith('photo-')) {
-    // Exact format for Unsplash source
     return `https://images.unsplash.com/${cleanPath}?auto=format&fit=crop&q=80&w=800`;
   }
-  if (!cleanPath.includes('/') && !cleanPath.includes('.')) {
-    // Probably a broken ID or partial path
-    return fallback;
-  }
-  return `${API_BASE}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+
+  // 4. Prepend API_BASE
+  const base = API_BASE.replace(/\/+$/, '');
+  return `${base}/${cleanPath}`;
 }
 
 /**
@@ -147,10 +146,11 @@ export async function captureAffiliate() {
     const sub2 = urlParams.get('sub2') || '';
     const sub3 = urlParams.get('sub3') || '';
     const productId = urlParams.get('product_id') || '';
+    const lc = urlParams.get('lc') || '';
 
     try {
       // Panggil backend "Monster" kita untuk Tracking Click
-      const res = await fetchJson(`${API_BASE}/api/public/affiliate/track?ref=${ref}&sub1=${sub1}&sub2=${sub2}&sub3=${sub3}&product_id=${productId}`);
+      const res = await fetchJson(`${API_BASE}/api/public/affiliate/track?ref=${ref}&sub1=${sub1}&sub2=${sub2}&sub3=${sub3}&product_id=${productId}&lc=${lc}`);
       
       // Simpan di localStorage agar tetap ADA saat checkout
       if (res.affiliate_id) {
