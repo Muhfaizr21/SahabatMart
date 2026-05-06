@@ -84,7 +84,7 @@ export default function SkinJourneyAdmin() {
       setJourneyConfigs(sc || []);
 
       const prodRes = await fetchJson(`${API_BASE}/api/admin/products`);
-      setProducts(prodRes || []);
+      setProducts(prodRes.data || []);
     } catch (err) {
       console.error("Admin Load Error:", err);
       toast.error('Gagal memuat data monitoring');
