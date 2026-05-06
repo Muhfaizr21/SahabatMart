@@ -81,10 +81,10 @@ export default function SkinJourneyAdmin() {
       setAiConfigs(ai || []);
       
       const sc = await fetchJson(`${API_BASE}/api/admin/configs?group=skin_journey`);
-      setJourneyConfigs(sc.data || []);
+      setJourneyConfigs(sc || []);
 
       const prodRes = await fetchJson(`${API_BASE}/api/admin/products`);
-      setProducts(prodRes.data || []);
+      setProducts(prodRes || []);
     } catch (err) {
       console.error("Admin Load Error:", err);
       toast.error('Gagal memuat data monitoring');
@@ -193,9 +193,9 @@ export default function SkinJourneyAdmin() {
       setActiveProgram(detail);
       setProgData({
         ...detail,
-        target_skin_type: detail.target_skin_type ? JSON.parse(detail.target_skin_type) : [],
-        target_concerns: detail.target_concerns ? JSON.parse(detail.target_concerns) : [],
-        ai_score_focus: detail.ai_score_focus ? JSON.parse(detail.ai_score_focus) : [],
+        target_skin_type: (detail.target_skin_type && detail.target_skin_type.startsWith('[')) ? JSON.parse(detail.target_skin_type) : [],
+        target_concerns: (detail.target_concerns && detail.target_concerns.startsWith('[')) ? JSON.parse(detail.target_concerns) : [],
+        ai_score_focus: (detail.ai_score_focus && detail.ai_score_focus.startsWith('{')) ? JSON.parse(detail.ai_score_focus) : [],
       });
       setPhaseData(detail.phases || []);
       setBenefitData(detail.benefits || []);
