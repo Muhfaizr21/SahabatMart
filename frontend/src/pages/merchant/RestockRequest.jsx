@@ -605,11 +605,11 @@ export default function RestockRequest() {
         }
 
         .catalog-area { 
-          flex: 1; 
+          flex: 2; 
           display: flex; 
           flex-direction: column; 
           background: #f8fafc; 
-          min-height: 0; /* Prevents flex items from growing beyond container */
+          min-height: 0; 
         }
         .modal-top-nav { padding: 32px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; }
         .search-box-v2 {
@@ -787,10 +787,11 @@ export default function RestockRequest() {
           .cart-area { 
             width: 100%; 
             height: auto;
-            max-height: 55%; 
+            max-height: 40%; 
             border-left: none; 
             border-top: 1px solid #f1f5f9; 
             box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+            overflow-y: auto;
           }
           
           .cart-head-v2 { padding: 16px 20px; }

@@ -1,11 +1,35 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson, uploadFile, formatImage } from '../lib/api';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { BUYER_API_BASE, AUTH_API_BASE, fetchJson, uploadFile, formatImage } from '../lib/api';
+import { QRCodeSVG } from 'qrcode.react';
+import { toPng } from 'html-to-image';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const query = new URLSearchParams(window.location.search);
-  const tabParam = query.get('tab');
+  const cardRef = useRef(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const downloadCard = async () => {
+    if (cardRef.current === null || !userData) return;
+    setIsDownloading(true);
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        cacheBust: true,
+        pixelRatio: 3,
+        backgroundColor: '#ffffff',
+      });
+      const link = document.createElement('a');
+      link.download = `AkuGlow-Member-${userData.id.substring(0, 8)}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Download failed', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam || 'profile');
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
@@ -183,8 +207,47 @@ export default function ProfilePage() {
   const profile = userData.profile || {};
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-6">
+    <main className="min-h-screen bg-gray-50 py-12 print:bg-white print:py-0">
+      <style>{`
+        @media print {
+          nav, aside, header, footer, .mb-10.border-b, .mt-12.w-full.max-w-md, button, .no-print {
+            display: none !important;
+          }
+          body, main {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .max-w-7xl {
+            max-width: 100% !important;
+          }
+          .flex-1 {
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+          }
+          .bg-white.rounded-\[2rem\] {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            width: 100% !important;
+          }
+          .animate-fade-in {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            min-height: 100vh !important;
+            width: 100% !important;
+          }
+          /* Ensure the card prints with its background colors */
+          .perspective-1000 {
+            transform: scale(1.4) !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+      <div className="max-w-7xl mx-auto px-6 print:px-0">
         <div className="flex flex-col lg:flex-row gap-8">
           
           {/* Sidebar */}
@@ -199,7 +262,7 @@ export default function ProfilePage() {
               />
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="w-32 h-32 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-4xl font-black mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative group cursor-pointer"
+                className="w-32 h-32 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-4xl font-black mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative group cursor-pointer"
               >
                 <img src={formatImage(formData.avatar_url || profile.avatar_url) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop"} alt={profile.full_name} className={`w-full h-full object-cover transition-transform ${uploadingAvatar ? 'opacity-50' : 'group-hover:scale-110'}`} />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -207,33 +270,39 @@ export default function ProfilePage() {
                 </div>
               </div>
               <h2 className="text-xl font-black text-gray-900 leading-tight mb-1">{profile.full_name || 'User AkuGlow'}</h2>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full mt-2 border border-yellow-200">
-                 <i className="bx bxs-crown"></i> <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Member Aktif</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 rounded-full mt-2 border border-rose-200">
+                 <i className="bx bxs-crown text-rose-500"></i> <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Member Aktif</span>
               </div>
             </div>
             
             <nav className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
               <button 
                 onClick={() => setActiveTab('profile')}
-                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'profile' ? 'bg-blue-50/50 text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
+                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'profile' ? 'bg-rose-50/50 text-rose-600 border-rose-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
               >
                 <i className="bx bx-user text-lg"></i> Biodata Diri
               </button>
               <button 
                 onClick={() => setActiveTab('orders')}
-                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'orders' ? 'bg-blue-50/50 text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
+                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'orders' ? 'bg-rose-50/50 text-rose-600 border-rose-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
               >
                 <i className="bx bx-shopping-bag text-lg"></i> Semua Pesanan
               </button>
               <button 
                 onClick={() => setActiveTab('address')}
-                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'address' ? 'bg-blue-50/50 text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
+                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'address' ? 'bg-rose-50/50 text-rose-600 border-rose-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
               >
                 <i className="bx bx-map-pin text-lg"></i> Alamat & Info
               </button>
               <button 
+                onClick={() => setActiveTab('member-card')}
+                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'member-card' ? 'bg-rose-50/50 text-rose-600 border-rose-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
+              >
+                <i className="bx bx-id-card text-lg"></i> Kartu Member Digital
+              </button>
+              <button 
                 onClick={() => setActiveTab('security')}
-                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'security' ? 'bg-blue-50/50 text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
+                className={`w-full flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all border-l-4 ${activeTab === 'security' ? 'bg-rose-50/50 text-rose-600 border-rose-600' : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'}`}
               >
                 <i className="bx bx-lock-alt text-lg"></i> Keamanan
               </button>
@@ -555,6 +624,142 @@ export default function ProfilePage() {
                       </button>
                     </div>
                   </form>
+                </div>
+              )}
+
+              {activeTab === 'member-card' && (
+                <div className="animate-fade-in flex flex-col items-center">
+                  <div className="mb-10 border-b border-gray-100 pb-6 w-full text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                      <h3 className="text-3xl font-black text-gray-900 tracking-tight">Kartu Member Digital</h3>
+                      <p className="text-sm text-gray-400 mt-1">Gunakan kartu ini untuk mendapatkan poin di setiap transaksi offline.</p>
+                    </div>
+                    <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100">
+                       <i className="bx bxs-check-shield text-lg"></i>
+                       <span className="text-[10px] font-black uppercase tracking-widest">Verified Member</span>
+                    </div>
+                  </div>
+
+                  {/* CLEAN AKUGLOW CARD */}
+                  <div className="relative w-full max-w-[440px] group flex justify-center">
+                    <div 
+                      ref={cardRef}
+                      className="relative w-full h-[280px] rounded-[2rem] p-9 text-white border border-gray-100 overflow-hidden bg-[#0f172a]"
+                    >
+                      {/* Subtle Gradient Background */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#1e293b] to-[#0f172a]"></div>
+                      
+                      {/* Subtle Pattern Overlay */}
+                      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+
+                      <div className="relative h-full flex flex-col justify-between z-10">
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                                <i className="bx bxs-crown text-2xl text-white"></i>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-black tracking-tighter text-2xl bg-gradient-to-r from-white via-white to-amber-200 bg-clip-text text-transparent">AKUGLOW</span>
+                                <span className="text-[8px] font-black text-amber-500 uppercase tracking-[0.3em] leading-none">Premium Experience</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-2 rounded-2xl shadow-xl border border-white/20 transform transition-transform group-hover:scale-105">
+                            <QRCodeSVG 
+                              value={userData.id} 
+                              size={65}
+                              level="H"
+                              fgColor="#0f172a"
+                              includeMargin={false}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-auto">
+                          <div className="mb-4">
+                            <h4 className="text-xl font-black tracking-tight leading-none text-white truncate">{profile.full_name || 'LOYAL MEMBER'}</h4>
+                            <div className="flex items-center gap-2 mt-1.5">
+                               <div className="h-[2px] w-6 bg-amber-500 rounded-full"></div>
+                               <p className="text-[8px] font-bold text-white/40 tracking-widest">ID: {userData.id.substring(0, 18).toUpperCase()}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                            <div className="flex flex-col">
+                              <span className="text-[8px] font-black text-white/30 uppercase tracking-widest leading-none mb-1">Loyalty Points</span>
+                              <div className="flex items-center gap-1.5">
+                                <i className="bx bxs-zap text-amber-400 text-sm"></i>
+                                <span className="text-lg font-black text-amber-400">{(profile.points || 0).toLocaleString()} <span className="text-[9px] text-white/40 font-bold uppercase ml-1">Pts</span></span>
+                              </div>
+                            </div>
+                            
+                            <div className="px-3 py-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
+                               <span className="text-[8px] font-black text-white/80 uppercase tracking-widest">Platinum</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Shine Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    </div>
+                  </div>
+
+                  {/* INFO SECTION */}
+                  <div className="mt-12 w-full max-w-md">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                       <div className="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-center">
+                          <div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
+                             <i className="bx bx-gift"></i>
+                          </div>
+                          <h6 className="font-bold text-gray-900 text-xs">Voucher Promo</h6>
+                          <p className="text-[10px] text-gray-400 mt-1">Tukar poin dengan diskon</p>
+                       </div>
+                       <div className="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-center">
+                          <div className="w-10 h-10 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
+                             <i className="bx bx-star"></i>
+                          </div>
+                          <h6 className="font-bold text-gray-900 text-xs">Akses Eksklusif</h6>
+                          <p className="text-[10px] text-gray-400 mt-1">Member-only event & flash sale</p>
+                       </div>
+                    </div>
+
+                    <div className="bg-gray-900 text-white rounded-[2rem] p-8 relative overflow-hidden shadow-2xl shadow-gray-900/20">
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-rose-600/20 rounded-full blur-2xl"></div>
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-4">
+                           <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center border border-white/10">
+                              <i className="bx bx-help-circle text-rose-400"></i>
+                           </div>
+                           <h5 className="font-black text-sm tracking-wide uppercase">Cara Penggunaan</h5>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          Tunjukkan kode QR di atas saat melakukan pembayaran di kasir outlet <span className="text-white font-bold underline decoration-rose-500 underline-offset-4">AkuGlow</span> mana saja untuk akumulasi poin dan riwayat belanja digital.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mt-6">
+                      <button 
+                        onClick={downloadCard}
+                        disabled={isDownloading}
+                        className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-rose-600 text-white font-black text-sm hover:bg-rose-700 transition-all active:scale-95 disabled:opacity-50 no-print"
+                      >
+                        <i className={`bx ${isDownloading ? 'bx-loader-alt animate-spin' : 'bx-download'} text-xl`}></i>
+                        {isDownloading ? 'Downloading...' : 'Download Card'}
+                      </button>
+
+                      <button 
+                        onClick={() => window.print()}
+                        className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-white border-2 border-gray-100 text-gray-900 font-black text-sm hover:border-rose-500 hover:text-rose-600 transition-all active:scale-95 no-print"
+                      >
+                        <i className="bx bx-printer text-xl"></i>
+                        Print Card
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -180,6 +180,7 @@ import MerchantOrders from './pages/merchant/OrderList';
 import MerchantWallet from './pages/merchant/Wallet';
 import MerchantSettings from './pages/merchant/Settings';
 import MerchantAnalytics from './pages/merchant/Analytics';
+import MerchantPOS from './pages/merchant/POS';
 
 // Affiliate Portal
 import AffiliateLayout from './components/affiliate/AffiliateLayout';
@@ -227,7 +228,7 @@ function AppContent() {
   const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
 
   return (
-    <div className={`min-h-screen flex flex-col ${isPanel ? 'bg-slate-50' : 'bg-[#111827]'}`}>
+    <div className={`min-h-screen flex flex-col ${isPanel ? 'bg-slate-50' : 'bg-white'}`}>
       <ScrollToTop />
       <Toaster position="top-right" reverseOrder={false} />
       <NavbarManager />
@@ -317,6 +318,7 @@ function AppContent() {
              <Route path="wallet" element={<MerchantWallet />} />
              <Route path="settings" element={<MerchantSettings />} />
              <Route path="analytics" element={<MerchantAnalytics />} />
+             <Route path="pos" element={<MerchantPOS />} />
           </Route>
 
           {/* Affiliate Routes */}

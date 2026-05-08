@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchJson, ADMIN_API_BASE, formatImage } from '../../lib/api';
+import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from 'html5-qrcode';
 
-const AdminPOS = () => {
+const MerchantPOS = () => {
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
@@ -12,7 +12,6 @@ const AdminPOS = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountPaid, setAmountPaid] = useState(0);
   const [showReceipt, setShowReceipt] = useState(false);
-  const [lastOrder, setLastOrder] = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [member, setMember] = useState(null);
   const [memberCode, setMemberCode] = useState('');
@@ -27,8 +26,7 @@ const AdminPOS = () => {
   const fetchProducts = async (q) => {
     setLoading(true);
     try {
-      // Adjusted for Admin POS
-      const data = await fetchJson(`${ADMIN_API_BASE}/pos/products?q=${q || ''}`);
+      const data = await fetchJson(`${MERCHANT_API_BASE}/pos/products?q=${q || ''}`);
       setProducts(data || []);
       
       // Auto-add logic for Scanners
@@ -141,7 +139,7 @@ const AdminPOS = () => {
     }
 
     try {
-      const data = await fetchJson(`${ADMIN_API_BASE}/pos/products?q=${q}`);
+      const data = await fetchJson(`${MERCHANT_API_BASE}/pos/products?q=${q}`);
       if (data && data.length > 0) {
         const p = data[0];
         let v = p.variants?.find(vv => vv.sku && vv.sku.toLowerCase() === q.toLowerCase());
@@ -177,6 +175,10 @@ const AdminPOS = () => {
     }
   }, [isScannerOpen]);
 
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
   const handleCheckout = async () => {
     if (cart.length === 0) {
       toast.error('Keranjang masih kosong');
@@ -191,7 +193,7 @@ const AdminPOS = () => {
 
     setProcessing(true);
     try {
-      const resp = await fetchJson(`${ADMIN_API_BASE}/pos/checkout`, {
+      const resp = await fetchJson(`${MERCHANT_API_BASE}/pos/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,6 +205,7 @@ const AdminPOS = () => {
           })),
           payment_method: paymentMethod,
           amount_paid: paymentMethod === 'cash' ? amountPaid : total,
+          notes: 'POS Merchant Transaction',
           member_id: member?.id || null
         })
       });
@@ -223,15 +226,16 @@ const AdminPOS = () => {
   };
 
   const quickPay = [50000, 100000, 200000, 500000];
+
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
     <div className="flex flex-col lg:flex-row bg-slate-50 h-[calc(100vh-120px)] -m-4 md:-m-8 overflow-hidden relative">
-      {/* Header Mobile */}
+      {/* Header Mobile - Only visible on small screens */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-slate-900 text-white shadow-lg z-20">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-xs font-black italic">SM</div>
-          <h2 className="text-sm font-black italic tracking-tighter">ADMIN POS</h2>
+          <h2 className="text-sm font-black italic tracking-tighter">MERCHANT POS</h2>
         </div>
         <button 
           onClick={() => setIsCartOpen(true)}
@@ -382,15 +386,20 @@ const AdminPOS = () => {
         </div>
       </div>
 
-      {/* Cart & Checkout Panel */}
+      {/* Cart & Checkout Overlay (Mobile) / Side Panel (Desktop) */}
       <div className={`
         fixed inset-0 lg:relative lg:inset-auto z-40 lg:z-0
         flex lg:block
         ${isCartOpen ? 'opacity-100' : 'opacity-0 lg:opacity-100 pointer-events-none lg:pointer-events-auto'}
         transition-opacity duration-300
       `}>
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm lg:hidden" onClick={() => setIsCartOpen(false)} />
+        {/* Backdrop - Only on mobile */}
+        <div 
+          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsCartOpen(false)}
+        />
         
+        {/* Sidebar cart content */}
         <div className={`
           ml-auto lg:ml-0 w-[85%] sm:w-[400px] lg:w-[420px] 
           bg-white shadow-2xl flex flex-col border-l border-slate-100 h-full
@@ -398,9 +407,17 @@ const AdminPOS = () => {
           ${isCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
         `}>
           <div className="p-5 md:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
-            <div>
-              <h2 className="text-lg md:text-xl font-black italic tracking-tighter leading-none uppercase">Admin Transaction</h2>
-              <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">{cart.length} Item terdaftar</p>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsCartOpen(false)}
+                className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400"
+              >
+                <i className="bx bx-chevron-right text-xl" />
+              </button>
+              <div>
+                <h2 className="text-lg md:text-xl font-black italic tracking-tighter leading-none">ORDER DETAILS</h2>
+                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">{cart.length} Item terdaftar</p>
+              </div>
             </div>
             <button onClick={() => setCart([])} className="p-2 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-lg transition-all active:scale-90">
               <i className="bx bx-trash text-xl" />
@@ -412,7 +429,7 @@ const AdminPOS = () => {
                <div className="h-full flex flex-col items-center justify-center opacity-20 py-10 md:py-20 text-center">
                   <i className="bx bx-barcode-reader text-7xl md:text-8xl mb-4" />
                   <p className="font-black text-base md:text-lg">BELUM ADA ITEM</p>
-                  <p className="text-[10px] md:text-xs">Central Warehouse Stock</p>
+                  <p className="text-[10px] md:text-xs">Scan Barcode untuk Memulai</p>
                </div>
             ) : (
               cart.map(item => (
@@ -450,7 +467,7 @@ const AdminPOS = () => {
                   <i className="bx bx-money" /> TUNAI
                </button>
                <button onClick={() => { setPaymentMethod('qris'); setAmountPaid(calculateTotal()); }} className={`py-3 md:py-3.5 rounded-2xl border-2 font-bold text-[11px] md:text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'qris' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-white bg-white text-slate-400'}`}>
-                  <i className="bx bx-qr" /> NON-TUNAI
+                  <i className="bx bx-qr" /> QRIS / NON-TUNAI
                </button>
             </div>
 
@@ -475,16 +492,15 @@ const AdminPOS = () => {
                </div>
             )}
 
-            <button onClick={handleCheckout} disabled={processing || cart.length === 0} className="w-full bg-slate-900 hover:bg-black disabled:bg-slate-100 disabled:text-slate-400 text-white py-4 md:py-5 rounded-[24px] md:rounded-3xl font-black text-base md:text-xl shadow-xl shadow-slate-100 active:shadow-none transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
+            <button onClick={handleCheckout} disabled={processing || cart.length === 0} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white py-4 md:py-5 rounded-[24px] md:rounded-3xl font-black text-base md:text-xl shadow-xl shadow-indigo-100 active:shadow-none transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
               {processing ? <i className="bx bx-loader-alt animate-spin text-2xl" /> : (
-                <>PROCESS HQ SALE <i className="bx bx-right-arrow-alt text-2xl" /></>
+                <>PROSES CHECKOUT <i className="bx bx-right-arrow-alt text-2xl" /></>
               )}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Camera Scanner Modal */}
+      {/* Camera Scanner Modal - High Z-Index */}
       {isScannerOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-2xl p-4">
           <div className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-300">
@@ -506,24 +522,24 @@ const AdminPOS = () => {
               <div id="reader" className="w-full rounded-2xl overflow-hidden border-2 border-slate-100 bg-slate-900 aspect-square"></div>
               <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex gap-4">
                 <i className="bx bxs-info-circle text-2xl text-indigo-500 flex-shrink-0" />
-                <p className="text-[11px] text-indigo-900/80 leading-relaxed font-bold">Pastikan pencahayaan cukup agar kode dapat terbaca dengan akurat oleh sensor kamera.</p>
+                <p className="text-[11px] text-indigo-900/80 leading-relaxed font-bold">Pastikan pencahayaan cukup agar kode produk dapat terbaca dengan akurat oleh sensor kamera.</p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Receipt Modal */}
+      {/* Modern Receipt Modal */}
       {showReceipt && lastOrder && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xl z-[110] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[44px] shadow-2xl overflow-hidden animate-receipt-in">
-            <div className="bg-slate-900 p-10 text-center text-white relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-16 translate-x-16" />
-               <div className="w-20 h-20 bg-emerald-500 rounded-[28px] flex items-center justify-center shadow-xl mx-auto mb-6 text-white scale-110">
+            <div className="bg-indigo-600 p-10 text-center text-white relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
+               <div className="w-20 h-20 bg-white rounded-[28px] flex items-center justify-center shadow-xl mx-auto mb-6 text-indigo-600 scale-110">
                   <i className="bx bx-check text-5xl" />
                </div>
-               <h2 className="text-3xl font-black mb-1 letter-spacing-tighter italic">HQ SALE SUCCESS</h2>
-               <p className="text-slate-500 text-xs font-black tracking-[0.2em] uppercase">{lastOrder.order_number}</p>
+               <h2 className="text-3xl font-black mb-1 letter-spacing-tighter italic">SUCCESS!</h2>
+               <p className="text-indigo-200 text-xs font-black tracking-[0.2em] uppercase">{lastOrder.order_number}</p>
             </div>
             
             <div className="p-10 space-y-8">
@@ -538,7 +554,7 @@ const AdminPOS = () => {
 
               <div className="border-t-2 border-dashed border-slate-100 pt-8 space-y-3">
                  <div className="flex justify-between items-center text-slate-400 font-bold text-[10px] uppercase tracking-widest">
-                    <span>Central Warehouse</span>
+                    <span>Platform Transaction</span>
                     <span>TID#{lastOrder.id?.slice(-6).toUpperCase()}</span>
                  </div>
                  <div className="flex justify-between items-center text-slate-800 font-black italic text-3xl tracking-tighter">
@@ -549,9 +565,9 @@ const AdminPOS = () => {
 
               <div className="flex gap-4 pt-4">
                  <button onClick={() => window.print()} className="flex-1 bg-slate-900 hover:bg-black text-white py-4.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                   <i className="bx bx-printer text-xl" /> PRINT
+                   <i className="bx bx-printer text-xl" /> CETAK
                  </button>
-                 <button onClick={() => setShowReceipt(false)} className="px-8 bg-slate-100 hover:bg-slate-200 text-slate-500 py-4.5 rounded-2xl font-black text-sm transition-all active:scale-95">CLOSE</button>
+                 <button onClick={() => setShowReceipt(false)} className="px-8 bg-slate-100 hover:bg-slate-200 text-slate-500 py-4.5 rounded-2xl font-black text-sm transition-all active:scale-95">OK</button>
               </div>
             </div>
           </div>
@@ -572,4 +588,4 @@ const AdminPOS = () => {
   );
 };
 
-export default AdminPOS;
+export default MerchantPOS;

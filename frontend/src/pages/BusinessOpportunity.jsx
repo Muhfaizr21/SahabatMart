@@ -79,39 +79,39 @@ const BusinessOpportunity = () => {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-['Plus_Jakarta_Sans'] overflow-hidden">
-      {/* Hero Section */}
+      {/* Hero Section - Styling Updated */}
       <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 px-6 overflow-hidden">
-        {/* Background Accents */}
+        {/* Background Accents with softer blur */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-100 blur-[120px] rounded-full opacity-60" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100 blur-[120px] rounded-full opacity-60" />
+          <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-100 blur-[100px] rounded-full opacity-50" />
+          <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-100 blur-[100px] rounded-full opacity-50" />
         </div>
 
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center">
-            <span className="inline-block py-1.5 px-4 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-bold tracking-widest uppercase mb-6 animate-bounce">
+            <span className="inline-block py-2 px-5 rounded-full bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 text-xs font-bold tracking-wider uppercase mb-6 shadow-sm">
               {hero.badge}
             </span>
-            <h1 className="text-4xl md:text-7xl font-black mb-6 leading-tight text-gray-900">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-6 leading-[1.2] text-gray-900 tracking-tight">
               {hero.title.includes('<br />') ? (
                 <span dangerouslySetInnerHTML={{ __html: hero.title }} />
               ) : (
                 hero.title
               )}
             </h1>
-            <p className="text-gray-600 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+            <p className="text-gray-600 text-lg md:text-xl max-w-2xl mx-auto mb-12 leading-relaxed">
               {hero.subtitle}
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
               <Link
                 to="/register"
-                className="w-full sm:w-auto px-10 py-4 bg-gray-900 rounded-2xl font-bold text-white shadow-2xl shadow-gray-200 hover:scale-105 transition-transform"
+                className="w-full sm:w-auto px-10 py-4.5 bg-gradient-to-r from-purple-700 to-purple-800 rounded-full font-bold text-white shadow-xl shadow-purple-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
               >
                 Daftar Gratis Sekarang
               </Link>
               <a
                 href="#cara-kerja"
-                className="w-full sm:w-auto px-10 py-4 bg-white border border-gray-200 rounded-2xl font-bold text-gray-900 hover:bg-gray-50 transition-all"
+                className="w-full sm:w-auto px-10 py-4.5 bg-white border-2 border-gray-200 rounded-full font-bold text-gray-700 hover:border-purple-300 hover:bg-purple-50/30 transition-all duration-300"
               >
                 Pelajari Cara Kerjanya
               </a>
@@ -120,16 +120,16 @@ const BusinessOpportunity = () => {
         </div>
       </section>
 
-      {/* Stats/USP Section */}
-      <section className="py-20 px-6 bg-gray-50/50">
+      {/* Stats/USP Section - Card style updated */}
+      <section className="py-20 px-6 bg-gradient-to-b from-white to-purple-50/20">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {stats.map((item, idx) => (
-              <div key={idx} className="p-8 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:border-purple-200 transition-all group">
-                <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <span className="material-symbols-outlined text-purple-600">{item.icon}</span>
+              <div key={idx} className="p-6 rounded-2xl bg-white border border-purple-100 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                  <span className="material-symbols-outlined text-purple-600 text-2xl">{item.icon}</span>
                 </div>
-                <h3 className="text-lg font-bold mb-2 text-gray-900">{item.label}</h3>
+                <h3 className="text-xl font-bold mb-2 text-gray-900">{item.label}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
               </div>
             ))}
@@ -142,31 +142,31 @@ const BusinessOpportunity = () => {
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl md:text-5xl font-black mb-8 leading-tight">Mulai Dengan <br /><span className="text-purple-600">Sangat Simpel</span></h2>
+              <h2 className="text-3xl md:text-5xl font-black mb-8 leading-tight tracking-tight">Mulai Dengan <br /><span className="bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">Sangat Simpel</span></h2>
               <div className="space-y-8">
-                <div className="flex gap-5">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-600 flex items-center justify-center shrink-0 font-bold text-sm text-white shadow-lg shadow-purple-200">1</div>
+                <div className="flex gap-5 group">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 font-black text-sm text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">1</div>
                   <div>
                     <h4 className="font-bold text-gray-900 mb-1">Daftar Mitra</h4>
                     <p className="text-gray-500 text-sm">Daftar sebagai mitra di SahabatMart.com secara gratis tanpa biaya admin.</p>
                   </div>
                 </div>
-                <div className="flex gap-5">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-600 flex items-center justify-center shrink-0 font-bold text-sm text-white shadow-lg shadow-purple-200">2</div>
+                <div className="flex gap-5 group">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 font-black text-sm text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">2</div>
                   <div>
                     <h4 className="font-bold text-gray-900 mb-1">Ambil Link</h4>
                     <p className="text-gray-500 text-sm">Gunakan link produk atau link pendaftaran unik dari Dashboard Member Anda.</p>
                   </div>
                 </div>
-                <div className="flex gap-5">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-600 flex items-center justify-center shrink-0 font-bold text-sm text-white shadow-lg shadow-purple-200">3</div>
+                <div className="flex gap-5 group">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 font-black text-sm text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">3</div>
                   <div>
                     <h4 className="font-bold text-gray-900 mb-1">Bagikan Konten</h4>
                     <p className="text-gray-500 text-sm">Share ke WhatsApp, TikTok, atau IG. Foto & video promosi sudah kami siapkan.</p>
                   </div>
                 </div>
-                <div className="flex gap-5">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-600 flex items-center justify-center shrink-0 font-bold text-sm text-white shadow-lg shadow-purple-200">4</div>
+                <div className="flex gap-5 group">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 font-black text-sm text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">4</div>
                   <div>
                     <h4 className="font-bold text-gray-900 mb-1">Terima Komisi</h4>
                     <p className="text-gray-500 text-sm">Dapatkan komisi otomatis dari setiap transaksi yang terjadi melalui link Anda.</p>
@@ -174,79 +174,77 @@ const BusinessOpportunity = () => {
                 </div>
               </div>
               <div className="mt-12">
-                <button className="flex items-center gap-3 px-8 py-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 font-bold text-sm hover:bg-rose-100 transition-all">
+                <button className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 rounded-xl text-rose-600 font-bold text-sm hover:from-rose-100 hover:to-pink-100 transition-all duration-300 shadow-sm">
                   <span className="material-symbols-outlined">picture_as_pdf</span>
                   Download PDF Presentasi Bisnis
                 </button>
               </div>
             </div>
             <div className="relative">
-              <div className="aspect-video rounded-[40px] overflow-hidden bg-gray-100 border border-gray-200 relative group shadow-2xl">
+              <div className="aspect-video rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 relative group shadow-xl">
                 <img src="https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=800" alt="Video Placeholder" className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <button className="w-20 h-20 rounded-full bg-white text-purple-600 flex items-center justify-center shadow-2xl hover:scale-110 transition-transform">
-                    <span className="material-symbols-outlined text-4xl">play_arrow</span>
+                  <button className="w-16 h-16 rounded-full bg-white text-purple-600 flex items-center justify-center shadow-2xl hover:scale-110 transition-transform duration-300">
+                    <span className="material-symbols-outlined text-3xl">play_arrow</span>
                   </button>
                 </div>
               </div>
-              <div className="absolute -bottom-8 -right-8 p-8 bg-gray-900 rounded-[32px] shadow-2xl hidden md:block">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Total Komisi Terbayar</p>
-                <p className="text-3xl font-black text-white">Rp 2.4 Miliar+</p>
+              <div className="absolute -bottom-6 -right-6 p-6 bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl hidden md:block border border-gray-700">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Total Komisi Terbayar</p>
+                <p className="text-2xl font-black text-white">Rp 2.4 Miliar+</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Tiers Section */}
-      <section className="py-24 px-6 bg-gray-50">
+      {/* Tiers Section - Card style elevated */}
+      <section className="py-24 px-6 bg-gradient-to-b from-purple-50/20 to-white">
         <div className="max-w-6xl mx-auto text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-black mb-4">Pilihan Keanggotaan</h2>
+          <h2 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Pilihan Keanggotaan</h2>
           <p className="text-gray-500">Mulai langkah Anda sekarang, sesuaikan dengan target penghasilan Anda</p>
         </div>
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
           {(dynamicContent?.tiers || []).map((tier, idx) => (
-            <div 
-              key={idx} 
-              className={`p-10 md:p-14 rounded-[48px] bg-white border relative overflow-hidden transition-all shadow-sm ${
-                tier.isPopular ? 'border-2 border-purple-500 shadow-2xl shadow-purple-100' : 'border-gray-200 hover:border-purple-200'
-              }`}
+            <div
+              key={idx}
+              className={`p-8 md:p-10 rounded-3xl bg-white border relative overflow-hidden transition-all duration-500 hover:-translate-y-2 ${tier.isPopular ? 'border-2 border-purple-400 shadow-2xl shadow-purple-200/50' : 'border-gray-100 shadow-lg hover:shadow-xl'
+                }`}
             >
               {tier.isPopular && (
-                <div className="absolute top-0 right-0 p-5 bg-purple-500 text-[10px] font-black uppercase tracking-widest text-white rounded-bl-3xl">
+                <div className="absolute top-0 right-0 px-5 py-2 bg-gradient-to-l from-purple-500 to-purple-600 text-[10px] font-black uppercase tracking-wider text-white rounded-bl-2xl shadow-md">
                   Paling Populer
                 </div>
               )}
-              <h3 className={`text-2xl font-bold mb-2 ${tier.isPopular ? 'text-purple-600' : 'text-gray-900'}`}>{tier.name}</h3>
-              <p className="text-gray-500 text-sm mb-10">{tier.desc}</p>
-              
-              <div className="space-y-5 mb-12">
+              <h3 className={`text-2xl font-black mb-2 ${tier.isPopular ? 'bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent' : 'text-gray-900'}`}>{tier.name}</h3>
+              <p className="text-gray-500 text-sm mb-8">{tier.desc}</p>
+
+              <div className="space-y-4 mb-10">
                 {tier.benefits.map((benefit, bIdx) => (
-                  <div key={bIdx} className={`flex justify-between items-center py-4 border-b ${tier.isPopular ? 'border-purple-50' : 'border-gray-50'}`}>
-                    <span className={`text-sm ${tier.isPopular ? 'text-gray-700' : 'text-gray-600'}`}>{benefit.label}</span>
+                  <div key={bIdx} className={`flex justify-between items-center py-3 ${tier.isPopular ? 'border-b border-purple-50' : 'border-b border-gray-50'}`}>
+                    <span className={`text-sm ${tier.isPopular ? 'text-gray-700 font-medium' : 'text-gray-600'}`}>{benefit.label}</span>
                     {benefit.value === 'check' ? (
-                      <span className="material-symbols-outlined text-green-500">check_circle</span>
+                      <span className="material-symbols-outlined text-emerald-500">check_circle</span>
                     ) : (
-                      <span className={`font-bold ${tier.isPopular ? 'text-purple-600 text-xl' : 'text-gray-900'}`}>{benefit.value}</span>
+                      <span className={`font-black ${tier.isPopular ? 'text-purple-600 text-xl' : 'text-gray-900'}`}>{benefit.value}</span>
                     )}
                   </div>
                 ))}
               </div>
 
               {tier.promoText && (
-                <div className="p-5 bg-purple-50 rounded-2xl border border-purple-100 mb-8">
-                  <p className="text-[10px] font-bold text-purple-700 uppercase tracking-widest mb-1">PEMBERITAHUAN</p>
-                  <p className="text-xs text-gray-600 leading-relaxed">{tier.promoText}</p>
+                <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200 mb-8">
+                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-1">✨ PEMBERITAHUAN</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{tier.promoText}</p>
                 </div>
               )}
 
-              <Link 
-                to="/register" 
-                className={`block text-center py-4 rounded-2xl font-bold transition-all ${
-                  tier.isPopular 
-                    ? 'bg-purple-600 text-white font-black hover:bg-purple-700 hover:scale-[1.02] shadow-xl shadow-purple-200 py-5' 
-                    : 'bg-gray-50 border border-gray-200 text-gray-900 hover:bg-gray-100'
-                }`}
+              <Link
+                to="/register"
+                className={`block text-center py-4 rounded-xl font-bold transition-all duration-300 ${tier.isPopular
+                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-200 hover:shadow-xl hover:scale-[1.02] py-4'
+                    : 'bg-gray-100 border border-gray-200 text-gray-800 hover:bg-gray-200'
+                  }`}
               >
                 {tier.buttonText}
               </Link>
@@ -255,37 +253,37 @@ const BusinessOpportunity = () => {
         </div>
       </section>
 
-      {/* Simulation Section */}
+      {/* Simulation Section - Modernized */}
       <section className="py-24 px-6 bg-white">
-        <div className="max-w-5xl mx-auto bg-gray-50 border border-gray-200 rounded-[60px] p-10 md:p-20 relative shadow-inner">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-black mb-6">Simulasi Potensi Komisi</h2>
-            <div className="flex justify-center gap-3 p-1.5 bg-gray-200/50 rounded-[24px] w-fit mx-auto">
-              <button 
+        <div className="max-w-5xl mx-auto bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-3xl p-8 md:p-12 shadow-xl relative">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-5xl font-black mb-6 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">Simulasi Potensi Komisi</h2>
+            <div className="flex justify-center gap-2 p-1.5 bg-gray-100 rounded-2xl w-fit mx-auto">
+              <button
                 onClick={() => setActiveSim(5)}
-                className={`px-8 py-3 rounded-[18px] text-sm font-bold transition-all ${activeSim === 5 ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${activeSim === 5 ? 'bg-white text-purple-600 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Duplikasi 5
               </button>
-              <button 
+              <button
                 onClick={() => setActiveSim(10)}
-                className={`px-8 py-3 rounded-[18px] text-sm font-bold transition-all ${activeSim === 10 ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-8 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${activeSim === 10 ? 'bg-white text-purple-600 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Duplikasi 10
               </button>
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-20 items-start">
-            <div className="space-y-8">
+          <div className="grid lg:grid-cols-2 gap-12 items-start">
+            <div className="space-y-6">
               <div>
                 <h3 className="text-2xl font-black text-gray-900 mb-2">{simulationData[activeSim].title}</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{simulationData[activeSim].desc}</p>
               </div>
-              
+
               <div className="space-y-3">
                 {simulationData[activeSim].levels.map((lvl, i) => (
-                  <div key={i} className="flex justify-between items-center p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
+                  <div key={i} className="flex justify-between items-center p-4 rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
                     <span className="text-xs font-bold text-gray-500">{lvl.name}</span>
                     <span className="text-sm font-black text-gray-900">{lvl.income}</span>
                   </div>
@@ -294,43 +292,43 @@ const BusinessOpportunity = () => {
             </div>
 
             <div className="space-y-8">
-              <div className="p-10 rounded-[40px] bg-purple-600 text-white shadow-2xl shadow-purple-200 text-center relative overflow-hidden">
+              <div className="p-8 rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-xl shadow-purple-200 text-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full" />
-                <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-4">Total Potensi Pasif Income</p>
-                <p className="text-4xl md:text-6xl font-black mb-4">{simulationData[activeSim].premium}</p>
-                <div className="inline-block px-4 py-1.5 bg-white/20 rounded-full text-[10px] font-bold">KHUSUS PREMIUM MEMBER</div>
+                <p className="text-xs font-bold uppercase tracking-wider opacity-80 mb-3">Total Potensi Pasif Income</p>
+                <p className="text-4xl md:text-5xl font-black mb-4">{simulationData[activeSim].premium}</p>
+                <div className="inline-block px-4 py-1.5 bg-white/20 rounded-full text-[10px] font-bold tracking-wide">KHUSUS PREMIUM MEMBER</div>
               </div>
 
-              <div className="p-8 rounded-[32px] bg-white border border-rose-100 text-center shadow-sm">
-                <p className="text-[11px] font-bold text-rose-500 uppercase tracking-widest mb-2">Bandingkan dengan Free Member</p>
+              <div className="p-6 rounded-xl bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-100 text-center shadow-sm">
+                <p className="text-[11px] font-black text-rose-500 uppercase tracking-wider mb-2">⚡ Bandingkan dengan Free Member</p>
                 <p className="text-2xl font-black text-gray-900 mb-1">Maksimal {simulationData[activeSim].free}</p>
-                <p className="text-xs text-gray-400">Upgrade ke Premium untuk membuka 3 Level komisi tambahan!</p>
+                <p className="text-xs text-gray-500">Upgrade ke Premium untuk membuka 3 Level komisi tambahan!</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Mission Section (Cards) */}
+      {/* Mission Section (Cards) - Enhanced visuals */}
       {dynamicContent?.mission && (
-        <section className="py-24 px-6 bg-white">
+        <section className="py-24 px-6 bg-gradient-to-b from-white to-purple-50/10">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-black mb-4 text-gray-900">{dynamicContent.mission.title}</h2>
-              <div className="w-20 h-1 bg-purple-600 mx-auto rounded-full" />
+              <div className="w-20 h-1 bg-gradient-to-r from-purple-500 to-pink-400 mx-auto rounded-full" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {dynamicContent.mission.items.map((item, i) => (
-                <div 
-                  key={i} 
-                  className="p-10 rounded-[32px] bg-white border border-gray-100 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.1)] transition-all duration-500 flex flex-col items-center text-center group hover:-translate-y-2"
+                <div
+                  key={i}
+                  className="p-8 rounded-2xl bg-white border border-purple-100 shadow-md hover:shadow-xl transition-all duration-500 flex flex-col items-center text-center group hover:-translate-y-2"
                 >
-                  <div className="w-20 h-20 rounded-full bg-purple-50 flex items-center justify-center mb-8 group-hover:bg-purple-600 transition-colors duration-500">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mb-6 group-hover:bg-gradient-to-br group-hover:from-purple-500 group-hover:to-pink-500 transition-all duration-500 shadow-md">
                     <span className="material-symbols-outlined text-4xl text-purple-600 group-hover:text-white transition-colors duration-500">
                       {item.icon}
                     </span>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-4 tracking-tight">{item.title}</h3>
+                  <h3 className="text-xl font-black text-gray-900 mb-3 tracking-tight">{item.title}</h3>
                   <p className="text-gray-500 leading-relaxed text-sm">
                     {item.desc}
                   </p>
@@ -341,23 +339,24 @@ const BusinessOpportunity = () => {
         </section>
       )}
 
-      {/* Target Audience */}
-      <section className="py-24 px-6 bg-gray-50/50">
+      {/* Target Audience - Card style updated */}
+      <section className="py-24 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-20">
+          <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black mb-4 text-gray-900">Cocok Untuk Siapa?</h2>
             <p className="text-gray-500 text-lg">Peluang inklusif untuk siapa saja yang ingin berkembang</p>
+            <div className="w-16 h-1 bg-gradient-to-r from-purple-400 to-pink-400 mx-auto mt-6 rounded-full" />
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { label: 'Ibu Rumah Tangga', icon: 'home_repair_service', color: 'bg-rose-50 text-rose-600' },
-              { label: 'Karyawan', icon: 'business_center', color: 'bg-blue-50 text-blue-600' },
-              { label: 'Mahasiswa', icon: 'school', color: 'bg-amber-50 text-amber-600' },
-              { label: 'Pemula Bisnis', icon: 'rocket_launch', color: 'bg-purple-50 text-purple-600' }
+              { label: 'Ibu Rumah Tangga', icon: 'home_repair_service', color: 'from-rose-100 to-rose-50 text-rose-600' },
+              { label: 'Karyawan', icon: 'business_center', color: 'from-blue-100 to-blue-50 text-blue-600' },
+              { label: 'Mahasiswa', icon: 'school', color: 'from-amber-100 to-amber-50 text-amber-600' },
+              { label: 'Pemula Bisnis', icon: 'rocket_launch', color: 'from-purple-100 to-purple-50 text-purple-600' }
             ].map((item, i) => (
-              <div key={i} className="text-center p-10 rounded-[32px] bg-white border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                <div className={`w-20 h-20 rounded-[24px] ${item.color} flex items-center justify-center mx-auto mb-8 shadow-sm`}>
-                  <span className="material-symbols-outlined text-4xl">{item.icon}</span>
+              <div key={i} className="text-center p-8 rounded-2xl bg-white border border-gray-100 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center mx-auto mb-6 shadow-sm`}>
+                  <span className="material-symbols-outlined text-3xl">{item.icon}</span>
                 </div>
                 <h4 className="font-black text-gray-900 text-lg">{item.label}</h4>
               </div>
@@ -366,17 +365,17 @@ const BusinessOpportunity = () => {
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* Final CTA - Dramatic but same colors */}
       <section className="py-32 px-6 relative bg-white overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-4xl bg-purple-50 blur-[120px] rounded-full opacity-50 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-4xl bg-gradient-to-r from-purple-100/60 to-pink-100/60 blur-[120px] rounded-full pointer-events-none" />
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h2 className="text-4xl md:text-7xl font-black mb-10 leading-tight">Saatnya Bangun <br /> <span className="text-purple-600">Masa Depanmu!</span></h2>
-          <p className="text-gray-500 text-xl mb-14 max-w-2xl mx-auto leading-relaxed">
+          <h2 className="text-4xl md:text-7xl font-black mb-10 leading-tight tracking-tight">Saatnya Bangun <br /> <span className="bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">Masa Depanmu!</span></h2>
+          <p className="text-gray-500 text-xl mb-12 max-w-2xl mx-auto leading-relaxed">
             Tidak perlu modal besar untuk memulai perubahan. Cukup gunakan produknya, bagikan linknya, dan nikmati hasilnya.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-             <Link to="/register" className="w-full sm:w-auto px-16 py-6 bg-gray-900 text-white rounded-3xl font-black text-xl hover:scale-105 transition-transform shadow-2xl shadow-gray-200">GABUNG SEKARANG</Link>
-             <Link to="/shop" className="w-full sm:w-auto px-16 py-6 bg-white border-2 border-gray-900 text-gray-900 rounded-3xl font-black text-xl hover:bg-gray-50 transition-all">BELANJA DULU</Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
+            <Link to="/register" className="w-full sm:w-auto px-12 py-5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl font-black text-xl hover:from-purple-700 hover:to-purple-800 hover:scale-105 transition-all duration-300 shadow-xl">🚀 GABUNG SEKARANG</Link>
+            <Link to="/shop" className="w-full sm:w-auto px-12 py-5 bg-white border-2 border-gray-300 text-gray-800 rounded-xl font-black text-xl hover:border-purple-400 hover:bg-purple-50/30 transition-all duration-300">🛍️ BELANJA DULU</Link>
           </div>
         </div>
       </section>

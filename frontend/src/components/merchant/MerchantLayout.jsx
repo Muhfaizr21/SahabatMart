@@ -114,6 +114,7 @@ const MerchantLayout = () => {
 
   const menuItems = [
     { name: 'Dashboard', icon: 'dashboard', path: '/merchant', end: true },
+    { name: 'POS Kasir', icon: 'point_of_sale', path: '/merchant/pos' },
     { name: 'Mitra Area', icon: 'stars', path: '/affiliate' },
     { name: 'Analitik', icon: 'insights', path: '/merchant/analytics' },
     { name: 'Inventori', icon: 'inventory_2', path: '/merchant/products' },

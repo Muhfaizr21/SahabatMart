@@ -532,9 +532,9 @@ export default function ShopPage() {
                            {isLoggedIn && (
                              <button 
                                onClick={() => handleAddToCart(product)}
-                               className="w-11 h-11 rounded-2xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
+                               className="w-9 h-9 rounded-xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
                              >
-                               <span className="material-symbols-outlined font-black text-xl">shopping_cart</span>
+                               <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
                              </button>
                            )}
                         </div>
@@ -605,7 +605,7 @@ export default function ShopPage() {
                                onClick={() => handleAddToCart(product)}
                                className="bg-[#0A0A0B] hover:bg-blue-600 text-white font-black px-8 py-3.5 rounded-2xl shadow-xl shadow-gray-200 transition-all flex items-center gap-3 active:scale-95"
                              >
-                               <span className="material-symbols-outlined font-black text-xl">shopping_cart</span>
+                               <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
                                <span>Beli Sekarang</span>
                              </button>
                            </div>
