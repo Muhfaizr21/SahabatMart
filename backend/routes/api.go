@@ -96,6 +96,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 				}
 
 				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+				ctx = context.WithValue(ctx, "user_role", role) // BUG-10 fix: expose role to controllers
 				if claims.MerchantID != "" { ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID) }
 				if claims.AffiliateID != "" { ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID) }
 
@@ -416,6 +417,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliates/withdrawals", adminOnly(adminCtrl.GetAffiliateWithdrawals))
 	mux.HandleFunc("/api/admin/affiliates/withdrawals/process", adminOnly(adminCtrl.ProcessAffiliateWithdrawal))
 	mux.HandleFunc("/api/admin/affiliates/configs/delete", adminOnly(adminCtrl.DeleteAffiliateTier))
+	mux.HandleFunc("/api/admin/affiliates/member/update-tier", adminOnly(adminCtrl.UpdateMemberTier))
 	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
 	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
 	mux.HandleFunc("/api/admin/commissions/category", adminOnly(adminCtrl.ManageCommissions))
@@ -432,6 +434,30 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/finance", adminOnly(adminCtrl.GetFinance))
 	mux.HandleFunc("/api/admin/finance/cashflow", adminOnly(adminCtrl.GetCashFlow))
 	mux.HandleFunc("/api/admin/finance/cashflow/config", adminOnly(adminCtrl.UpdateCashFlowConfig))
+
+	adminFinanceCtrl := controllers.NewAdminFinanceController(db)
+	mux.HandleFunc("/api/admin/finance/revenue-detail", adminOnly(adminFinanceCtrl.GetRevenueDetail))
+	mux.HandleFunc("/api/admin/finance/mutation", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			adminOnly(adminFinanceCtrl.DeleteMutation)(w, r)
+		} else {
+			adminOnly(adminFinanceCtrl.CreateMutation)(w, r)
+		}
+	})
+	mux.HandleFunc("/api/admin/finance/generate", adminOnly(adminFinanceCtrl.GenerateAllocations))
+	mux.HandleFunc("/api/admin/finance/config", adminOnly(adminFinanceCtrl.UpdateConfig))
+	mux.HandleFunc("/api/admin/finance/data-saving-detail", adminOnly(adminFinanceCtrl.GetDataSavingDetail))
+	mux.HandleFunc("/api/admin/finance/profit-share-detail", adminOnly(adminFinanceCtrl.GetProfitShareDetail))
+	mux.HandleFunc("/api/admin/finance/locations", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			adminOnly(adminFinanceCtrl.CreateLocation)(w, r)
+		} else if r.Method == http.MethodDelete {
+			adminOnly(adminFinanceCtrl.DeleteLocation)(w, r)
+		} else {
+			adminOnly(adminFinanceCtrl.GetLocations)(w, r)
+		}
+	})
+	mux.HandleFunc("/api/admin/finance/locations/update", adminOnly(adminFinanceCtrl.UpdateLocation))
 	mux.HandleFunc("/api/admin/transactions", adminOnly(adminCtrl.GetTransactions))
 	mux.HandleFunc("/api/admin/finance/ledger", adminOnly(adminCtrl.GetFinanceLedger))
 	mux.HandleFunc("/api/admin/payouts", adminOnly(adminCtrl.GetPayouts))

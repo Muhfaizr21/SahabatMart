@@ -19,7 +19,7 @@ export default function AdminUsers() {
   const [limit, setLimit] = useState(20);
   
   const [modal, setModal] = useState(null);
-  const [newUserData, setNewUserData] = useState({ email: '', password: '', fullName: '', role: 'buyer' });
+  const [newUserData, setNewUserData] = useState({ email: '', password: '', fullName: '', role: 'affiliate' });
   const [saving, setSaving] = useState(false);
   
   const [downlines, setDownlines] = useState([]);
@@ -77,7 +77,7 @@ export default function AdminUsers() {
     }).then(() => {
       load();
       setModal(null);
-      setNewUserData({ email: '', password: '', fullName: '', role: 'buyer' });
+      setNewUserData({ email: '', password: '', fullName: '', role: 'affiliate' });
     }).catch(e => alert(e.message)).finally(() => setSaving(false));
   };
 
@@ -141,7 +141,6 @@ export default function AdminUsers() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <select style={{ ...A.select, height: 42, minWidth: 130 }} value={filterRole} onChange={e => setFilterRole(e.target.value)}>
             <option value="">Semua Role</option>
-            <option value="buyer">Buyer</option>
             <option value="merchant">Merchant</option>
             <option value="affiliate">Affiliate</option>
             <option value="admin">Admin</option>
@@ -348,8 +347,8 @@ export default function AdminUsers() {
             </div>
             <div>
               <FieldLabel>Role Utama</FieldLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {['buyer', 'merchant', 'affiliate', 'admin'].map(r => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {['merchant', 'affiliate', 'admin'].map(r => (
                   <button type="button" key={r}
                     onClick={() => setNewUserData({...newUserData, role: r})}
                     style={{
@@ -391,8 +390,8 @@ export default function AdminUsers() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div>
               <FieldLabel>Ubah Role</FieldLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                {['buyer', 'merchant', 'affiliate'].map(r => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                {['merchant', 'affiliate'].map(r => (
                   <button key={r}
                     onClick={() => updateUser(modal.id, modal.status, r)}
                     style={{

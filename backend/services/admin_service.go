@@ -4,6 +4,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/repositories"
 	"fmt"
+	"time"
 	"gorm.io/gorm"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -48,21 +49,22 @@ func (s *AdminService) UpdateUserStatus(adminID, userID, status, ip string) erro
 	}
 	return err
 }
-func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminNote string) error {
+func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminNote, trackingNumber string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var req models.RestockRequest
 		if err := tx.Preload("Items").First(&req, "id = ?", requestID).Error; err != nil {
 			return err
 		}
 
-		if req.Status != "pending" && req.Status != "requested" && status != "shipped" {
-			return gorm.ErrInvalidData
+		// Status Transition Validation
+		if req.Status != "pending" && req.Status != "requested" && status != "shipped" && status != "rejected" {
+			return fmt.Errorf("transisi status tidak valid dari %s ke %s", req.Status, status)
 		}
 
-		if status == "approved" || status == "shipped" {
-			// Transfer Stock from PUSAT (Inventory in Transit)
+		// 1. Stock Movement Logic
+		if status == "approved" && (req.Status == "pending" || req.Status == "requested") {
+			// Deduct from Pusat
 			for _, item := range req.Items {
-				// 1. Deduct from Pusat
 				var pusatInv models.Inventory
 				err := tx.Where("merchant_id = ? AND product_id = ?", models.PusatID, item.ProductID).First(&pusatInv).Error
 				if err != nil {
@@ -71,21 +73,44 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 				if pusatInv.Stock < item.Quantity {
 					return fmt.Errorf("stok pusat tidak cukup untuk %s (Tersisa: %d)", item.ProductID, pusatInv.Stock)
 				}
-				if err := tx.Model(&pusatInv).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+				
+				stockBefore := pusatInv.Stock
+				pusatInv.Stock -= item.Quantity
+				if err := tx.Save(&pusatInv).Error; err != nil {
 					return err
 				}
+
+				// Log Mutation Pusat (OUT)
+				tx.Create(&models.StockMutation{
+					ProductID:   item.ProductID,
+					MerchantID:  models.PusatID,
+					Type:        "RESTOCK_OUT",
+					Quantity:    item.Quantity,
+					Reference:   req.ID,
+					StockBefore: stockBefore,
+					StockAfter:  pusatInv.Stock,
+					Note:        "Pengiriman ke Merchant: " + req.MerchantID,
+				})
 			}
 		}
 
-		req.Status = status
-		req.AdminNote = adminNote
-		if err := tx.Save(&req).Error; err != nil {
+		// 2. Update Record
+		updates := map[string]interface{}{
+			"status":     status,
+			"admin_note": adminNote,
+			"updated_at": time.Now(),
+		}
+		if trackingNumber != "" {
+			updates["tracking_number"] = trackingNumber
+		}
+
+		if err := tx.Model(&req).Updates(updates).Error; err != nil {
 			return err
 		}
 
-		s.Audit.Log(adminID, "moderate_restock", "restock_request", requestID, "status="+status, "internal")
+		s.Audit.Log(adminID, "moderate_restock", "restock_request", requestID, fmt.Sprintf("status=%s, resi=%s", status, trackingNumber), "internal")
 
-		// [Akuglow Sync] Notify Merchant
+		// 3. Notify Merchant
 		title := "📦 Update Restock"
 		msg := fmt.Sprintf("Permintaan kulakan Anda %s telah diperbarui menjadi: %s.", req.ID, status)
 		if status == "approved" { title = "✅ Restock Disetujui" }

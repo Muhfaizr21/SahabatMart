@@ -44,13 +44,16 @@ func StartHousekeeping(db *gorm.DB) {
 			log.Printf("❌ Housekeeping Error (Order Expiry): %v", err)
 		}
 
-		// 5. Auto-upgrade Affiliate Tiers (Now handled by service)
-		// Process in batches to avoid DB spikes
-		var affiliates []models.AffiliateMember
-		db.Where("status = 'active'").Find(&affiliates)
-		if len(affiliates) > 0 {
-			log.Printf("👥 Checking tier upgrades for %d affiliates...", len(affiliates))
-			for _, aff := range affiliates {
+		// 5. Auto-upgrade Affiliate Tiers (Optimization: Only check recently active ones)
+		// We avoid looping through 10K+ users every run. 
+		// Real-time upgrades are handled in OrderService; this is a safety fallback.
+		var recentlyActiveAffiliates []models.AffiliateMember
+		checkSince := time.Now().Add(-15 * time.Minute)
+		db.Where("status = 'active' AND updated_at >= ?", checkSince).Find(&recentlyActiveAffiliates)
+		
+		if len(recentlyActiveAffiliates) > 0 {
+			log.Printf("👥 Safety Check: Validating tier upgrades for %d recently active affiliates...", len(recentlyActiveAffiliates))
+			for _, aff := range recentlyActiveAffiliates {
 				affiliateService.TriggerTierUpgrade(aff.ID)
 			}
 		}

@@ -17,14 +17,16 @@ export default function AdminReviews() {
       setLoading(true);
       const res = await fetchJson(`${ADMIN_API_BASE}/reviews?page=${page}&limit=${limit}`);
       
-      if (res && res.data) {
-        setReviews(res.data || []);
+      if (res && Array.isArray(res.data)) {
+        setReviews(res.data);
         setMeta({ 
           total_pages: res.total_pages || 1, 
           total: res.total || 0 
         });
+      } else if (Array.isArray(res)) {
+        setReviews(res);
       } else {
-        setReviews(res || []);
+        setReviews([]);
       }
     } catch (err) {
       console.error(err);

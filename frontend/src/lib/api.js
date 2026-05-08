@@ -24,9 +24,12 @@ export async function fetchJson(url, options = {}) {
     const response = await fetch(url, { ...options, headers });
 
     if (response.status === 401) {
-      // localStorage.removeItem('token');
-      // localStorage.removeItem('user');
-      // window.location.href = '/login'; // Force redirect to login
+      // BUG-03 fix: auto-logout saat token tidak valid / expired
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/admin')) {
+        window.location.href = '/login';
+      }
     }
 
     if (!response.ok) {

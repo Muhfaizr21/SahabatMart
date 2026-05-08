@@ -60,10 +60,9 @@ export default function MerchantWallet() {
 
       {/* KPI Cards */}
       <StatRow stats={[
-        { label: 'SALDO DOMPET (CAIR)', val: loading ? '...' : idr(wallet?.available_balance), icon: 'bx-wallet-alt', color: '#10b981' },
-        { label: 'SALDO PENDING (ESCROW)', val: loading ? '...' : idr(wallet?.pending_balance), icon: 'bxs-lock-alt', color: '#f59e0b' },
-        { label: 'TOTAL PENDAPATAN', val: loading ? '...' : idr(wallet?.total_sales), icon: 'bxs-bank', color: '#6366f1' },
-        { label: 'BIAYA LAYANAN', val: loading ? '...' : `${wallet?.service_fee || 5}%`, icon: 'bx-shield-quarter', color: '#8b5cf6' },
+        { label: 'SALDO KOMISI (CAIR)', val: loading ? '...' : idr(wallet?.available_balance), icon: 'bx-wallet-alt', color: '#10b981' },
+        { label: 'KOMISI PENDING (ESCROW)', val: loading ? '...' : idr(wallet?.pending_balance), icon: 'bxs-lock-alt', color: '#f59e0b' },
+        { label: 'TOTAL KOMISI MERCHANT', val: loading ? '...' : idr(wallet?.total_sales), icon: 'bxs-bank', color: '#6366f1' },
       ]} />
 
       {/* Helper Banner */}

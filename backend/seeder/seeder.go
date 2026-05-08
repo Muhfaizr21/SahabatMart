@@ -96,6 +96,9 @@ func SeedAll(db *gorm.DB) {
 	// 9. Akuglow Skin Journey Dynamic Data
 	SeedSkinJourney(db)
 
+	// 10. SahabatMart Dynamic Finance Data
+	SeedFinance(db)
+
 	fmt.Println("✅ Seeding Completed! 200+ Users created with full ecosystem activity.")
 }
 
@@ -118,13 +121,19 @@ func finalizeWarehouse(db *gorm.DB, suppliers []models.Supplier) {
 
 	// 1. Mark Master Products & Set Wholesale Prices
 	var products []models.Product
-	db.Find(&products).Limit(10)
+	db.Find(&products) // Process ALL products
 	for i, p := range products {
-		db.Model(&p).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"is_master":       true,
 			"wholesale_price": p.Price * 0.75, // Harga merchant diskon 25%
-			"cogs":            p.Price * 0.50, // Harga modal pusat 50%
-		})
+		}
+		
+		// Only set default COGS if it's still 0 (to avoid overwriting specific values from Akuglow seeder)
+		if p.COGS == 0 {
+			updates["cogs"] = p.Price * 0.50 // Default 50%
+		}
+
+		db.Model(&p).Updates(updates)
 
 		// 2. Create Initial Inbound for Master Products
 		if i < 3 { // Just for the first 3 products
@@ -568,6 +577,8 @@ func SeedConfigs(db *gorm.DB) {
 		{Key: "payout_min_amount", Value: "50000", Description: "Minimum Payout (Rp)"},
 		{Key: "payout_schedule", Value: "weekly", Description: "Jadwal Payout (daily/weekly/monthly)"},
 		{Key: "payout_day", Value: "friday", Description: "Hari Payout (jika weekly)"},
+		{Key: "payout_payday_dates", Value: "25,30", Description: "Tanggal Gajian (pisahkan dengan koma, misal: 25,30)"},
+		{Key: "settlement_delay_hours", Value: "24", Description: "Delay Settlement Saldo (Jam)"},
 		{Key: "payment_gateway", Value: "tripay", Description: "Payment Gateway Aktif (tripay/midtrans)"},
 		{Key: "payment_tripay_merchant", Value: "", Description: "Tripay Merchant Code"},
 		{Key: "payment_tripay_key", Value: "", Description: "Tripay API Key"},
@@ -593,13 +604,97 @@ func SeedConfigs(db *gorm.DB) {
 		{Key: "stats_products_sold", Value: "20K+", Description: "Statistik: Produk Terjual"},
 		{Key: "stats_satisfied_users", Value: "7M+", Description: "Statistik: Pengguna Puas"},
 		{Key: "stats_official_stores", Value: "4+", Description: "Statistik: Mitra Toko Resmi"},
+		{Key: "business_opportunity_content", Value: `{
+  "hero": {
+    "badge": "Peluang Bisnis Masa Depan",
+    "title": "Bisnis Skincare Premium Tanpa Modal & Stok Barang",
+    "subtitle": "Bergabunglah sebagai mitra AkuGlow dan raih kebebasan finansial melalui sistem affiliate tercanggih dengan potensi penghasilan ratusan juta rupiah."
+  },
+  "simulationData": {
+    "5": {
+      "title": "Duplikasi 5 Orang",
+      "desc": "Jika Anda mengajak 5 orang, dan masing-masing mengajak 5 orang lagi dengan belanja Rp100rb/bulan.",
+      "free": "Rp 300.000",
+      "premium": "Rp 3.900.000",
+      "levels": [
+        { "name": "Level 1 (5 org)", "income": "Rp 75.000" },
+        { "name": "Level 2 (25 org)", "income": "Rp 175.000" },
+        { "name": "Level 3 (125 org)", "income": "Rp 625.000" },
+        { "name": "Level 4 (625 org)", "income": "Rp 3.125.000" },
+        { "name": "Level 5 (3125 org)", "income": "Rp 15.625.000" }
+      ]
+    },
+    "10": {
+      "title": "Duplikasi 10 Orang",
+      "desc": "Jika Anda mengajak 10 orang, dan masing-masing mengajak 10 orang lagi dengan belanja Rp100rb/bulan.",
+      "free": "Rp 600.000",
+      "premium": "Rp 125.850.000",
+      "levels": [
+        { "name": "Level 1 (10 org)", "income": "Rp 150.000" },
+        { "name": "Level 2 (100 org)", "income": "Rp 700.000" },
+        { "name": "Level 3 (1000 org)", "income": "Rp 5.000.000" },
+        { "name": "Level 4 (10rb org)", "income": "Rp 20.000.000" },
+        { "name": "Level 5 (100rb org)", "income": "Rp 100.000.000" }
+      ]
+    }
+  },
+  "tiers": [
+    {
+      "name": "Free Member",
+      "desc": "Cocok untuk pemula yang ingin belajar dasar bisnis.",
+      "benefits": [
+        { "label": "Komisi Penjualan Langsung", "value": "10%" },
+        { "label": "Komisi Level 2", "value": "5%" },
+        { "label": "Marketing Kit & Edukasi", "value": "check" }
+      ],
+      "buttonText": "Daftar Free",
+      "isPopular": false
+    },
+    {
+      "name": "Premium Member",
+      "desc": "Maksimalkan profit dengan akses komisi hingga 5 Level.",
+      "benefits": [
+        { "label": "Komisi Penjualan Langsung", "value": "15%" },
+        { "label": "Komisi Multi-Level (2-5)", "value": "Aktif" },
+        { "label": "Private Coaching", "value": "check" },
+        { "label": "Voucher & Reward Point", "value": "check" }
+      ],
+      "buttonText": "Dapatkan Akses Premium",
+      "isPopular": true,
+      "promoText": "PROMO AKTIVASI: Cukup belanja produk skincare bulanan Anda, otomatis jadi Premium Member!"
+    }
+  ],
+  "mission": {
+    "title": "Visi & Misi Kami",
+    "items": [
+      { "title": "Innovation", "desc": "Menciptakan teknologi yang tepat guna dan berkualitas tinggi untuk mitra.", "icon": "lightbulb" },
+      { "title": "Sustainability", "desc": "Membangun hubungan jangka panjang yang sehat dengan mitra dan pelanggan.", "icon": "sync" },
+      { "title": "Empowerment", "desc": "Memberdayakan sumber daya manusia dengan kualitas dan integritas.", "icon": "person" },
+      { "title": "Repair", "desc": "Melakukan peningkatan teknologi dan sistem secara terus-menerus.", "icon": "handyman" },
+      { "title": "Distribution", "desc": "Memastikan rantai pasok dan produktivitas berjalan optimal dan merata.", "icon": "inventory" },
+      { "title": "Target", "desc": "Distribusi teknologi tepat guna yang merata sesuai dengan target nasional.", "icon": "track_changes" }
+    ]
+  }
+}`, Description: "Konten Halaman Peluang Bisnis (JSON)"},
+		{Key: "finance_income_source_list", Value: `[
+			{"name": "Platform Fee Pesanan", "type": "platform_fee"},
+			{"name": "Restock / Inbound", "type": "restock_revenue"},
+			{"name": "Biaya Iklan Merchant", "type": "commission_earned"},
+			{"name": "Komisi Platform", "type": "sale_revenue"},
+			{"name": "Lain-lain", "type": "manual_income"}
+		]`, Description: "Daftar Sumber Pendapatan Platform (JSON)"},
 	}
 
 	for _, c := range configs {
-		var count int64
-		db.Model(&models.PlatformConfig{}).Where("key = ?", c.Key).Count(&count)
-		if count == 0 {
+		var existing models.PlatformConfig
+		err := db.Where("key = ?", c.Key).First(&existing).Error
+		if err == gorm.ErrRecordNotFound {
 			db.Create(&c)
+		} else {
+			db.Model(&existing).Updates(map[string]interface{}{
+				"value":       c.Value,
+				"description": c.Description,
+			})
 		}
 	}
 }

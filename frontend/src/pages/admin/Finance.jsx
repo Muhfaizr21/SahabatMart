@@ -1,320 +1,600 @@
 import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
-import { PageHeader, StatRow, TablePanel, idr, fmtDate, A, Modal } from '../../lib/adminStyles.jsx';
+import { ADMIN_API_BASE } from '../../lib/api';
+import { toast } from 'react-hot-toast';
+import FinanceConfigModal from '../../components/admin/FinanceConfigModal';
 
 const API = ADMIN_API_BASE;
+const idr = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
+const pct = (part, total) => total > 0 ? ((part / total) * 100).toFixed(1) : '0.0';
 
-const TAB_LIST = [
-  { val: 'cashflow', icon: 'bx-pie-chart-alt-2', label: 'Cash Flow & Alokasi' },
-  { val: 'transactions', icon: 'bx-transfer', label: 'Mutasi Uang' },
-  { val: 'ledger', icon: 'bxs-file-find', label: 'Ledger Audit' },
+const PERIODS = [
+  { value: 'all',   label: 'Semua Waktu' },
+  { value: 'today', label: 'Hari Ini' },
+  { value: 'week',  label: '7 Hari Terakhir' },
+  { value: 'month', label: 'Bulan Ini' },
+  { value: 'year',  label: 'Tahun Ini' },
 ];
 
-export default function AdminFinance() {
-  const [cashflow, setCashflow] = useState(null);
-  const [txList, setTxList] = useState([]);
-  const [ledger, setLedger] = useState([]);
-  const [tab, setTab] = useState('cashflow');
-  const [loading, setLoading] = useState(true);
-  const [month, setMonth] = useState('');
-  
-  // Settings modal
-  const [showSettings, setShowSettings] = useState(false);
-  const [cfg, setCfg] = useState({});
-  const [saving, setSaving] = useState(false);
+const MUTATION_TYPES = [
+  { value: 'expense',  label: 'Uang Keluar (Expense)' },
+  { value: 'income',   label: 'Uang Masuk (Income)' },
+  { value: 'transfer', label: 'Transfer Antar Rekening' },
+];
 
-  const loadCashflow = () => {
+const MUTATION_STATUSES = [
+  { value: 'processed', label: 'Proses Sekarang' },
+  { value: 'pending',   label: 'Rencanakan (Pending)' },
+];
+
+const emptyMut = { category: '', amount: '', description: '', type: 'expense', status: 'processed', from_location_id: '', to_location_id: '' };
+
+export default function AdminFinance() {
+  const [data, setData]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [period, setPeriod]     = useState('all');
+  const [showConfig, setShowConfig] = useState(false);
+  const [mutation, setMutation] = useState(emptyMut);
+  const [saving, setSaving]     = useState(false);
+
+  useEffect(() => { fetchData(); }, [period]);
+
+  const fetchData = async () => {
     setLoading(true);
-    fetchJson(`${API}/finance/cashflow${month ? '?month='+month : ''}`).then(d => {
-      setCashflow(d || null);
-      if (d) {
-        setCfg({
-          allocations: (d.allocations || []).map(a => ({ ...a, rate: a.rate * 100 })),
-          split_aplikasi_dagang: (d.split_aplikasi_dagang || 0) * 100,
-          split_akuglow: (d.split_akuglow || 0) * 100,
-        });
-      }
-    }).catch(console.error).finally(() => setLoading(false));
+    try {
+      const r = await fetch(`${API}/finance/revenue-detail?period=${period}`, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+      });
+      const res = await r.json();
+      setData(res);
+    } catch {
+      toast.error('Gagal memuat data keuangan');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => {
-    if (tab === 'cashflow') loadCashflow();
-    if (tab === 'transactions') {
-      fetchJson(`${API}/transactions`).then(d => {
-        const list = Array.isArray(d) ? d : (d?.data || []);
-        setTxList(list);
-      });
-    }
-    if (tab === 'ledger') {
-      fetchJson(`${API}/finance/ledger`).then(d => {
-        const list = Array.isArray(d) ? d : (d?.data || []);
-        setLedger(list);
-      });
-    }
-  }, [tab, month]);
-
-  const saveConfig = async () => {
+  const handleMutation = async (e) => {
+    e.preventDefault();
+    if (!mutation.category || !mutation.amount) { toast.error('Kategori & nominal wajib diisi'); return; }
     setSaving(true);
     try {
-      await fetchJson(`${API}/finance/cashflow/config`, {
+      const r = await fetch(`${API}/finance/mutation`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
         body: JSON.stringify({
-          allocations: cfg.allocations.map(a => ({
-            key: a.key,
-            value: parseFloat(a.rate) / 100,
-            label: a.label
-          })),
-          split_aplikasi_dagang: parseFloat(cfg.split_aplikasi_dagang) / 100,
-          split_akuglow: parseFloat(cfg.split_akuglow) / 100,
-        })
+          ...mutation,
+          amount:           Number(mutation.amount),
+          from_location_id: mutation.from_location_id ? Number(mutation.from_location_id) : null,
+          to_location_id:   mutation.to_location_id   ? Number(mutation.to_location_id)   : null,
+        }),
       });
-      setShowSettings(false);
-      loadCashflow();
-    } catch(e) {
-      alert(e.message);
-    } finally {
-      setSaving(false);
-    }
+      if (r.ok) { toast.success('Mutasi berhasil dicatat'); setMutation(emptyMut); fetchData(); }
+      else       { toast.error('Gagal: ' + (await r.text())); }
+    } catch { toast.error('Gagal mencatat mutasi'); }
+    finally { setSaving(false); }
   };
 
-  const addAllocation = () => {
-    const newKey = `alloc_new_${Date.now()}`;
-    setCfg({
-      ...cfg,
-      allocations: [...cfg.allocations, { key: newKey, label: 'Kategori Baru', rate: 0 }]
-    });
-  };
-
-  const removeAllocation = (key) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus alokasi ini? Perubahan akan permanen setelah Anda klik Simpan.')) {
-      setCfg({
-        ...cfg,
-        allocations: cfg.allocations.filter(a => a.key !== key)
+  const handleDeleteMutation = async (id) => {
+    if (!window.confirm('Yakin ingin menghapus mutasi ini? Saldo Kas akan dikembalikan ke asal jika mutasi sudah diproses.')) return;
+    try {
+      const r = await fetch(`${API}/finance/mutation?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
       });
-    }
+      if (r.ok) { toast.success('Mutasi dihapus'); fetchData(); }
+      else toast.error('Gagal menghapus mutasi');
+    } catch { toast.error('Error server'); }
   };
 
-  const updateAlloc = (key, field, val) => {
-    setCfg({
-      ...cfg,
-      allocations: cfg.allocations.map(a => a.key === key ? { ...a, [field]: val } : a)
-    });
+  const handleLocationAction = async (action, loc = null) => {
+    try {
+      if (action === 'delete') {
+        if (!window.confirm(`Hapus kas "${loc.name}"? Pastikan tidak ada uang tersisa di dalamnya.`)) return;
+        const r = await fetch(`${API}/finance/locations?id=${loc.id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+        if (r.ok) { toast.success('Kas dihapus'); fetchData(); }
+      } else if (action === 'create') {
+        const name = window.prompt('Masukkan nama Lokasi Kas / Bank baru:');
+        if (!name) return;
+        const r = await fetch(`${API}/finance/locations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
+          body: JSON.stringify({ name, balance: 0, is_primary: false })
+        });
+        if (r.ok) { toast.success('Kas berhasil ditambahkan'); fetchData(); }
+      } else if (action === 'edit') {
+        const name = window.prompt('Edit nama Lokasi Kas / Bank:', loc.name);
+        if (!name) return;
+        const balanceRaw = window.prompt('Sesuaikan saldo aktual:', loc.balance);
+        if (balanceRaw === null) return;
+        const r = await fetch(`${API}/finance/locations/update?id=${loc.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
+          body: JSON.stringify({ name, balance: Number(balanceRaw), is_primary: loc.is_primary })
+        });
+        if (r.ok) { toast.success('Kas berhasil diperbarui'); fetchData(); }
+      }
+    } catch { toast.error('Terjadi kesalahan koneksi'); }
   };
 
-  const FlowCard = ({ title, amount, color, icon, items }) => (
-    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', padding: 24, flex: '1 1 300px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 12, background: color+'14', color: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
-          <i className={`bx ${icon}`} />
-        </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{title}</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>{idr(amount)}</div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {items.map((it, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: i < items.length-1 ? '1px dashed #e2e8f0' : 'none' }}>
-            <span style={{ fontSize: 13, color: '#64748b' }}>{it.label}</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: it.color || '#0f172a' }}>{idr(it.value)}</span>
-          </div>
-        ))}
-      </div>
+  const gross       = data?.gross_revenue    || 0;
+  const capitalCost = data?.capital_cost     || 0;
+  const grossProfit = data?.gross_profit     || 0;
+  const totalSaved  = data?.data_saving?.total || 0;
+  const netProfit   = data?.net_profit        || 0;
+
+  if (loading && !data) return (
+    <div className="p-20 text-center">
+      <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-slate-400 font-bold text-sm">Sinkronisasi data keuangan...</p>
     </div>
   );
 
   return (
-    <div style={A.page} className="fade-in">
-      <PageHeader title="Arus Kas & Keuangan" subtitle="Laporan pembagian revenue, alokasi keuntungan, dan mutasi uang.">
-        <div style={{ display: 'flex', gap: 10 }}>
-          <input type="month" style={{ ...A.select, width: 180 }} value={month} onChange={e => setMonth(e.target.value)} />
-          <button style={A.btnGhost} onClick={() => window.location.reload()}><i className="bx bx-refresh" /> Refresh</button>
-          <button style={A.btnPrimary} onClick={() => setShowSettings(true)}><i className="bx bx-cog" /> Atur Persentase</button>
-        </div>
-      </PageHeader>
+    <div className="flex flex-col gap-10 pb-24 text-slate-700 admin-page-container">
 
-      <div style={{ display:'flex', background:'#f8fafc', padding:4, borderRadius:14, border:'1px solid #f1f5f9', gap:4, alignSelf:'flex-start' }}>
-        {TAB_LIST.map(t => (
-          <button key={t.val} style={{
-            display:'flex', alignItems:'center', gap:7,
-            padding:'9px 20px', borderRadius:11, border:'none',
-            fontWeight:700, fontSize:13, cursor:'pointer',
-            background: tab===t.val ? '#fff' : 'transparent',
-            color: tab===t.val ? '#0f172a' : '#94a3b8',
-            boxShadow: tab===t.val ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-          }} onClick={() => setTab(t.val)}>
-            <i className={`bx ${t.icon}`} style={{ fontSize:16 }} />{t.label}
+      {/* ── Header ── */}
+      <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm finance-header">
+        <div>
+          <span className="bg-indigo-100 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-2 inline-block">
+            DYNAMIC LEDGER
+          </span>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Laporan Keuangan</h1>
+          <p className="text-sm text-slate-400 mt-1">Sistem alokasi pendapatan & pencatatan kas real-time.</p>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <select
+            value={period}
+            onChange={e => setPeriod(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold shadow-sm outline-none cursor-pointer hover:bg-slate-100 transition-all"
+          >
+            {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          <button onClick={() => setShowConfig(true)} className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl text-sm font-bold shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all border-b-4 border-slate-200 active:border-b-0 active:translate-y-1">
+            <i className='bx bx-cog text-lg' /> Konfigurasi
           </button>
-        ))}
+          <button onClick={fetchData} disabled={loading} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-black shadow-lg shadow-indigo-100 flex items-center gap-2 hover:bg-indigo-700 transition-all border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 disabled:opacity-60">
+            <i className={`bx bx-refresh text-lg ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
       </div>
 
-      {tab === 'cashflow' && cashflow && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Layer 1: Revenue */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
-            <FlowCard 
-              title="1. Pembagian Revenue" 
-              amount={cashflow.total_revenue} 
-              color="#3b82f6" 
-              icon="bx-wallet"
-              items={[
-                { label: 'Uang Modal (HPP)', value: cashflow.total_cogs, color: '#ef4444' },
-                { label: 'Bonus Affiliate', value: cashflow.total_affiliate_bonus, color: '#f59e0b' },
-                { label: 'Bonus Merchant', value: cashflow.total_merchant_bonus, color: '#8b5cf6' },
-                { label: 'Keuntungan Kotor', value: cashflow.gross_profit, color: '#10b981' },
-              ]}
-            />
-            {/* Layer 2: Gross Profit Allocation */}
-            <FlowCard 
-              title="2. Alokasi Keuntungan Kotor" 
-              amount={cashflow.gross_profit} 
-              color="#10b981" 
-              icon="bx-pie-chart"
-              items={[
-                ...(cashflow.allocations || []).map(a => ({
-                   label: `${a.label} (${(a.rate*100).toFixed(1)}%)`,
-                   value: a.value
-                })),
-                { label: 'Keuntungan Bersih', value: cashflow.net_profit, color: '#14b8a6' },
-              ]}
-            />
-            {/* Layer 3: Net Profit Split */}
-            <FlowCard 
-              title="3. Pembagian Keuntungan Bersih" 
-              amount={cashflow.net_profit} 
-              color="#14b8a6" 
-              icon="bxs-bank"
-              items={[
-                { label: `Aplikasi Dagang (${(cashflow.split_aplikasi_dagang*100).toFixed(1)}%)`, value: cashflow.net_aplikasi_dagang, color: '#6366f1' },
-                { label: `Akuglow (${(cashflow.split_akuglow*100).toFixed(1)}%)`, value: cashflow.net_akuglow, color: '#ec4899' },
-              ]}
-            />
+      {/* ── Section 1: Alur Perhitungan ── */}
+      <div className="space-y-5">
+        <SectionTitle n="1" title="Alur Perhitungan Keuangan" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          {/* Gross Revenue */}
+          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm flex flex-col relative overflow-hidden group finance-card">
+            <div>
+              <div className="w-14 h-14 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 mb-6 transition-transform group-hover:scale-110 duration-500">
+                <i className='bx bx-trending-up text-2xl' />
+              </div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GROSS REVENUE</div>
+              <div className="text-3xl font-black text-slate-900 tracking-tighter mb-2">{idr(gross)}</div>
+            </div>
+
+            {/* Rincian Sumber Pendapatan */}
+            <div className="mt-8 space-y-3 border-t border-slate-50 pt-6 relative z-10">
+              {/* Harga Modal Section */}
+              <div className="flex justify-between text-[11px] font-black mb-1 p-2 bg-slate-50 rounded-xl">
+                <span className="text-slate-500">HARGA MODAL (COGS)</span>
+                <span className="text-rose-500">{idr(capitalCost)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] font-black mb-4 p-2 bg-emerald-50 rounded-xl">
+                <span className="text-emerald-700">LABA KOTOR</span>
+                <span className="text-emerald-600">{idr(grossProfit)}</span>
+              </div>
+
+              <div className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2 px-2">Sumber Pendapatan</div>
+              {data?.income_breakdown && Object.entries(data.income_breakdown)
+                .sort((a, b) => b[1] - a[1]) // Urutkan dari yang terbesar
+                .map(([label, val], idx) => (
+                  <div key={idx} className="group/item px-2">
+                    <div className="flex justify-between text-[11px] font-bold mb-1.5">
+                      <span className="text-slate-400 group-hover/item:text-indigo-600 transition-colors">{label}</span>
+                      <span className="text-slate-700">{idr(val)}</span>
+                    </div>
+                    <div className="w-full h-1 bg-slate-50 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
+                        style={{ width: `${(val / gross * 100) || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <p className="text-[10px] font-bold text-slate-300 mt-8 leading-relaxed italic opacity-60">
+              Total pendapatan kotor dari semua kanal platform.
+            </p>
+            <i className='bx bx-trending-up absolute -bottom-6 -right-6 text-9xl text-slate-50 opacity-10 group-hover:scale-120 transition-all duration-700' />
           </div>
 
-          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', padding: 24 }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: 16, color: '#0f172a' }}>Status Kas Platform (Live Audit)</h3>
-            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>Saldo riil yang tersedia di akun kas pusat setelah dikurangi payout yang sudah dibayar.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-              <div style={{ padding: 20, borderRadius: 12, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
-                <div style={{ fontSize: 13, color: '#0369a1', marginBottom: 4, fontWeight: 700 }}>SALDO KAS PUSAT (HQ)</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#0c4a6e' }}>{idr(cashflow.cash_balance)}</div>
+          {/* Data Saving */}
+          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm flex flex-col finance-card">
+            <div className="flex justify-between items-start mb-6">
+              <div className="w-14 h-14 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-100">
+                <i className='bx bx-pie-chart-alt-2 text-2xl' />
               </div>
-              <div style={{ padding: 20, borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Dana Escrow (Liabilitas)</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{idr(cashflow.total_escrow_liability)}</div>
+              <a href={`/admin/finance/data-saving?period=${period}`} className="text-indigo-600 text-[10px] font-black hover:underline flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-full">
+                DETAIL <i className='bx bx-right-arrow-alt' />
+              </a>
+            </div>
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ALOKASI BIAYA (DATA SAVING)</div>
+            <div className="text-3xl font-black text-rose-500 tracking-tighter mb-1">- {idr(totalSaved)}</div>
+            <div className="text-[10px] font-bold text-slate-400 mb-6">{pct(totalSaved, gross)}% dari Gross Revenue</div>
+            <div className="space-y-2 mt-auto">
+              {data?.data_saving && Object.entries(data.data_saving)
+                .filter(([k]) => k !== 'total')
+                .slice(0, 4)
+                .map(([label, val], idx) => (
+                  <div key={idx} className="flex justify-between text-[11px] font-bold">
+                    <span className="text-slate-400 capitalize">{label}</span>
+                    <span className="text-slate-700">{idr(val.value)}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Net Profit */}
+          <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl shadow-slate-200 flex flex-col justify-between relative overflow-hidden finance-card">
+            <div className="relative z-10">
+              <div className="w-14 h-14 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 mb-6">
+                <i className='bx bx-check-shield text-2xl' />
               </div>
+              <div className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">NET PROFIT (LABA BERSIH)</div>
+              <div className="text-3xl font-black tracking-tighter text-white">{idr(netProfit)}</div>
+              <div className="text-[10px] font-bold text-indigo-300/60 mt-1 mb-6">{pct(netProfit, gross)}% dari Gross Revenue</div>
+              
+              <div className="space-y-2 mt-auto">
+                {data?.profit_shares && Object.entries(data.profit_shares)
+                  .filter(([k]) => k !== 'total')
+                  .slice(0, 4)
+                  .map(([label, val], idx) => (
+                    <div key={idx} className="flex justify-between text-[11px] font-bold">
+                      <span className="text-indigo-300 capitalize">{label}</span>
+                      <span className="text-white">{idr(val.value)}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            
+            <div className="mt-8 flex justify-between items-center relative z-10">
+              <p className="text-[11px] text-indigo-200/50 max-w-[120px]">Siap dibagikan ke stakeholder.</p>
+              <a href={`/admin/finance/profit-share?period=${period}`} className="bg-indigo-500/20 text-indigo-300 text-[10px] font-black px-4 py-2 rounded-xl hover:bg-indigo-500 hover:text-white transition-all">
+                BAGI HASIL <i className='bx bx-right-arrow-alt ml-1' />
+              </a>
+            </div>
+            <i className='bx bxs-coin-stack absolute -bottom-8 -right-8 text-9xl text-white opacity-5' />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 2: Rincian Arus Uang Masuk ── */}
+      <div className="space-y-5">
+        <SectionTitle n="2" title="Rincian Sumber Arus Masuk" />
+        <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 finance-stat-grid">
+            {data?.income_breakdown && Object.entries(data.income_breakdown).map(([label, val], idx) => {
+              const colors = ['indigo','emerald','amber','sky','rose'];
+              const c = colors[idx % colors.length];
+              return (
+                <div key={idx} className={`p-5 bg-${c}-50 rounded-3xl border border-${c}-100`}>
+                  <div className={`text-[10px] font-black text-${c}-500 uppercase tracking-widest mb-2`}>{label}</div>
+                  <div className="text-lg font-black text-slate-900">{idr(val)}</div>
+                  <div className={`text-[10px] font-bold text-${c}-400 mt-1`}>{pct(val, gross)}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 3: Pemantauan Kas & Mutasi ── */}
+      <div className="space-y-5">
+        <SectionTitle n="3" title="Kas & Pencatatan Mutasi" />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+
+          {/* Locations */}
+          <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Lokasi Saldo Riil</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full">
+                  TOTAL: {idr(data?.locations?.reduce((a, l) => a + l.balance, 0))}
+                </span>
+                <button onClick={() => handleLocationAction('create')} className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black hover:bg-indigo-500 hover:text-white transition-all">
+                  + TAMBAH KAS
+                </button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {data?.locations?.map((loc, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-100 shadow-sm group-hover:text-indigo-500 transition-all">
+                      <i className={`bx ${loc.name.toLowerCase().includes('kas') ? 'bx-wallet-alt' : 'bx-credit-card'} text-sm`} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-700 leading-tight">{loc.name}</div>
+                      {loc.is_primary && <div className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">Rekening Utama</div>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm font-black text-slate-900">{idr(loc.balance)}</div>
+                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleLocationAction('edit', loc)} className="text-slate-400 hover:text-indigo-500"><i className='bx bx-edit text-xs'></i></button>
+                      <button onClick={() => handleLocationAction('delete', loc)} className="text-slate-400 hover:text-rose-500"><i className='bx bx-trash text-xs'></i></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Mutation Form */}
+          <div className="lg:col-span-3 bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Catat Mutasi Kas</h3>
+            <form onSubmit={handleMutation} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <select
+                  value={mutation.type}
+                  onChange={e => setMutation({...mutation, type: e.target.value})}
+                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:border-indigo-300 transition-all"
+                >
+                  {MUTATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+                <select
+                  value={mutation.status}
+                  onChange={e => setMutation({...mutation, status: e.target.value})}
+                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:border-indigo-300 transition-all"
+                >
+                  {MUTATION_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  value={mutation.category}
+                  onChange={e => setMutation({...mutation, category: e.target.value})}
+                  placeholder="Kategori (misal: Biaya Operasional)"
+                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:bg-white focus:border-indigo-300 transition-all"
+                />
+                <input
+                  type="number"
+                  value={mutation.amount}
+                  onChange={e => setMutation({...mutation, amount: e.target.value})}
+                  placeholder="Nominal (Rp)"
+                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-black outline-none focus:bg-white focus:border-indigo-300 transition-all text-indigo-600"
+                />
+              </div>
+
+              <input
+                type="text"
+                value={mutation.description}
+                onChange={e => setMutation({...mutation, description: e.target.value})}
+                placeholder="Keterangan / Deskripsi transaksi"
+                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:bg-white focus:border-indigo-300 transition-all"
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <select value={mutation.from_location_id} onChange={e => setMutation({...mutation, from_location_id: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none">
+                  <option value="">Dari Rekening (Opsional)</option>
+                  {data?.locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <select value={mutation.to_location_id} onChange={e => setMutation({...mutation, to_location_id: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none">
+                  <option value="">Ke Rekening (Opsional)</option>
+                  {data?.locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full bg-slate-900 text-white py-4 rounded-2xl text-xs font-black shadow-lg hover:bg-slate-800 transition-all border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Menyimpan...</> : <><i className='bx bx-save' /> Simpan Mutasi</>}
+              </button>
+            </form>
+
+            {/* Recent Mutations */}
+            {data?.mutations?.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-slate-50 space-y-3">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mutasi Terkini</h4>
+                {data.mutations.slice(0, 5).map((m, i) => (
+                  <div key={i} className="flex justify-between items-center group relative p-2 -mx-2 hover:bg-slate-50 rounded-2xl transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs ${m.type === 'income' ? 'bg-emerald-50 text-emerald-600' : m.type === 'transfer' ? 'bg-sky-50 text-sky-600' : 'bg-rose-50 text-rose-500'}`}>
+                        <i className={`bx ${m.type === 'income' ? 'bx-plus' : m.type === 'transfer' ? 'bx-transfer' : 'bx-minus'}`} />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-black text-slate-700">{m.category}</div>
+                        <div className="text-[9px] text-slate-400">{m.description || '-'}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className={`text-xs font-black ${m.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`}>{idr(m.amount)}</div>
+                        <div className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${m.status === 'processed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{m.status}</div>
+                      </div>
+                      <button onClick={() => handleDeleteMutation(m.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-500 transition-all">
+                        <i className='bx bx-trash text-sm'></i>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Section 4: Audit Transaksi & Harga Modal ── */}
+        <div className="space-y-5 pt-8">
+          <SectionTitle n="4" title="Audit Transaksi & Harga Modal" />
+          <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu / Customer</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gross Amount</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Harga Modal (COGS)</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gross Profit</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Margin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {data?.recent_orders?.length > 0 ? (
+                    data.recent_orders.map((order, i) => {
+                      const profit = order.total_amount - order.total_cogs;
+                      const margin = (profit / order.total_amount) * 100;
+                      return (
+                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="text-xs font-black text-slate-900">{order.customer || 'Customer'}</div>
+                            <div className="text-[10px] font-bold text-slate-400">{new Date(order.created_at).toLocaleString('id-ID')}</div>
+                            <div className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full inline-block mt-1">ID: {order.id.split('-')[0].toUpperCase()}</div>
+                          </td>
+                          <td className="px-8 py-6">
+                            {(() => {
+                              const statusMap = {
+                                completed:     { label: 'Selesai',       cls: 'bg-emerald-50 text-emerald-600' },
+                                delivered:     { label: 'Terkirim',      cls: 'bg-emerald-50 text-emerald-600' },
+                                shipped:       { label: 'Dikirim',       cls: 'bg-sky-50 text-sky-600'         },
+                                ready_to_ship: { label: 'Siap Kirim',    cls: 'bg-indigo-50 text-indigo-600'   },
+                                paid:          { label: 'Dibayar',       cls: 'bg-amber-50 text-amber-600'     },
+                                processing:    { label: 'Diproses',      cls: 'bg-amber-50 text-amber-600'     },
+                                cancelled:     { label: 'Dibatalkan',    cls: 'bg-rose-50 text-rose-500'       },
+                              };
+                              const s = statusMap[order.status] || { label: order.status, cls: 'bg-slate-50 text-slate-500' };
+                              return <span className={`text-[9px] font-black px-2 py-1 rounded-full ${s.cls}`}>{s.label}</span>;
+                            })()}
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="text-xs font-black text-slate-900">{idr(order.total_amount)}</div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="text-xs font-black text-rose-500">{idr(order.total_cogs)}</div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="text-xs font-black text-emerald-600">{idr(profit)}</div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className={`text-[10px] font-black px-2 py-1 rounded-lg inline-block ${margin > 20 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                              {margin.toFixed(1)}%
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="px-8 py-20 text-center">
+                        <div className="flex flex-col items-center opacity-30">
+                          <i className='bx bx-data text-4xl mb-2' />
+                          <span className="text-xs font-bold">Belum ada data transaksi untuk audit</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Mutasi Uang */}
-      {tab === 'transactions' && (
-        <TablePanel loading={loading}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={A.th}>Tanggal</th>
-                <th style={A.th}>ID Ref</th>
-                <th style={A.th}>Kategori</th>
-                <th style={A.th}>Nominal</th>
-                <th style={A.th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txList.map((t, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={A.td}>{fmtDate(t.created_at)}</td>
-                  <td style={A.td}><code style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:4}}>{t.id?.slice(0,8)}</code></td>
-                  <td style={A.td}>{t.type}</td>
-                  <td style={{ ...A.td, color: t.amount < 0 ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-                    {t.amount < 0 ? '-' : '+'}{idr(Math.abs(t.amount))}
-                  </td>
-                  <td style={A.td}>Selesai</td>
-                </tr>
-              ))}
-              {txList.length === 0 && <tr><td colSpan={5} style={{textAlign:'center', padding:40, color:'#94a3b8'}}>Belum ada mutasi uang.</td></tr>}
-            </tbody>
-          </table>
-        </TablePanel>
-      )}
-
-      {/* Ledger */}
-      {tab === 'ledger' && (
-        <TablePanel loading={loading}>
-           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={A.th}>Timestamp</th>
-                <th style={A.th}>Tipe Operasi</th>
-                <th style={A.th}>Arus Dana</th>
-                <th style={A.th}>Saldo Akhir</th>
-                <th style={A.th}>Referensi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledger.map((l, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={A.td}>{fmtDate(l.created_at)}</td>
-                  <td style={A.td}>{l.type}</td>
-                  <td style={{ ...A.td, color: l.amount < 0 ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-                    {l.amount < 0 ? '-' : '+'}{idr(Math.abs(l.amount))}
-                  </td>
-                  <td style={A.td}>{idr(l.balance_after)}</td>
-                  <td style={A.td}><code style={{background:'#f1f5f9', padding:'2px 6px', borderRadius:4}}>{l.reference_id?.slice(0,8)}</code></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TablePanel>
-      )}
-
-      {showSettings && (
-        <Modal title="Atur Alokasi & Profit Share" onClose={() => setShowSettings(false)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h4 style={{ margin: 0, color: '#0f172a', fontSize: 14 }}>Daftar Alokasi Pengeluaran</h4>
-            
-            {cfg.allocations.map((a, idx) => (
-              <div key={a.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', padding: 12, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ ...A.label, fontSize: 11 }}>Nama Alokasi</label>
-                  <input type="text" style={{ ...A.input, padding: '6px 10px' }} value={a.label} onChange={e => updateAlloc(a.key, 'label', e.target.value)} />
-                </div>
-                <div style={{ width: 80 }}>
-                  <label style={{ ...A.label, fontSize: 11 }}>Rate (%)</label>
-                  <input type="number" style={{ ...A.input, padding: '6px 10px' }} value={a.rate} onChange={e => updateAlloc(a.key, 'rate', e.target.value)} />
-                </div>
-                <button onClick={() => removeAllocation(a.key)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 8, width: 34, height: 34, cursor: 'pointer' }}>
-                  <i className="bx bx-trash" />
-                </button>
-              </div>
-            ))}
-            
-            <button style={{ ...A.btnGhost, padding: '8px', border: '1px dashed #cbd5e1' }} onClick={addAllocation}>
-              <i className="bx bx-plus" /> Tambah Alokasi Baru
-            </button>
-
-            <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '10px 0' }} />
-            <h4 style={{ margin: 0, color: '#0f172a', fontSize: 14 }}>Pembagian Keuntungan Bersih</h4>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={A.label}>Aplikasi Dagang (%)</label>
-                <input type="number" style={A.input} value={cfg.split_aplikasi_dagang} onChange={e => setCfg({...cfg, split_aplikasi_dagang: e.target.value})} />
-              </div>
-              <div>
-                <label style={A.label}>Akuglow (%)</label>
-                <input type="number" style={A.input} value={cfg.split_akuglow} onChange={e => setCfg({...cfg, split_akuglow: e.target.value})} />
-              </div>
+      {/* ── Section 5: Riwayat Aktivitas Wallet (Audit Trail Lengkap) ── */}
+      <div className="space-y-5">
+        <SectionTitle n="5" title="Audit Trail — Seluruh Aktivitas Wallet" />
+        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden finance-card">
+          <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50">
+            <div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Real-time Feed</div>
+              <div className="text-sm font-black text-slate-900">Semua pergerakan uang di sistem</div>
             </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
-              <button style={A.btnGhost} onClick={() => setShowSettings(false)}>Batal</button>
-              <button style={A.btnPrimary} onClick={saveConfig} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
-            </div>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">
+              {data?.wallet_activity?.length || 0} transaksi
+            </span>
           </div>
-        </Modal>
-      )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu</th>
+                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
+                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pemilik Wallet</th>
+                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Keterangan</th>
+                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Jumlah</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {data?.wallet_activity?.length > 0 ? (
+                  data.wallet_activity.map((tx, i) => {
+                    const isIn = tx.amount > 0;
+                    const typeMap = {
+                      sale_revenue:      { label: 'Penjualan',       color: 'emerald' },
+                      platform_fee:      { label: 'Biaya Platform',  color: 'indigo'  },
+                      commission_earned: { label: 'Komisi Afiliasi', color: 'sky'     },
+                      restock_revenue:   { label: 'Restock',         color: 'amber'   },
+                      withdrawal:        { label: 'Penarikan',       color: 'rose'    },
+                      refund:            { label: 'Refund',          color: 'rose'    },
+                      topup:             { label: 'Top Up',          color: 'emerald' },
+                    };
+                    const t = typeMap[tx.type] || { label: tx.type, color: 'slate' };
+                    return (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-4">
+                          <div className="text-[10px] font-black text-slate-700">{new Date(tx.created_at).toLocaleDateString('id-ID')}</div>
+                          <div className="text-[9px] text-slate-400">{new Date(tx.created_at).toLocaleTimeString('id-ID')}</div>
+                        </td>
+                        <td className="px-8 py-4">
+                          <span className={`text-[10px] font-black px-3 py-1 rounded-full bg-${t.color}-50 text-${t.color}-600`}>
+                            {t.label}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4">
+                          <div className="text-[11px] font-bold text-slate-600">{tx.wallet_owner}</div>
+                        </td>
+                        <td className="px-8 py-4">
+                          <div className="text-[10px] text-slate-400 max-w-[200px] truncate">{tx.description || '-'}</div>
+                        </td>
+                        <td className="px-8 py-4 text-right">
+                          <div className={`text-xs font-black ${isIn ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {isIn ? '+' : ''}{idr(tx.amount)}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="px-8 py-16 text-center">
+                      <div className="flex flex-col items-center opacity-30">
+                        <i className='bx bx-wallet text-4xl mb-2' />
+                        <span className="text-xs font-bold">Belum ada aktivitas wallet untuk periode ini</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <FinanceConfigModal isOpen={showConfig} onClose={() => setShowConfig(false)} onRefresh={fetchData} />
+    </div>
+  );
+}
+
+function SectionTitle({ n, title }) {
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-10 h-10 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-sm shadow-xl shadow-slate-200">{n}</div>
+      <h2 className="text-xl font-black text-slate-900 tracking-tight">{title}</h2>
     </div>
   );
 }

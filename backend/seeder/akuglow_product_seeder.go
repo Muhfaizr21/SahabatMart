@@ -47,6 +47,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-BODY-001",
 			Description: "✨ Manfaat Utama:\n- Mencerahkan kulit kusam & meratakan warna kulit\n- Menyamarkan noda hitam dan flek\n- Melembapkan kulit secara intensif\n- Menenangkan kulit sensitif\n- Membuat kulit halus, kenyal, dan glowing alami\n\n🧪 Kandungan Utama:\n- DNA Salmon Extract – Membantu regenerasi sel kulit\n- Niacinamide – Mengurangi noda hitam\n- Glycerin – Melembapkan kulit\n- Vitamin E – Antioxidant alami\n\n📝 Cara Pakai:\n1. Bersihkan kulit terlebih dahulu\n2. Ambil Akuglow DNA Salmon Lotion secukupnya\n3. Oleskan merata ke seluruh tubuh\n4. Pijat lembut hingga terserap sempurna",
 			Price:       149500,
+			COGS:        75000,
 			Category:    "Body Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/dna-salmon-3-300x300.webp",
@@ -63,6 +64,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-FACE-001",
 			Description: "🛡️ Manfaat Utama:\n- Memperbaiki skin barrier yang rusak\n- Mengurangi kemerahan & iritasi\n- Melembapkan tanpa menyumbat pori\n- Menenangkan kulit sensitif\n\n💎 Keunggulan:\n- Non-Comedogenic & Alcohol-Free\n- Paraben-Free & Aman untuk Bumil/Busui\n- BPOM & Halal Certified\n\n💡 Cara Pakai:\n1. Gunakan pagi dan malam hari setelah toner\n2. Aplikasikan secukupnya ke wajah dan leher\n3. Pijat lembut hingga meresap",
 			Price:       119700,
+			COGS:        60000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/Calming-barier-4-300x300.webp",
@@ -80,6 +82,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Description: "🌙 Manfaat Utama:\n- Mencerahkan kulit saat tidur\n- Menyamarkan noda hitam & bekas jerawat\n- Memperbaiki tekstur kulit & pori-pori\n- Wajah glowing di pagi hari\n\n🔬 Kandungan Aktif:\n- Niacinamide & Collagen\n- Alpha Arbutin & Vitamin E\n\n✨ Cara Pakai:\n- Gunakan setiap malam sebelum tidur\n- Oleskan merata ke seluruh wajah & leher\n- Biarkan bekerja semalaman",
 			Price:       94500,
 			OldPrice:    100000,
+			COGS:        45000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/night-cream-boster-3-300x300.webp",
@@ -97,6 +100,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			Description: "☀️ Manfaat Utama:\n- Instant brightening (Cerah seketika)\n- Perlindungan UV (UVA/UVB Protection)\n- Melembapkan tanpa rasa lengket\n- Menyamarkan noda hitam\n\n🧬 Kandungan Aktif:\n- Niacinamide & Alpha Arbutin\n- Vitamin C & DNA Salmon\n\n✅ Cara Pakai:\n1. Gunakan setiap pagi setelah membersihkan wajah\n2. Oleskan merata pada wajah dan leher\n3. Tunggu hingga meresap sebelum makeup",
 			Price:       85000,
 			OldPrice:    150000,
+			COGS:        40000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/daycream-2-300x300.webp",
@@ -113,6 +117,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-FACE-004",
 			Description: "🚀 Manfaat Utama:\n- Solusi wajah “badak” yang susah putih\n- Memudarkan flek hitam menahun\n- Mengangkat sel kulit mati\n- Membuat kulit licin & glowing\n\n🧪 Kandungan Aktif:\n- Hexylresorcinol & Alpha Arbutin\n- Niacinamide & Vitamin E\n- Marine Collagen\n\n⚠️ Cara Pakai:\n- Gunakan khusus pada malam hari\n- Oleskan tipis merata ke seluruh wajah",
 			Price:       99500,
+			COGS:        50000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/night-cream-boster-3-300x300.webp",
@@ -129,6 +134,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-FACE-005",
 			Description: "🧼 Manfaat Utama:\n- Membersihkan minyak & debu secara total\n- Menjaga kelembapan (Deep Hydration)\n- Menguatkan skin barrier\n\n🌿 Kandungan:\n- Glycerin & Butylene Glycol\n- Coco Glucoside (Pembersih Alami)",
 			Price:       85000,
+			COGS:        35000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/facial-foam-4-300x300.webp",
@@ -145,6 +151,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-FACE-006",
 			Description: "💧 Manfaat Utama:\n- Menyeimbangkan pH kulit\n- Mencerahkan kulit kusam\n- Membantu penyerapan skincare selanjutnya\n\n🌟 Kandungan:\n- Niacinamide & Hyaluronic Acid\n- Allantoin & Aloe Vera Extract",
 			Price:       75000,
+			COGS:        30000,
 			Category:    "Face Care",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/face-toner-2-300x300.webp",
@@ -161,6 +168,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-PKG-001",
 			Description: "🎁 Isi Paket Lengkap:\n1. Day Cream SPF Hybrid (10gr)\n2. Night Cream (10gr)\n3. Facial Foam Brush (100ml)\n4. Toner (100ml)\n5. Pouch Eksklusif + Brosur\n\n🏆 Manfaat Utama:\n- Mencerahkan & memutihkan kulit kusam\n- Memudarkan flek hitam & bekas jerawat\n- Mengecilkan pori & mengontrol minyak\n- Wajah glowing, sehat, dan merona alami",
 			Price:       274500,
+			COGS:        135000,
 			Category:    "Package",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2025/10/paketan-1-300x300.webp",
@@ -177,6 +185,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			SKU:         "AKU-PKG-002",
 			Description: "🚑 Solusi Terbaik Untuk:\n- Kulit sensitif & kemerahan\n- Breakout, Beruntusan, Jerawat meradang\n- Kulit rusak akibat over-eksfoliasi\n\n📦 Isi Paket:\n1. Gentle Facial Foam (SLS-Free)\n2. Calming Barrier Gel Soothing Moisturizer\n3. Day Cream Sunscreen (Non-comedogenic)",
 			Price:       256000,
+			COGS:        125000,
 			Category:    "Package",
 			Brand:       "AkuGlow",
 			Image:       "https://akuglow.com/wp-content/uploads/2026/04/WhatsApp-Image-2026-04-16-at-20.09.53.jpeg",
@@ -198,8 +207,11 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			db.Create(&p)
 			existing = p
 		} else {
-			// Update gambar saja untuk kali ini agar sinkron dengan link baru
-			db.Model(&existing).Update("image", p.Image)
+			// Update gambar & COGS agar sinkron
+			db.Model(&existing).Updates(map[string]interface{}{
+				"image": p.Image,
+				"cogs":  p.COGS,
+			})
 		}
 
 		// Create Standard Variant
@@ -208,6 +220,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 				ID:    uuid.New().String(),
 				SKU:   existing.SKU + "-STD",
 				Price: existing.Price,
+				COGS:  existing.COGS,
 				Stock: 1000,
 			}).FirstOrCreate(&models.ProductVariant{})
 

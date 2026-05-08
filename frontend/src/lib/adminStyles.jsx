@@ -210,7 +210,7 @@ export const roleBadge = (role) => {
 // ─── COMMON PAGE HEADER ──────────────────────────────────
 export function PageHeader({ title, subtitle, children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 0 }}>
+    <div className="admin-header-stack" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 0 }}>
       <div style={{ minWidth: 0 }}>
         <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em', marginBottom: subtitle ? 4 : 0, margin: 0 }}>
           {title}

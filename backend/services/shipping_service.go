@@ -23,15 +23,14 @@ type ShippingService struct {
 
 func NewShippingService(db *gorm.DB) *ShippingService {
 	apiKey := os.Getenv("BITESHIP_API_KEY")
-	baseURL := "https://api.biteship.com" // Default to live, can be overridden by env
-	if os.Getenv("GO_ENV") == "development" {
-		// BaseURL for test could be different if Biteship uses a separate one, 
-		// but usually it's the same URL with different API Key prefix.
+	baseURL := os.Getenv("BITESHIP_BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://api.biteship.com"
 	}
 	
 	return &ShippingService{
-		DB:     db,
-		ApiKey: apiKey,
+		DB:      db,
+		ApiKey:  apiKey,
 		BaseURL: baseURL,
 	}
 }
@@ -161,7 +160,7 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 
 		// Fallback untuk mode development jika saldo habis
 		errorMessage, _ := errBody["error"].(string)
-		if strings.Contains(strings.ToLower(errorMessage), "balance") {
+		if os.Getenv("GO_ENV") != "production" && strings.Contains(strings.ToLower(errorMessage), "balance") {
 			log.Println("💡 Insufficient balance detected. Returning mock rates for development...")
 			return []map[string]interface{}{
 				{
@@ -189,7 +188,7 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 			}, nil
 		}
 
-		return nil, fmt.Errorf("biteship api returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("biteship api returned status %d: %s", resp.StatusCode, errorMessage)
 	}
 
 	var result struct {
@@ -337,8 +336,11 @@ func (s *ShippingService) GetTracking(biteshipOrderID string) (map[string]interf
 
 // HandleWebhook memproses update status dari Biteship
 func (s *ShippingService) HandleWebhook(payload map[string]interface{}) error {
+	log.Printf("[Biteship Webhook] Incoming payload: %+v", payload)
+	
 	event, ok := payload["event"].(string)
 	if !ok || event != "order.status_updated" {
+		log.Printf("[Biteship Webhook] Skipping event: %s", event)
 		return nil
 	}
 

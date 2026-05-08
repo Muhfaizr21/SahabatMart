@@ -31,8 +31,8 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		return err
 	}
 	
-	// 0. [Financial Audit] Record TOTAL Inflow to HQ Cash Account
-	descInflow := fmt.Sprintf("Pembayaran Pesanan #%s", order.OrderNumber)
+	// 1. [TOTAL INFLOW] Customer pays FULL amount to HQ
+	descInflow := fmt.Sprintf("Penerimaan Pembayaran Pesanan #%s", order.OrderNumber)
 	if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, order.GrandTotal, order.ID, "order", descInflow, nil); err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 	orderSvc := NewOrderService(tx)
 	
 	for _, group := range order.MerchantGroups {
-		// 1. Merchant Payout
+		// 2. [ALLOCATION] Payout to Merchant
 		var merchant models.Merchant
 		if err := tx.First(&merchant, "id = ?", group.MerchantID).Error; err != nil {
 			return err
@@ -49,12 +49,20 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		actualPayout := group.MerchantPayout
 		settleDate := time.Now().Add(24 * time.Hour) 
 		
-		descPayout := fmt.Sprintf("Penjualan Produk (Pesanan #%s)", order.OrderNumber)
+		descPayout := fmt.Sprintf("Bagi Hasil Penjualan (Pesanan #%s)", order.OrderNumber)
+		
+		// Debit Admin (Source)
+		descDebitAdmin := fmt.Sprintf("Alokasi Penjualan Merchant %s (Pesanan #%s)", merchant.StoreName, order.OrderNumber)
+		if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -actualPayout, order.ID, "order", descDebitAdmin, nil); err != nil {
+			return err
+		}
+
+		// Credit Merchant (Destination)
 		if err := s.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxSaleRevenue, actualPayout, order.ID, "order", descPayout, &settleDate); err != nil {
 			return err
 		}
 
-		// 2. Affiliate Commission Distribution
+		// 3. [ALLOCATION] Affiliate Commission Distribution
 		var orderItems []models.OrderItem
 		// Filter items by Group ID to avoid double-counting
 		tx.Where("order_id = ? AND order_merchant_group_id = ?", order.ID, group.ID).Find(&orderItems)
@@ -82,7 +90,13 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 						}
 						settleAt := time.Now().AddDate(0, 0, holdDays)
 
-						// Use ent.CommissionID as ref for status tracking
+						// Debit Admin (Source)
+						descDebitComm := fmt.Sprintf("Alokasi Komisi Affiliate %s (Pesanan #%s)", member.RefCode, order.OrderNumber)
+						if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -ent.Amount, ent.CommissionID, "affiliate_commission", descDebitComm, nil); err != nil {
+							return err
+						}
+
+						// Credit Affiliate (Destination)
 						if err := s.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxCommissionEarned, ent.Amount, ent.CommissionID, "affiliate_commission", descComm, &settleAt); err != nil {
 							return err
 						}
@@ -93,7 +107,7 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 			// Fallback ke Global/Default jika tidak menggunakan preset
 			if !presetDistributed && item.CommissionAmount > 0 && order.AffiliateID != nil {
 				var member models.AffiliateMember
-				if err := tx.First(&member, "id = ?", *order.AffiliateID).Error; err == nil {
+				if tx.First(&member, "id = ?", *order.AffiliateID).Error == nil {
 					descFallback := fmt.Sprintf("Komisi Affiliate - %s (Pesanan #%s)", item.ProductName, order.OrderNumber)
 					
 					holdDays := 3
@@ -118,6 +132,13 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 						HoldUntil:   &settleAt,
 					}
 					if err := tx.Create(&commRecord).Error; err == nil {
+						// Debit Admin
+						descDebitFallback := fmt.Sprintf("Alokasi Komisi Affiliate Fallback (Pesanan #%s)", order.OrderNumber)
+						if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -item.CommissionAmount, commRecord.ID, "affiliate_commission", descDebitFallback, nil); err != nil {
+							return err
+						}
+
+						// Credit Affiliate
 						if err := s.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxCommissionEarned, item.CommissionAmount, commRecord.ID, "affiliate_commission", descFallback, &settleAt); err != nil {
 							return err
 						}
@@ -125,13 +146,10 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 				}
 			}
 		}
-
-		// 3. Platform Revenue
-		revenue := group.PlatformFee
-		if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPlatformFee, revenue, order.ID, "order", "Pendapatan Layanan (Platform Fee)", nil); err != nil {
-			return err
-		}
 	}
+
+	// NOTE: The remaining balance in Admin wallet is the Net Platform Revenue (Platform Fees + Tax + etc).
+	// No need for a separate TxPlatformFee credit unless we want to move it to another internal wallet.
 
 	return nil
 }
@@ -204,7 +222,7 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 		var txs []models.WalletTransaction
 		now := time.Now()
 		
-		err := tx.Where("is_settled = ? AND target_settlement_date <= ?", false, now).Find(&txs).Error
+		err := tx.Where("is_settled = ? AND target_settlement_date IS NOT NULL AND target_settlement_date <= ?", false, now).Find(&txs).Error
 		if err != nil {
 			return err
 		}
@@ -244,6 +262,21 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 	})
 	return count, err
 }
+
+// UpdateSettlementDatesOnDelivery memperbarui target_settlement_date saat barang sampai.
+// Ini memastikan dana merchant cair tepat X jam setelah barang diterima pembeli.
+func (s *FinanceService) UpdateSettlementDatesOnDelivery(tx *gorm.DB, orderID string) error {
+	configSvc := NewConfigService(tx)
+	merchantSettleHours := configSvc.GetInt("settlement_merchant_hours", 24)
+	
+	newSettleDate := time.Now().Add(time.Duration(merchantSettleHours) * time.Hour)
+	
+	// Cari semua transaksi merchant terkait order ini yang masih pending
+	return tx.Model(&models.WalletTransaction{}).
+		Where("reference_id = ? AND reference_type = 'order' AND is_settled = ?", orderID, false).
+		Update("target_settlement_date", newSettleDate).Error
+}
+
 
 func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error {
 	var txs []models.WalletTransaction

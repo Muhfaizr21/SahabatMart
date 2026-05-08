@@ -215,7 +215,7 @@ export default function MerchantOrders() {
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                        <span style={{ color: '#64748b', fontWeight: 600 }}>Komisi Afiliasi</span>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}>Komisi Mitra</span>
                         <span style={{ color: '#64748b', fontWeight: 700 }}>-{idr(order.affiliate_commission)}</span>
                       </div>
 

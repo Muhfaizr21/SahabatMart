@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
-import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, API_BASE, formatImage } from '../../lib/api';
 
 // Menu items sesuai DOKUMEN RESMI Alur Mitra Affiliate Akuglow - Section 2
 // Urutan persis sesuai spesifikasi: Dashboard, Merchant Area*, Profil Saya, Omset Tim,
@@ -51,8 +51,8 @@ const SidebarLink = ({ item, collapsed }) => {
       end={item.end}
       className={() =>
         `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${isActive
-          ? 'active bg-gradient-to-r from-purple-500/20 to-transparent text-purple-300 border-l-4 border-purple-400'
-          : 'text-slate-400 hover:text-white hover:bg-white/5'
+          ? 'active bg-rose-50 text-rose-600 border-l-4 border-rose-500'
+          : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
         }`
       }
       title={collapsed ? item.name : ''}
@@ -83,6 +83,7 @@ const AffiliateLayout = () => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [liveProfile, setLiveProfile] = useState(null);
   const dropdownRef = React.useRef(null);
   const profileRef = React.useRef(null);
 
@@ -123,8 +124,16 @@ const AffiliateLayout = () => {
     }
   };
 
+  const fetchProfile = async () => {
+    try {
+      const res = await fetchJson(`${AFFILIATE_API_BASE}/profile`);
+      if (res?.status === 'success') setLiveProfile(res.affiliate);
+    } catch (e) {}
+  };
+
   useEffect(() => {
     fetchNotifs();
+    fetchProfile();
     
     // [Akuglow Sync] Real-time SSE Connection
     const affiliateID = user.affiliate?.id || user.id; // Usually affiliate.id is used for pushing
@@ -207,26 +216,26 @@ const AffiliateLayout = () => {
     navigate('/login');
   };
 
-  const affiliateRefCode = user.affiliate_ref_code || user.affiliate?.ref_code || 'AGL-REF';
-  const tierName = user.affiliate?.membership_tier?.name || 'Mitra Dasar';
+  const affiliateRefCode = liveProfile?.ref_code || user.affiliate_ref_code || user.affiliate?.ref_code || 'AGL-REF';
+  const tierName = liveProfile?.tier?.name || user.affiliate?.membership_tier?.name || 'Mitra Dasar';
   const displayName = user.profile?.full_name || user.email || 'Affiliate';
   const initial = displayName.charAt(0).toUpperCase();
 
   const sidebarContent = (
     <div ref={sidebarRef} className="flex flex-col h-full overflow-y-auto custom-scrollbar">
       {/* Logo */}
-      <div className={`px-6 py-8 flex items-center ${(!sidebarOpen && !isMobile) ? 'justify-center' : 'justify-between'} sticky top-0 bg-[#151b2d] z-10 whitespace-nowrap overflow-hidden transition-all duration-300`}>
+      <div className={`px-6 py-8 flex items-center ${(!sidebarOpen && !isMobile) ? 'justify-center' : 'justify-between'} sticky top-0 bg-[#0c1324] z-10 whitespace-nowrap overflow-hidden transition-all duration-300 border-b border-white/5`}>
         {(sidebarOpen || isMobile) ? (
-          <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain" />
+          <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain brightness-110" />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/20">
              <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />
           </div>
         )}
         {!isMobile && (
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={`text-slate-500 hover:text-white transition-colors p-1 ${(!sidebarOpen && !isMobile) ? 'hidden' : 'block'}`}
+            className={`text-slate-400 hover:text-rose-600 transition-colors p-1 ${(!sidebarOpen && !isMobile) ? 'hidden' : 'block'}`}
           >
             <span className="material-symbols-outlined text-lg">
               {sidebarOpen ? 'chevron_left' : 'chevron_right'}
@@ -256,9 +265,9 @@ const AffiliateLayout = () => {
       {/* Affiliate ID card */}
       {(sidebarOpen || isMobile) && (
         <div className="px-4 mt-auto mb-6">
-          <div className="bg-gradient-to-br from-purple-600/30 to-blue-900/30 backdrop-blur-sm border border-purple-500/20 p-5 rounded-2xl relative overflow-hidden">
-            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl" />
-            <p className="text-[9px] font-bold text-purple-400 tracking-[0.2em] uppercase mb-1">
+          <div className="bg-gradient-to-br from-rose-500/10 to-rose-600/10 border border-rose-500/20 p-5 rounded-2xl relative overflow-hidden">
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-rose-500/20 rounded-full blur-2xl" />
+            <p className="text-[9px] font-bold text-rose-400 tracking-[0.2em] uppercase mb-1">
               Kode Referral
             </p>
             <p className="text-base font-black text-white tracking-wider">{affiliateRefCode}</p>
@@ -269,13 +278,13 @@ const AffiliateLayout = () => {
 
       {/* Bottom actions */}
       <div className="px-3 pb-8 space-y-1">
-        <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-left">
+        <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all text-left">
           <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'wght' 300" }}>help</span>
           {(sidebarOpen || isMobile) && <span className="text-[12px] font-semibold uppercase tracking-wider">Bantuan</span>}
         </button>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-all text-left"
+          className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all text-left"
         >
           <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'wght' 300" }}>logout</span>
           {(sidebarOpen || isMobile) && <span className="text-[12px] font-semibold uppercase tracking-wider">Logout</span>}
@@ -289,7 +298,7 @@ const AffiliateLayout = () => {
       className="min-h-screen flex"
       style={{
         background: '#0c1324',
-        color: '#dce1fb',
+        color: '#f8fafc',
         fontFamily: "'Manrope', 'Plus Jakarta Sans', sans-serif",
       }}
     >
@@ -306,9 +315,8 @@ const AffiliateLayout = () => {
         <aside
           style={{
             width: sidebarOpen ? '260px' : '74px',
-            background: 'rgba(21, 27, 45, 0.95)',
-            borderRight: '1px solid rgba(77, 67, 84, 0.15)',
-            backdropFilter: 'blur(20px)',
+            background: '#0c1324',
+            borderRight: '1px solid rgba(255, 255, 255, 0.05)',
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             flexShrink: 0,
           }}
@@ -323,9 +331,8 @@ const AffiliateLayout = () => {
         <aside
           style={{
             width: '280px',
-            background: 'rgba(21, 27, 45, 1)',
-            borderRight: '1px solid rgba(77, 67, 84, 0.2)',
-            backdropFilter: 'blur(20px)',
+            background: '#0c1324',
+            borderRight: '1px solid rgba(255, 255, 255, 0.05)',
             transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
             transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
@@ -350,188 +357,194 @@ const AffiliateLayout = () => {
           style={{
             background: 'rgba(12, 19, 36, 0.8)',
             backdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(77, 67, 84, 0.15)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
           }}
         >
-          <button
-            onClick={() => (isMobile ? setMobileOpen(!mobileOpen) : setSidebarOpen(!sidebarOpen))}
-            className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white"
-          >
-            <span className="material-symbols-outlined">
-              {(isMobile ? mobileOpen : sidebarOpen) ? 'menu_open' : 'menu'}
-            </span>
-          </button>
+          <div className="max-w-6xl mx-auto w-full flex justify-between items-center">
+            <button
+              onClick={() => (isMobile ? setMobileOpen(!mobileOpen) : setSidebarOpen(!sidebarOpen))}
+              className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-rose-500"
+            >
+              <span className="material-symbols-outlined">
+                {(isMobile ? mobileOpen : sidebarOpen) ? 'menu_open' : 'menu'}
+              </span>
+            </button>
 
-          <div className="flex items-center gap-4">
-            {/* Notification system */}
-            <div className="relative" ref={dropdownRef}>
-              <button 
-                onClick={() => setNotifOpen(!notifOpen)}
-                className={`p-2 rounded-xl transition-all ${notifOpen ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-              >
-                <span className="material-symbols-outlined">notifications</span>
-              </button>
-              {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-purple-400 rounded-full border border-[#0c1324] animate-pulse" />
-              )}
+            <div className="flex items-center gap-4">
+              {/* Notification system */}
+              <div className="relative" ref={dropdownRef}>
+                <button 
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  className={`p-2 rounded-xl transition-all ${notifOpen ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                >
+                  <span className="material-symbols-outlined">notifications</span>
+                </button>
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-purple-400 rounded-full border border-[#0c1324] animate-pulse" />
+                )}
 
-              {/* Notification Dropdown */}
-              {notifOpen && (
-                <>
-                  <div className="absolute right-0 mt-3 w-80 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="px-5 py-4 border-bottom border-white/5 bg-white/5 flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-bold text-white uppercase tracking-wider">Notifikasi</span>
-                        {unreadCount > 0 && (
-                          <span className="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {unreadCount}
-                          </span>
+                {/* Notification Dropdown */}
+                {notifOpen && (
+                  <>
+                    <div className="absolute right-0 mt-3 w-80 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="px-5 py-4 border-bottom border-white/5 bg-white/5 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-bold text-white uppercase tracking-wider">Notifikasi</span>
+                          {unreadCount > 0 && (
+                            <span className="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAllAsRead();
+                            }}
+                            className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-tight"
+                          >
+                            Tandai Dibaca
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteAllNotifs();
+                            }}
+                            className="text-[10px] font-bold text-rose-400 hover:text-rose-300 transition-colors uppercase tracking-tight"
+                          >
+                            Hapus Semua
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
+                        {notifications.length === 0 ? (
+                          <div className="p-10 text-center">
+                            <span className="material-symbols-outlined text-slate-600 text-4xl mb-2">notifications_off</span>
+                            <p className="text-slate-500 text-xs">Belum ada notifikasi</p>
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div 
+                              key={n.id}
+                              onClick={() => {
+                                markAsRead(n.id);
+                                setNotifOpen(false);
+                                if (n.link) navigate(n.link);
+                              }}
+                              className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group relative ${!n.is_read ? 'bg-purple-500/5' : ''}`}
+                            >
+                              <div className="flex gap-3">
+                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-purple-400' : 'bg-transparent'}`} />
+                                <div className="flex-1 min-w-0 pr-6">
+                                  <p className={`text-[12px] leading-tight mb-1 ${!n.is_read ? 'text-white font-bold' : 'text-slate-300 font-medium'}`}>
+                                    {n.title}
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed group-hover:text-slate-300">
+                                    {n.message}
+                                  </p>
+                                  <p className="text-[9px] text-slate-500 mt-2 font-semibold uppercase tracking-tighter">
+                                    {new Date(n.created_at).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                </div>
+                                <button 
+                                  onClick={(e) => deleteNotif(e, n.id)}
+                                  className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-rose-400"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markAllAsRead();
-                          }}
-                          className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-tight"
-                        >
-                          Tandai Dibaca
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteAllNotifs();
-                          }}
-                          className="text-[10px] font-bold text-rose-400 hover:text-rose-300 transition-colors uppercase tracking-tight"
-                        >
-                          Hapus Semua
+                      
+                      <div className="p-3 bg-white/5 border-t border-white/5">
+                        <button className="w-full py-2 text-[10px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-widest">
+                          Lihat Semua
                         </button>
                       </div>
                     </div>
-                    
-                    <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
-                      {notifications.length === 0 ? (
-                        <div className="p-10 text-center">
-                          <span className="material-symbols-outlined text-slate-600 text-4xl mb-2">notifications_off</span>
-                          <p className="text-slate-500 text-xs">Belum ada notifikasi</p>
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div 
-                            key={n.id}
-                            onClick={() => {
-                              markAsRead(n.id);
-                              setNotifOpen(false);
-                              if (n.link) navigate(n.link);
-                            }}
-                            className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group relative ${!n.is_read ? 'bg-purple-500/5' : ''}`}
-                          >
-                            <div className="flex gap-3">
-                              <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-purple-400' : 'bg-transparent'}`} />
-                              <div className="flex-1 min-w-0 pr-6">
-                                <p className={`text-[12px] leading-tight mb-1 ${!n.is_read ? 'text-white font-bold' : 'text-slate-300 font-medium'}`}>
-                                  {n.title}
-                                </p>
-                                <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed group-hover:text-slate-300">
-                                  {n.message}
-                                </p>
-                                <p className="text-[9px] text-slate-500 mt-2 font-semibold uppercase tracking-tighter">
-                                  {new Date(n.created_at).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </div>
-                              <button 
-                                onClick={(e) => deleteNotif(e, n.id)}
-                                className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-rose-400"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
+                  </>
+                )}
+              </div>
+
+              <div className="h-6 w-px bg-white/10" />
+
+              {/* User info with Dropdown */}
+              <div className="relative" ref={profileRef}>
+                <div 
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className={`flex items-center gap-3 p-1.5 pr-3 rounded-2xl transition-all cursor-pointer select-none ${profileOpen ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}
+                >
+                  <div
+                    className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-white font-black text-sm shadow-lg border border-white/10"
+                    style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)' }}
+                  >
+                    {user.profile?.avatar_url ? (
+                       <img src={formatImage(user.profile.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                       initial
+                    )}
+                  </div>
+                  <div className="text-right hidden sm:block">
+                    <p className="text-xs font-bold text-white leading-tight">{displayName}</p>
+                    <div className="flex items-center justify-end gap-1">
+                      <p className="text-[10px] text-purple-400 capitalize font-medium">{tierName} Partner</p>
+                      <span className={`material-symbols-outlined text-[12px] text-slate-500 transition-transform duration-300 ${profileOpen ? 'rotate-180' : ''}`}>expand_more</span>
                     </div>
-                    
-                    <div className="p-3 bg-white/5 border-t border-white/5">
-                      <button className="w-full py-2 text-[10px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-widest">
-                        Lihat Semua
+                  </div>
+                </div>
+
+                {/* Profile Dropdown */}
+                {profileOpen && (
+                  <div className="absolute right-0 mt-3 w-56 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-4 bg-white/5 border-b border-white/5">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Akun Terhubung</p>
+                      <p className="text-xs font-bold text-white truncate">{user.email}</p>
+                    </div>
+                    <div className="p-2">
+                      <button 
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate('/affiliate/settings');
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all text-left"
+                      >
+                        <span className="material-symbols-outlined text-lg">account_circle</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Profil Saya</span>
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate('/profile');
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all text-left"
+                      >
+                        <span className="material-symbols-outlined text-lg">shopping_basket</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Halaman Buyer</span>
+                      </button>
+                      
+                      <div className="h-[1px] bg-white/5 my-2 mx-3" />
+                      
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all text-left group"
+                      >
+                        <span className="material-symbols-outlined text-lg">logout</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Keluar Sesi</span>
                       </button>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-
-            <div className="h-6 w-px bg-white/10" />
-
-            {/* User info with Dropdown */}
-            <div className="relative" ref={profileRef}>
-              <div 
-                onClick={() => setProfileOpen(!profileOpen)}
-                className={`flex items-center gap-3 p-1.5 pr-3 rounded-2xl transition-all cursor-pointer select-none ${profileOpen ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}
-              >
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-lg border border-white/10"
-                  style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)' }}
-                >
-                  {initial}
-                </div>
-                <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-white leading-tight">{displayName}</p>
-                  <div className="flex items-center justify-end gap-1">
-                    <p className="text-[10px] text-purple-400 capitalize font-medium">{tierName} Partner</p>
-                    <span className={`material-symbols-outlined text-[12px] text-slate-500 transition-transform duration-300 ${profileOpen ? 'rotate-180' : ''}`}>expand_more</span>
-                  </div>
-                </div>
+                )}
               </div>
-
-              {/* Profile Dropdown */}
-              {profileOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-[#1a2235] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="p-4 bg-white/5 border-b border-white/5">
-                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Akun Terhubung</p>
-                    <p className="text-xs font-bold text-white truncate">{user.email}</p>
-                  </div>
-                  <div className="p-2">
-                    <button 
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/affiliate/settings');
-                      }}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all text-left"
-                    >
-                      <span className="material-symbols-outlined text-lg">account_circle</span>
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Profil Saya</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/profile');
-                      }}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all text-left"
-                    >
-                      <span className="material-symbols-outlined text-lg">shopping_basket</span>
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Halaman Buyer</span>
-                    </button>
-                    
-                    <div className="h-[1px] bg-white/5 my-2 mx-3" />
-                    
-                    <button 
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all text-left group"
-                    >
-                      <span className="material-symbols-outlined text-lg">logout</span>
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Keluar Sesi</span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <main className="p-6 md:p-8 max-w-6xl mx-auto w-full">
           <Outlet />
         </main>
       </div>

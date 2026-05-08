@@ -12,12 +12,12 @@ const CloseIcon = () => <svg width="22" height="22" fill="none" stroke="currentC
 const CompareIcon = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="16 3 21 8 16 13"/><line x1="21" y1="8" x2="9" y2="8"/><polyline points="8 21 3 16 8 11"/><line x1="3" y1="16" x2="15" y2="16"/></svg>;
 
 const navLinks = [
-  { label: 'Beranda', href: '/' },
-  { label: 'Toko', href: '/shop' },
-  { label: 'Blog', href: '/blog' },
-  { label: 'Kupon', href: '/coupons' },
-  { label: 'Tentang', href: '/about' },
-  { label: 'Kontak', href: '/contact' },
+  { label: 'HOME', href: '/' },
+  { label: 'TENTANG', href: '/about' },
+  { label: 'SHOP', href: '/shop' },
+  { label: 'PELUANG BISNIS', href: '/peluang-bisnis' },
+  { label: 'BLOG', href: '/blog' },
+  { label: 'KONTAK', href: '/contact' },
 ];
 
 const categories = ['Electronics', 'Smartphones', 'Computers', 'Smart Watches', 'Gaming', 'Cameras', 'Headphones'];

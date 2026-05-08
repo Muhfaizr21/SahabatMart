@@ -952,6 +952,72 @@ export default function SkinJourneyAdmin() {
                       <textarea style={{ ...A.input, height: 60 }} placeholder="Tips khusus untuk user..." value={ps.additional_notes} onChange={e => {
                         const newPS = [...productStepData]; newPS[idx].additional_notes = e.target.value; setProductStepData(newPS);
                       }} />
+
+                      <div style={{ marginTop: 20 }}>
+                        <FieldLabel>Instruksi Langkah-demi-Langkah (Step-by-Step)</FieldLabel>
+                        {(typeof ps.step_by_step_json === 'string' ? JSON.parse(ps.step_by_step_json || '[]') : (ps.step_by_step_json || [])).map((step, sIdx) => (
+                          <div key={sIdx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                            <input 
+                              style={A.input} 
+                              value={step} 
+                              onChange={e => {
+                                const newPS = [...productStepData];
+                                const currentSteps = typeof newPS[idx].step_by_step_json === 'string' ? JSON.parse(newPS[idx].step_by_step_json || '[]') : (newPS[idx].step_by_step_json || []);
+                                currentSteps[sIdx] = e.target.value;
+                                newPS[idx].step_by_step_json = currentSteps;
+                                setProductStepData(newPS);
+                              }} 
+                            />
+                            <button style={{ ...A.btnGhost, color: '#ef4444' }} onClick={() => {
+                                const newPS = [...productStepData];
+                                const currentSteps = typeof newPS[idx].step_by_step_json === 'string' ? JSON.parse(newPS[idx].step_by_step_json || '[]') : (newPS[idx].step_by_step_json || []);
+                                currentSteps.splice(sIdx, 1);
+                                newPS[idx].step_by_step_json = currentSteps;
+                                setProductStepData(newPS);
+                            }}>X</button>
+                          </div>
+                        ))}
+                        <button style={{ ...A.btnGhost, color: '#6366f1', fontSize: 11 }} onClick={() => {
+                            const newPS = [...productStepData];
+                            const currentSteps = typeof newPS[idx].step_by_step_json === 'string' ? JSON.parse(newPS[idx].step_by_step_json || '[]') : (newPS[idx].step_by_step_json || []);
+                            currentSteps.push("");
+                            newPS[idx].step_by_step_json = currentSteps;
+                            setProductStepData(newPS);
+                        }}>+ TAMBAH LANGKAH</button>
+                      </div>
+
+                      <div style={{ marginTop: 20 }}>
+                        <FieldLabel>Tips Khusus</FieldLabel>
+                        {(typeof ps.tips_json === 'string' ? JSON.parse(ps.tips_json || '[]') : (ps.tips_json || [])).map((tip, tIdx) => (
+                          <div key={tIdx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                            <input 
+                              style={A.input} 
+                              value={tip} 
+                              onChange={e => {
+                                const newPS = [...productStepData];
+                                const currentTips = typeof newPS[idx].tips_json === 'string' ? JSON.parse(newPS[idx].tips_json || '[]') : (newPS[idx].tips_json || []);
+                                currentTips[tIdx] = e.target.value;
+                                newPS[idx].tips_json = currentTips;
+                                setProductStepData(newPS);
+                              }} 
+                            />
+                            <button style={{ ...A.btnGhost, color: '#ef4444' }} onClick={() => {
+                                const newPS = [...productStepData];
+                                const currentTips = typeof newPS[idx].tips_json === 'string' ? JSON.parse(newPS[idx].tips_json || '[]') : (newPS[idx].tips_json || []);
+                                currentTips.splice(tIdx, 1);
+                                newPS[idx].tips_json = currentTips;
+                                setProductStepData(newPS);
+                            }}>X</button>
+                          </div>
+                        ))}
+                        <button style={{ ...A.btnGhost, color: '#6366f1', fontSize: 11 }} onClick={() => {
+                            const newPS = [...productStepData];
+                            const currentTips = typeof newPS[idx].tips_json === 'string' ? JSON.parse(newPS[idx].tips_json || '[]') : (newPS[idx].tips_json || []);
+                            currentTips.push("");
+                            newPS[idx].tips_json = currentTips;
+                            setProductStepData(newPS);
+                        }}>+ TAMBAH TIPS</button>
+                      </div>
                     </div>
                   ))}
                   <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>

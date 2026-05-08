@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
 	"gorm.io/gorm"
@@ -143,7 +145,7 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 		// UPDATE STOK DI GUDANG PUSAT
 		var inventory models.Inventory
 		err := tx.Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID).First(&inventory).Error
-		
+
 		stockBefore := 0
 		if err == gorm.ErrRecordNotFound {
 			inventory = models.Inventory{
@@ -195,7 +197,7 @@ func (ctrl *WarehouseController) GetStockHistory(w http.ResponseWriter, r *http.
 	productID := r.URL.Query().Get("product_id")
 	var mutations []models.StockMutation
 	query := ctrl.DB.Order("created_at desc")
-	
+
 	if productID != "" {
 		query = query.Where("product_id = ?", productID)
 	}
@@ -216,14 +218,20 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	var input struct {
+		AdminNote string `json:"admin_note"`
+	}
+	json.NewDecoder(r.Body).Decode(&input)
+
 	var restock models.RestockRequest
 	if err := ctrl.DB.Preload("Items").First(&restock, "id = ?", restockID).Error; err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Request restock tidak ditemukan")
 		return
 	}
 
-	if restock.Status != "requested" {
-		utils.JSONError(w, http.StatusBadRequest, "Request ini sudah diproses sebelumnya")
+	// Status requested is standard for new requests
+	if restock.Status != "requested" && restock.Status != "pending" {
+		utils.JSONError(w, http.StatusBadRequest, "Request ini sudah diproses sebelumnya (Status: "+restock.Status+")")
 		return
 	}
 
@@ -246,7 +254,11 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 
 		stockBefore := pusatInv.Stock
 		pusatInv.Stock -= item.Quantity
-		tx.Save(&pusatInv)
+		if err := tx.Save(&pusatInv).Error; err != nil {
+			tx.Rollback()
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal update stok pusat")
+			return
+		}
 
 		// Log Mutation Pusat (OUT)
 		tx.Create(&models.StockMutation{
@@ -262,12 +274,23 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 	}
 
 	// 2. Update Status Restock
-	tx.Model(&restock).Updates(map[string]interface{}{
+	if err := tx.Model(&restock).Updates(map[string]interface{}{
 		"status":     "approved",
+		"admin_note": input.AdminNote,
 		"updated_at": time.Now(),
-	})
+	}).Error; err != nil {
+		tx.Rollback()
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal update status restock")
+		return
+	}
 
 	tx.Commit()
+
+	// 3. Notify Merchant
+	notif := services.NewNotificationService(ctrl.DB)
+	_ = notif.Push(restock.MerchantID, "merchant", "restock_update", "✅ Restock Disetujui",
+		fmt.Sprintf("Permintaan restock %s Anda telah disetujui.", restock.ID), "/merchant/restock")
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Restock disetujui, stok pusat telah dikurangi"})
 }
 
@@ -280,6 +303,7 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 
 	var input struct {
 		TrackingNumber string `json:"tracking_number"`
+		AdminNote      string `json:"admin_note"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -290,11 +314,19 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 	if err := ctrl.DB.Model(&models.RestockRequest{}).Where("id = ?", restockID).Updates(map[string]interface{}{
 		"status":          "shipped",
 		"tracking_number": input.TrackingNumber,
+		"admin_note":      input.AdminNote,
 		"updated_at":      time.Now(),
 	}).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal update status pengiriman")
 		return
 	}
+
+	// Notify Merchant
+	var restock models.RestockRequest
+	ctrl.DB.First(&restock, "id = ?", restockID)
+	notif := services.NewNotificationService(ctrl.DB)
+	_ = notif.Push(restock.MerchantID, "merchant", "restock_update", "🚚 Restock Dikirim",
+		fmt.Sprintf("Restock %s dalam pengiriman (Resi: %s).", restock.ID, input.TrackingNumber), "/merchant/restock")
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Barang dalam pengiriman B2B", "tracking_number": input.TrackingNumber})
 }

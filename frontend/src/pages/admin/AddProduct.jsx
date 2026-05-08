@@ -369,7 +369,7 @@ export default function AdminAddProduct() {
              
              <div className="form-grid">
                 <div>
-                  <FieldLabel>Komisi Afiliasi Reguler (%)</FieldLabel>
+                  <FieldLabel>Komisi Mitra Reguler (%)</FieldLabel>
                   <input style={A.input} type="number" step="0.01" placeholder="Misal: 10" 
                     value={p.base_affiliate_fee} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee: parseFloat(e.target.value) || 0 }))} />
                 </div>

@@ -182,6 +182,7 @@ func SeedRealWorldData(db *gorm.DB) {
 				Quantity:              1,
 				UnitPrice:             subtotal,
 				Subtotal:              subtotal,
+				COGS:                  product.COGS,
 				PlatformFeeAmount:     platformFee,
 				CommissionAmount:      affComm,
 				MerchantAmount:        merchantPayout,

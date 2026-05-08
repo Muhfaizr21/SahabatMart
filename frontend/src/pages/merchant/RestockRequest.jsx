@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchJson, MERCHANT_API_BASE, PUBLIC_API_BASE, API_BASE, formatImage } from '../../lib/api';
-import { idr } from '../../lib/adminStyles';
+import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
 
 export default function RestockRequest() {
   const [requests, setRequests] = useState([]);
@@ -10,10 +9,7 @@ export default function RestockRequest() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [cart, setCart] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('wallet'); // 'wallet' or 'transfer'
-  const [wallet, setWallet] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedCat, setSelectedCat] = useState('');
 
   useEffect(() => {
     loadRequests();
@@ -34,32 +30,35 @@ export default function RestockRequest() {
   const openModal = async () => {
     setShowModal(true);
     try {
-      const [prodRaw, walletRaw] = await Promise.all([
-        fetchJson(`${MERCHANT_API_BASE}/catalog`),
-        fetchJson(`${MERCHANT_API_BASE}/wallet`)
-      ]);
+      const prodRaw = await fetchJson(`${MERCHANT_API_BASE}/catalog`);
       setMasterProducts(prodRaw || []);
       setFilteredProducts(prodRaw || []);
-      setWallet(walletRaw?.data || walletRaw);
     } catch (err) {}
   };
 
   useEffect(() => {
     let result = masterProducts;
-    if (searchTerm) result = result.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (searchTerm) {
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
     setFilteredProducts(result);
   }, [searchTerm, masterProducts]);
 
   const addToCart = (p) => {
-    const buyPrice = p.wholesale_price || (p.price * 0.8);
     const ex = cart.find(i => i.product_id === p.id);
-    if (ex) setCart(cart.map(i => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i));
-    else setCart([...cart, { product_id: p.id, qty: 1, name: p.name, price: buyPrice, image: p.image }]);
+    if (ex) {
+      setCart(cart.map(i => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i));
+    } else {
+      setCart([...cart, { product_id: p.id, qty: 1, name: p.name, image: p.image }]);
+    }
   };
 
   const updateQty = (id, val) => {
     const q = parseInt(val);
-    if (isNaN(q) || q < 0) return; // Allow empty or 0 temporarily while typing
+    if (isNaN(q) || q < 0) return;
     if (q === 0) {
       setCart(cart.filter(i => i.product_id !== id));
       return;
@@ -74,8 +73,7 @@ export default function RestockRequest() {
       await fetchJson(`${MERCHANT_API_BASE}/restock/request`, {
         method: 'POST',
         body: JSON.stringify({ 
-          items: cart.map(i => ({ product_id: i.product_id, quantity: i.qty })),
-          payment_method: paymentMethod
+          items: cart.map(i => ({ product_id: i.product_id, quantity: i.qty }))
         })
       });
       setCart([]);
@@ -88,13 +86,13 @@ export default function RestockRequest() {
     }
   };
 
-  const getStatusColor = (s) => {
+  const getStatusInfo = (s) => {
     switch(s) {
-      case 'received': return '#10b981';
-      case 'approved': return '#10b981';
-      case 'rejected': return '#ef4444';
-      case 'shipped': return '#3b82f6';
-      default: return '#f59e0b';
+      case 'received': return { color: '#10b981', label: 'SELESAI', icon: 'check_circle' };
+      case 'approved': return { color: '#10b981', label: 'DISETUJUI', icon: 'verified' };
+      case 'rejected': return { color: '#ef4444', label: 'DITOLAK', icon: 'cancel' };
+      case 'shipped': return { color: '#3b82f6', label: 'DIKIRIM', icon: 'local_shipping' };
+      default: return { color: '#f59e0b', label: 'PENDING', icon: 'pending' };
     }
   };
 
@@ -112,318 +110,706 @@ export default function RestockRequest() {
   };
 
   return (
-    <div className="artisan-page">
+    <div className="premium-restock-page">
       {/* HEADER SECTION */}
-      <div className="artisan-header">
-         <div className="header-left">
-            <div className="breadcrumb">AkuGlow &bull; Merchant</div>
-            <h1>Ringkasan Stok</h1>
-            <p className="subtitle">Kelola inventori toko Anda dengan sinkronisasi langsung dari pusat.</p>
-         </div>
-         <div className="header-right">
-            <button className="primary-glass-btn" onClick={openModal}>
-               <span className="material-symbols-outlined">add_business</span>
-               Restock Baru
-            </button>
-         </div>
-      </div>
+      <header className="page-header">
+        <div className="header-content">
+          <div className="title-group">
+            <span className="badge">LOGISTIK & DISTRIBUSI</span>
+            <h1>Manajemen Stok Pusat</h1>
+            <p>Sinkronkan inventori merchant Anda langsung dari gudang pusat tanpa biaya transfer.</p>
+          </div>
+          <button className="btn-add-restock" onClick={openModal}>
+            <span className="material-symbols-outlined">inventory_2</span>
+            Buat Permintaan Baru
+          </button>
+        </div>
+      </header>
 
-      {/* STATS BENTO */}
-      <div className="artisan-bento">
-         <div className="bento-card main">
-            <div className="card-lbl">PERMINTAAN TERTUNDA</div>
-            <div className="card-val">{requests.filter(r => r.status === 'requested').length}</div>
-            <div className="card-trend text-amber-500">Menunggu Verifikasi</div>
-         </div>
-         <div className="bento-card">
-            <div className="card-lbl">DALAM PENGIRIMAN</div>
-            <div className="card-val">{requests.filter(r => r.status === 'shipped').length}</div>
-            <div className="card-trend text-indigo-500">Barang Sedang Dikirim</div>
-         </div>
-         <div className="bento-card">
-            <div className="card-lbl">TOTAL RESTOK SELESAI</div>
-            <div className="card-val">{requests.filter(r => r.status === 'received').length}</div>
-            <div className="card-trend text-emerald-500">Permintaan Selesai</div>
-         </div>
-      </div>
+      {/* STATS OVERVIEW */}
+      <section className="stats-grid">
+        <div className="stat-card pending">
+          <div className="stat-icon"><span className="material-symbols-outlined">hourglass_top</span></div>
+          <div className="stat-data">
+            <span className="stat-label">Permintaan Aktif</span>
+            <span className="stat-value">{requests.filter(r => ['requested', 'approved', 'shipped'].includes(r.status)).length}</span>
+          </div>
+          <div className="stat-bg-icon"><span className="material-symbols-outlined">hourglass_top</span></div>
+        </div>
+        <div className="stat-card shipping">
+          <div className="stat-icon"><span className="material-symbols-outlined">local_shipping</span></div>
+          <div className="stat-data">
+            <span className="stat-label">Sedang Dikirim</span>
+            <span className="stat-value">{requests.filter(r => r.status === 'shipped').length}</span>
+          </div>
+          <div className="stat-bg-icon"><span className="material-symbols-outlined">local_shipping</span></div>
+        </div>
+        <div className="stat-card completed">
+          <div className="stat-icon"><span className="material-symbols-outlined">task_alt</span></div>
+          <div className="stat-data">
+            <span className="stat-label">Restok Selesai</span>
+            <span className="stat-value">{requests.filter(r => r.status === 'received').length}</span>
+          </div>
+          <div className="stat-bg-icon"><span className="material-symbols-outlined">task_alt</span></div>
+        </div>
+      </section>
 
-      {/* REQUEST LIST */}
-      <div className="artisan-list-container">
-         <div className="list-title">Riwayat Aktivitas</div>
-         {loading ? (
-           <div className="shimmer-list">Memuat database restok...</div>
-         ) : (
-           <div className="requests-grid">
-              {requests.length === 0 ? (
-                <div className="empty-state">
-                   <span className="material-symbols-outlined">inbox</span>
-                   <p>Belum ada riwayat permintaan restok.</p>
-                </div>
-              ) : requests.map(req => (
-                <div key={req.id} className="req-card">
-                   <div className="req-header">
-                      <div className="req-id">CODE: SM-{req.id.slice(0,5).toUpperCase()}</div>
-                      <div className="status-dot" style={{ backgroundColor: getStatusColor(req.status) }}></div>
-                   </div>
-                   <div className="req-date">{new Date(req.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-                   <div className="req-body">
-                      <div className="req-item-count">{req.items?.length || 0} Produk</div>
-                      <div className="req-qty-total">{req.total_items || 0} pcs Total</div>
-                   </div>
-                    <div className="req-footer">
-                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-                          <div className="req-status-lbl" style={{ color: getStatusColor(req.status) }}>{req.status?.toUpperCase()}</div>
-                          <div className="req-note" title={req.admin_note}>{req.admin_note || 'Menunggu respon pusat...'}</div>
-                       </div>
+      {/* ACTIVITY LIST */}
+      <main className="activity-section">
+        <div className="section-header">
+          <h2>Riwayat Aktivitas</h2>
+          <div className="filter-group">
+            <span className="total-indicator">{requests.length} Transaksi Terarsip</span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="loader-container">
+            <div className="premium-spinner"></div>
+            <p>Sinkronisasi data gudang...</p>
+          </div>
+        ) : (
+          <div className="requests-table-container">
+            {requests.length === 0 ? (
+              <div className="empty-state-v2">
+                <div className="empty-icon"><span className="material-symbols-outlined">package_2</span></div>
+                <h3>Belum Ada Riwayat</h3>
+                <p>Klik tombol "Buat Permintaan Baru" untuk mulai mengisi stok toko Anda.</p>
+              </div>
+            ) : (
+              <div className="requests-grid-v2">
+                {requests.map(req => {
+                  const statusInfo = getStatusInfo(req.status);
+                  return (
+                    <div key={req.id} className={`request-card-v2 ${req.status}`}>
+                      <div className="card-head">
+                        <div className="id-badge">#{req.id.slice(-6).toUpperCase()}</div>
+                        <div className="status-pill" style={{ '--status-color': statusInfo.color }}>
+                          <span className="material-symbols-outlined">{statusInfo.icon}</span>
+                          {statusInfo.label}
+                        </div>
+                      </div>
+                      
+                      <div className="card-body">
+                        <div className="date-box">
+                          <span className="material-symbols-outlined">calendar_today</span>
+                          {new Date(req.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                        <div className="items-summary">
+                          <div className="summary-row">
+                            <span className="label">Varian Produk</span>
+                            <span className="value">{req.items?.length || 0}</span>
+                          </div>
+                          <div className="summary-row">
+                            <span className="label">Total Kuantitas</span>
+                            <span className="value highlight">{req.total_items || 0} Pcs</span>
+                          </div>
+                        </div>
+                        {req.admin_note && (
+                          <div className="admin-note-box">
+                            <span className="note-label">Catatan Admin:</span>
+                            <p className="note-content">"{req.admin_note}"</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="card-footer-v2">
+                        {req.status === 'shipped' ? (
+                          <button className="btn-receive-confirm" onClick={() => handleReceive(req.id)}>
+                            <span className="material-symbols-outlined">front_loader</span>
+                            Konfirmasi Penerimaan
+                          </button>
+                        ) : (
+                          <div className="footer-info">
+                            <span className="material-symbols-outlined">info</span>
+                            {req.status === 'received' ? 'Stok telah masuk ke inventori' : 'Menunggu pemrosesan gudang'}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
 
-                   {req.status === 'shipped' && (
-                     <button className="elite-receive-btn" onClick={() => handleReceive(req.id)}>
-                        Konfirmasi Terima
-                     </button>
-                   )}
-                </div>
-              ))}
-           </div>
-         )}
-      </div>
-
-      {/* ELITE RESTOCK MODAL */}
+      {/* PREMIUM SELECTION MODAL */}
       {showModal && (
-        <div className="elite-modal-overlay">
-           <div className="elite-modal-body">
-              {/* CONTENT LEFT: PRODUCT LIST */}
-              <div className="elite-content-area">
-                 <div className="elite-search-header">
-                    <div className="search-pill">
-                       <span className="material-symbols-outlined">search</span>
-                       <input type="text" placeholder="Cari Master SKU..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                    </div>
-                    <button className="elite-close" onClick={() => setShowModal(false)}>
-                       <span className="material-symbols-outlined">close</span>
-                    </button>
-                 </div>
-                 
-                 <div className="elite-product-grid custom-scroll">
-                    {filteredProducts.map(p => (
-                      <div key={p.id} className="elite-p-card" onClick={() => addToCart(p)}>
-                         <div className="p-img">
-                            <img src={formatImage(p.image)} alt="" />
-                            <div className="p-hover-add"><span className="material-symbols-outlined">add</span></div>
-                         </div>
-                         <div className="p-details">
-                            <div className="p-tag">{p.category}</div>
-                            <div className="p-name">{p.name}</div>
-                            <div className="p-price">{idr(p.price)}</div>
-                         </div>
-                      </div>
-                    ))}
-                 </div>
+        <div className="premium-modal-overlay">
+          <div className="premium-modal-container">
+            {/* MODAL LEFT: CATALOG */}
+            <div className="catalog-area">
+              <div className="modal-top-nav">
+                <div className="search-box-v2">
+                  <span className="material-symbols-outlined">search</span>
+                  <input 
+                    type="text" 
+                    placeholder="Cari Produk atau SKU..." 
+                    value={searchTerm} 
+                    onChange={e => setSearchTerm(e.target.value)} 
+                    autoFocus
+                  />
+                </div>
+                <button className="btn-close-modal" onClick={() => setShowModal(false)}>
+                  <span className="material-symbols-outlined">close</span>
+                </button>
               </div>
 
-              {/* SIDEBAR RIGHT: CART */}
-              <div className="elite-cart-sidebar">
-                 <div className="cart-header">
-                    <h3>Daftar Kulakan</h3>
-                    <div className="cart-badge">{cart.length}</div>
-                 </div>
-
-                 <div className="cart-list-elite custom-scroll">
-                    {cart.length === 0 ? (
-                      <div className="cart-empty-elite">Pilih produk di samping untuk mengisi daftar kulakan toko Anda.</div>
-                    ) : cart.map(item => (
-                      <div key={item.product_id} className="cart-item-elite">
-                         <div className="ce-info">
-                            <div className="ce-name">{item.name}</div>
-                            <div className="ce-qty-input">
-                               <span>Qty</span>
-                               <input 
-                                 type="number" 
-                                 min="0" 
-                                 value={item.qty} 
-                                 onChange={e => updateQty(item.product_id, e.target.value)}
-                               />
-                            </div>
-                         </div>
-                         <div className="ce-actions">
-                            <button onClick={() => setCart(cart.filter(i => i.product_id !== item.product_id))} className="ce-del">
-                               <span className="material-symbols-outlined">delete</span>
-                            </button>
-                            <div className="ce-price">{idr(item.price * item.qty)}</div>
-                         </div>
+              <div className="catalog-grid-v2 custom-scrollbar">
+                {filteredProducts.map(p => (
+                  <div key={p.id} className="catalog-item-v2" onClick={() => addToCart(p)}>
+                    <div className="item-image-v2">
+                      <img src={formatImage(p.image)} alt={p.name} />
+                      <div className="item-overlay-v2">
+                        <span className="material-symbols-outlined">add</span>
                       </div>
-                    ))}
-                 </div>
-
-                 <div style={{ padding: '0 40px', marginBottom: 20 }}>
-                    <div style={{ fontSize:11, fontWeight:900, color:'#94a3b8', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Metode Pembayaran</div>
-                    <div style={{ display:'flex', gap:10 }}>
-                       <button 
-                         onClick={() => setPaymentMethod('wallet')}
-                         style={{ 
-                           flex:1, padding:'12px', borderRadius:10, border:'1px solid '+(paymentMethod==='wallet'?'#4f46e5':'#e2e8f0'),
-                           background: paymentMethod==='wallet'?'#eef2ff':'white', color: paymentMethod==='wallet'?'#4f46e5':'#64748b',
-                           fontSize:12, fontWeight:800, cursor:'pointer'
-                         }}
-                       >
-                          Saldo Dompet
-                       </button>
-                       <button 
-                         onClick={() => setPaymentMethod('transfer')}
-                         style={{ 
-                           flex:1, padding:'12px', borderRadius:10, border:'1px solid '+(paymentMethod==='transfer'?'#4f46e5':'#e2e8f0'),
-                           background: paymentMethod==='transfer'?'#eef2ff':'white', color: paymentMethod==='transfer'?'#4f46e5':'#64748b',
-                           fontSize:12, fontWeight:800, cursor:'pointer'
-                         }}
-                       >
-                          Transfer Manual
-                       </button>
                     </div>
-                    {paymentMethod === 'wallet' && wallet && (
-                      <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Saldo Tersedia:</span>
-                         <span style={{ fontSize: 12, fontWeight: 800, color: (wallet.available_balance < cart.reduce((s, i) => s + (i.price * i.qty), 0)) ? '#ef4444' : '#10b981' }}>
-                            {idr(wallet.available_balance)}
-                         </span>
+                    <div className="item-info-v2">
+                      <span className="item-cat-v2">{p.category}</span>
+                      <h4 className="item-name-v2">{p.name}</h4>
+                      <div className="item-stock-v2">
+                        <span className="material-symbols-outlined">database</span>
+                        Tersedia di Pusat
                       </div>
-                    )}
-                    {paymentMethod === 'wallet' && wallet && (wallet.available_balance < cart.reduce((s, i) => s + (i.price * i.qty), 0)) && (
-                      <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700, marginTop: 4 }}>
-                         <i className="bx bx-error-circle" /> Saldo tidak mencukupi untuk kulakan ini.
-                      </div>
-                    )}
-                 </div>
-
-                 <div className="cart-footer-elite">
-                    <div className="total-box">
-                       <span>ESTIMASI BIAYA</span>
-                       <h4>{idr(cart.reduce((s, i) => s + (i.price * i.qty), 0))}</h4>
                     </div>
-                    <button 
-                       className="submit-elite-btn" 
-                       disabled={isSubmitting || cart.length === 0 || (paymentMethod === 'wallet' && wallet && wallet.available_balance < cart.reduce((s, i) => s + (i.price * i.qty), 0))} 
-                       onClick={submitRestock}
-                    >
-                       {isSubmitting ? 'MEMPROSES...' : 'KIRIM PERMINTAAN'} 
-                       {!isSubmitting && <span className="material-symbols-outlined">send</span>}
-                    </button>
-                 </div>
+                  </div>
+                ))}
               </div>
-           </div>
+            </div>
+
+            {/* MODAL RIGHT: CART */}
+            <div className="cart-area">
+              <div className="cart-head-v2">
+                <h3>Permintaan Restok</h3>
+                <div className="item-count-badge">{cart.length}</div>
+              </div>
+
+              <div className="cart-items-v2 custom-scrollbar">
+                {cart.length === 0 ? (
+                  <div className="cart-empty-v2">
+                    <span className="material-symbols-outlined">shopping_basket</span>
+                    <p>Pilih produk dari katalog untuk menambah daftar restok.</p>
+                  </div>
+                ) : cart.map(item => (
+                  <div key={item.product_id} className="cart-card-v2">
+                    <img src={formatImage(item.image)} alt="" className="cart-item-img-v2" />
+                    <div className="cart-item-details-v2">
+                      <div className="ci-top">
+                        <h5>{item.name}</h5>
+                        <button className="btn-remove-v2" onClick={() => updateQty(item.product_id, 0)}>
+                          <span className="material-symbols-outlined">close</span>
+                        </button>
+                      </div>
+                      <div className="ci-bottom">
+                        <div className="qty-control-v2">
+                          <button onClick={() => updateQty(item.product_id, item.qty - 1)}>-</button>
+                          <input 
+                            type="number" 
+                            value={item.qty} 
+                            onChange={e => updateQty(item.product_id, e.target.value)}
+                          />
+                          <button onClick={() => updateQty(item.product_id, item.qty + 1)}>+</button>
+                        </div>
+                        <span className="unit-label">Pcs</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="cart-footer-v2">
+                <div className="total-summary-v2">
+                  <div className="summary-line">
+                    <span>Total Barang</span>
+                    <span>{cart.length} Varian</span>
+                  </div>
+                  <div className="summary-line main">
+                    <span>Total Kuantitas</span>
+                    <span>{cart.reduce((s, i) => s + i.qty, 0)} Pcs</span>
+                  </div>
+                </div>
+                <button 
+                  className="btn-submit-restock" 
+                  disabled={isSubmitting || cart.length === 0} 
+                  onClick={submitRestock}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="mini-spinner"></div>
+                      Mengirim...
+                    </>
+                  ) : (
+                    <>
+                      Konfirmasi Permintaan
+                      <span className="material-symbols-outlined">arrow_forward</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       <style>{`
-        /* ARTISAN COLLECTION: UI V6 */
-        .artisan-page { padding: 40px; background: #fdfdfd; min-height: 100vh; animation: pageFade 0.8s ease-out; font-family: 'Inter', sans-serif; }
-        @keyframes pageFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-        .artisan-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px; }
-        .header-left .breadcrumb { font-size: 11px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
-        .header-left h1 { font-size: 42px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -2px; line-height: 1; }
-        .header-left .subtitle { color: #64748b; font-weight: 500; margin-top: 10px; font-size: 16px; }
+        .premium-restock-page {
+          padding: 40px;
+          background: #f8fafc;
+          min-height: 100vh;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          color: #0f172a;
+          animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* HEADER */
+        .page-header {
+          margin-bottom: 40px;
+        }
+        .header-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .title-group .badge {
+          background: #e0e7ff;
+          color: #4338ca;
+          padding: 4px 12px;
+          border-radius: 100px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 1px;
+          margin-bottom: 12px;
+          display: inline-block;
+        }
+        .title-group h1 {
+          font-size: 32px;
+          font-weight: 800;
+          letter-spacing: -1px;
+          margin: 0;
+          color: #1e293b;
+        }
+        .title-group p {
+          color: #64748b;
+          margin: 8px 0 0 0;
+          font-size: 16px;
+        }
+
+        .btn-add-restock {
+          background: #0f172a;
+          color: white;
+          border: none;
+          padding: 16px 28px;
+          border-radius: 16px;
+          font-weight: 700;
+          font-size: 15px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+        }
+        .btn-add-restock:hover {
+          background: #4338ca;
+          transform: translateY(-2px);
+          box-shadow: 0 20px 40px -10px rgba(67, 56, 202, 0.3);
+        }
+
+        /* STATS */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+          margin-bottom: 40px;
+        }
+        .stat-card {
+          background: white;
+          padding: 24px;
+          border-radius: 24px;
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          position: relative;
+          overflow: hidden;
+          border: 1px solid #f1f5f9;
+          transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+          transform: translateY(-4px);
+          border-color: #e2e8f0;
+          box-shadow: 0 20px 30px -10px rgba(0,0,0,0.05);
+        }
+        .stat-icon {
+          width: 60px;
+          height: 60px;
+          border-radius: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .stat-icon span { font-size: 28px; }
+        .pending .stat-icon { background: #fff7ed; color: #f59e0b; }
+        .shipping .stat-icon { background: #eff6ff; color: #3b82f6; }
+        .completed .stat-icon { background: #ecfdf5; color: #10b981; }
+
+        .stat-data { display: flex; flex-direction: column; }
+        .stat-label { font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 4px; }
+        .stat-value { font-size: 28px; font-weight: 800; color: #1e293b; }
+
+        .stat-bg-icon {
+          position: absolute;
+          right: -20px;
+          bottom: -20px;
+          opacity: 0.03;
+          transform: rotate(-15deg);
+        }
+        .stat-bg-icon span { font-size: 120px; }
+
+        /* ACTIVITY SECTION */
+        .activity-section {
+          background: white;
+          border-radius: 32px;
+          padding: 32px;
+          border: 1px solid #f1f5f9;
+        }
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 32px;
+        }
+        .section-header h2 { font-size: 20px; font-weight: 800; margin: 0; }
+        .total-indicator { font-size: 13px; font-weight: 700; color: #64748b; background: #f8fafc; padding: 6px 14px; border-radius: 10px; }
+
+        .requests-grid-v2 {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 24px;
+        }
+        .request-card-v2 {
+          background: #f8fafc;
+          border: 1px solid #f1f5f9;
+          border-radius: 24px;
+          padding: 24px;
+          transition: all 0.3s ease;
+          display: flex;
+          flex-direction: column;
+        }
+        .request-card-v2:hover {
+          background: white;
+          border-color: #cbd5e1;
+          box-shadow: 0 15px 30px -10px rgba(0,0,0,0.05);
+        }
+        .card-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+        .id-badge { font-family: monospace; font-size: 13px; font-weight: 800; color: #64748b; background: #e2e8f0; padding: 4px 10px; border-radius: 8px; }
+        .status-pill {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 800;
+          color: var(--status-color);
+          background: white;
+          border: 1px solid var(--status-color);
+          box-shadow: 0 4px 10px -2px rgba(0,0,0,0.05);
+        }
+        .status-pill span { font-size: 16px; }
+
+        .card-body { flex: 1; }
+        .date-box { display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+        .date-box span { font-size: 16px; }
+
+        .items-summary {
+          background: white;
+          padding: 16px;
+          border-radius: 16px;
+          margin-bottom: 20px;
+        }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .summary-row:last-child { margin-bottom: 0; }
+        .summary-row .label { font-size: 12px; font-weight: 600; color: #94a3b8; }
+        .summary-row .value { font-size: 14px; font-weight: 700; color: #1e293b; }
+        .summary-row .value.highlight { color: #4338ca; font-size: 15px; }
+
+        .admin-note-box {
+          background: #fffbeb;
+          padding: 12px;
+          border-radius: 12px;
+          border-left: 4px solid #f59e0b;
+        }
+        .note-label { display: block; font-size: 10px; font-weight: 800; color: #b45309; text-transform: uppercase; margin-bottom: 4px; }
+        .note-content { margin: 0; font-size: 12px; color: #92400e; font-style: italic; line-height: 1.4; }
+
+        .card-footer-v2 { margin-top: 24px; }
+        .btn-receive-confirm {
+          width: 100%;
+          background: linear-gradient(135deg, #4338ca, #6366f1);
+          color: white;
+          border: none;
+          padding: 14px;
+          border-radius: 14px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 10px 20px -5px rgba(67, 56, 202, 0.4);
+        }
+        .btn-receive-confirm:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        .footer-info { display: flex; align-items: center; gap: 8px; color: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase; justify-content: center; }
+        .footer-info span { font-size: 16px; }
+
+        /* MODAL */
+        .premium-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(16px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px;
+          animation: modalFade 0.3s ease-out;
+        }
+        @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+
+        .premium-modal-container {
+          width: 100%;
+          max-width: 1280px;
+          height: 85vh;
+          background: white;
+          border-radius: 32px;
+          display: flex;
+          overflow: hidden;
+          box-shadow: 0 50px 100px -20px rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .catalog-area { 
+          flex: 1; 
+          display: flex; 
+          flex-direction: column; 
+          background: #f8fafc; 
+          min-height: 0; /* Prevents flex items from growing beyond container */
+        }
+        .modal-top-nav { padding: 32px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; }
+        .search-box-v2 {
+          background: #f1f5f9;
+          padding: 4px 16px;
+          border-radius: 16px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 380px;
+          transition: all 0.3s ease;
+        }
+        .search-box-v2:focus-within { background: white; box-shadow: 0 0 0 4px rgba(67, 56, 202, 0.1); border: 1px solid #4338ca; }
+        .search-box-v2 input { border: none; background: transparent; outline: none; padding: 12px 0; font-weight: 600; width: 100%; font-family: inherit; }
+        .btn-close-modal { width: 44px; height: 44px; border-radius: 12px; border: none; background: #f1f5f9; color: #64748b; cursor: pointer; transition: 0.2s; }
+        .btn-close-modal:hover { background: #fee2e2; color: #ef4444; transform: rotate(90deg); }
         
-        .primary-glass-btn { border: none; background: #0f172a; color: white; padding: 16px 30px; border-radius: 20px; font-weight: 900; font-size: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3); }
-        .primary-glass-btn:hover { transform: translateY(-5px); background: #4f46e5; box-shadow: 0 30px 60px -15px rgba(79, 70, 229, 0.4); }
+        .catalog-grid-v2 { 
+          flex: 1; 
+          overflow-y: auto; 
+          -webkit-overflow-scrolling: touch;
+          padding: 32px; 
+          display: grid; 
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+          gap: 24px; 
+        }
+        .catalog-item-v2 { cursor: pointer; transition: 0.3s; }
+        .catalog-item-v2:hover { transform: translateY(-6px); }
+        .item-image-v2 { position: relative; padding-top: 100%; border-radius: 20px; overflow: hidden; background: white; border: 1px solid #f1f5f9; margin-bottom: 12px; }
+        .item-image-v2 img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: 0.5s ease; }
+        .catalog-item-v2:hover .item-image-v2 img { transform: scale(1.1); }
+        .item-overlay-v2 { position: absolute; inset: 0; background: rgba(67, 56, 202, 0.6); display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.3s; }
+        .item-overlay-v2 span { color: white; font-size: 40px; transform: scale(0.5); transition: 0.3s; }
+        .catalog-item-v2:hover .item-overlay-v2 { opacity: 1; }
+        .catalog-item-v2:hover .item-overlay-v2 span { transform: scale(1); }
 
-        .artisan-bento { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 24px; margin-bottom: 60px; }
-        .bento-card { background: white; padding: 32px; border-radius: 35px; border: 1px solid #f1f5f9; position: relative; overflow: hidden; transition: 0.3s; }
-        .bento-card:hover { border-color: #6366f1; transform: scale(1.02); }
-        .bento-card.main { background: #4f46e5; color: white; border: none; box-shadow: 0 40px 80px -20px rgba(79, 70, 229, 0.3); }
-        .bento-card.main .card-lbl { color: rgba(255,255,255,0.7); }
-        .bento-card.main .card-val { color: white; }
-        .bento-card.main .card-trend { color: white; opacity: 0.8; }
-        
-        .card-lbl { font-size: 11px; font-weight: 900; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; }
-        .card-val { font-size: 48px; font-weight: 900; color: #0f172a; margin: 10px 0; }
-        .card-trend { font-size: 13px; font-weight: 700; }
+        .item-cat-v2 { font-size: 9px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px; }
+        .item-name-v2 { font-size: 14px; font-weight: 700; margin: 4px 0 8px 0; color: #1e293b; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 40px; }
+        .item-stock-v2 { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #94a3b8; }
+        .item-stock-v2 span { font-size: 14px; }
 
-        .artisan-list-container { }
-        .list-title { font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 30px; letter-spacing: -0.5px; }
-        .requests-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
-        
-        .req-card { background: white; border-radius: 30px; padding: 24px; border: 1px solid #f1f5f9; transition: 0.3s; }
-        .req-card:hover { transform: translateY(-5px); border-color: #e2e8f0; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.05); }
-        .req-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .req-id { font-size: 12px; font-weight: 900; color: #0f172a; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
-        .req-date { font-size: 13px; color: #94a3b8; font-weight: 600; margin-bottom: 20px; }
-        .req-body { display: flex; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px dashed #f1f5f9; margin-bottom: 20px; }
-        .req-item-count { font-weight: 800; font-size: 14px; color: #475569; }
-        .req-qty-total { font-weight: 900; font-size: 14px; color: #0f172a; }
-        .req-footer { display: flex; justify-content: space-between; align-items: baseline; }
-        .req-status-lbl { font-size: 11px; font-weight: 900; letter-spacing: 1px; }
-        .req-note { font-size: 12px; font-weight: 500; color: #94a3b8; text-align: right; font-style: italic; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cart-area { width: 400px; display: flex; flex-direction: column; background: white; border-left: 1px solid #f1f5f9; }
+        .cart-head-v2 { padding: 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
+        .cart-head-v2 h3 { font-size: 18px; font-weight: 800; margin: 0; }
+        .item-count-badge { background: #4338ca; color: white; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; }
 
-        /* ELITE MODAL DESIGN */
-        .elite-modal-overlay { position: fixed; inset: 0; z-index: 99999; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(25px); display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .elite-modal-body { width: 100%; max-width: 1400px; height: 90vh; background: white; border-radius: 40px; display: flex; overflow: hidden; box-shadow: 0 80px 150px -40px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.5); position: relative; }
-        
-        .elite-content-area { flex: 1; display: flex; flex-direction: column; background: #fdfdfd; }
-        .elite-search-header { padding: 35px 50px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
-        .search-pill { background: #f1f5f9; padding: 4px 20px; border-radius: 20px; display: flex; align-items: center; gap: 12px; width: 400px; border: 2px solid transparent; transition: 0.3s; }
-        .search-pill:focus-within { background: white; border-color: #4f46e5; box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.05); }
-        .search-pill input { border: none; background: transparent; outline: none; padding: 12px 0; font-weight: 600; flex: 1; }
-        .elite-close { width: 44px; height: 44px; border-radius: 14px; border: none; background: #fee2e2; color: #ef4444; cursor: pointer; transition: 0.3s; }
-        .elite-close:hover { transform: rotate(90deg); background: #ef4444; color: white; }
+        .cart-items-v2 { flex: 1; overflow-y: auto; padding: 24px; }
+        .cart-card-v2 { display: flex; gap: 16px; background: #f8fafc; padding: 12px; border-radius: 16px; margin-bottom: 16px; border: 1px solid #f1f5f9; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .cart-item-img-v2 { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; }
+        .cart-item-details-v2 { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .ci-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .ci-top h5 { font-size: 13px; font-weight: 700; margin: 0; color: #1e293b; padding-right: 12px; }
+        .btn-remove-v2 { border: none; background: transparent; color: #94a3b8; cursor: pointer; padding: 0; }
+        .btn-remove-v2:hover { color: #ef4444; }
 
-        .elite-product-grid { flex: 1; overflow-y: auto; padding: 50px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 35px; }
-        .elite-p-card { cursor: pointer; transition: 0.3s; }
-        .elite-p-card:hover { transform: translateY(-8px); }
-        .elite-p-card .p-img { position: relative; padding-top: 100%; border-radius: 35px; overflow: hidden; background: #f8fafc; margin-bottom: 18px; border: 1px solid #f1f5f9; }
-        .elite-p-card .p-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
-        .elite-p-card:hover .p-img img { transform: scale(1.1); }
-        .p-hover-add { position: absolute; inset: 0; background: rgba(79, 70, 229, 0.05); opacity: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); transition: 0.3s; }
-        .p-hover-add span { font-size: 56px; color: #4f46e5; font-weight: 200; transform: scale(0.6); transition: 0.4s; }
-        .elite-p-card:hover .p-hover-add { opacity: 1; }
-        .elite-p-card:hover .p-hover-add span { transform: scale(1); }
+        .ci-bottom { display: flex; justify-content: space-between; align-items: center; }
+        .qty-control-v2 { display: flex; align-items: center; background: white; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+        .qty-control-v2 button { border: none; background: transparent; width: 28px; height: 28px; cursor: pointer; font-weight: 800; color: #4338ca; transition: 0.2s; }
+        .qty-control-v2 button:hover { background: #f1f5f9; }
+        .qty-control-v2 input { width: 40px; border: none; text-align: center; font-size: 13px; font-weight: 800; color: #1e293b; outline: none; }
+        .unit-label { font-size: 11px; font-weight: 700; color: #94a3b8; }
 
-        .p-details { padding: 4px; }
-        .p-tag { font-size: 9px; font-weight: 900; color: #a5b4fc; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
-        .p-name { font-size: 15px; font-weight: 900; color: #0f172a; margin-bottom: 6px; height: 36px; overflow: hidden; line-height: 1.25; }
-        .p-price { font-size: 16px; font-weight: 900; color: #0f172a; opacity: 0.7; }
+        .cart-footer-v2 { padding: 32px; border-top: 1px solid #f1f5f9; background: #f8fafc; }
+        .total-summary-v2 { margin-bottom: 24px; }
+        .summary-line { display: flex; justify-content: space-between; font-size: 13px; color: #64748b; font-weight: 600; margin-bottom: 8px; }
+        .summary-line.main { font-size: 18px; color: #1e293b; font-weight: 800; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1; }
 
-        .elite-cart-sidebar { width: 380px; min-width: 380px; border-left: 1px solid #f1f5f9; background: #ffffff; display: flex; flex-direction: column; }
-        .cart-header { padding: 40px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-        .cart-header h3 { margin: 0; font-size: 20px; font-weight: 900; color: #0f172a; }
-        .cart-badge { background: #0f172a; color: white; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: 900; }
-        
-        .cart-list-elite { flex: 1; overflow-y: auto; padding: 20px 40px; }
-        .cart-item-elite { padding: 20px; background: #fbfbfd; border-radius: 25px; border: 1px solid #f1f5f9; margin-bottom: 16px; transition: 0.2s; }
-        .ce-name { font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 15px; }
-        .ce-qty { font-size: 12px; font-weight: 700; color: #94a3b8; }
-        .ce-actions { display: flex; justify-content: space-between; align-items: center; }
-        .ce-del { border: none; background: #fee2e2; color: #ef4444; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; transition: 0.2s; }
-        .ce-del:hover { background: #ef4444; color: white; transform: scale(1.1); }
-        .ce-price { font-size: 16px; font-weight: 900; color: #0f172a; }
+        .btn-submit-restock {
+          width: 100%;
+          background: #0f172a;
+          color: white;
+          border: none;
+          padding: 18px;
+          border-radius: 16px;
+          font-weight: 800;
+          font-size: 16px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
+        }
+        .btn-submit-restock:hover:not(:disabled) { background: #4338ca; transform: translateY(-2px); box-shadow: 0 20px 40px -10px rgba(67, 56, 202, 0.3); }
+        .btn-submit-restock:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        .ce-qty-input { display: flex; align-items: center; gap: 8px; margin-bottom: 15px; }
-        .ce-qty-input span { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; }
-        .ce-qty-input input { width: 80px; border: 1px solid #e2e8f0; background: white; padding: 6px 12px; border-radius: 10px; font-weight: 900; color: #0f172a; outline: none; transition: 0.2s; }
-        .ce-qty-input input:focus { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.05); }
-        .ce-qty-input input::-webkit-inner-spin-button { opacity: 1; }
+        .mini-spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .cart-footer-elite { padding: 40px; border-top: 1px solid #f1f5f9; }
-        .total-box { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; }
-        .total-box span { font-size: 11px; font-weight: 900; color: #94a3b8; letter-spacing: 1.5px; }
-        .total-box h4 { font-size: 28px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -1px; }
+        /* SCROLLBAR */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
-        .submit-elite-btn { width: 100%; border: none; padding: 24px; border-radius: 24px; background: #0f172a; color: white; font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 15px; box-shadow: 0 30px 60px -15px rgba(15,23,42,0.4); }
-        .submit-elite-btn:hover:not(:disabled) { background: #4f46e5; transform: translateY(-5px); box-shadow: 0 40px 80px -20px rgba(79, 70, 229, 0.4); }
-        .submit-elite-btn:disabled { opacity: 0.2; transform: none; box-shadow: none; cursor: not-allowed; }
+        .empty-state-v2 { text-align: center; padding: 80px 40px; color: #94a3b8; }
+        .empty-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.3; }
+        .empty-state-v2 h3 { color: #64748b; font-size: 18px; font-weight: 800; margin: 0 0 8px 0; }
+        .empty-state-v2 p { font-size: 14px; margin: 0; }
 
-        .elite-receive-btn { width: 100%; border: none; padding: 12px; border-radius: 15px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; font-weight: 900; font-size: 13px; cursor: pointer; transition: 0.3s; margin-top: 20px; box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.3); }
-        .elite-receive-btn:hover { transform: translateY(-3px); box-shadow: 0 15px 30px -8px rgba(79, 70, 229, 0.4); filter: brightness(1.1); }
+        .cart-empty-v2 { text-align: center; padding: 40px 20px; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 12px; height: 100%; justify-content: center; }
+        .cart-empty-v2 span { font-size: 48px; opacity: 0.2; }
+        .cart-empty-v2 p { font-size: 13px; font-weight: 600; margin: 0; }
 
-        /* CUSTOM SCROLLBAR */
-        .custom-scroll::-webkit-scrollbar { width: 8px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; border: 2px solid white; }
-        
-        @media (max-width: 1200px) {
-           .artisan-bento { grid-template-columns: 1fr; }
-           .elite-modal-body { border-radius: 0; height: 100vh; }
-           .elite-cart-sidebar { width: 350px; }
+        .premium-spinner { width: 40px; height: 40px; border: 4px solid #f1f5f9; border-top-color: #4338ca; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+        .loader-container { text-align: center; padding: 60px; color: #64748b; font-weight: 700; font-size: 14px; }
+
+        @media (max-width: 768px) {
+          .premium-restock-page { padding: 16px; }
+          
+          .header-content { 
+            flex-direction: column; 
+            align-items: flex-start; 
+            gap: 16px; 
+          }
+          
+          .btn-add-restock { width: 100%; justify-content: center; padding: 14px; }
+          
+          .title-group h1 { font-size: 24px; }
+          .title-group p { font-size: 14px; }
+          
+          .stats-grid { grid-template-columns: 1fr; gap: 12px; }
+          .stat-card { padding: 20px; }
+          .stat-value { font-size: 24px; }
+          
+          .activity-section { padding: 20px; border-radius: 24px; }
+          .requests-grid-v2 { grid-template-columns: 1fr; gap: 16px; }
+
+          /* Modal Mobile Optimization (Bottom Sheet Style) */
+          .premium-modal-overlay { 
+            padding: 0; 
+            align-items: flex-end; 
+          }
+          
+          .premium-modal-container { 
+            height: 94vh; 
+            border-radius: 32px 32px 0 0; 
+            flex-direction: column;
+            animation: sheetUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+          
+          .modal-top-nav { 
+            padding: 16px 20px; 
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            z-index: 10;
+          }
+          
+          .search-box-v2 { 
+            flex: 1;
+            width: auto;
+            padding: 2px 12px;
+            border-radius: 12px;
+          }
+          .search-box-v2 input { padding: 10px 0; font-size: 14px; }
+          
+          .btn-close-modal { 
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+            background: #f1f5f9;
+          }
+          
+          .catalog-grid-v2 { 
+            padding: 16px; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 12px; 
+          }
+          
+          .cart-area { 
+            width: 100%; 
+            height: auto;
+            max-height: 55%; 
+            border-left: none; 
+            border-top: 1px solid #f1f5f9; 
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+          }
+          
+          .cart-head-v2 { padding: 16px 20px; }
+          .cart-head-v2 h3 { font-size: 16px; }
+          
+          .cart-items-v2 { padding: 0 20px 10px 20px; }
+          .cart-card-v2 { padding: 10px; margin-bottom: 12px; gap: 12px; }
+          .cart-item-img-v2 { width: 48px; height: 48px; border-radius: 10px; }
+          .ci-top h5 { font-size: 12px; }
+          
+          .cart-footer-v2 { padding: 20px; }
+          .btn-submit-restock { padding: 16px; font-size: 15px; border-radius: 14px; }
+          .summary-line.main { font-size: 16px; margin-top: 8px; padding-top: 8px; }
+        }
+
+        @media (min-width: 769px) and (max-width: 1100px) {
+          .stats-grid { grid-template-columns: repeat(2, 1fr); }
+          .premium-modal-container { max-width: 95%; height: 90vh; }
+          .cart-area { width: 320px; }
         }
       `}</style>
     </div>

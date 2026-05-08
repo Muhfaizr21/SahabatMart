@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
@@ -256,14 +256,18 @@ export default function TeamPerformance() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black flex-shrink-0"
+                          className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center text-white text-xs font-black flex-shrink-0"
                           style={{ 
                             background: m.level === 1 
                               ? 'linear-gradient(135deg, #7c3aed, #b76dff)' 
                               : 'linear-gradient(135deg, #475569, #64748b)'
                           }}
                         >
-                          {(m.full_name || 'M').charAt(0).toUpperCase()}
+                          {m.avatar_url ? (
+                            <img src={formatImage(m.avatar_url)} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            (m.full_name || 'M').charAt(0).toUpperCase()
+                          )}
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-white">{m.full_name || 'Mitra'}</p>

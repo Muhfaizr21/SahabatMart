@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchJson, uploadFile, formatImage, AFFILIATE_API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 
 const toast = (msg, type = 'success') => {
@@ -36,11 +36,14 @@ const InputField = ({ label, name, type = 'text', value, onChange, placeholder, 
 
 export default function AffiliateSettings() {
   const storedUser = getStoredUser();
+  const fileInputRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [form, setForm] = useState({
     full_name: '',
+    avatar_url: '',
     bank_name: '',
     bank_account_number: '',
     bank_account_name: '',
@@ -56,6 +59,7 @@ export default function AffiliateSettings() {
       const user = res.user || {};
       setForm({
         full_name: user.profile?.full_name || '',
+        avatar_url: user.profile?.avatar_url || '',
         bank_name: aff.bank_name || '',
         bank_account_number: aff.bank_account_number || '',
         bank_account_name: aff.bank_account_name || '',
@@ -74,6 +78,30 @@ export default function AffiliateSettings() {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const res = await uploadFile(`${AFFILIATE_API_BASE.replace('/affiliate', '/buyer')}/upload`, file);
+      const imageUrl = res.url || (res.data && res.data.url);
+      if (imageUrl) {
+        const newForm = { ...form, avatar_url: imageUrl };
+        setForm(newForm);
+        // Auto-save langsung ke backend
+        await fetchJson(`${AFFILIATE_API_BASE}/profile/update`, {
+          method: 'PUT',
+          body: JSON.stringify({ avatar_url: imageUrl }),
+        });
+        toast('Foto profil berhasil diperbarui!');
+      }
+    } catch (err) {
+      toast('Gagal upload foto: ' + err.message, 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleSave = async (e) => {
@@ -131,11 +159,35 @@ export default function AffiliateSettings() {
               </p>
 
               <div className="flex items-center gap-4 mb-4">
-                <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg"
-                  style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)', color: 'white' }}
-                >
-                  {form.full_name?.charAt(0)?.toUpperCase() || 'A'}
+                <div className="relative">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    accept="image/*"
+                  />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-14 h-14 rounded-2xl overflow-hidden cursor-pointer relative group"
+                    style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)' }}
+                  >
+                    {form.avatar_url ? (
+                      <img
+                        src={formatImage(form.avatar_url)}
+                        alt="Foto Profil"
+                        className="w-full h-full object-cover"
+                        style={{ opacity: uploadingAvatar ? 0.5 : 1 }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl font-black text-white">
+                        {form.full_name?.charAt(0)?.toUpperCase() || 'A'}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="material-symbols-outlined text-white text-sm">{uploadingAvatar ? 'hourglass_empty' : 'photo_camera'}</span>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <p className="text-white font-black text-lg font-['Plus_Jakarta_Sans']">{form.full_name || 'Affiliate'}</p>

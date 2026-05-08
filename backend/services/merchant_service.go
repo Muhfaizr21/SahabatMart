@@ -122,7 +122,6 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 	}
 
 	totalQty := 0
-	var totalAmount float64
 	
 	req := &models.RestockRequest{
 		MerchantID:    merchantID,
@@ -139,65 +138,30 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 
 		// 2. Process Items
 		for i := range items {
-			var prod models.Product
-			if err := tx.First(&prod, "id = ?", items[i].ProductID).Error; err != nil {
-				return fmt.Errorf("produk %s tidak ditemukan", items[i].ProductID)
-			}
-			
-			// [Financial Audit Fix] Use WholesalePrice for B2B transactions
-			// Fallback order: WholesalePrice -> COGS -> 80% Retail Price
 			items[i].RestockID = req.ID
-			items[i].UnitPrice = prod.WholesalePrice
-			if items[i].UnitPrice <= 0 {
-				items[i].UnitPrice = prod.COGS
-			}
-			if items[i].UnitPrice <= 0 {
-				items[i].UnitPrice = prod.Price * 0.8 // Default 20% margin for merchant
-			}
-			items[i].Subtotal = items[i].UnitPrice * float64(items[i].Quantity)
+			items[i].UnitPrice = 0 // No billing for restock
+			items[i].Subtotal = 0
 			
 			if err := tx.Create(&items[i]).Error; err != nil {
 				return err
 			}
 			
 			totalQty += items[i].Quantity
-			totalAmount += items[i].Subtotal
 		}
 
 		// 3. Update Header with Totals
 		if err := tx.Model(req).Updates(map[string]interface{}{
-			"total_items": totalQty,
-			"total_price": totalAmount,
+			"total_items":    totalQty,
+			"total_price":    0,
+			"payment_status": "paid", // Already 'paid' because it's non-billing movement
 		}).Error; err != nil {
 			return err
 		}
 
-		// 4. Handle Wallet Payment
-		if paymentMethod == "wallet" {
-			financeSvc := NewFinanceService(s.DB)
-			// [CRITICAL FIX] Get UserID
-			var merchant models.Merchant
-			if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
-				return err
-			}
-
-			// Deduct balance
-			desc := fmt.Sprintf("Pembayaran Restock / Kulakan: %s", req.ID)
-			err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxRestockPayment, -totalAmount, req.ID, "restock_request", desc, nil)
-			if err != nil {
-				return fmt.Errorf("saldo tidak mencukupi untuk pembayaran wallet: %v", err)
-			}
-			
-			// HQ receives money (system-hq)
-			err = financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, totalAmount, req.ID, "restock_request", "Penerimaan Kulakan Merchant: "+merchantID, nil)
-			if err != nil {
-				return err
-			}
-
-			// Update request as paid
-			if err := tx.Model(req).Update("is_paid", true).Error; err != nil {
-				return err
-			}
+		// 4. Update request status to 'requested' (No immediate payment needed)
+		// Admin will approve this and it will sync stock to merchant's warehouse.
+		if err := tx.Model(req).Update("status", "requested").Error; err != nil {
+			return err
 		}
 
 		return nil
@@ -335,18 +299,14 @@ func (s *MerchantService) GetWallet(merchantID string) (map[string]interface{}, 
 }
 
 func (s *MerchantService) RequestPayout(merchantID string, amount float64, note string, bankName, accNo, accName string) (*models.PayoutRequest, error) {
-	financeSvc := NewFinanceService(s.DB)
-	wallet, err := financeSvc.Repo.GetWalletWithLock(merchantID, models.WalletMerchant)
-	if err != nil {
-		return nil, err
-	}
-
-	if wallet.Balance < amount {
-		return nil, errors.New("saldo tidak mencukupi")
-	}
-
-	// [Financial Integrity] Min withdrawal check from config
 	configSvc := NewConfigService(s.DB)
+	
+	// [Akuglow - Payday Restriction]
+	isPayday, allowedDates := configSvc.IsPayday()
+	if !isPayday {
+		return nil, fmt.Errorf("penarikan dana hanya dapat dilakukan pada tanggal: %s", allowedDates)
+	}
+
 	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
 	if amount < minWithdrawal {
 		return nil, fmt.Errorf("minimum penarikan adalah Rp %.0f", minWithdrawal)
@@ -364,8 +324,21 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 		RequestedAt:       time.Now(),
 	}
 
-	err = s.DB.Transaction(func(tx *gorm.DB) error {
-		// [CRITICAL FIX] Get Merchant to find UserID
+	financeSvc := NewFinanceService(s.DB)
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Get Wallet with Lock (Must be inside transaction)
+		// Re-initialize repo with transaction tx
+		repo := &repositories.FinanceRepository{DB: tx}
+		wallet, err := repo.GetWalletWithLock(merchantID, models.WalletMerchant)
+		if err != nil {
+			return err
+		}
+
+		if wallet.Balance < amount {
+			return errors.New("saldo tidak mencukupi")
+		}
+
+		// 2. Get Merchant to find UserID
 		var merchant models.Merchant
 		if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
 			return err
@@ -376,20 +349,12 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 		}
 		
 		desc := fmt.Sprintf("Penarikan Dana / Payout PID:%s", payout.ID)
-		// [CRITICAL FIX] Use UserID and negative amount
-		err = financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalRequest, -amount, payout.ID, "payout_request", desc, nil)
-		if err != nil {
+		if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalRequest, -amount, payout.ID, "payout_request", desc, nil); err != nil {
 			return err
 		}
 
 		return nil
 	})
-
-	// Add payout.ID generated to description if possible?
-	if payout.ID != "" {
-		desc := fmt.Sprintf("Penarikan Dana / Payout PID:%s", payout.ID)
-		s.DB.Model(&models.WalletTransaction{}).Where("reference_id = ? AND type = ?", payout.ID, models.TxWithdrawalRequest).Update("description", desc)
-	}
 
 	return payout, err
 }
@@ -596,14 +561,14 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 					MerchantID:    merchantID,
 					ProductID:     item.ProductID,
 					Stock:         item.Quantity,
-					BasePrice:     prod.Price,
+					BasePrice:     prod.COGS,
 					LastSyncPrice: time.Now(),
 				}
 				if err := tx.Create(&inv).Error; err != nil { return err }
 			} else if err == nil {
 				if err := tx.Model(&inv).Updates(map[string]interface{}{
 					"stock":           gorm.Expr("stock + ?", item.Quantity),
-					"base_price":      prod.Price,
+					"base_price":      prod.COGS,
 					"last_sync_price": time.Now(),
 				}).Error; err != nil { return err }
 				inv.Stock += item.Quantity // For mutation log
@@ -622,26 +587,6 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 				StockAfter:  inv.Stock,
 				Note:        "Received from Pusat (Restock)",
 			})
-		}
-
-		// 2. Financial Transaction (Merchant pays HQ)
-		financeSvc := NewFinanceService(tx)
-		
-		// Debit Merchant
-		descPay := fmt.Sprintf("Pembayaran Kulakan: %s", req.ID)
-		// [CRITICAL FIX] Get UserID
-		var merchant models.Merchant
-		if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
-			return err
-		}
-		if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxRestockPayment, -req.TotalPrice, req.ID, "restock", descPay, nil); err != nil {
-			return err
-		}
-
-		// Credit HQ
-		descRev := fmt.Sprintf("Pendapatan Kulakan Merchant: %s", req.ID)
-		if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxRestockRevenue, req.TotalPrice, req.ID, "restock", descRev, nil); err != nil {
-			return err
 		}
 
 		req.Status = "received"

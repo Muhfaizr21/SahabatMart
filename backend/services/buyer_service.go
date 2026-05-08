@@ -121,12 +121,24 @@ func (s *BuyerService) MoveFromWishlistToCart(buyerID string, productID string, 
 			merchantID = inv.MerchantID
 		}
 
+		// BUG-09 fix: Jika variantID kosong, resolve ke first variant produk
+		if variantID == "" {
+			var firstVariant models.ProductVariant
+			if err := tx.Where("product_id = ?", productID).First(&firstVariant).Error; err == nil {
+				variantID = firstVariant.ID
+			}
+			// Jika masih kosong, gunakan productID sebagai fallback terakhir
+			if variantID == "" {
+				variantID = productID
+			}
+		}
+
 		// 2. Add to cart
 		if err := s.AddToCart(buyerID, productID, variantID, merchantID, quantity, ""); err != nil {
 			return err
 		}
 
-		// 2. Remove from wishlist
+		// 3. Remove from wishlist
 		return tx.Where("buyer_id = ? AND product_id = ?", buyerID, productID).Delete(&models.Wishlist{}).Error
 	})
 }

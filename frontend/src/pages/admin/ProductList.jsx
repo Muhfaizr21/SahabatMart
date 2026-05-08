@@ -148,7 +148,7 @@ export default function AdminProductList() {
   }, [products]);
 
   return (
-    <div style={A.page} className="fade-in">
+    <div style={A.page} className="fade-in admin-page-container">
       {showQR && (
         <Modal title="Digital Product ID" onClose={() => setShowQR(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, padding: '8px 0', textAlign: 'center' }}>
@@ -221,26 +221,31 @@ export default function AdminProductList() {
         </Modal>
       )}
 
-      <PageHeader title="Katalog Produk" subtitle="Kelola dan moderasi seluruh listing produk platform AkuGlow.">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
-          <div style={{ ...A.searchWrap, minWidth: 250, flex: 1 }}>
+      <div className="admin-header-stack">
+        <PageHeader 
+          title="Katalog Produk" 
+          subtitle="Kelola dan moderasi seluruh listing produk platform AkuGlow."
+          noMargin
+        />
+        <div className="admin-filter-stack">
+          <div style={A.searchWrap} className="search-wrap">
             <i className="bx bx-search" style={A.searchIcon} />
             <input
-              style={A.searchInput}
+              style={{ ...A.searchInput, width: '100%' }}
               placeholder="Cari nama produk..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && load()}
             />
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button style={{ ...A.btnGhost, flex: '1 1 auto' }} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
-            <Link to="/admin/products/add" style={{ ...A.btnPrimary, flex: '1 1 auto', textDecoration: 'none' }}>
-              <i className="bx bx-plus" /> Tambah Produk
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button style={{ ...A.btnGhost, flex: 1 }} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
+            <Link to="/admin/products/add" style={{ ...A.btnPrimary, flex: 1, textDecoration: 'none', display: 'inline-flex', justifyContent: 'center' }}>
+              <i className="bx bx-plus" /> Tambah
             </Link>
           </div>
         </div>
-      </PageHeader>
+      </div>
 
       <StatRow stats={[
         { label: 'Total Produk', val: stats.total,    icon: 'bxs-package',      color: '#6366f1' },
@@ -340,7 +345,7 @@ export default function AdminProductList() {
                           />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5, marginBottom: 2 }} className="product-name-hover">{p.name}</div>
+                          <div className="products-admin__product-name product-name-hover" style={{ fontSize: 13.5, marginBottom: 2 }}>{p.name}</div>
                           <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}>
                             SKU #{String(p.id).slice(0, 8).toUpperCase()}
                             <button 
@@ -354,8 +359,8 @@ export default function AdminProductList() {
                       </Link>
                     </td>
                     <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: '#eff6ff', color: '#2563eb', fontSize: 12, fontWeight: 700 }}>
-                        <i className="bx bx-store" style={{ fontSize: 13 }} />{p.store_name || 'Platform'}
+                      <span className="products-admin__merchant-pill">
+                        <i className="bx bx-store" />{p.store_name || 'Platform'}
                       </span>
                     </td>
                     <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
@@ -367,7 +372,7 @@ export default function AdminProductList() {
                       </span>
                     </td>
                     <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
-                      <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>{idr(p.price)}</div>
+                      <div className="products-admin__price" style={{ fontSize: 14 }}>{idr(p.price)}</div>
                       {p.old_price > p.price && (
                         <div style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>{idr(p.old_price)}</div>
                       )}
@@ -380,7 +385,7 @@ export default function AdminProductList() {
                       )}
                     </td>
                     <td style={{ ...A.td, paddingBottom: isLast ? 100 : 16 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{fmtDate(p.created_at)}</div>
+                      <div className="products-admin__date" style={{ fontSize: 13 }}>{fmtDate(p.created_at)}</div>
                     </td>
                     <td style={{ ...A.td, paddingRight: 24, textAlign: 'right', paddingBottom: isLast ? 100 : 16 }}>
                       <ActionDropdown product={p} onToggle={toggle} onDelete={del} onViewQR={setShowQR} />

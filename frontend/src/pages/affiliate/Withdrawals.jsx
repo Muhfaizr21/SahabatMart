@@ -68,7 +68,7 @@ export default function AffiliateWithdrawals() {
       return;
     }
     if (amt > balance) {
-      setError('Jumlah melebihi saldo tersedia');
+      setError('Jumlah melebihi komisi tersedia');
       return;
     }
     setRequesting(true);
@@ -114,7 +114,7 @@ export default function AffiliateWithdrawals() {
       >
         <div>
           <p className="text-[10px] font-bold text-purple-400 tracking-[0.2em] uppercase mb-1">
-            Saldo Tersedia
+            Komisi Tersedia
           </p>
           <p className="text-4xl font-black text-white font-['Plus_Jakarta_Sans']">
             {formatRp(balance)}

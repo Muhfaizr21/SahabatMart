@@ -622,7 +622,7 @@ const AdminLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main style={{ flex: 1, padding: '32px', overflowX: 'hidden', maxWidth: '100%' }}>
+        <main className="admin-main-content">
           <Outlet />
         </main>
       </div>
@@ -633,6 +633,22 @@ const AdminLayout = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
         * { box-sizing: border-box; }
+        
+        .admin-main-content {
+          flex: 1;
+          padding: 32px;
+          overflow-x: hidden;
+          max-width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+          .admin-main-content { padding: 24px; }
+        }
+        @media (max-width: 768px) {
+          .admin-main-content { padding: 16px; }
+          header { padding: 0 16px !important; }
+        }
+
         .fade-in { animation: fadeIn 0.35s ease forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>

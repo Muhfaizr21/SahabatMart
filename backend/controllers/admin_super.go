@@ -260,6 +260,58 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ac.DB.Model(&models.User{}).Where("id = ?", req.UserID).Updates(updates)
+
+	// [Auto-Bootstrap] Buatkan record terkait jika role berubah
+	var user models.User
+	ac.DB.Preload("Profile").First(&user, "id = ?", req.UserID)
+	userName := "User"
+	if user.Profile.FullName != "" {
+		userName = user.Profile.FullName
+	}
+
+	if req.Role == "merchant" {
+		var count int64
+		ac.DB.Model(&models.Merchant{}).Where("user_id = ?", req.UserID).Count(&count)
+		if count == 0 {
+			err := ac.DB.Create(&models.Merchant{
+				UserID:    req.UserID,
+				StoreName: "Toko " + userName,
+				Status:    "active",
+			}).Error
+			if err != nil {
+				fmt.Println("[BOOTSTRAP ERROR] Failed creating Merchant:", err)
+			} else {
+				ac.DB.Create(&models.Wallet{
+					OwnerID:   req.UserID,
+					OwnerType: models.WalletMerchant,
+					Balance:   0,
+				})
+			}
+		}
+	} else if req.Role == "affiliate" {
+		var count int64
+		ac.DB.Model(&models.AffiliateMember{}).Where("user_id = ?", req.UserID).Count(&count)
+		if count == 0 {
+			var tier models.MembershipTier
+			ac.DB.Order("level ASC").First(&tier)
+			err := ac.DB.Create(&models.AffiliateMember{
+				UserID:           req.UserID,
+				MembershipTierID: tier.ID,
+				Status:           models.AffiliateActive,
+				RefCode:          utils.GenerateRefCode(userName),
+			}).Error
+			if err != nil {
+				fmt.Println("[BOOTSTRAP ERROR] Failed creating Affiliate:", err)
+			} else {
+				ac.DB.Create(&models.Wallet{
+					OwnerID:   req.UserID,
+					OwnerType: models.WalletAffiliate,
+					Balance:   0,
+				})
+			}
+		}
+	}
+
 	ac.Audit.Log(models.AdminID, "update_user", "user", req.UserID,
 		fmt.Sprintf("status=%s role=%s admin_role=%s", req.Status, req.Role, req.AdminRole),
 		r.RemoteAddr)
@@ -716,6 +768,7 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 		MonthlyTurnover  float64   `json:"monthly_turnover"`
 		TeamDownlines    int64     `json:"team_downlines"`
 		Role             string    `json:"role"`
+		MembershipTierID uint      `json:"membership_tier_id"`
 	}
 
 	whereClause := "u.role IN ('affiliate', 'merchant') AND am.id IS NOT NULL"
@@ -740,7 +793,7 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 	q := `
 		SELECT u.id, u.email, u.status, up.full_name, u.role,
 		       am.ref_code, mt.name AS tier_name, mt.color AS tier_color, mt.level AS tier_level,
-		       mt.base_commission_rate AS comm_rate,
+		       mt.base_commission_rate AS comm_rate, mt.id AS membership_tier_id,
 		       w.total_earned, w.total_withdrawn, am.total_clicks, am.total_conversions,
 		       am.bank_name, am.status AS aff_status, am.created_at AS joined_at,
 		       w.balance,
@@ -772,6 +825,41 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 		"limit":  limit,
 		"data":   rows,
 	})
+}
+
+// POST /api/admin/affiliates/member/update-tier
+func (ac *AdminController) UpdateMemberTier(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		UserID           string `json:"user_id"`
+		MembershipTierID uint   `json:"membership_tier_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if req.UserID == "" || req.MembershipTierID == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "UserID dan MembershipTierID wajib diisi")
+		return
+	}
+
+	// Update the AffiliateMember record associated with this user
+	if err := ac.DB.Model(&models.AffiliateMember{}).
+		Where("user_id = ?", req.UserID).
+		Update("membership_tier_id", req.MembershipTierID).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate tier member: "+err.Error())
+		return
+	}
+
+	// Log audit
+	ac.Audit.Log(models.AdminID, "update_member_tier", "affiliate_member", req.UserID, 
+		fmt.Sprintf("UserID: %s, NewTierID: %d", req.UserID, req.MembershipTierID), r.RemoteAddr)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "Tier member berhasil diperbarui"})
 }
 
 // GET /api/admin/affiliates/configs  → list membership tiers
@@ -1481,6 +1569,7 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 		ProductID:  p.ID,
 		MerchantID: models.PusatID,
 		Stock:      p.Stock,
+		BasePrice:  p.COGS, // Set initial modal
 	})
 
 	ac.Audit.Log(models.AdminID, "create_product", "product", p.ID, p.Name, r.RemoteAddr)
@@ -1561,14 +1650,14 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 				MerchantID: models.PusatID,
 				ProductID:  req.ID,
 				Stock:      req.Stock,
-				BasePrice:  req.Price, // Sync Harga
+				BasePrice:  req.COGS, // Sync Modal (COGS)
 			}
 			return tx.Create(&inv).Error
 		}
-		// Jika sudah ada, update Stok, Harga & COGS (jika tabel inv ada field cogs)
+		// Jika sudah ada, update Stok & COGS (BasePrice)
 		return tx.Model(&inv).Updates(map[string]interface{}{
 			"stock":      req.Stock,
-			"base_price": req.Price,
+			"base_price": req.COGS,
 		}).Error
 	})
 
@@ -1610,7 +1699,7 @@ func (ac *AdminController) UpdateProductTierCommission(w http.ResponseWriter, r 
 	
 	config.ProductID = req.ProductID
 	config.MembershipTierID = req.TierID
-	config.CommissionRate = req.CommissionRate
+	config.CommissionRate = req.CommissionRate / 100.0
 
 	if err == gorm.ErrRecordNotFound {
 		ac.DB.Create(&config)
@@ -2112,7 +2201,7 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 // DELETE /api/admin/commissions/presets
 func (ac *AdminController) ManageCommissionPresets(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		var presets []models.CommissionPreset
+		presets := []models.CommissionPreset{}
 		ac.DB.Order("name asc").Find(&presets)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
@@ -3499,26 +3588,21 @@ func (ac *AdminController) ModerateRestockRequest(w http.ResponseWriter, r *http
 	adminID := r.Context().Value("user_id").(string)
 	
 	var req struct {
-		RequestID string `json:"request_id"`
-		Status    string `json:"status"` // "approved" or "rejected"
-		AdminNote string `json:"admin_note"`
+		RequestID      string `json:"request_id"`
+		Status         string `json:"status"`
+		AdminNote      string `json:"admin_note"`
+		TrackingNumber string `json:"tracking_number"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
 
-	err := ac.Service.ModerateRestockRequest(adminID, req.RequestID, req.Status, req.AdminNote)
+	err := ac.Service.ModerateRestockRequest(adminID, req.RequestID, req.Status, req.AdminNote, req.TrackingNumber)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal moderasi: "+err.Error())
 		return
 	}
-
-	// Notify Merchant
-	var restock models.RestockRequest
-	ac.DB.First(&restock, "id = ?", req.RequestID)
-	ac.Notif.Push(restock.MerchantID, "merchant", "restock_update", "Status Restock Diperbarui", 
-		fmt.Sprintf("Permintaan restock Anda statusnya kini: %s.", req.Status), "/merchant/restock")
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
@@ -3766,7 +3850,7 @@ func (ac *AdminController) GetAllReviews(w http.ResponseWriter, r *http.Request)
 		ProductName string `json:"product_name"`
 	}
 	
-	var res []ReviewResponse
+	res := []ReviewResponse{}
 	ac.DB.Table("reviews").
 		Select("reviews.*, products.name as product_name").
 		Joins("LEFT JOIN products ON products.id = reviews.product_id").

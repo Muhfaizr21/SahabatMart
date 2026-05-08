@@ -2,6 +2,7 @@ package services
 
 import (
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/repositories"
 	"errors"
 	"fmt"
 	"log"
@@ -575,4 +576,85 @@ func (s *AffiliateService) LinkUpline(userID, refCode string) error {
 		go s.UpdateUplineSnapshotsRecursive(uID)
 		return nil
 	})
+}
+
+func (s *AffiliateService) RequestWithdrawal(affiliateID string, amount float64) (*models.AffiliateWithdrawal, error) {
+	// 1. Get affiliate member for bank info & balance
+	var affiliate models.AffiliateMember
+	if err := s.DB.Preload("Tier").Where("id = ?", affiliateID).First(&affiliate).Error; err != nil {
+		return nil, errors.New("affiliate tidak ditemukan")
+	}
+
+	// 2. Prevent withdrawal spam
+	var existingPending int64
+	s.DB.Model(&models.AffiliateWithdrawal{}).
+		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
+		Count(&existingPending)
+	if existingPending > 0 {
+		return nil, errors.New("anda masih memiliki pengajuan penarikan yang sedang diproses")
+	}
+
+	// 3. Validate bank info
+	if affiliate.BankName == "" || affiliate.BankAccountNumber == "" {
+		return nil, errors.New("harap lengkapi informasi rekening bank di pengaturan terlebih dahulu")
+	}
+
+	// 4. Payday Restriction
+	configSvc := NewConfigService(s.DB)
+	isPayday, allowedDates := configSvc.IsPayday()
+	if !isPayday {
+		return nil, fmt.Errorf("penarikan komisi hanya dapat dilakukan pada tanggal: %s", allowedDates)
+	}
+
+	// 5. Minimum withdrawal amount
+	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
+	if affiliate.Tier != nil && affiliate.Tier.MinWithdrawalAmount > 0 {
+		if affiliate.Tier.MinWithdrawalAmount > minWithdrawal {
+			minWithdrawal = affiliate.Tier.MinWithdrawalAmount
+		}
+	}
+
+	if amount < minWithdrawal {
+		return nil, fmt.Errorf("minimum penarikan adalah Rp %.0f", minWithdrawal)
+	}
+
+	// 6. Use Wallet for balance check & deduction
+	financeSvc := NewFinanceService(s.DB)
+	var wd models.AffiliateWithdrawal
+	
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Get Wallet with Lock (Must be inside transaction)
+		repo := &repositories.FinanceRepository{DB: tx}
+		wallet, err := repo.GetWalletWithLock(affiliate.UserID, models.WalletAffiliate)
+		if err != nil {
+			return fmt.Errorf("gagal mendapatkan data dompet")
+		}
+
+		if wallet.Balance < amount {
+			return fmt.Errorf("saldo tidak mencukupi. Saldo tersedia: Rp %.0f", wallet.Balance)
+		}
+
+		// 2. Create withdrawal record
+		wd = models.AffiliateWithdrawal{
+			AffiliateID:       affiliateID,
+			Amount:            amount,
+			BankName:          affiliate.BankName,
+			BankAccountNumber: affiliate.BankAccountNumber,
+			BankAccountName:   affiliate.BankAccountName,
+			Status:            "pending",
+		}
+		if err := tx.Create(&wd).Error; err != nil {
+			return err
+		}
+
+		// 3. Deduct from wallet immediately (Request phase)
+		desc := fmt.Sprintf("Permintaan Penarikan: %s", wd.ID)
+		if err := financeSvc.ProcessTransaction(tx, affiliate.UserID, models.WalletAffiliate, models.TxWithdrawalRequest, -amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return &wd, err
 }

@@ -199,7 +199,7 @@ export default function AdminEditProduct() {
         body: JSON.stringify({
             product_id: productId,
             membership_tier_id: parseInt(tierId),
-            commission_rate: parseFloat(rate) / 100
+            commission_rate: parseFloat(rate)
         })
     }).then(resp => {
         const updated = resp.data || resp;

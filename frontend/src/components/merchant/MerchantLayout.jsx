@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
-import { fetchJson, MERCHANT_API_BASE } from '../../lib/api';
+import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
 
 const SidebarLink = ({ item }) => (
   <NavLink
@@ -267,8 +267,12 @@ const MerchantLayout = () => {
                             </h4>
                             <p className={`text-[10px] font-bold transition-colors ${showProfileMenu ? 'text-slate-400' : 'text-slate-400'}`}>Toko Resmi</p>
                         </div>
-                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-black text-xs shadow-lg border-2 transition-all ${showProfileMenu ? 'bg-white text-slate-900 border-slate-800' : 'bg-gradient-to-br from-violet-600 to-indigo-800 text-white border-white'}`}>
-                            {user.profile?.full_name?.charAt(0) || 'M'}
+                        <div className={`h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center font-black text-xs shadow-lg border-2 transition-all ${showProfileMenu ? 'bg-white text-slate-900 border-slate-800' : 'bg-gradient-to-br from-violet-600 to-indigo-800 text-white border-white'}`}>
+                            {user.profile?.avatar_url ? (
+                                <img src={formatImage(user.profile.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                user.profile?.full_name?.charAt(0) || 'M'
+                            )}
                         </div>
                     </div>
 

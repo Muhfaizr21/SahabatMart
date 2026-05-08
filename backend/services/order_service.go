@@ -77,6 +77,16 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		items[i].Subtotal = actualPrice * float64(items[i].Quantity)
 		items[i].Weight = product.Weight
 		items[i].ProductName = product.Name
+		items[i].COGS = product.COGS // Snapshot modal saat beli untuk laporan finance
+		items[i].SKU = product.SKU
+
+		// Handle variant COGS override if exists
+		if items[i].ProductVariantID != nil && *items[i].ProductVariantID != "" {
+			var v models.ProductVariant
+			if err := s.DB.First(&v, "id = ?", *items[i].ProductVariantID).Error; err == nil && v.COGS > 0 {
+				items[i].COGS = v.COGS
+			}
+		}
 
 		totalSubtotal += items[i].Subtotal
 		totalWeight += float64(items[i].Weight * items[i].Quantity)
@@ -222,7 +232,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				item.PlatformFeeAmount = platAmt
 				item.CommissionAmount = affAmt
 				item.DistributionFeeAmount = distAmt
-				item.MerchantAmount = (item.Subtotal - platAmt - affAmt)
+				item.MerchantAmount = distAmt // Merchant only gets their commission/fee
 				item.COGS = cogs
 
 				if err := tx.Create(&item).Error; err != nil {
@@ -236,7 +246,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				group.Subtotal += item.Subtotal
 				group.PlatformFee += platAmt
 				group.AffiliateCommission += affAmt
-				group.MerchantPayout += (item.Subtotal - platAmt - affAmt)
+				group.MerchantPayout += distAmt // HQ-centric: Merchant payout is just the commission
 				group.DistributionCommission += distAmt
 			}
 
@@ -350,10 +360,18 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 			return err
 		}
 
-		// Notifikasi ke Buyer
+		// Notifikasi ke Buyer (BUG-P2 fix: role "buyer" sudah dihapus, gunakan role dari DB)
 		if order.BuyerID != nil {
-			_ = s.Notification.Push(*order.BuyerID, "buyer", "payment_success", "Pembayaran Berhasil", 
-				fmt.Sprintf("Pembayaran untuk pesanan %s telah kami terima.", order.OrderNumber), 
+			// Cek role user dari DB untuk menentukan notif channel yang tepat
+			var buyer models.User
+			buyerRole := "affiliate" // default role
+			if err := tx.Select("role").First(&buyer, "id = ?", *order.BuyerID).Error; err == nil {
+				if buyer.Role == "merchant" {
+					buyerRole = "merchant"
+				}
+			}
+			_ = s.Notification.Push(*order.BuyerID, buyerRole, "payment_success", "Pembayaran Berhasil",
+				fmt.Sprintf("Pembayaran untuk pesanan %s telah kami terima.", order.OrderNumber),
 				fmt.Sprintf("/order/%s", order.ID))
 		}
 
@@ -399,23 +417,11 @@ type PresetCommissionEntry struct {
 func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, distAmt float64, platAmt float64, cogs float64, err error) {
 	subtotal := item.UnitPrice * float64(item.Quantity)
 
-	// 1. Platform Fee
-	var platRate float64
-	var merchComm models.MerchantCommission
-	var catComm models.CategoryCommission
+	// 1. Platform Fee (DISABLED per User Request)
+	platAmt = 0.0
+
 	var product models.Product
 	db.Where("id = ?", item.ProductID).First(&product)
-
-	if err := db.Where("merchant_id = ?", merchantID).First(&merchComm).Error; err == nil {
-		platRate = merchComm.FeePercent / 100.0
-	} else if err := db.Where("category_name = ?", product.Category).First(&catComm).Error; err == nil {
-		platRate = catComm.FeePercent / 100.0
-	} else {
-		// Standardize: Assume input is percentage (e.g. 5 = 5% = 0.05)
-		rawFee := s.ConfigService.GetFloat("default_platform_fee", 5.0)
-		platRate = rawFee / 100.0
-	}
-	platAmt = subtotal * platRate
 
 	// 2. COGS
 	cogs = product.COGS
@@ -438,10 +444,6 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 		distAmt = subtotal * (product.BaseDistributionFee / 100.0)
 	} else if product.BaseDistributionFeeNominal > 0 {
 		distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
-	} else if merchComm.DistFee > 0 {
-		distAmt = subtotal * (merchComm.DistFee / 100.0)
-	} else if catComm.DistFee > 0 {
-		distAmt = subtotal * (catComm.DistFee / 100.0)
 	} else if merchant.DistributionFeePercent > 0 {
 		distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
 	}
@@ -478,20 +480,11 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 						affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
 					} else if product.BaseAffiliateFeeNominal > 0 {
 						affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
-					} else if merchComm.AffiliateFee > 0 {
-						affAmt = subtotal * (merchComm.AffiliateFee / 100.0)
-					} else if catComm.AffiliateFee > 0 {
-						affAmt = subtotal * (catComm.AffiliateFee / 100.0)
 					} else {
-						var tier models.MembershipTier
-						if err := db.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
-							affAmt = subtotal * tier.BaseCommissionRate
-						} else {
-							// Standardize: Assume input is percentage (e.g. 3 = 3% = 0.03)
-							rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
-							affRate := rawComm / 100.0
-							affAmt = subtotal * affRate
-						}
+						// Standardize: Assume input is percentage (e.g. 3 = 3% = 0.03)
+						rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
+						affRate := rawComm / 100.0
+						affAmt = subtotal * affRate
 					}
 				}
 			}
@@ -680,6 +673,11 @@ func (s *OrderService) UpdateMerchantOrderStatus(groupID string, status models.M
 		} else if status == models.MOrderDelivered {
 			now := time.Now()
 			group.DeliveredAt = &now
+			
+			// [Financial Fix] Trigger settlement countdown saat barang sampai
+			if err := s.FinanceService.UpdateSettlementDatesOnDelivery(tx, group.OrderID); err != nil {
+				log.Printf("⚠️ Gagal update settlement date untuk order %s: %v", group.OrderID, err)
+			}
 		}
 
 		if err := tx.Save(&group).Error; err != nil {

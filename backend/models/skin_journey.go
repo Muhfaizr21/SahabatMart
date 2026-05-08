@@ -109,6 +109,14 @@ type SkinCommunityComment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// SkinCommunityLike - Tracking like per user (BUG-13)
+type SkinCommunityLike struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	PostID    uint      `gorm:"uniqueIndex:idx_post_user_like;not null" json:"post_id"`
+	UserID    string    `gorm:"type:uuid;uniqueIndex:idx_post_user_like;not null" json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ═══════════════════════════════════════════════════════════════
 // DYNAMIC JOURNEY CONFIGURATION - ADMIN MANAGED (NO HARDCODE)
 // ═══════════════════════════════════════════════════════════════
@@ -234,6 +242,8 @@ type SkinJourneyRoutine struct {
 	ProgramID    uint            `gorm:"index" json:"program_id"`
 	StepID       uint            `gorm:"index" json:"step_id"`
 	Step         SkinJourneyStep `gorm:"foreignKey:StepID" json:"step"`
+	ProductID    string          `gorm:"type:uuid;index" json:"product_id"`
+	Product      Product         `gorm:"foreignKey:ProductID" json:"product"`
 	Week         int             `json:"week"`
 	TimeOfDay    string          `gorm:"type:varchar(20)" json:"time_of_day"` // morning, evening, both, weekly
 	DurationMin  int             `json:"duration_min"`
@@ -300,6 +310,7 @@ type UserSkinJourneyHistory struct {
 func (SkinCommunityGroup) TableName() string        { return "skin_community_groups" }
 func (SkinCommunityPost) TableName() string         { return "skin_community_posts" }
 func (SkinCommunityComment) TableName() string      { return "skin_community_comments" }
+func (SkinCommunityLike) TableName() string         { return "skin_community_likes" } // BUG-13
 func (SkinJourneyProgram) TableName() string        { return "skin_journey_programs" }
 func (SkinJourneyPhase) TableName() string          { return "skin_journey_phases" }
 func (SkinJourneyBenefit) TableName() string        { return "skin_journey_benefits" }

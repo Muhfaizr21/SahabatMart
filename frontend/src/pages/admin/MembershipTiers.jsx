@@ -28,7 +28,6 @@ export default function MembershipTiers() {
   const EMPTY = {
     name: '',
     level: 1,
-    base_commission_rate: 0.1,
     min_active_mitra: 0,
     min_monthly_turnover: 0,
     min_total_transactions: 0,
@@ -44,7 +43,7 @@ export default function MembershipTiers() {
     name: '',
     description: '',
     is_active: true,
-    levels: [{ level: 1, rate: 0.1 }]
+    levels: [{ level: 1, rate: 10 }]
   };
 
   const load = () => {
@@ -78,7 +77,6 @@ export default function MembershipTiers() {
     const payload = {
         ...modal,
         level: parseInt(modal.level),
-        base_commission_rate: parseFloat(modal.base_commission_rate),
         min_active_mitra: parseInt(modal.min_active_mitra),
         min_monthly_turnover: parseFloat(modal.min_monthly_turnover),
         min_total_transactions: parseInt(modal.min_total_transactions),
@@ -137,7 +135,7 @@ export default function MembershipTiers() {
   const addPresetLevel = () => {
     setPresetModal(p => ({
       ...p,
-      levels: [...p.levels, { level: p.levels.length + 1, rate: 0.05 }]
+      levels: [...p.levels, { level: p.levels.length + 1, rate: 5 }]
     }));
   };
 
@@ -179,13 +177,16 @@ export default function MembershipTiers() {
 
   const openTierPresetModal = (existing = null) => {
     if (existing) {
-      setTierPresetModal(existing);
+      setTierPresetModal({
+        ...existing,
+        tiers: (existing.tiers || []).map(t => ({ ...t, commission_rate: +(t.commission_rate * 100).toFixed(2) }))
+      });
       return;
     }
     // create default item for every tier
     const defaultTiers = tiers.map(t => ({
       membership_tier_id: t.id,
-      commission_rate: t.base_commission_rate || 0.1
+      commission_rate: 10
     }));
     setTierPresetModal({
       name: '',
@@ -275,12 +276,12 @@ export default function MembershipTiers() {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
               <thead>
                 <tr>
-                  {['Jenjang & Level', 'Syarat Upgrade', 'Komisi Dasar', 'Warna/Ikon', 'Status', 'Opsi'].map((h, i) => (
+                  {['Jenjang & Level', 'Syarat Upgrade', 'Warna/Ikon', 'Status', 'Opsi'].map((h, i) => (
                     <th key={h} style={{ 
                       ...A.th, 
-                      textAlign: i === 5 ? 'right' : 'left', 
+                      textAlign: i === 4 ? 'right' : 'left', 
                       paddingLeft: i === 0 ? 24 : 16, 
-                      paddingRight: i === 5 ? 24 : 16 
+                      paddingRight: i === 4 ? 24 : 16 
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -326,14 +327,6 @@ export default function MembershipTiers() {
                            {tier.min_performance_points > 0 && <span>• {tier.min_performance_points} Pts</span>}
                         </div>
                       </div>
-                    </td>
-                    <td style={A.td}>
-                      <span style={{ 
-                          padding: '4px 8px', borderRadius: 6, background: '#f0fdf4', 
-                          color: '#16a34a', fontWeight: 700, fontSize: 12 
-                      }}>
-                        {(tier.base_commission_rate * 100).toFixed(1)}%
-                      </span>
                     </td>
                     <td style={A.td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -426,7 +419,16 @@ export default function MembershipTiers() {
                       </td>
                       <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6 }}>
-                          <button style={A.iconBtn('#6366f1', '#eef2ff')} onClick={() => setPresetModal({ ...preset })} title="Edit"><i className="bx bx-pencil" /></button>
+                          <button 
+                            style={A.iconBtn('#6366f1', '#eef2ff')} 
+                            onClick={() => setPresetModal({ 
+                              ...preset, 
+                              levels: (preset.levels || []).map(l => ({ ...l, rate: +(l.rate * 100).toFixed(2) })) 
+                            })} 
+                            title="Edit"
+                          >
+                            <i className="bx bx-pencil" />
+                          </button>
                           <button style={A.iconBtn('#ef4444', '#fff1f2')} onClick={() => delPreset(preset.id)} title="Hapus"><i className="bx bx-trash" /></button>
                         </div>
                       </td>
@@ -523,11 +525,6 @@ export default function MembershipTiers() {
                 <input type="number" style={{ ...A.select, width: '100%' }} value={modal.level} onChange={e => setModal({...modal, level: e.target.value})} required />
               </div>
               
-              <div>
-                <FieldLabel>Komisi Dasar (%)</FieldLabel>
-                <input type="number" step="0.01" style={{ ...A.select, width: '100%' }} value={modal.base_commission_rate} onChange={e => setModal({...modal, base_commission_rate: e.target.value})} required />
-              </div>
-
               <div>
                 <FieldLabel>Min. Mitra Aktif</FieldLabel>
                 <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_active_mitra} onChange={e => setModal({...modal, min_active_mitra: e.target.value})} required />
@@ -627,8 +624,8 @@ export default function MembershipTiers() {
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 60, fontWeight: 700, color: '#475569', fontSize: 13 }}>Level {idx + 1}</div>
                         <input 
-                          type="number" step="0.01" style={{ ...A.select, flex: 1 }} 
-                          placeholder="Rate (contoh: 0.10 untuk 10%)" 
+                          type="number" step="0.1" style={{ ...A.select, flex: 1 }} 
+                          placeholder="Rate (%)" 
                           value={lvl.rate} 
                           onChange={e => updatePresetLevel(idx, e.target.value)} 
                           required 
@@ -691,8 +688,8 @@ export default function MembershipTiers() {
                             {tierObj ? tierObj.name : 'Unknown Tier'}
                           </div>
                           <input 
-                            type="number" step="0.01" style={{ ...A.select, flex: 1 }} 
-                            placeholder="Rate (contoh: 0.10 untuk 10%)" 
+                            type="number" step="0.1" style={{ ...A.select, flex: 1 }} 
+                            placeholder="Rate (%)" 
                             value={tItem.commission_rate} 
                             onChange={e => updateTierPresetRate(tItem.membership_tier_id, e.target.value)} 
                             required 

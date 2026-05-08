@@ -16,6 +16,7 @@ export default function AffiliateStatus() {
   const [tiers, setTiers] = useState([]);
   const [eligibility, setEligibility] = useState(null);
   const [stats, setStats] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -24,15 +25,19 @@ export default function AffiliateStatus() {
     const load = async () => {
       setLoading(true);
       try {
-        const [tierData, elig, teamStats] = await Promise.all([
+        const [tierData, elig, teamStats, profData] = await Promise.all([
           fetch(`${API_BASE}/api/public/membership-tiers`).then(r => r.ok ? r.json() : []),
           fetchJson(`${AFFILIATE_API_BASE}/merchant-eligibility`).catch(() => null),
           fetchJson(`${AFFILIATE_API_BASE}/team-stats`).catch(() => null),
+          fetchJson(`${AFFILIATE_API_BASE}/profile`).catch(() => null),
         ]);
         
         setTiers(Array.isArray(tierData) ? tierData : []);
         setEligibility(elig);
         setStats(teamStats);
+        if (profData?.status === 'success') {
+          setProfile(profData.affiliate);
+        }
       } finally {
         setLoading(false);
       }
@@ -53,7 +58,7 @@ export default function AffiliateStatus() {
     }
   };
 
-  const currentTierName = user?.affiliate?.membership_tier?.name?.toLowerCase() || '';
+  const currentTierName = profile?.tier?.name?.toLowerCase() || user?.affiliate?.membership_tier?.name?.toLowerCase() || '';
   const currentTierIdx = tiers.findIndex(t => t.name?.toLowerCase() === currentTierName);
   const currentTier = tiers[currentTierIdx >= 0 ? currentTierIdx : 0] || (tiers.length > 0 ? tiers[0] : { name: 'Mitra Dasar', level: 1 });
   const nextTier = (currentTierIdx >= 0 && currentTierIdx + 1 < tiers.length) ? tiers[currentTierIdx + 1] : null;
@@ -61,7 +66,7 @@ export default function AffiliateStatus() {
   const activeMitra = eligibility?.active_mitra || 0;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
   const isEligibleMerchant = eligibility?.is_eligible || false;
-  const refCode = user?.affiliate_ref_code || user?.affiliate?.ref_code || 'AG-REF';
+  const refCode = profile?.ref_code || user?.affiliate_ref_code || user?.affiliate?.ref_code || 'AG-REF';
   const totalDownlines = stats?.total_downlines || 0;
 
   return (

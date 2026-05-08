@@ -300,6 +300,7 @@ export default function CheckoutPage() {
             shipping_name: `${form.firstName} ${form.lastName}`,
             shipping_phone: form.phone,
             shipping_address: form.address,
+            shipping_district: form.district, // BUG-P3 fix: kecamatan wajib untuk ekspedisi
             shipping_city: form.city,
             shipping_province: form.province,
             shipping_postal_code: form.postalCode,
@@ -318,6 +319,7 @@ export default function CheckoutPage() {
                 return {
                   merchant_id: mId,
                   courier_code: sel?.courier_code || 'PICKUP',
+                  courier_service: sel?.courier_service || 'SELF', // field name backend pakai courier_service bukan service_code
                   service_code: sel?.courier_service || 'SELF',
                   shipping_cost: sel?.price || 0,
                   shipping_type: shippingType
@@ -568,7 +570,14 @@ export default function CheckoutPage() {
                       onClick={() => {
                         setShippingType('pickup');
                         setShippingCost(0);
-                        setSelectedShipping({ courier_code: 'PICKUP', courier_name: 'AMBIL DI TOKO', courier_service: 'SELF' });
+                        // BUG-P1 fix: nama state adalah setSelectedShippings (plural), bukan setSelectedShipping
+                        const pickupMethod = { courier_code: 'PICKUP', courier_name: 'AMBIL DI TOKO', courier_service: 'SELF', price: 0 };
+                        const pickupMap = {};
+                        cart.items.forEach(i => {
+                          const mId = i.merchant_id || '00000000-0000-0000-0000-000000000000';
+                          pickupMap[mId] = pickupMethod;
+                        });
+                        setSelectedShippings(pickupMap);
                       }}
                       className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${shippingType === 'pickup' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
                     >Ambil di Toko</button>

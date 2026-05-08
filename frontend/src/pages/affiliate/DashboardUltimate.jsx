@@ -122,8 +122,8 @@ export default function AffiliateDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard icon="ads_click" label="Klik" value={formatNum(stats.total_clicks)} sub="Total klik link Anda" color="#ddb7ff" />
           <StatCard icon="shopping_cart" label="Order" value={formatNum(stats.total_orders)} sub={`${stats.total_orders_pending || 0} menunggu bayar`} color="#fabc4e" />
-          <StatCard icon="payments" label="Saldo Aktif" value={formatRp(stats.balance)} sub={`Pending: ${formatRp(stats.pending_commission)}`} color="#4ade80" />
-          <StatCard icon="groups" label="Tim Aktif" value={formatNum(stats.total_downline)} sub={`${activeMitraCount} aktif bulan ini`} color="#f43f5e" />
+          <StatCard icon="payments" label="Komisi Aktif" value={formatRp(stats.balance)} sub={`Pending: ${formatRp(stats.pending_commission)}`} color="#4ade80" />
+          <StatCard icon="groups" label="Total Tim" value={formatNum(stats.total_downline)} sub={`${activeMitraCount} aktif bulan ini`} color="#f43f5e" />
         </div>
 
         {/* Join Team Section (Only if no upline) */}

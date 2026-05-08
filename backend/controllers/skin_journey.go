@@ -107,7 +107,7 @@ func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) 
 
 	// [Point 2] Clear all previous progress logs to ensure a truly fresh start
 	sc.DB.Exec("DELETE FROM skin_step_logs WHERE user_id = ?", userID)
-	sc.DB.Exec("DELETE FROM skin_progresses WHERE user_id = ?", userID)
+	sc.DB.Exec("DELETE FROM skin_progress_logs WHERE user_id = ?", userID) // BUG-07 fix: nama tabel benar
 
 	utils.JSONResponse(w, http.StatusOK, pretest)
 }
@@ -156,6 +156,8 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		LastPhoto         string                            `json:"last_photo,omitempty"`
 		ConsistencyScore  int                               `json:"consistency_score"`
 		UserName          string                            `json:"user_name"`
+		StartedAt         *time.Time                        `json:"started_at,omitempty"` // BUG-01 fix
+		SkinProfileJSON   string                            `json:"skin_profile_json,omitempty"`
 	}
 
 	if pretest.ID != 0 {
@@ -183,10 +185,39 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		if userJourney.ProgramID != 0 {
 			results.Program = &userJourney.Program
 		}
-		results.IsCompleted = userJourney.IsCompleted // Sync status
-		
+		results.IsCompleted = userJourney.IsCompleted
+		results.SkinProfileJSON = userJourney.SkinProfileJSON
+		// BUG-01: expose started_at in response
+		if !userJourney.StartedAt.IsZero() {
+			t := userJourney.StartedAt
+			results.StartedAt = &t
+		}
 		// Fetch Routines for this program
 		sc.DB.Preload("Step").Where("program_id = ?", userJourney.ProgramID).Find(&results.Routines)
+
+		// [Akuglow Sync] Fallback: If legacy Routines are empty, generate them from ProductSteps (Flow 3 & 4)
+		if len(results.Routines) == 0 {
+			var productSteps []models.SkinJourneyProductStep
+			sc.DB.Preload("Product").Where("program_id = ?", userJourney.ProgramID).Order("step_number asc").Find(&productSteps)
+			
+			for _, ps := range productSteps {
+				// Map Phase to Routine structure (Legacy logic uses TimeOfDay)
+				results.Routines = append(results.Routines, models.SkinJourneyRoutine{
+					ID:           ps.ID, // Important for MarkStepComplete
+					ProgramID:    ps.ProgramID,
+					Instructions: ps.Purpose,
+					TimeOfDay:    ps.Phase,
+					ProductID:    ps.ProductID,
+					Product:      ps.Product,
+					Step: models.SkinJourneyStep{
+						ID:          ps.ID,
+						Name:        ps.StepName,
+						Icon:        "spa", // Default icon for product steps
+						Description: ps.Purpose,
+					},
+				})
+			}
+		}
 	}
 	
 	// Fetch Product Recommendations based on skin type and concern from PreTest
@@ -394,38 +425,34 @@ func (sc *SkinController) PostWeeklyProgress(w http.ResponseWriter, r *http.Requ
 	userID, _ := r.Context().Value("user_id").(string)
 	progress.UserID = userID
 
-	// Auto-hitung week_number berdasarkan tanggal pre-test
-	var pretest models.SkinPreTest
-	if err := sc.DB.Where("user_id = ?", userID).First(&pretest).Error; err == nil {
-		daysSinceStart := int(time.Since(pretest.CreatedAt).Hours() / 24)
+	// BUG-02 fix: hitung week dari UserSkinJourney.StartedAt (lebih akurat dari pretest)
+	var userJourneyForWeek models.UserSkinJourney
+	if err := sc.DB.Where("user_id = ?", userID).First(&userJourneyForWeek).Error; err == nil && !userJourneyForWeek.StartedAt.IsZero() {
+		daysSinceStart := int(time.Since(userJourneyForWeek.StartedAt).Hours() / 24)
 		progress.WeekNumber = (daysSinceStart / 7) + 1
 	} else {
-		// Fallback: lanjut dari log terakhir
-		var lastLog models.SkinProgress
-		sc.DB.Where("user_id = ?", userID).Order("week_number desc").First(&lastLog)
-		progress.WeekNumber = lastLog.WeekNumber + 1
-		if (progress.WeekNumber < 1) { progress.WeekNumber = 1 }
+		// Fallback ke pretest
+		var pretest models.SkinPreTest
+		if err := sc.DB.Where("user_id = ?", userID).First(&pretest).Error; err == nil {
+			daysSinceStart := int(time.Since(pretest.CreatedAt).Hours() / 24)
+			progress.WeekNumber = (daysSinceStart / 7) + 1
+		} else {
+			var lastLog models.SkinProgress
+			sc.DB.Where("user_id = ?", userID).Order("week_number desc").First(&lastLog)
+			progress.WeekNumber = lastLog.WeekNumber + 1
+			if progress.WeekNumber < 1 { progress.WeekNumber = 1 }
+		}
 	}
 
-	// --- FOR TESTING: Auto-increment week if already uploaded today ---
-	var countToday int64
-	sc.DB.Model(&models.SkinProgress{}).Where("user_id = ? AND created_at >= ?", userID, time.Now().Truncate(24*time.Hour)).Count(&countToday)
-	if countToday > 0 {
-		progress.WeekNumber += int(countToday)
-	}
-	// ------------------------------------------------------------------
-
-	/* --- TEMPORARILY DISABLED FOR TESTING ---
+	// BUG-02 fix: Weekly lock — cegah upload > 1x per minggu
 	var existingThisWeek models.SkinProgress
-	err := sc.DB.Where("user_id = ? AND week_number = ?", userID, progress.WeekNumber).First(&existingThisWeek).Error
-	if err == nil {
+	if err := sc.DB.Where("user_id = ? AND week_number = ?", userID, progress.WeekNumber).First(&existingThisWeek).Error; err == nil {
 		utils.JSONError(w, http.StatusConflict, fmt.Sprintf(
 			"Kamu sudah upload progres minggu ke-%d! Tunggu minggu depan ya 💪",
 			progress.WeekNumber,
 		))
 		return
 	}
-	*/
 
 	if err := sc.DB.Create(&progress).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Failed to save progress: "+err.Error())
@@ -805,8 +832,31 @@ func (sc *SkinController) DeleteCommunityComment(w http.ResponseWriter, r *http.
 
 func (sc *SkinController) LikeCommunityPost(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
+	userID, _ := r.Context().Value("user_id").(string)
+	if userID == "" {
+		claims, _ := utils.ParseJWT(r.Header.Get("Authorization"))
+		if claims != nil { userID = claims.UserID }
+	}
+
+	// BUG-13 fix: cegah like berkali-kali dari user yang sama
+	var existing models.SkinCommunityLike
+	err := sc.DB.Where("post_id = ? AND user_id = ?", id, userID).First(&existing).Error
+	if err == nil {
+		// Sudah like sebelumnya — unlike
+		sc.DB.Delete(&existing)
+		sc.DB.Model(&models.SkinCommunityPost{}).Where("id = ?", id).Update("likes", gorm.Expr("GREATEST(likes - 1, 0)"))
+		utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "unliked"})
+		return
+	}
+	sc.DB.Create(&models.SkinCommunityLike{PostID: parseUint(id), UserID: userID})
 	sc.DB.Model(&models.SkinCommunityPost{}).Where("id = ?", id).Update("likes", gorm.Expr("likes + 1"))
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "liked"})
+}
+
+func parseUint(s string) uint {
+	var v uint
+	fmt.Sscanf(s, "%d", &v)
+	return v
 }
 
 // UploadCommunityImage - Menangani upload gambar dari lokal
@@ -824,12 +874,20 @@ func (sc *SkinController) UploadCommunityImage(w http.ResponseWriter, r *http.Re
 	}
 	defer file.Close()
 
-	// Buat nama file unik (WebP dari Frontend)
+	// BUG-05 fix: pastikan direktori upload ada
+	if err := os.MkdirAll("uploads/community", 0755); err != nil {
+		log.Printf("❌ [Community] Gagal membuat direktori uploads/community: %v", err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyiapkan direktori upload")
+		return
+	}
+
+	// Buat nama file unik
 	fileName := fmt.Sprintf("%d-%s", time.Now().Unix(), handler.Filename)
 	filePath := "uploads/community/" + fileName
 
 	dst, err := os.Create(filePath)
 	if err != nil {
+		log.Printf("❌ [Community] Gagal membuat file %s: %v", filePath, err)
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan file di server")
 		return
 	}
@@ -841,7 +899,9 @@ func (sc *SkinController) UploadCommunityImage(w http.ResponseWriter, r *http.Re
 	}
 
 	// Return URL absolut agar frontend bisa akses
-	url := fmt.Sprintf("/uploads/community/%s", fileName)
+	baseURL := os.Getenv("APP_URL")
+	if baseURL == "" { baseURL = os.Getenv("BASE_URL") }
+	url := fmt.Sprintf("%s/uploads/community/%s", strings.TrimRight(baseURL, "/"), fileName)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"url": url})
 }
 
@@ -918,25 +978,34 @@ func (sc *SkinController) FinishJourney(w http.ResponseWriter, r *http.Request) 
 	var warrior models.SkinWarriorLevel
 	sc.DB.Where("user_id = ?", userID).First(&warrior)
 
-	history := models.UserSkinJourneyHistory{
-		UserID:          userID,
-		ProgramID:       userJourney.ProgramID,
-		ProgramName:     userJourney.Program.Name,
-		StartedAt:       userJourney.StartedAt,
-		FinishedAt:      time.Now(),
-		DayCount:        int(time.Since(userJourney.StartedAt).Hours()/24) + 1,
-		FinalRank:       warrior.LevelName,
-		SkinProfileJSON: userJourney.SkinProfileJSON,
+	// BUG-08 fix: cek duplikat history (program_id + started_at yang sama)
+	var existingHistory models.UserSkinJourneyHistory
+	duplicateCheck := sc.DB.Where("user_id = ? AND program_id = ? AND started_at = ?",
+		userID, userJourney.ProgramID, userJourney.StartedAt).First(&existingHistory)
+	if duplicateCheck.Error == nil {
+		// History sudah ada — jangan duplikat
+		log.Printf("⚠️ [FinishJourney] History duplikat ditemukan untuk user %s program %d, skip create", userID, userJourney.ProgramID)
+	} else {
+		history := models.UserSkinJourneyHistory{
+			UserID:          userID,
+			ProgramID:       userJourney.ProgramID,
+			ProgramName:     userJourney.Program.Name,
+			StartedAt:       userJourney.StartedAt,
+			FinishedAt:      time.Now(),
+			DayCount:        int(time.Since(userJourney.StartedAt).Hours()/24) + 1,
+			FinalRank:       warrior.LevelName,
+			SkinProfileJSON: userJourney.SkinProfileJSON,
+		}
+		var totalSteps, completedSteps int64
+		sc.DB.Model(&models.SkinJourneyRoutine{}).Where("program_id = ?", userJourney.ProgramID).Count(&totalSteps)
+		expectedTotalSteps := int64(history.DayCount) * totalSteps
+		sc.DB.Model(&models.SkinStepLog{}).Where("user_id = ? AND created_at >= ?", userID, userJourney.StartedAt).Count(&completedSteps)
+		if expectedTotalSteps > 0 {
+			history.ConsistencyScore = int((float64(completedSteps) / float64(expectedTotalSteps)) * 100)
+			if history.ConsistencyScore > 100 { history.ConsistencyScore = 100 }
+		}
+		sc.DB.Create(&history)
 	}
-	var totalSteps, completedSteps int64
-	sc.DB.Model(&models.SkinJourneyRoutine{}).Where("program_id = ?", userJourney.ProgramID).Count(&totalSteps)
-	expectedTotalSteps := int64(history.DayCount) * totalSteps
-	sc.DB.Model(&models.SkinStepLog{}).Where("user_id = ? AND created_at >= ?", userID, userJourney.StartedAt).Count(&completedSteps)
-	if expectedTotalSteps > 0 {
-		history.ConsistencyScore = int((float64(completedSteps) / float64(expectedTotalSteps)) * 100)
-		if history.ConsistencyScore > 100 { history.ConsistencyScore = 100 }
-	}
-	sc.DB.Create(&history)
 	sc.DB.Model(&warrior).Update("experience", warrior.Experience+500)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{

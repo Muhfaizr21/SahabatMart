@@ -60,6 +60,8 @@ import CouponPage from './pages/CouponPage';
 import InvoicePage from './pages/InvoicePage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
+import BusinessOpportunity from './pages/BusinessOpportunity';
+
 
 // New Components for AkuGlow Home Look
 import StatsSection from './components/StatsSection';
@@ -79,6 +81,8 @@ import AdminMerchants from './pages/admin/Merchants';
 import AdminAffiliates from './pages/admin/Affiliates';
 import AdminModeration from './pages/admin/Moderation';
 import AdminFinance from './pages/admin/Finance';
+import AdminDataSavingDetail from './pages/admin/DataSavingDetail';
+import AdminProfitShareDetail from './pages/admin/ProfitShareDetail';
 import AdminCommissions from './pages/admin/Commissions';
 import AdminPayouts from './pages/admin/Payouts';
 import AdminSettings from './pages/admin/Settings';
@@ -223,7 +227,7 @@ function AppContent() {
   const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
 
   return (
-    <div className={`min-h-screen flex flex-col ${isPanel ? 'bg-[#0c1324]' : 'bg-[#111827]'}`}>
+    <div className={`min-h-screen flex flex-col ${isPanel ? 'bg-slate-50' : 'bg-[#111827]'}`}>
       <ScrollToTop />
       <Toaster position="top-right" reverseOrder={false} />
       <NavbarManager />
@@ -251,6 +255,8 @@ function AppContent() {
           <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-conditions" element={<TermsConditions />} />
+          <Route path="/peluang-bisnis" element={<BusinessOpportunity />} />
+
 
           {/* Akuglow Skin Journey */}
           {/* [Redirects for Legacy Skin Paths] */}
@@ -275,6 +281,8 @@ function AppContent() {
             <Route path="merchants/restock" element={<AdminRestock />} />
             <Route path="moderation" element={<AdminModeration />} />
             <Route path="finance" element={<AdminFinance />} />
+            <Route path="finance/data-saving" element={<AdminDataSavingDetail />} />
+            <Route path="finance/profit-share" element={<AdminProfitShareDetail />} />
             <Route path="commissions" element={<AdminCommissions />} />
             <Route path="payouts" element={<AdminPayouts />} />
             <Route path="brands" element={<AdminBrands />} />

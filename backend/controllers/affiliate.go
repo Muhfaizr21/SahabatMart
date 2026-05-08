@@ -87,9 +87,8 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 	ac.DB.Model(&models.Order{}).Where("affiliate_id = ? AND status NOT IN ('cancelled', 'expired')", affiliateID).Count(&totalOrders)
 	ac.DB.Model(&models.Order{}).Where("affiliate_id = ? AND status = 'pending_payment'", affiliateID).Count(&pendingOrders)
 
-	// 5. Total Downline (Semua, bukan cuma yang aktif)
-	var totalDownline int64
-	ac.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&totalDownline)
+	// 5. Total Downline (Seluruh Kedalaman Jaringan)
+	totalDownline, _, _ := ac.Service.GetTeamStats(affiliateID)
 
 	// 6. Data Grafik Bulanan (6 bulan terakhir)
 	type MonthlyData struct {
@@ -397,80 +396,7 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get affiliate member for bank info & balance
-	var affiliate models.AffiliateMember
-	if err := ac.DB.Preload("Tier").Where("id = ?", affiliateID).First(&affiliate).Error; err != nil {
-		utils.JSONError(w, http.StatusNotFound, "Affiliate tidak ditemukan")
-		return
-	}
-
-	// [CRITICAL FIX] Prevent withdrawal spam
-	var existingPending int64
-	ac.DB.Model(&models.AffiliateWithdrawal{}).
-		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
-		Count(&existingPending)
-	if existingPending > 0 {
-		utils.JSONError(w, http.StatusTooManyRequests, "Anda masih memiliki pengajuan penarikan yang sedang diproses.")
-		return
-	}
-
-	// Validate bank info
-	if affiliate.BankName == "" || affiliate.BankAccountNumber == "" {
-		utils.JSONError(w, http.StatusBadRequest, "Harap lengkapi informasi rekening bank di pengaturan terlebih dahulu")
-		return
-	}
-
-	// Minimum withdrawal amount (from config, tier or default 50000)
-	configSvc := services.NewConfigService(ac.DB)
-	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
-	if affiliate.Tier != nil && affiliate.Tier.MinWithdrawalAmount > 0 {
-		if affiliate.Tier.MinWithdrawalAmount > minWithdrawal {
-			minWithdrawal = affiliate.Tier.MinWithdrawalAmount
-		}
-	}
-
-	if req.Amount < minWithdrawal {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Minimum penarikan adalah Rp %.0f", minWithdrawal))
-		return
-	}
-
-	// [CRITICAL FIX] Use Wallet for balance check & deduction
-	financeSvc := services.NewFinanceService(ac.DB)
-	var wd models.AffiliateWithdrawal
-	
-	err := ac.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Get Wallet with Lock
-		wallet, err := financeSvc.GetWallet(affiliate.UserID, models.WalletAffiliate)
-		if err != nil {
-			return fmt.Errorf("gagal mendapatkan data dompet")
-		}
-
-		if wallet.Balance < req.Amount {
-			return fmt.Errorf("saldo tidak mencukupi. Saldo tersedia: Rp %.0f", wallet.Balance)
-		}
-
-		// 2. Create withdrawal record
-		wd = models.AffiliateWithdrawal{
-			AffiliateID:       affiliateID,
-			Amount:            req.Amount,
-			BankName:          affiliate.BankName,
-			BankAccountNumber: affiliate.BankAccountNumber,
-			BankAccountName:   affiliate.BankAccountName,
-			Status:            "pending",
-		}
-		if err := tx.Create(&wd).Error; err != nil {
-			return err
-		}
-
-		// 3. Deduct from wallet immediately (Request phase)
-		desc := fmt.Sprintf("Permintaan Penarikan: %s", wd.ID)
-		if err := financeSvc.ProcessTransaction(tx, affiliate.UserID, models.WalletAffiliate, models.TxWithdrawalRequest, -req.Amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
-			return err
-		}
-
-		return nil
-	})
-
+	wd, err := ac.Service.RequestWithdrawal(affiliateID, req.Amount)
 	if err != nil {
 		utils.JSONError(w, http.StatusBadRequest, err.Error())
 		return
@@ -478,10 +404,13 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 
 	// Notify admin
 	notifSvc := services.NewNotificationService(ac.DB)
-	var aff models.User
-	ac.DB.Select("email").Where("id = ?", affiliate.UserID).First(&aff)
-	msg := fmt.Sprintf("Affiliate '%s' mengajukan penarikan komisi sebesar Rp %.0f.", affiliate.BankAccountName, req.Amount)
-	notifSvc.Push("", "admin", "affiliate_withdrawal_request", "Permintaan Penarikan Afiliasi", msg, "/admin/affiliates")
+	var affMember models.AffiliateMember
+	if err := ac.DB.First(&affMember, "id = ?", affiliateID).Error; err == nil {
+		var affUser models.User
+		ac.DB.Select("email").Where("id = ?", affMember.UserID).First(&affUser)
+		msg := fmt.Sprintf("Affiliate '%s' mengajukan penarikan komisi sebesar Rp %.0f.", affMember.BankAccountName, req.Amount)
+		notifSvc.Push("", "admin", "affiliate_withdrawal_request", "Permintaan Penarikan Afiliasi", msg, "/admin/affiliates")
+	}
 
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"status":  "success",
@@ -526,6 +455,7 @@ func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Requ
 
 	var req struct {
 		FullName          string `json:"full_name"`
+		AvatarUrl         string `json:"avatar_url"`
 		BankName          string `json:"bank_name"`
 		BankAccountNumber string `json:"bank_account_number"`
 		BankAccountName   string `json:"bank_account_name"`
@@ -536,10 +466,19 @@ func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Update user_profiles (nama + foto)
+	profileUpdates := map[string]interface{}{}
 	if req.FullName != "" {
-		ac.DB.Table("user_profiles").Where("user_id = ?", userID).Update("full_name", req.FullName)
+		profileUpdates["full_name"] = req.FullName
+	}
+	if req.AvatarUrl != "" {
+		profileUpdates["avatar_url"] = req.AvatarUrl
+	}
+	if len(profileUpdates) > 0 {
+		ac.DB.Table("user_profiles").Where("user_id = ?", userID).Updates(profileUpdates)
 	}
 
+	// Update affiliate_members (data bank & postback)
 	updates := map[string]interface{}{}
 	if req.BankName != "" {
 		updates["bank_name"] = req.BankName
@@ -590,6 +529,7 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		Turnover     float64   `json:"turnover"`
 		Level        int       `json:"level"`
 		ReferrerName string    `json:"referrer_name"`
+		AvatarUrl    string    `json:"avatar_url"`
 	}
 	var downlines []DownlineRow
 	
@@ -599,7 +539,7 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 	ac.DB.Raw(`
 		WITH RECURSIVE team AS (
 			-- Anchor: Direct downlines (Level 1)
-			SELECT am.id, am.user_id, am.upline_id, up.full_name, am.status, am.created_at, 
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
 			       1 as level, CAST('Anda' AS VARCHAR(150)) as referrer_name
 			FROM affiliate_members am
 			LEFT JOIN user_profiles up ON up.user_id = am.user_id
@@ -608,20 +548,20 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 			UNION ALL
 			
 			-- Recursive member: Indirect downlines (Level 2+)
-			SELECT am.id, am.user_id, am.upline_id, up.full_name, am.status, am.created_at, 
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
 			       t.level + 1, CAST(t.full_name AS VARCHAR(150)) as referrer_name
 			FROM affiliate_members am
 			LEFT JOIN user_profiles up ON up.user_id = am.user_id
 			JOIN team t ON am.upline_id = t.id
 			WHERE t.level < 10 
 		)
-		SELECT t.user_id, t.full_name, t.status, t.created_at as joined_at,
+		SELECT t.user_id, t.full_name, t.avatar_url, t.status, t.created_at as joined_at,
 		       t.level, t.referrer_name,
 		       COALESCE(SUM(o.subtotal), 0) as turnover
 		FROM team t
 		LEFT JOIN orders o ON o.affiliate_id = t.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
 		WHERE t.full_name ILIKE ? OR t.user_id::text ILIKE ?
-		GROUP BY t.user_id, t.full_name, t.status, t.created_at, t.level, t.referrer_name
+		GROUP BY t.user_id, t.full_name, t.avatar_url, t.status, t.created_at, t.level, t.referrer_name
 		ORDER BY t.level ASC, t.created_at DESC
 		LIMIT ? OFFSET ?
 	`, affiliateID, searchQuery, searchQuery, limit, offset).Scan(&downlines)

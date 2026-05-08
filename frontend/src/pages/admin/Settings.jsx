@@ -8,7 +8,7 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_maintenance',    value: 'false',            description: 'Mode Pemeliharaan',           group: 'platform',  type: 'bool' },
   { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
   { key: 'default_platform_fee',    value: '5',                description: 'Fee Layanan Merchant (Platform Fee) (%)',   group: 'platform',  type: 'number' },
-  { key: 'default_affiliate_commission', value: '10',          description: 'Komisi Afiliasi Default (%)',               group: 'platform',  type: 'number' },
+  { key: 'default_affiliate_commission', value: '10',          description: 'Komisi Mitra Default (%)',               group: 'platform',  type: 'number' },
   { key: 'platform_currency',       value: 'IDR',              description: 'Mata Uang',                  group: 'platform',  type: 'text' },
   { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
   { key: 'merchant_min_active_mitra',  value: '100',          description: 'Min. Mitra Aktif (Merchant)', group: 'platform',  type: 'number' },

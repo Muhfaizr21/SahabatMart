@@ -9,11 +9,13 @@ export default function BlogDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch main blog detail
+    // Fetch main blog detail — backend expects ?slug=... param
     setLoading(true);
     fetchJson(`${PUBLIC_API_BASE}/blogs/detail?slug=${id}`)
       .then(d => {
-        if (d) setBlog(d);
+        // BUG-06 fix: handle both wrapped ({data: blog}) and unwrapped responses
+        const blog = d?.data || d;
+        if (blog) setBlog(blog);
       })
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
@@ -21,8 +23,9 @@ export default function BlogDetailPage() {
     // Fetch latest posts for sidebar
     fetchJson(`${PUBLIC_API_BASE}/blogs`)
       .then(d => {
-        const posts = d || [];
-        setLatestPosts(posts.filter(p => (p.slug || p.id) !== id).slice(0, 5));
+        const posts = Array.isArray(d) ? d : (d?.data || []);
+        // BUG-06 fix: filter by slug (same type as URL param id), fallback to string id
+        setLatestPosts(posts.filter(p => (p.slug || String(p.id)) !== id).slice(0, 5));
       })
       .catch(err => console.error(err));
   }, [id]);

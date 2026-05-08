@@ -51,7 +51,7 @@ func ConnectDB() {
 		&models.AffiliateTurnoverSnapshot{}, &models.LeaderboardCache{},
 		// Akuglow Skin Journey
 		&models.SkinPreTest{}, &models.SkinProgress{}, &models.SkinJournal{}, &models.SkinWarriorLevel{},
-		&models.SkinEducation{}, &models.SkinCommunityGroup{}, &models.SkinCommunityPost{}, &models.SkinCommunityComment{},
+		&models.SkinEducation{}, &models.SkinCommunityGroup{}, &models.SkinCommunityPost{}, &models.SkinCommunityComment{}, &models.SkinCommunityLike{}, // BUG-13
 		&models.SkinJourneyProgram{}, &models.SkinJourneyStep{}, &models.SkinJourneyRoutine{},
 		&models.SkinJourneyProductMapping{}, &models.SkinJourneyAIConfig{}, &models.UserSkinJourney{},
 		&models.UserSkinJourneyHistory{}, &models.SkinStepLog{},
@@ -63,6 +63,8 @@ func ConnectDB() {
 		// Commission Preset System (Multi-Level)
 		&models.CommissionPreset{}, &models.CommissionPresetLevel{},
 		&models.TierCommissionPreset{}, &models.TierCommissionPresetItem{},
+		// Finance models
+		&models.FinanceRevenueAllocation{}, &models.FinancialLocation{}, &models.MoneyMutation{},
 	)
 	
 	// [Migration Fixes] Migrasi manual/one-time dipindahkan ke seeder jika diperlukan.
@@ -142,5 +144,4 @@ func main() {
 	log.Printf("🚀 Server running on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
-
 

@@ -41,14 +41,15 @@ export default function WishlistPage() {
   const moveToCart = async (p) => {
     setActing(p.id);
     try {
-      // Find the first variant ID, or fallback to product ID if no variants preloaded
-      const variantId = p.variants && p.variants.length > 0 ? p.variants[0].id : p.id;
+      // BUG-09 fix: jika tidak ada variants, kirim null bukan product_id sebagai variantId
+      // Backend akan handle sendiri (fallback ke default variant atau skip)
+      const variantId = (p.variants && p.variants.length > 0) ? p.variants[0].id : null;
       
       await fetchJson(`${BUYER_API_BASE}/cart/move-from-wishlist`, {
         method: 'POST',
         body: JSON.stringify({
           product_id: p.id,
-          product_variant_id: variantId,
+          product_variant_id: variantId, // null jika tidak ada variant
           quantity: 1
         })
       });

@@ -22,6 +22,7 @@ export default function AdminAffiliates() {
   const [tab, setTab]               = useState('members');
   const [loading, setLoading]       = useState(true);
   const [editTier, setEditTier]     = useState(null);
+  const [editMemberTier, setEditMemberTier] = useState(null);
   const [processWd, setProcessWd]   = useState(null);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState('');
@@ -79,6 +80,20 @@ export default function AdminAffiliates() {
       body: JSON.stringify({ id: processWd.id, action, note: processWd.note || '' }),
     }).then(() => { load(); setProcessWd(null); })
       .catch(console.error).finally(() => setSaving(false));
+  };
+
+  const saveMemberTier = () => {
+    if (!editMemberTier) return;
+    setSaving(true);
+    fetchJson(`${API}/affiliates/member/update-tier`, {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: editMemberTier.id,
+        membership_tier_id: parseInt(editMemberTier.new_tier_id)
+      }),
+    }).then(() => { load(); setEditMemberTier(null); })
+      .catch(err => alert(err.message || 'Gagal mengubah tier member'))
+      .finally(() => setSaving(false));
   };
 
   const pendingWd = withdrawals.filter(w => w.status === 'pending').length;
@@ -189,9 +204,18 @@ export default function AdminAffiliates() {
                       </td>
                       <td style={A.td}><span style={{ fontWeight: 700, color: '#f59e0b' }}>{idr(a.monthly_turnover || 0)}</span></td>
                       <td style={{ ...A.td, paddingRight: 24 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...(STATUS_BADGE[a.affiliate_status] || STATUS_BADGE['pending_verification']) }}>
-                          {a.affiliate_status || 'pending'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...(STATUS_BADGE[a.affiliate_status] || STATUS_BADGE['pending_verification']) }}>
+                            {a.affiliate_status || 'pending'}
+                          </span>
+                          <button 
+                            style={A.iconBtn('#6366f1', '#eef2ff')} 
+                            title="Ubah Tier Member"
+                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '' })}
+                          >
+                            <i className="bx bx-edit-alt" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -401,6 +425,47 @@ export default function AdminAffiliates() {
             <button style={{ ...A.btnPrimary, background: 'linear-gradient(135deg,#10b981,#059669)' }}
               onClick={() => processWithdrawal('approve')} disabled={saving}>
               {saving ? '...' : <><i className="bx bx-check-circle" /> Approve</>}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── MODAL: Edit Member Tier ─────────────────────────────── */}
+      {editMemberTier && (
+        <Modal title="Ubah Level Member" onClose={() => setEditMemberTier(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#f8fafc', borderRadius: 14, padding: '16px 20px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Member</div>
+              <div style={{ fontWeight: 700, color: '#0f172a' }}>{editMemberTier.full_name || editMemberTier.email}</div>
+              <div style={{ fontSize: 12, color: '#94a3b8' }}>Tier Saat Ini: <span style={{ color: '#6366f1', fontWeight: 700 }}>{editMemberTier.tier_name || 'Mitra Dasar'}</span></div>
+            </div>
+
+            <div>
+              <FieldLabel>Pilih Tier Baru</FieldLabel>
+              <select 
+                style={{ ...A.select, width: '100%' }}
+                value={editMemberTier.new_tier_id}
+                onChange={e => setEditMemberTier(p => ({ ...p, new_tier_id: e.target.value }))}
+              >
+                <option value="">-- Pilih Tier --</option>
+                {tiers.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} (Level {t.level})</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+                * Perubahan tier akan langsung mempengaruhi rate komisi member ini pada transaksi berikutnya.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
+            <button onClick={() => setEditMemberTier(null)} style={A.btnGhost}>Batal</button>
+            <button 
+              onClick={saveMemberTier} 
+              disabled={saving || !editMemberTier.new_tier_id} 
+              style={A.btnPrimary}
+            >
+              {saving ? '...' : <><i className="bx bx-save" /> Simpan Perubahan</>}
             </button>
           </div>
         </Modal>

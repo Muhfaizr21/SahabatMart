@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"SahabatMart/backend/models"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -39,8 +40,27 @@ func AutoSeedCriticalData(db *gorm.DB) {
 		}
 	}
 
-	// [Auto-Fix] Pastikan admin@akuglow.com selalu ACTIVE
-	db.Model(&models.User{}).Where("email = ?", "admin@akuglow.com").Update("status", "active")
+	// [Auto-Fix] Pastikan admin@akuglow.com selalu ada dan ACTIVE
+	var admin models.User
+	if err := db.Where("email = ?", "admin@akuglow.com").First(&admin).Error; err != nil {
+		password, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+		pwHash := string(password)
+		admin = models.User{
+			ID:           "00000000-0000-0000-0000-000000000000",
+			Email:        "admin@akuglow.com",
+			PasswordHash: &pwHash,
+			Role:         "superadmin",
+			Status:       "active",
+		}
+		db.Create(&admin)
+		db.Create(&models.UserProfile{
+			UserID:   admin.ID,
+			FullName: "Superadmin",
+		})
+		log.Println("✅ Akun admin@akuglow.com berhasil direkonstruksi.")
+	} else {
+		db.Model(&models.User{}).Where("email = ?", "admin@akuglow.com").Update("status", "active")
+	}
 
 	// [Logistics] Seed default couriers if empty
 	var logCount int64
@@ -73,4 +93,10 @@ func AutoSeedCriticalData(db *gorm.DB) {
 
 	// [Home Banners] Auto-seed slider
 	seedBanners(db)
+
+	// [Merchants] Auto-seed at least 1 merchant for testing
+	SeedMerchants(db)
+
+	// [Finance] We no longer auto-seed high-fidelity finance data here to avoid startup lag.
+	// Use 'go run cmd/seeder/main.go' for that.
 }

@@ -97,7 +97,7 @@ export default function AffiliateDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
            <StatCard icon="ads_click" label="Total Klik" value={formatNum(stats.total_clicks)} sub="Traffic ke link Anda" color="#ddb7ff" />
            <StatCard icon="shopping_cart" label="Total Order" value={formatNum(stats.total_orders)} sub="Konversi berhasil" color="#fabc4e" />
-           <StatCard icon="payments" label="Saldo Siap" value={formatRp(stats.balance)} sub="Siap ditarik" color="#4ade80" />
+           <StatCard icon="payments" label="Komisi Aktif" value={formatRp(stats.balance)} sub="Siap ditarik" color="#4ade80" />
            <StatCard icon="schedule" label="Pending" value={formatRp(stats.pending_commission)} sub="Menunggu verifikasi" color="#ffcc33" />
            <StatCard icon="account_balance_wallet" label="Ditarik" value={formatRp(stats.total_withdrawn)} sub="Total penarikan" color="#60a5fa" />
         </div>

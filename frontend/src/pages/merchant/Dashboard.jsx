@@ -122,9 +122,8 @@ export default function MerchantDashboard() {
 
       <StatRow stats={[
         { label: 'Total Penjualan Kotor', val: loading ? '...' : idr(stats.revenue), icon: 'bx-cart', color: '#6366f1' },
-        { label: 'Biaya Platform', val: loading ? '...' : idr(stats.platformFee), icon: 'bx-shield-quarter', color: '#f59e0b' },
-        { label: 'Komisi Afiliasi', val: loading ? '...' : idr(stats.commission), icon: 'bx-share-alt', color: '#ef4444' },
-        { label: 'Pendapatan Bersih', val: loading ? '...' : idr(stats.netRevenue), icon: 'bx-diamond', color: '#10b981' },
+        { label: 'Komisi Mitra', val: loading ? '...' : idr(stats.commission), icon: 'bx-share-alt', color: '#ef4444' },
+        { label: 'Komisi Merchant', val: loading ? '...' : idr(stats.netRevenue), icon: 'bx-diamond', color: '#10b981' },
       ]} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 24, paddingBottom: 40, alignItems: 'start' }}>
