@@ -151,9 +151,9 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 
 		// 3. Update Header with Totals
 		if err := tx.Model(req).Updates(map[string]interface{}{
-			"total_items":    totalQty,
-			"total_price":    0,
-			"payment_status": "paid", // Already 'paid' because it's non-billing movement
+			"total_items": totalQty,
+			"total_price": 0,
+			"is_paid":     true, // Already 'paid' because it's non-billing movement
 		}).Error; err != nil {
 			return err
 		}

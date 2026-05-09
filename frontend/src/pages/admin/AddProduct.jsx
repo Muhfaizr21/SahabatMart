@@ -13,6 +13,7 @@ export default function AdminAddProduct() {
   const [attrs, setAttrs] = useState([]);
   const [presets, setPresets] = useState([]);
   const [tierPresets, setTierPresets] = useState([]);
+  const [merchantPresets, setMerchantPresets] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -22,7 +23,8 @@ export default function AdminAddProduct() {
     base_affiliate_fee: 0, base_affiliate_fee_nominal: 0,
     base_distribution_fee: 0, base_distribution_fee_nominal: 0,
     commission_preset_id: null,
-    tier_commission_preset_id: null
+    tier_commission_preset_id: null,
+    merchant_commission_preset_id: null
   });
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
@@ -33,19 +35,22 @@ export default function AdminAddProduct() {
       fetchJson(`${API}/brands`),
       fetchJson(`${API}/attributes`),
       fetchJson(`${API}/commission-presets`),
-      fetchJson(`${API}/tier-commission-presets`)
-    ]).then(([c, b, a, prs, tprs]) => {
+      fetchJson(`${API}/tier-commission-presets`),
+      fetchJson(`${API}/merchant-commission-presets`)
+    ]).then(([c, b, a, prs, tprs, mprs]) => {
       const cats = Array.isArray(c) ? c : (c?.data || []);
       const brds = Array.isArray(b) ? b : (b?.data || []);
       const atts = Array.isArray(a) ? a : (a?.data || []);
       const pData = Array.isArray(prs) ? prs : (prs?.data || []);
       const tpData = Array.isArray(tprs) ? tprs : (tprs?.data || []);
+      const mData = Array.isArray(mprs) ? mprs : (mprs?.data || []);
 
       setCategories(cats);
       setBrands(brds);
       setAttrs(atts);
       setPresets(pData);
       setTierPresets(tpData);
+      setMerchantPresets(mData);
 
       if (cats.length > 0) setP(prev => ({ ...prev, category: cats[0].name }));
       if (brds.length > 0) setP(prev => ({ ...prev, brand: brds[0].name }));
@@ -421,6 +426,21 @@ export default function AdminAddProduct() {
                     ))}
                   </select>
                   <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Atur rate komisi berbeda untuk Reseller / Agen / VIP.</div>
+                </div>
+
+                <div>
+                  <FieldLabel>Merchant Commission Preset</FieldLabel>
+                  <select
+                    value={p.merchant_commission_preset_id || ''}
+                    onChange={e => setP(prev => ({ ...prev, merchant_commission_preset_id: e.target.value || null }))}
+                    style={{ ...A.select, borderColor: '#3b82f6', background: '#fff' }}
+                  >
+                    <option value="">-- Tanpa Preset (Manual %) --</option>
+                    {merchantPresets.filter(pr => pr.is_active).map(pr => (
+                      <option key={pr.id} value={pr.id}>{pr.name} ({(pr.merchant_commission_rate * 100).toFixed(1)}%)</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Gunakan preset untuk standarisasi komisi merchant.</div>
                 </div>
              </div>
           </div>

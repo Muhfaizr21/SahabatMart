@@ -31,3 +31,17 @@ type CommissionPresetLevel struct {
 
 func (CommissionPreset) TableName() string      { return "commission_presets" }
 func (CommissionPresetLevel) TableName() string { return "commission_preset_levels" }
+
+// MerchantCommissionPreset: Template komisi merchant per produk.
+// Memudahkan admin untuk set komisi merchant secara massal/preset.
+type MerchantCommissionPreset struct {
+	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	Name        string    `gorm:"type:varchar(100);not null;uniqueIndex" json:"name"`
+	Description string    `gorm:"type:text" json:"description"`
+	Rate        float64   `gorm:"type:decimal(6,4);not null" json:"rate"` // e.g. 0.10 = 10%
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (MerchantCommissionPreset) TableName() string { return "merchant_commission_presets" }

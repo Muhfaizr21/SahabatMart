@@ -7,8 +7,8 @@ import (
 	"net"
 	"net/http"
 	"regexp"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"SahabatMart/backend/models"
@@ -16,8 +16,8 @@ import (
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 
-	"gorm.io/gorm"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type AdminController struct {
@@ -96,9 +96,13 @@ func (ac *AdminController) GetUsers(w http.ResponseWriter, r *http.Request) {
 	search := r.URL.Query().Get("search")
 	sort := r.URL.Query().Get("sort")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page <= 0 { page = 1 }
+	if page <= 0 {
+		page = 1
+	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 { limit = 20 }
+	if limit <= 0 {
+		limit = 20
+	}
 	offset := (page - 1) * limit
 
 	baseQuery := ac.DB.Model(&models.User{}).Joins("JOIN user_profiles ON user_profiles.user_id = users.id")
@@ -128,11 +132,11 @@ func (ac *AdminController) GetUsers(w http.ResponseWriter, r *http.Request) {
 	} else if sort == "name" {
 		order = "user_profiles.full_name ASC"
 	}
- 
+
 	if order != "" {
 		query = query.Order(order)
 	}
-	
+
 	var users []models.User
 	err := query.Limit(limit).Offset(offset).Find(&users).Error
 	if err != nil {
@@ -178,16 +182,16 @@ func (ac *AdminController) fetchDownlineTree(uplineID string, currentLevel, maxL
 	}
 
 	type DownlineData struct {
-		ID        string    `json:"id"`
-		UserID    string    `json:"user_id"`
-		RefCode   string    `json:"ref_code"`
-		Status    string    `json:"status"`
-		FullName  string    `json:"full_name"`
-		Email     string    `json:"email"`
-		Avatar    *string   `json:"avatar_url"`
-		JoinedAt  time.Time `json:"joined_at"`
-		TierName  string    `json:"tier_name"`
-		Earnings  float64   `json:"total_earned"`
+		ID       string    `json:"id"`
+		UserID   string    `json:"user_id"`
+		RefCode  string    `json:"ref_code"`
+		Status   string    `json:"status"`
+		FullName string    `json:"full_name"`
+		Email    string    `json:"email"`
+		Avatar   *string   `json:"avatar_url"`
+		JoinedAt time.Time `json:"joined_at"`
+		TierName string    `json:"tier_name"`
+		Earnings float64   `json:"total_earned"`
 	}
 	var downlines []DownlineData
 
@@ -228,7 +232,6 @@ func (ac *AdminController) fetchDownlineTree(uplineID string, currentLevel, maxL
 
 	return result
 }
-
 
 // PUT /api/admin/users/update
 func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -608,9 +611,11 @@ func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	action := "create_category"
-	if cat.ID > 0 { action = "update_category" }
+	if cat.ID > 0 {
+		action = "update_category"
+	}
 	ac.Audit.Log(models.AdminID, action, "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data":   cat,
@@ -741,9 +746,13 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 	search := r.URL.Query().Get("search")
 	status := r.URL.Query().Get("status")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page <= 0 { page = 1 }
+	if page <= 0 {
+		page = 1
+	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 { limit = 20 }
+	if limit <= 0 {
+		limit = 20
+	}
 	offset := (page - 1) * limit
 
 	type AffRow struct {
@@ -856,7 +865,7 @@ func (ac *AdminController) UpdateMemberTier(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Log audit
-	ac.Audit.Log(models.AdminID, "update_member_tier", "affiliate_member", req.UserID, 
+	ac.Audit.Log(models.AdminID, "update_member_tier", "affiliate_member", req.UserID,
 		fmt.Sprintf("UserID: %s, NewTierID: %d", req.UserID, req.MembershipTierID), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "Tier member berhasil diperbarui"})
@@ -902,13 +911,13 @@ func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.
 		req.CommissionHoldDays = 7
 	}
 	tier := models.MembershipTier{
-		ID:                   req.ID,
-		Name:                 req.Name,
-		Level:                req.Level,
-		BaseCommissionRate:   req.BaseCommissionRate,
-		MinEarningsUpgrade:   req.MinEarningsUpgrade,
-		MonthlyFee:           req.MonthlyFee,
-		CommissionHoldDays:   req.CommissionHoldDays,
+		ID:                 req.ID,
+		Name:               req.Name,
+		Level:              req.Level,
+		BaseCommissionRate: req.BaseCommissionRate,
+		MinEarningsUpgrade: req.MinEarningsUpgrade,
+		MonthlyFee:         req.MonthlyFee,
+		CommissionHoldDays: req.CommissionHoldDays,
 		// New Requirements (Req 4)
 		MinActiveMitra:       req.MinActiveMitra,
 		MinMonthlyTurnover:   req.MinMonthlyTurnover,
@@ -1093,26 +1102,26 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 	merchantID := r.URL.Query().Get("merchant_id")
 
 	type ProductRow struct {
-		ID          string    `json:"id"`
-		Name        string    `json:"name"`
-		Description string    `json:"description"`
-		SKU         string    `json:"sku"`
-		Slug        string    `json:"slug"`
-		Price       float64   `json:"price"`
-		OldPrice    float64   `json:"old_price"`
+		ID             string  `json:"id"`
+		Name           string  `json:"name"`
+		Description    string  `json:"description"`
+		SKU            string  `json:"sku"`
+		Slug           string  `json:"slug"`
+		Price          float64 `json:"price"`
+		OldPrice       float64 `json:"old_price"`
 		WholesalePrice float64 `json:"wholesale_price"`
-		COGS        float64   `json:"cogs"`
-		Category    string    `json:"category"`
-		Brand       string    `json:"brand"`
-		Stock       int       `json:"stock"`
-		Attributes  string    `json:"attributes"`
-		Image       string    `json:"image"`
-		Images      string    `json:"images"`
-		Status      string    `json:"status"`
-		Weight      int       `json:"weight"`
-		MerchantID  string    `json:"merchant_id"`
-		StoreName   string    `json:"store_name"`
-		
+		COGS           float64 `json:"cogs"`
+		Category       string  `json:"category"`
+		Brand          string  `json:"brand"`
+		Stock          int     `json:"stock"`
+		Attributes     string  `json:"attributes"`
+		Image          string  `json:"image"`
+		Images         string  `json:"images"`
+		Status         string  `json:"status"`
+		Weight         int     `json:"weight"`
+		MerchantID     string  `json:"merchant_id"`
+		StoreName      string  `json:"store_name"`
+
 		BaseAffiliateFee           float64 `json:"base_affiliate_fee"`
 		BaseAffiliateFeeNominal    float64 `json:"base_affiliate_fee_nominal"`
 		BaseDistributionFee        float64 `json:"base_distribution_fee"`
@@ -1120,7 +1129,7 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 		MerchantCommissionPercent  float64 `json:"merchant_commission_percent"`
 		CommissionPresetID         *string `json:"commission_preset_id"`
 
-		CreatedAt   time.Time `json:"created_at"`
+		CreatedAt time.Time `json:"created_at"`
 	}
 
 	query := ac.DB.Table("products p").
@@ -1166,32 +1175,32 @@ func (ac *AdminController) GetProductDetail(w http.ResponseWriter, r *http.Reque
 	}
 
 	type ProductRow struct {
-		ID          string    `json:"id"`
-		Name        string    `json:"name"`
-		Description string    `json:"description"`
-		SKU         string    `json:"sku"`
-		Slug        string    `json:"slug"`
-		Price       float64   `json:"price"`
-		OldPrice    float64   `json:"old_price"`
-		WholesalePrice float64 `json:"wholesale_price"`
-		COGS        float64   `json:"cogs"`
-		Category    string    `json:"category"`
-		Brand       string    `json:"brand"`
-		Stock       int       `json:"stock"`
-		Attributes  string    `json:"attributes"`
-		Image       string    `json:"image"`
-		Images      string    `json:"images"`
-		Status      string    `json:"status"`
-		Weight      int       `json:"weight"`
-		MerchantID  string    `json:"merchant_id"`
-		StoreName   string    `json:"store_name"`
-		BaseAffiliateFee           float64 `json:"base_affiliate_fee"`
-		BaseAffiliateFeeNominal    float64 `json:"base_affiliate_fee_nominal"`
-		BaseDistributionFee        float64 `json:"base_distribution_fee"`
-		BaseDistributionFeeNominal float64 `json:"base_distribution_fee_nominal"`
-		MerchantCommissionPercent  float64 `json:"merchant_commission_percent"`
-		CommissionPresetID         *string `json:"commission_preset_id"`
-		CreatedAt   time.Time `json:"created_at"`
+		ID                         string    `json:"id"`
+		Name                       string    `json:"name"`
+		Description                string    `json:"description"`
+		SKU                        string    `json:"sku"`
+		Slug                       string    `json:"slug"`
+		Price                      float64   `json:"price"`
+		OldPrice                   float64   `json:"old_price"`
+		WholesalePrice             float64   `json:"wholesale_price"`
+		COGS                       float64   `json:"cogs"`
+		Category                   string    `json:"category"`
+		Brand                      string    `json:"brand"`
+		Stock                      int       `json:"stock"`
+		Attributes                 string    `json:"attributes"`
+		Image                      string    `json:"image"`
+		Images                     string    `json:"images"`
+		Status                     string    `json:"status"`
+		Weight                     int       `json:"weight"`
+		MerchantID                 string    `json:"merchant_id"`
+		StoreName                  string    `json:"store_name"`
+		BaseAffiliateFee           float64   `json:"base_affiliate_fee"`
+		BaseAffiliateFeeNominal    float64   `json:"base_affiliate_fee_nominal"`
+		BaseDistributionFee        float64   `json:"base_distribution_fee"`
+		BaseDistributionFeeNominal float64   `json:"base_distribution_fee_nominal"`
+		MerchantCommissionPercent  float64   `json:"merchant_commission_percent"`
+		CommissionPresetID         *string   `json:"commission_preset_id"`
+		CreatedAt                  time.Time `json:"created_at"`
 	}
 
 	var row ProductRow
@@ -1237,7 +1246,7 @@ func (ac *AdminController) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 
 		SplitAplikasiDagang float64 `json:"split_aplikasi_dagang"`
 		SplitAkuglow        float64 `json:"split_akuglow"`
-		
+
 		CashBalance          float64 `json:"cash_balance"`
 		TotalEscrowLiability float64 `json:"total_escrow_liability"`
 	}
@@ -1325,25 +1334,25 @@ func (ac *AdminController) GetCashFlow(w http.ResponseWriter, r *http.Request) {
 
 	var cashBalance, totalEscrow float64
 	ac.DB.Model(&models.Wallet{}).Where("owner_id = ?", models.PusatID).Select("COALESCE(balance, 0)").Scan(&cashBalance)
-	
+
 	// Global Escrow Liability (All wallets' balance + pending)
 	ac.DB.Model(&models.Wallet{}).
 		Where("owner_type IN (?, ?)", models.WalletMerchant, models.WalletAffiliate).
 		Select("COALESCE(SUM(balance + pending_balance), 0)").Scan(&totalEscrow)
 
 	data := CashFlowData{
-		TotalRevenue:        totalRevenue,
-		TotalCOGS:           totalCOGS,
-		TotalAffiliateBonus: totalAffBonus,
-		TotalMerchantBonus:  totalMerchBonus,
-		GrossProfit:         grossProfit,
-		Allocations:         allocations,
-		NetProfit:           netProfit,
-		NetAplikasiDagang:   netProfit * splitAppDagang,
-		NetAkuglow:          netProfit * splitAkuglow,
-		SplitAplikasiDagang: splitAppDagang,
-		SplitAkuglow:        splitAkuglow,
-		CashBalance:         cashBalance,
+		TotalRevenue:         totalRevenue,
+		TotalCOGS:            totalCOGS,
+		TotalAffiliateBonus:  totalAffBonus,
+		TotalMerchantBonus:   totalMerchBonus,
+		GrossProfit:          grossProfit,
+		Allocations:          allocations,
+		NetProfit:            netProfit,
+		NetAplikasiDagang:    netProfit * splitAppDagang,
+		NetAkuglow:           netProfit * splitAkuglow,
+		SplitAplikasiDagang:  splitAppDagang,
+		SplitAkuglow:         splitAkuglow,
+		CashBalance:          cashBalance,
 		TotalEscrowLiability: totalEscrow,
 	}
 
@@ -1371,7 +1380,7 @@ func (ac *AdminController) UpdateCashFlowConfig(w http.ResponseWriter, r *http.R
 	for _, a := range req.Allocations {
 		currentKeys = append(currentKeys, a.Key)
 	}
-	
+
 	delQuery := ac.DB.Table("platform_configs").Where("key LIKE 'alloc_%'")
 	if len(currentKeys) > 0 {
 		delQuery = delQuery.Where("key NOT IN ?", currentKeys)
@@ -1410,7 +1419,6 @@ func (ac *AdminController) UpdateCashFlowConfig(w http.ResponseWriter, r *http.R
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-
 // PUT /api/admin/products/moderate
 func (ac *AdminController) ModerateProduct(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -1429,7 +1437,7 @@ func (ac *AdminController) ModerateProduct(w http.ResponseWriter, r *http.Reques
 	var prod models.Product
 	ac.DB.First(&prod, "id = ?", req.ID)
 	ac.DB.Table("products").Where("id = ?", req.ID).Update("status", req.Status)
-	
+
 	// Notify Merchants who have this in inventory
 	statusMsg := fmt.Sprintf("Produk '%s' Anda telah %s oleh tim moderasi.", prod.Name, req.Status)
 	if req.Status == "active" {
@@ -1559,7 +1567,7 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := ac.DB.Create(&p).Error; err != nil {
-		fmt.Printf("❌ Database Error: %v\n", err) 
+		fmt.Printf("❌ Database Error: %v\n", err)
 		utils.JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Database Error: %v", err))
 		return
 	}
@@ -1583,28 +1591,29 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var req struct {
-		ID          string  `json:"id"`
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		SKU         string  `json:"sku"`
-		Price       float64 `json:"price"`
-		OldPrice    float64 `json:"old_price"`
-		COGS        float64 `json:"cogs"` // Modal Awal
-		Category    string  `json:"category"`
-		Brand       string  `json:"brand"`
-		Attributes  string  `json:"attributes"`
-		Stock       int     `json:"stock"`
-		Image       string  `json:"image"`
-		Images      string  `json:"images"` // Added missing images field
-		Status      string  `json:"status"`
-		Weight      int     `json:"weight"`
-		BaseAffiliateFee          float64 `json:"base_affiliate_fee"`
-		BaseAffiliateFeeNominal   float64 `json:"base_affiliate_fee_nominal"`
+		ID                         string  `json:"id"`
+		Name                       string  `json:"name"`
+		Description                string  `json:"description"`
+		SKU                        string  `json:"sku"`
+		Price                      float64 `json:"price"`
+		OldPrice                   float64 `json:"old_price"`
+		COGS                       float64 `json:"cogs"` // Modal Awal
+		Category                   string  `json:"category"`
+		Brand                      string  `json:"brand"`
+		Attributes                 string  `json:"attributes"`
+		Stock                      int     `json:"stock"`
+		Image                      string  `json:"image"`
+		Images                     string  `json:"images"` // Added missing images field
+		Status                     string  `json:"status"`
+		Weight                     int     `json:"weight"`
+		BaseAffiliateFee           float64 `json:"base_affiliate_fee"`
+		BaseAffiliateFeeNominal    float64 `json:"base_affiliate_fee_nominal"`
 		BaseDistributionFee        float64 `json:"base_distribution_fee"`
 		BaseDistributionFeeNominal float64 `json:"base_distribution_fee_nominal"`
-		MerchantCommissionPercent float64 `json:"merchant_commission_percent"`
-		CommissionPresetID        *string `json:"commission_preset_id"`
-		TierCommissionPresetID    *string `json:"tier_commission_preset_id"`
+		MerchantCommissionPercent  float64 `json:"merchant_commission_percent"`
+		CommissionPresetID         *string `json:"commission_preset_id"`
+		TierCommissionPresetID     *string `json:"tier_commission_preset_id"`
+		MerchantCommissionPresetID *string `json:"merchant_commission_preset_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
@@ -1633,6 +1642,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"merchant_commission_percent":   req.MerchantCommissionPercent,
 		"commission_preset_id":          req.CommissionPresetID,
 		"tier_commission_preset_id":     req.TierCommissionPresetID,
+		"merchant_commission_preset_id": req.MerchantCommissionPresetID,
 	}
 
 	// Use Transaction for atomic sync
@@ -1696,7 +1706,7 @@ func (ac *AdminController) UpdateProductTierCommission(w http.ResponseWriter, r 
 
 	var config models.ProductTierCommission
 	err := ac.DB.Where("product_id = ? AND membership_tier_id = ?", req.ProductID, req.TierID).First(&config).Error
-	
+
 	config.ProductID = req.ProductID
 	config.MembershipTierID = req.TierID
 	config.CommissionRate = req.CommissionRate / 100.0
@@ -1752,7 +1762,7 @@ func (ac *AdminController) GetFinance(w http.ResponseWriter, r *http.Request) {
 			Joins("JOIN orders ON orders.id = order_items.order_id").
 			Where("orders.status IN ('paid', 'shipped', 'delivered', 'completed')").
 			Select("COALESCE(SUM(order_items.cogs * order_items.quantity), 0)").Scan(&totalCOGS)
-		
+
 		// Net Profit = Gross Revenue - COGS - Distributions
 		totalNetProfit = totalRevenue - totalCOGS - merchantLiability - affiliateLiability
 	}
@@ -1924,9 +1934,9 @@ func (ac *AdminController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 // POST /api/admin/orders/status → Update status dengan State Machine (Req 1)
 func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		OrderID string            `json:"order_id"`
+		OrderID string             `json:"order_id"`
 		Status  models.OrderStatus `json:"status"`
-		Note    string            `json:"note"`
+		Note    string             `json:"note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
@@ -1960,8 +1970,10 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 
 	// [FIX] Sinkronkan status ke semua Merchant Groups dengan mapping yang benar
 	mStatus := string(req.Status)
-	if req.Status == models.OrderPaid { mStatus = "confirmed" }
-	
+	if req.Status == models.OrderPaid {
+		mStatus = "confirmed"
+	}
+
 	if err := ac.DB.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", order.ID).Update("status", mStatus).Error; err != nil {
 		fmt.Printf("[WARNING] Failed to sync status to merchant groups: %v\n", err)
 	}
@@ -1975,9 +1987,11 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Audit Trail (Req 9) - Fix: Split host from port for inet type
-	adminID := "00000000-0000-0000-0000-000000000001" 
+	adminID := "00000000-0000-0000-0000-000000000001"
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if ip == "" { ip = r.RemoteAddr }
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
 	utils.LogAudit(ac.DB, adminID, "update_order_status", "order", order.ID, fmt.Sprintf("Changed status from %s to %s. Note: %s", oldStatus, req.Status, req.Note), string(oldStatus), string(req.Status), ip, r.UserAgent())
 
 	// If status is PAID, trigger background work (Commissions, etc - Req 13)
@@ -2033,11 +2047,11 @@ func (ac *AdminController) FreezeOrder(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusInternalServerError, "Failed to freeze order")
 		return
 	}
-	
+
 	ac.Audit.Log(models.AdminID, "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
-		"status": "success", 
+		"status":  "success",
 		"message": "Order has been frozen for mediation",
 	})
 }
@@ -2138,11 +2152,11 @@ func (ac *AdminController) ManageMerchantCommissions(w http.ResponseWriter, r *h
 func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost || r.Method == http.MethodPut {
 		var req struct {
-			ProductID          string  `json:"product_id"`
-			BaseAffiliateFee   float64 `json:"base_affiliate_fee"`
-			BaseDistFee        float64 `json:"base_distribution_fee"`
+			ProductID           string  `json:"product_id"`
+			BaseAffiliateFee    float64 `json:"base_affiliate_fee"`
+			BaseDistFee         float64 `json:"base_distribution_fee"`
 			AffiliateFeeNominal float64 `json:"base_affiliate_fee_nominal"`
-			DistFeeNominal     float64 `json:"base_distribution_fee_nominal"`
+			DistFeeNominal      float64 `json:"base_distribution_fee_nominal"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			utils.JSONError(w, http.StatusBadRequest, "Invalid request body")
@@ -2155,9 +2169,9 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 		}
 
 		err := ac.DB.Model(&models.Product{}).Where("id = ?", req.ProductID).Updates(map[string]interface{}{
-			"base_affiliate_fee":           req.BaseAffiliateFee,
-			"base_distribution_fee":        req.BaseDistFee,
-			"base_affiliate_fee_nominal":   req.AffiliateFeeNominal,
+			"base_affiliate_fee":            req.BaseAffiliateFee,
+			"base_distribution_fee":         req.BaseDistFee,
+			"base_affiliate_fee_nominal":    req.AffiliateFeeNominal,
 			"base_distribution_fee_nominal": req.DistFeeNominal,
 		}).Error
 
@@ -2166,11 +2180,11 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 			return
 		}
 
-		ac.Audit.Log(models.AdminID, "update_product_commission", "product", req.ProductID, 
+		ac.Audit.Log(models.AdminID, "update_product_commission", "product", req.ProductID,
 			fmt.Sprintf("Aff=%.2f%% Dist=%.2f%%", req.BaseAffiliateFee, req.BaseDistFee), r.RemoteAddr)
 
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-			"status": "success",
+			"status":  "success",
 			"message": "Product commission updated successfully",
 		})
 		return
@@ -2182,9 +2196,9 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 			return
 		}
 		err := ac.DB.Model(&models.Product{}).Where("id = ?", id).Updates(map[string]interface{}{
-			"base_affiliate_fee":           0,
-			"base_distribution_fee":        0,
-			"base_affiliate_fee_nominal":   0,
+			"base_affiliate_fee":            0,
+			"base_distribution_fee":         0,
+			"base_affiliate_fee_nominal":    0,
 			"base_distribution_fee_nominal": 0,
 		}).Error
 		if err != nil {
@@ -2262,20 +2276,20 @@ func (ac *AdminController) GetPayouts(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 
 	type PayoutRow struct {
-		ID          string     `json:"id"`
-		TargetID    string     `json:"target_id"` // merchant_id or affiliate_id
-		Type        string     `json:"type"`      // 'merchant' or 'affiliate'
-		Name        string     `json:"name"`      // store_name or full_name
-		SubName     string     `json:"sub_name"`  // owner_name or email/ref_code
-		Amount      float64    `json:"amount"`
+		ID            string     `json:"id"`
+		TargetID      string     `json:"target_id"` // merchant_id or affiliate_id
+		Type          string     `json:"type"`      // 'merchant' or 'affiliate'
+		Name          string     `json:"name"`      // store_name or full_name
+		SubName       string     `json:"sub_name"`  // owner_name or email/ref_code
+		Amount        float64    `json:"amount"`
 		BankName      string     `json:"bank_name"`
 		AccountNumber string     `json:"account_number"`
 		AccountName   string     `json:"account_name"`
-		Status      string     `json:"status"`
-		Note        string     `json:"note"`
-		RequestedAt time.Time  `json:"requested_at"`
-		ProcessedAt *time.Time `json:"processed_at"`
-		ProcessedBy *string    `json:"processed_by"`
+		Status        string     `json:"status"`
+		Note          string     `json:"note"`
+		RequestedAt   time.Time  `json:"requested_at"`
+		ProcessedAt   *time.Time `json:"processed_at"`
+		ProcessedBy   *string    `json:"processed_by"`
 	}
 
 	query := `
@@ -2302,7 +2316,7 @@ func (ac *AdminController) GetPayouts(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN user_profiles up_aff ON up_aff.user_id = u.id
 		) AS unified_payouts
 	`
-	
+
 	args := []interface{}{}
 	if status != "" {
 		if status == "approved" {
@@ -2383,7 +2397,7 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 				}
 				tx.Model(&models.AffiliateMember{}).Where("id = ?", wd.AffiliateID).
 					Update("total_withdrawn", gorm.Expr("total_withdrawn + ?", wd.Amount))
-				
+
 				// [Financial Sync] Record Outflow from Platform (HQ) Wallet
 				platformDesc := fmt.Sprintf("Pembayaran Payout Affiliate %s: %s", wd.AffiliateID, wd.ID)
 				if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -wd.Amount, wd.ID, "payout_outflow", platformDesc, nil); err != nil {
@@ -2421,7 +2435,7 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 				if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalCompleted, 0, payout.ID, "payout_request", desc, nil); err != nil {
 					return err
 				}
-				
+
 				// [Financial Sync] Record Outflow from Platform (HQ) Wallet
 				platformDesc := fmt.Sprintf("Pembayaran Payout Merchant %s: %s", payout.MerchantID, payout.ID)
 				if err := financeSvc.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -payout.Amount, payout.ID, "payout_outflow", platformDesc, nil); err != nil {
@@ -2453,7 +2467,7 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 
 func (ac *AdminController) GetBrands(w http.ResponseWriter, r *http.Request) {
 	var brands []models.Brand
-	
+
 	// Gunakan query yang paling aman: Scan ke map dulu baru pindah ke struct
 	var results []map[string]interface{}
 	ac.DB.Table("brands").
@@ -2466,12 +2480,18 @@ func (ac *AdminController) GetBrands(w http.ResponseWriter, r *http.Request) {
 		var b models.Brand
 		b.ID = uint(res["id"].(int64))
 		b.Name = res["name"].(string)
-		if res["logo_url"] != nil { b.LogoURL = res["logo_url"].(string) }
-		if res["is_featured"] != nil { b.IsFeatured = res["is_featured"].(bool) }
-		if res["product_count"] != nil { b.ProductCount = res["product_count"].(int64) }
+		if res["logo_url"] != nil {
+			b.LogoURL = res["logo_url"].(string)
+		}
+		if res["is_featured"] != nil {
+			b.IsFeatured = res["is_featured"].(bool)
+		}
+		if res["product_count"] != nil {
+			b.ProductCount = res["product_count"].(int64)
+		}
 		brands = append(brands, b)
 	}
-		
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": brands})
 }
 
@@ -2575,7 +2595,7 @@ func (ac *AdminController) SyncCouriers(w http.ResponseWriter, r *http.Request) 
 	for _, c := range couriers {
 		code := fmt.Sprintf("%v", c["courier_code"])
 		name := fmt.Sprintf("%v", c["courier_name"])
-		
+
 		var channel models.LogisticChannel
 		if err := ac.DB.Where("code = ?", code).First(&channel).Error; err != nil {
 			// Create new
@@ -2596,7 +2616,6 @@ func (ac *AdminController) SyncCouriers(w http.ResponseWriter, r *http.Request) 
 // ─────────────────────────────────────────────────────────────────────────────
 // DISPUTE & ARBITRATION
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 func (ac *AdminController) GetDisputes(w http.ResponseWriter, r *http.Request) {
 	var disputes []models.Dispute
@@ -2635,7 +2654,7 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 		if req.Status == "refund_approved" {
 			finance := services.NewFinanceService(ac.DB)
 			desc := fmt.Sprintf("Refund Sengketa: %s", dispute.OrderID)
-			
+
 			// [CRITICAL FIX] Get UserID from Merchant
 			var merchant models.Merchant
 			if err := tx.First(&merchant, "id = ?", dispute.MerchantID).Error; err != nil {
@@ -2646,7 +2665,7 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 			if err := finance.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxRefundDeduction, dispute.Amount, fmt.Sprintf("%d", dispute.ID), "dispute", desc, nil); err != nil {
 				return err
 			}
-			
+
 			// [Audit Fix] Batalkan Komisi Affiliate agar tidak terjadi kebocoran dana
 			affiliateService := services.NewAffiliateService(ac.DB, ac.Notif)
 			if err := affiliateService.CancelCommission(dispute.OrderID); err != nil {
@@ -2659,7 +2678,7 @@ func (ac *AdminController) ArbitrateDispute(w http.ResponseWriter, r *http.Reque
 		} else if req.Status == "rejected" {
 			finance := services.NewFinanceService(ac.DB)
 			desc := fmt.Sprintf("Sengketa Ditolak, Dana Diteruskan: %s", dispute.OrderID)
-			
+
 			// [CRITICAL FIX] Get UserID from Merchant
 			var merchant models.Merchant
 			if err := tx.First(&merchant, "id = ?", dispute.MerchantID).Error; err != nil {
@@ -2775,7 +2794,9 @@ func (ac *AdminController) UpsertSettings(w http.ResponseWriter, r *http.Request
 		return
 	}
 	for _, cfg := range configs {
-		if cfg.Key == "" { continue }
+		if cfg.Key == "" {
+			continue
+		}
 		ac.DB.Where(models.PlatformConfig{Key: cfg.Key}).
 			Assign(models.PlatformConfig{Value: cfg.Value, Description: cfg.Description}).
 			FirstOrCreate(&models.PlatformConfig{Key: cfg.Key})
@@ -2876,21 +2897,21 @@ func (ac *AdminController) GetPublicProducts(w http.ResponseWriter, r *http.Requ
 	}
 
 	query.Preload("Inventories").Find(&products)
-	
+
 	// Tambahkan informasi stok agregat untuk ditampilkan di card
 	type ProductWithStock struct {
 		models.Product
 		TotalStock int `json:"total_stock"`
 		Sold       int `json:"sold"`
 	}
-	
+
 	result := make([]ProductWithStock, len(products))
 	for i, p := range products {
 		total := 0
 		for _, inv := range p.Inventories {
 			total += inv.Stock
 		}
-		
+
 		// Hitung sold count untuk ditampilkan
 		var sold int
 		ac.DB.Table("order_items").Where("product_id = ?", p.ID).Select("COALESCE(SUM(quantity), 0)").Scan(&sold)
@@ -2915,8 +2936,10 @@ func (ac *AdminController) GetPublicCategories(w http.ResponseWriter, r *http.Re
 		WHERE p.status = 'active'
 		ORDER BY c.order ASC
 	`).Scan(&cats)
-	
-	if len(cats) == 0 { cats = []models.Category{} }
+
+	if len(cats) == 0 {
+		cats = []models.Category{}
+	}
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": cats})
 }
 
@@ -3045,14 +3068,14 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 	ac.DB.Model(&models.User{}).Where("role = 'affiliate'").Count(&totalAffiliates)
 	if ac.hasTable("order_merchant_groups") {
 		ac.DB.Table("order_merchant_groups").Count(&totalOrders)
-		
+
 		// [FIX] Gunakan MerchantOrderStatus yang benar agar SUM tidak 0
 		activeStats := []string{"confirmed", "processing", "packed", "handed_to_courier", "shipped", "delivered", "completed"}
-		
+
 		ac.DB.Table("order_merchant_groups").
 			Where("status IN ?", activeStats).
 			Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
-		
+
 		ac.DB.Table("order_merchant_groups").
 			Where("status IN ?", activeStats).
 			Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalFee)
@@ -3177,7 +3200,7 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 	var product models.Product
 	err := ac.DB.Preload("Variants").Preload("Inventories").
 		Where("id = ? OR slug = ?", id, id).First(&product).Error
-	
+
 	if err == nil {
 		// Calculate real sold count
 		var totalSold int64
@@ -3186,7 +3209,7 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 			Where("order_items.product_id = ? AND orders.status = ?", product.ID, models.OrderCompleted).
 			Select("COALESCE(SUM(order_items.quantity), 0)").
 			Scan(&totalSold)
-		
+
 		// If real sold is 0, maybe we want a base offset to look better, but the user asked for sync.
 		// Let's provide the real count. If the user wants a fake offset, they can add it later.
 		product.SoldCount = totalSold
@@ -3292,7 +3315,7 @@ func (ac *AdminController) POSGetProducts(w http.ResponseWriter, r *http.Request
 			Or("slug ILIKE ?", like).
 			Or("sku ILIKE ?", like).
 			Or("id IN (SELECT product_id FROM product_variants WHERE sku ILIKE ?)", like))
-		
+
 		// If search looks like a potential ID, add OR condition for it
 		if len(search) >= 8 {
 			db = db.Or("CAST(id AS TEXT) ILIKE ?", search+"%")
@@ -3323,11 +3346,11 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 			ProductID        string  `json:"product_id"`
 			ProductVariantID *string `json:"product_variant_id"`
 			Quantity         int     `json:"quantity"`
-			Price           float64 `json:"price"`
+			Price            float64 `json:"price"`
 		} `json:"items"`
 		PaymentMethod string  `json:"payment_method"`
 		AmountPaid    float64 `json:"amount_paid"`
-		BuyerID       *string `json:"buyer_id"`
+		MemberID      *string `json:"member_id"`
 		Notes         string  `json:"notes"`
 		Discount      float64 `json:"discount"`
 	}
@@ -3347,7 +3370,7 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 
 		var subtotal float64
 		var totalPlatformFee float64
-		
+
 		// Temporary storage for items to be created after order
 		type itemData struct {
 			product models.Product
@@ -3404,16 +3427,16 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 		grandTotal := subtotal - req.Discount
 
 		order = models.Order{
-			OrderNumber:      orderNumber,
-			BuyerID:          req.BuyerID,
-			CashierID:        &adminID,
-			OrderType:        "pos",
-			Subtotal:         subtotal,
-			TotalDiscount:    req.Discount,
-			GrandTotal:       grandTotal,
-			Status:           models.OrderCompleted,
-			PaidAt:           &[]time.Time{time.Now()}[0],
-			Notes:            req.Notes,
+			OrderNumber:   orderNumber,
+			BuyerID:       req.MemberID,
+			CashierID:     &adminID,
+			OrderType:     "pos",
+			Subtotal:      subtotal,
+			TotalDiscount: req.Discount,
+			GrandTotal:    grandTotal,
+			Status:        models.OrderCompleted,
+			PaidAt:        &[]time.Time{time.Now()}[0],
+			Notes:         req.Notes,
 		}
 
 		if err := tx.Create(&order).Error; err != nil {
@@ -3429,8 +3452,10 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 			var catComm models.CategoryCommission
 			tx.Where("LOWER(category_name) = LOWER(?)", it.product.Category).First(&catComm)
 			feeRate := catComm.FeePercent / 100
-			if feeRate == 0 { feeRate = 0.01 }
-			
+			if feeRate == 0 {
+				feeRate = 0.01
+			}
+
 			itemSubtotal := it.price * float64(it.qty)
 			itemFee := itemSubtotal * feeRate
 			totalPlatformFee += itemFee
@@ -3457,8 +3482,8 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 
 			var variantID *string
 			sku := it.product.Slug
-			if it.variant.ID != "" { 
-				sku = it.variant.SKU 
+			if it.variant.ID != "" {
+				sku = it.variant.SKU
 				vid := it.variant.ID
 				variantID = &vid
 			}
@@ -3483,12 +3508,12 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 		// Update Merchant Groups and create OrderItems
 		for _, mg := range merchantGroups {
 			tx.Save(mg)
-			
+
 			// Add to Merchant Balance
 			tx.Model(&models.Merchant{}).Where("id = ?", mg.MerchantID).
 				Updates(map[string]interface{}{
-					"balance":      gorm.Expr("balance + ?", mg.MerchantPayout),
-					"total_sales":  gorm.Expr("total_sales + ?", mg.Subtotal),
+					"balance":     gorm.Expr("balance + ?", mg.MerchantPayout),
+					"total_sales": gorm.Expr("total_sales + ?", mg.Subtotal),
 				})
 		}
 
@@ -3586,7 +3611,7 @@ func (ac *AdminController) GetRestockRequests(w http.ResponseWriter, r *http.Req
 // POST /api/admin/merchants/restock/moderate
 func (ac *AdminController) ModerateRestockRequest(w http.ResponseWriter, r *http.Request) {
 	adminID := r.Context().Value("user_id").(string)
-	
+
 	var req struct {
 		RequestID      string `json:"request_id"`
 		Status         string `json:"status"`
@@ -3667,9 +3692,13 @@ func (ac *AdminController) DeleteEducation(w http.ResponseWriter, r *http.Reques
 // GET /api/admin/events
 func (ac *AdminController) GetEvents(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 { page = 1 }
+	if page < 1 {
+		page = 1
+	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 { limit = 10 }
+	if limit < 1 {
+		limit = 10
+	}
 	offset := (page - 1) * limit
 
 	var total int64
@@ -3677,7 +3706,7 @@ func (ac *AdminController) GetEvents(w http.ResponseWriter, r *http.Request) {
 
 	var events []models.AffiliateEvent
 	ac.DB.Order("start_time DESC").Limit(limit).Offset(offset).Find(&events)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data":   events,
@@ -3849,7 +3878,7 @@ func (ac *AdminController) GetAllReviews(w http.ResponseWriter, r *http.Request)
 		models.Review
 		ProductName string `json:"product_name"`
 	}
-	
+
 	res := []ReviewResponse{}
 	ac.DB.Table("reviews").
 		Select("reviews.*, products.name as product_name").
@@ -3864,7 +3893,7 @@ func (ac *AdminController) GetAllReviews(w http.ResponseWriter, r *http.Request)
 	for i := range res {
 		ac.DB.Preload("Profile").First(&res[i].Buyer, "id = ?", res[i].BuyerID)
 	}
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"data":        res,
 		"total":       total,
@@ -3881,19 +3910,19 @@ func (ac *AdminController) DeleteReview(w http.ResponseWriter, r *http.Request) 
 		utils.JSONError(w, http.StatusBadRequest, "ID diperlukan")
 		return
 	}
-	
+
 	var review models.Review
 	if err := ac.DB.First(&review, "id = ?", id).Error; err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Review tidak ditemukan")
 		return
 	}
-	
+
 	ac.DB.Delete(&review)
-	
+
 	// Resync product rating
 	productService := services.NewProductService(ac.DB)
 	productService.SyncProductRating(review.ProductID)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success", "message": "Review berhasil dihapus"})
 }
 
@@ -4009,4 +4038,116 @@ func (ac *AdminController) DeleteCommissionPreset(w http.ResponseWriter, r *http
 		return
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT VARIANTS MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/products/variants?product_id=...
+func (ac *AdminController) GetProductVariants(w http.ResponseWriter, r *http.Request) {
+	productID := r.URL.Query().Get("product_id")
+	if productID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Product ID required")
+		return
+	}
+	var variants []models.ProductVariant
+	ac.DB.Where("product_id = ?", productID).Order("created_at ASC").Find(&variants)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": variants})
+}
+
+// POST /api/admin/products/variants/add
+func (ac *AdminController) AddProductVariant(w http.ResponseWriter, r *http.Request) {
+	var v models.ProductVariant
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+	if v.ProductID == "" || v.Name == "" || v.SKU == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ProductID, Name, and SKU are required")
+		return
+	}
+
+	// Check SKU uniqueness in both Product and ProductVariant tables
+	var count int64
+	ac.DB.Model(&models.Product{}).Where("sku = ?", v.SKU).Count(&count)
+	if count > 0 {
+		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh produk utama")
+		return
+	}
+	ac.DB.Model(&models.ProductVariant{}).Where("sku = ?", v.SKU).Count(&count)
+	if count > 0 {
+		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh varian lain")
+		return
+	}
+
+	if err := ac.DB.Create(&v).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat varian: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(models.AdminID, "add_variant", "product_variant", v.ID, v.Name, r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": v})
+}
+
+// PUT /api/admin/products/variants/update
+func (ac *AdminController) UpdateProductVariant(w http.ResponseWriter, r *http.Request) {
+	var req models.ProductVariant
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+	if req.ID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Variant ID required")
+		return
+	}
+
+	// Check SKU uniqueness (excluding current variant)
+	var count int64
+	ac.DB.Model(&models.Product{}).Where("sku = ?", req.SKU).Count(&count)
+	if count > 0 {
+		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh produk utama")
+		return
+	}
+	ac.DB.Model(&models.ProductVariant{}).Where("sku = ? AND id <> ?", req.SKU, req.ID).Count(&count)
+	if count > 0 {
+		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh varian lain")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"name":            req.Name,
+		"sku":             req.SKU,
+		"price":           req.Price,
+		"wholesale_price": req.WholesalePrice,
+		"cogs":            req.COGS,
+		"stock":           req.Stock,
+		"weight":          req.Weight,
+		"image":           req.Image,
+	}
+
+	if err := ac.DB.Model(&models.ProductVariant{}).Where("id = ?", req.ID).Updates(updates).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal update varian: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(models.AdminID, "update_variant", "product_variant", req.ID, req.Name, r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/admin/products/variants/delete?id=...
+func (ac *AdminController) DeleteProductVariant(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Variant ID required")
+		return
+	}
+
+	if err := ac.DB.Where("id = ?", id).Delete(&models.ProductVariant{}).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus varian")
+		return
+	}
+
+	ac.Audit.Log(models.AdminID, "delete_variant", "product_variant", id, "", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

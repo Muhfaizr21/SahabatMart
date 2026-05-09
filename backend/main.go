@@ -63,6 +63,7 @@ func ConnectDB() {
 		// Commission Preset System (Multi-Level)
 		&models.CommissionPreset{}, &models.CommissionPresetLevel{},
 		&models.TierCommissionPreset{}, &models.TierCommissionPresetItem{},
+		&models.MerchantCommissionPreset{},
 		// Finance models
 		&models.FinanceRevenueAllocation{}, &models.FinancialLocation{}, &models.MoneyMutation{},
 	)

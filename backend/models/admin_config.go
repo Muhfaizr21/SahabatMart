@@ -400,6 +400,7 @@ type Product struct {
 	// Assign preset ini untuk mendistribusikan komisi ke seluruh jaringan upline secara otomatis.
 	CommissionPresetID *string `gorm:"type:uuid;index" json:"commission_preset_id"` // nullable = tidak pakai preset
 	TierCommissionPresetID *string `gorm:"type:uuid;index" json:"tier_commission_preset_id"` // nullable = tidak pakai preset matrix
+	MerchantCommissionPresetID *string `gorm:"type:uuid;index" json:"merchant_commission_preset_id"` // Preset komisi merchant
 	
 	MerchantID  string    `gorm:"type:uuid;index" json:"merchant_id"`
 	Stock       int       `gorm:"default:0" json:"stock"`

@@ -438,14 +438,23 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	db.Where("id = ?", merchantID).First(&merchant)
 
 	// 3. Distribution Fee (Merchant cut)
-	if product.MerchantCommissionPercent > 0 {
-		distAmt = subtotal * (product.MerchantCommissionPercent / 100.0)
-	} else if product.BaseDistributionFee > 0 {
-		distAmt = subtotal * (product.BaseDistributionFee / 100.0)
-	} else if product.BaseDistributionFeeNominal > 0 {
-		distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
-	} else if merchant.DistributionFeePercent > 0 {
-		distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
+	if product.MerchantCommissionPresetID != nil && *product.MerchantCommissionPresetID != "" {
+		var mPreset models.MerchantCommissionPreset
+		if err := db.Where("id = ? AND is_active = true", *product.MerchantCommissionPresetID).First(&mPreset).Error; err == nil {
+			distAmt = subtotal * mPreset.Rate
+		}
+	}
+
+	if distAmt == 0 {
+		if product.MerchantCommissionPercent > 0 {
+			distAmt = subtotal * (product.MerchantCommissionPercent / 100.0)
+		} else if product.BaseDistributionFee > 0 {
+			distAmt = subtotal * (product.BaseDistributionFee / 100.0)
+		} else if product.BaseDistributionFeeNominal > 0 {
+			distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
+		} else if merchant.DistributionFeePercent > 0 {
+			distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
+		}
 	}
 
 	// 4. Affiliate Fee — hanya hitung total untuk backward compat (Level 1 saja)

@@ -205,6 +205,9 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	// Orders
 	mux.HandleFunc("/api/merchant/orders", merchantOnly(merchantCtrl.GetOrders))
 	mux.HandleFunc("/api/merchant/orders/status", merchantOnly(merchantCtrl.UpdateOrderStatus))
+	mux.HandleFunc("/api/merchant/pos/products", merchantOnly(merchantCtrl.POSGetProducts))
+	mux.HandleFunc("/api/merchant/pos/checkout", merchantOnly(merchantCtrl.POSCheckout))
+	mux.HandleFunc("/api/pos/member/", merchantOnly(merchantCtrl.GetMemberByCode))
 	
 	// Finance
 	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
@@ -424,6 +427,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/commissions/merchant", adminOnly(adminCtrl.ManageMerchantCommissions))
 	mux.HandleFunc("/api/admin/commissions/product", adminOnly(adminCtrl.ManageProductCommissions))
 	mux.HandleFunc("/api/admin/commissions/presets", adminOnly(adminCtrl.ManageCommissionPresets))
+	
+	// Product Variants
+	mux.HandleFunc("/api/admin/products/variants", adminOnly(adminCtrl.GetProductVariants))
+	mux.HandleFunc("/api/admin/products/variants/add", adminOnly(adminCtrl.AddProductVariant))
+	mux.HandleFunc("/api/admin/products/variants/update", adminOnly(adminCtrl.UpdateProductVariant))
+	mux.HandleFunc("/api/admin/products/variants/delete", adminOnly(adminCtrl.DeleteProductVariant))
 
 	// Membership Tiers (Jenjang Status Mitra — Dapat diatur superadmin)
 	mux.HandleFunc("/api/admin/membership-tiers", adminOnly(tierCtrl.GetTiers))
@@ -518,6 +527,9 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/tier-commission-presets", adminOnly(adminCtrl.GetTierCommissionPresets))
 	mux.HandleFunc("/api/admin/tier-commission-presets/upsert", adminOnly(adminCtrl.UpsertTierCommissionPreset))
 	mux.HandleFunc("/api/admin/tier-commission-presets/delete", adminOnly(adminCtrl.DeleteTierCommissionPreset))
+	mux.HandleFunc("/api/admin/merchant-commission-presets", adminOnly(adminCtrl.GetMerchantCommissionPresets))
+	mux.HandleFunc("/api/admin/merchant-commission-presets/upsert", adminOnly(adminCtrl.UpsertMerchantCommissionPreset))
+	mux.HandleFunc("/api/admin/merchant-commission-presets/delete", adminOnly(adminCtrl.DeleteMerchantCommissionPreset))
 
 	// --- Warehouse (Master Gudang) Routes ---
 	mux.HandleFunc("/api/admin/warehouse/suppliers", adminOnly(warehouseCtrl.GetSuppliers))

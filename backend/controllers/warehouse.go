@@ -260,20 +260,35 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 			return
 		}
 
-		// Log Mutation Pusat (OUT)
-		tx.Create(&models.StockMutation{
+		// 1.2 Deduct from Product Table (Sync for Admin UI)
+		if err := tx.Model(&models.Product{}).
+			Where("id = ? AND merchant_id = ?", item.ProductID, models.PusatID).
+			Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+			tx.Rollback()
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal sinkronisasi stok master produk")
+			return
+		}
+
+		// 2. Log Mutasi (Mata Elang) - Tracking Stock OUT from Pusat
+		mutation := models.StockMutation{
 			ProductID:   item.ProductID,
 			MerchantID:  models.PusatID,
 			Type:        "RESTOCK_OUT",
-			Quantity:    item.Quantity,
-			Reference:   restock.ID,
+			Quantity:    -item.Quantity,
 			StockBefore: stockBefore,
 			StockAfter:  pusatInv.Stock,
-			Note:        "Pengiriman ke Merchant: " + restock.MerchantID,
-		})
+			Reference:   restock.ID,
+			Note:        fmt.Sprintf("Restock untuk merchant %s (Req: %s)", restock.MerchantID, restock.ID),
+			CreatedAt:   time.Now(),
+		}
+		if err := tx.Create(&mutation).Error; err != nil {
+			tx.Rollback()
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mencatat mutasi stok")
+			return
+		}
 	}
 
-	// 2. Update Status Restock
+	// 3. Update Request Status
 	if err := tx.Model(&restock).Updates(map[string]interface{}{
 		"status":     "approved",
 		"admin_note": input.AdminNote,

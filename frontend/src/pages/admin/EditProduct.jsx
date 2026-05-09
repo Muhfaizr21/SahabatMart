@@ -27,7 +27,8 @@ export default function AdminEditProduct() {
     base_distribution_fee: 0, base_distribution_fee_nominal: 0,
     merchant_commission_percent: 0,
     commission_preset_id: '',
-    tier_commission_preset_id: ''
+    tier_commission_preset_id: '',
+    merchant_commission_preset_id: ''
   });
 
   const [tiers, setTiers] = useState([]);
@@ -35,9 +36,14 @@ export default function AdminEditProduct() {
   const [updatingTier, setUpdatingTier] = useState(null);
   const [presets, setPresets] = useState([]);
   const [tierPresets, setTierPresets] = useState([]);
+  const [merchantPresets, setMerchantPresets] = useState([]);
 
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
+  const [variants, setVariants] = useState([]);
+  const [newVariant, setNewVariant] = useState({ name: '', sku: '', price: 0, wholesale_price: 0, cogs: 0, stock: 0, weight: 0 });
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [editingVariant, setEditingVariant] = useState(null);
 
   useEffect(() => {
     console.log("DEBUG: Fetching Product ID:", productId);
@@ -52,9 +58,13 @@ export default function AdminEditProduct() {
       fetchJson(`${API}/products/detail?id=${productId}`),
       fetchJson(`${API}/commission-presets`),
       fetchJson(`${API}/tier-commission-presets`),
-    ]).then(([cats, brds, atts, tiersData, tComms, prod, prs, tprs]) => {
+      fetchJson(`${API}/merchant-commission-presets`),
+      fetchJson(`${API}/products/variants?product_id=${productId}`),
+    ]).then(([cats, brds, atts, tiersData, tComms, prod, prs, tprs, mprs, vars]) => {
       setPresets(Array.isArray(prs) ? prs : (prs?.data || []));
       setTierPresets(Array.isArray(tprs) ? tprs : (tprs?.data || []));
+      setMerchantPresets(Array.isArray(mprs) ? mprs : (mprs?.data || []));
+      setVariants(Array.isArray(vars) ? vars : (vars?.data || []));
       setCategories(Array.isArray(cats) ? cats : (cats?.data || []));
       setBrands(Array.isArray(brds) ? brds : (brds?.data || []));
       setAttrs(Array.isArray(atts) ? atts : (atts?.data || []));
@@ -78,6 +88,7 @@ export default function AdminEditProduct() {
           merchant_commission_percent: item.merchant_commission_percent || 0,
           commission_preset_id: item.commission_preset_id || null,
           tier_commission_preset_id: item.tier_commission_preset_id || null,
+          merchant_commission_preset_id: item.merchant_commission_preset_id || null,
           attributes: item.attributes || '{}'
         });
         try {
@@ -230,6 +241,7 @@ export default function AdminEditProduct() {
       weight: parseInt(p.weight) || 0,
       stock: parseInt(p.stock) || 0,
       merchant_commission_percent: parseFloat(p.merchant_commission_percent) || 0,
+      merchant_commission_preset_id: p.merchant_commission_preset_id || null,
     };
 
     fetchJson(`${API}/products/update`, {
@@ -245,6 +257,39 @@ export default function AdminEditProduct() {
       toast.error("Gagal update: " + err.message);
     })
     .finally(() => setSaving(false));
+  };
+
+  const handleAddVariant = () => {
+    const payload = { ...newVariant, product_id: productId };
+    fetchJson(`${API}/products/variants/add`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }).then(resp => {
+      setVariants(prev => [...prev, resp.data || resp]);
+      setNewVariant({ name: '', sku: '', price: 0, wholesale_price: 0, cogs: 0, stock: 0, weight: 0 });
+      setShowVariantModal(false);
+      toast.success('Varian berhasil ditambahkan');
+    }).catch(e => toast.error(e.message));
+  };
+
+  const handleUpdateVariant = () => {
+    fetchJson(`${API}/products/variants/update`, {
+      method: 'PUT',
+      body: JSON.stringify(editingVariant)
+    }).then(() => {
+      setVariants(prev => prev.map(v => v.id === editingVariant.id ? editingVariant : v));
+      setEditingVariant(null);
+      toast.success('Varian diperbarui');
+    }).catch(e => toast.error(e.message));
+  };
+
+  const handleDeleteVariant = (id) => {
+    if (!window.confirm('Hapus varian ini?')) return;
+    fetchJson(`${API}/products/variants/delete?id=${id}`, { method: 'DELETE' })
+      .then(() => {
+        setVariants(prev => prev.filter(v => v.id !== id));
+        toast.success('Varian dihapus');
+      }).catch(e => toast.error(e.message));
   };
 
   if (loading) return (
@@ -470,6 +515,63 @@ export default function AdminEditProduct() {
               </table>
             </div>
           </div>
+
+          {/* Card 4: Variants Management */}
+          <div style={{ ...A.card, padding: '25px', marginTop: '24px' }}>
+            <div className="card-header-between" style={{ marginBottom: 20 }}>
+              <h5 className="card-title" style={{ margin: 0 }}>
+                <i className="bx bx-purchase-tag-alt" /> Varian Produk (SKU Berbeda)
+              </h5>
+              <button 
+                onClick={() => setShowVariantModal(true)}
+                className="btn-add-variant"
+                style={{ background: '#4361ee', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <i className="bx bx-plus" /> Tambah Varian
+              </button>
+            </div>
+            
+            {variants.length > 0 ? (
+              <div className="table-responsive">
+                <table className="variant-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1.5px solid #f1f5f9' }}>
+                      <th style={{ padding: '12px 0', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Nama Varian</th>
+                      <th style={{ padding: '12px 0', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>SKU</th>
+                      <th style={{ padding: '12px 0', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>Harga (Rp)</th>
+                      <th style={{ padding: '12px 0', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', textAlign: 'center' }}>Stok</th>
+                      <th style={{ padding: '12px 0', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', textAlign: 'right' }}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map(v => (
+                      <tr key={v.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '16px 0', fontWeight: 800, color: '#0f172a', fontSize: 14 }}>{v.name}</td>
+                        <td style={{ padding: '16px 0', color: '#64748b', fontSize: 12 }}>{v.sku}</td>
+                        <td style={{ padding: '16px 0', fontWeight: 800, color: '#4361ee', fontSize: 14 }}>{v.price.toLocaleString('id-ID')}</td>
+                        <td style={{ padding: '16px 0', textAlign: 'center' }}>
+                          <span style={{ background: v.stock > 0 ? '#dcfce7' : '#fee2e2', color: v.stock > 0 ? '#166534' : '#991b1b', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>
+                            {v.stock}
+                          </span>
+                        </td>
+                        <td style={{ padding: '16px 0', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button onClick={() => setEditingVariant(v)} className="btn-icon" title="Edit"><i className="bx bx-edit-alt" /></button>
+                            <button onClick={() => handleDeleteVariant(v.id)} className="btn-icon danger" title="Hapus"><i className="bx bx-trash" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: '40px 0', textAlign: 'center', background: '#f8fafc', borderRadius: 16, border: '2px dashed #e2e8f0' }}>
+                <i className="bx bx-package" style={{ fontSize: 40, color: '#cbd5e1', marginBottom: 12 }} />
+                <p style={{ color: '#94a3b8', fontSize: 13, fontWeight: 600 }}>Belum ada varian. Gunakan varian jika produk memiliki harga/stok berbeda (misal: 10ml vs 30ml).</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Sidebar Actions */}
@@ -540,6 +642,19 @@ export default function AdminEditProduct() {
                       />
                       <span className="suffix">%</span>
                     </div>
+                  </div>
+                  <div>
+                    <label className="mini-label">Merchant Commission Preset</label>
+                    <select 
+                      className="form-select" 
+                      value={p.merchant_commission_preset_id || ''} 
+                      onChange={e => setP({...p, merchant_commission_preset_id: e.target.value || null})}
+                    >
+                      <option value="">-- Tanpa Preset --</option>
+                      {merchantPresets.map(mp => (
+                        <option key={mp.id} value={mp.id}>{mp.name} ({(mp.merchant_commission_rate * 100).toFixed(1)}%)</option>
+                      ))}
+                    </select>
                   </div>
                  <div className="divider-h" />
                  <div>
@@ -862,9 +977,120 @@ export default function AdminEditProduct() {
 
         .spinner-small { width: 18px; height: 18px; border: 3px solid #eee; border-top: 3px solid #4361ee; border-radius: 50%; animation: spin 0.6s linear infinite; }
         
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
+          display: flex; align-items: center; justify-content: center; z-index: 1000;
+          animation: fadeIn 0.2s ease-out;
+        }
+        .modal-content {
+          background: #fff; width: 500px; max-width: 95%; border-radius: 24px;
+          padding: 32px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-title { font-size: 18px; font-weight: 900; color: #1e293b; margin: 0; }
+        .btn-close { background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; }
+        
+        .variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        
+        .btn-icon {
+          width: 32px; height: 32px; border-radius: 8px; border: none;
+          background: #f1f5f9; color: #64748b; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .btn-icon:hover { background: #e2e8f0; color: #4361ee; }
+        .btn-icon.danger:hover { background: #fee2e2; color: #ef4444; }
+
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
       `}</style>
+
+      {/* Modal: Add Variant */}
+      {showVariantModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">Tambah Varian Baru</h3>
+              <button className="btn-close" onClick={() => setShowVariantModal(false)}>&times;</button>
+            </div>
+            <div className="variant-grid">
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="mini-label">Nama Varian (Misal: 10ml, Merah, dsb)</label>
+                <input type="text" className="form-input-small bold" value={newVariant.name} onChange={e => setNewVariant({...newVariant, name: e.target.value})} placeholder="Nama Varian" />
+              </div>
+              <div>
+                <label className="mini-label">SKU Varian</label>
+                <input type="text" className="form-input-small" value={newVariant.sku} onChange={e => setNewVariant({...newVariant, sku: e.target.value})} placeholder="SKU-VAR-1" />
+              </div>
+              <div>
+                <label className="mini-label">Stok</label>
+                <input type="number" className="form-input-small" value={newVariant.stock} onChange={e => setNewVariant({...newVariant, stock: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Harga Jual (Rp)</label>
+                <input type="number" className="form-input-small bold" style={{ color: '#4361ee' }} value={newVariant.price} onChange={e => setNewVariant({...newVariant, price: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Harga Grosir (Rp)</label>
+                <input type="number" className="form-input-small" value={newVariant.wholesale_price} onChange={e => setNewVariant({...newVariant, wholesale_price: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Modal / COGS (Rp)</label>
+                <input type="number" className="form-input-small danger" value={newVariant.cogs} onChange={e => setNewVariant({...newVariant, cogs: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Berat (Gram)</label>
+                <input type="number" className="form-input-small" value={newVariant.weight} onChange={e => setNewVariant({...newVariant, weight: parseInt(e.target.value)})} />
+              </div>
+            </div>
+            <button onClick={handleAddVariant} className="btn-save" style={{ width: '100%', padding: '14px' }}>Tambah Varian</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Variant */}
+      {editingVariant && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">Edit Varian</h3>
+              <button className="btn-close" onClick={() => setEditingVariant(null)}>&times;</button>
+            </div>
+            <div className="variant-grid">
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="mini-label">Nama Varian</label>
+                <input type="text" className="form-input-small bold" value={editingVariant.name} onChange={e => setEditingVariant({...editingVariant, name: e.target.value})} />
+              </div>
+              <div>
+                <label className="mini-label">SKU Varian</label>
+                <input type="text" className="form-input-small" value={editingVariant.sku} onChange={e => setEditingVariant({...editingVariant, sku: e.target.value})} />
+              </div>
+              <div>
+                <label className="mini-label">Stok</label>
+                <input type="number" className="form-input-small" value={editingVariant.stock} onChange={e => setEditingVariant({...editingVariant, stock: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Harga Jual (Rp)</label>
+                <input type="number" className="form-input-small bold" style={{ color: '#4361ee' }} value={editingVariant.price} onChange={e => setEditingVariant({...editingVariant, price: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Harga Grosir (Rp)</label>
+                <input type="number" className="form-input-small" value={editingVariant.wholesale_price} onChange={e => setEditingVariant({...editingVariant, wholesale_price: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Modal / COGS (Rp)</label>
+                <input type="number" className="form-input-small danger" value={editingVariant.cogs} onChange={e => setEditingVariant({...editingVariant, cogs: parseInt(e.target.value)})} />
+              </div>
+              <div>
+                <label className="mini-label">Berat (Gram)</label>
+                <input type="number" className="form-input-small" value={editingVariant.weight} onChange={e => setEditingVariant({...editingVariant, weight: parseInt(e.target.value)})} />
+              </div>
+            </div>
+            <button onClick={handleUpdateVariant} className="btn-save" style={{ width: '100%', padding: '14px' }}>Simpan Perubahan</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,6 +25,11 @@ export default function MembershipTiers() {
   const [tierPresetModal, setTierPresetModal] = useState(null);
   const [tierPresetSaving, setTierPresetSaving] = useState(false);
 
+  // --- MERCHANT PRESETS STATE ---
+  const [merchantPresets, setMerchantPresets] = useState([]);
+  const [merchantPresetModal, setMerchantPresetModal] = useState(null);
+  const [merchantPresetSaving, setMerchantPresetSaving] = useState(false);
+
   const EMPTY = {
     name: '',
     level: 1,
@@ -61,6 +66,10 @@ export default function MembershipTiers() {
       
     fetchJson(`${API}/tier-commission-presets`)
       .then(d => setTierPresets(Array.isArray(d) ? d : (d?.data || [])))
+      .catch(console.error);
+
+    fetchJson(`${API}/merchant-commission-presets`)
+      .then(d => setMerchantPresets(Array.isArray(d) ? d : (d?.data || [])))
       .catch(console.error);
   };
 
@@ -208,6 +217,42 @@ export default function MembershipTiers() {
     });
   };
 
+  // --- MERCHANT PRESETS ACTIONS ---
+  const saveMerchantPreset = (e) => {
+    e.preventDefault();
+    setMerchantPresetSaving(true);
+    fetchJson(`${API}/merchant-commission-presets/upsert`, {
+      method: 'POST',
+      body: JSON.stringify(merchantPresetModal)
+    })
+      .then(() => { loadPresets(); setMerchantPresetModal(null); })
+      .catch(e => alert(e.message))
+      .finally(() => setMerchantPresetSaving(false));
+  };
+
+  const delMerchantPreset = (id) => {
+    if (!window.confirm('Hapus preset komisi merchant ini?')) return;
+    fetchJson(`${API}/merchant-commission-presets/delete?id=${id}`, { method: 'DELETE' })
+      .then(loadPresets)
+      .catch(e => alert(e.message));
+  };
+
+  const openMerchantPresetModal = (existing = null) => {
+    if (existing) {
+      setMerchantPresetModal({
+        ...existing,
+        rate: +(existing.rate * 100).toFixed(2)
+      });
+      return;
+    }
+    setMerchantPresetModal({
+      name: '',
+      description: '',
+      is_active: true,
+      rate: 10
+    });
+  };
+
   return (
     <div style={A.page} className="fade-in">
       <PageHeader 
@@ -227,6 +272,11 @@ export default function MembershipTiers() {
         {activeTab === 'tier_presets' && (
           <button style={A.btnPrimary} onClick={() => openTierPresetModal()}>
             <i className="bx bx-plus" /> Tambah Preset Tier Matrix
+          </button>
+        )}
+        {activeTab === 'merchant_presets' && (
+          <button style={A.btnPrimary} onClick={() => openMerchantPresetModal()}>
+            <i className="bx bx-plus" /> Tambah Preset Komisi Merchant
           </button>
         )}
       </PageHeader>
@@ -267,6 +317,18 @@ export default function MembershipTiers() {
           }}
         >
           Tier Commission Presets
+        </button>
+        <button 
+          onClick={() => setActiveTab('merchant_presets')}
+          style={{ 
+            padding: '12px 16px', border: 'none', background: 'transparent',
+            fontWeight: 600, fontSize: 14, cursor: 'pointer',
+            color: activeTab === 'merchant_presets' ? '#4f46e5' : '#64748b',
+            borderBottom: activeTab === 'merchant_presets' ? '2px solid #4f46e5' : '2px solid transparent',
+            transition: 'all 0.2s'
+          }}
+        >
+          Merchant Presets
         </button>
       </div>
 
@@ -510,6 +572,71 @@ export default function MembershipTiers() {
         </div>
       )}
 
+      {activeTab === 'merchant_presets' && (
+        <div style={{ overflowX: 'auto', background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9' }} className="fade-in">
+          <TablePanel loading={loading}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+              <thead>
+                <tr>
+                  {['Nama Preset', 'Rate Komisi', 'Status', 'Opsi'].map((h, i) => (
+                    <th key={h} style={{ 
+                      ...A.th, 
+                      textAlign: i === 3 ? 'right' : 'left', 
+                      paddingLeft: i === 0 ? 24 : 16, 
+                      paddingRight: i === 3 ? 24 : 16 
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {merchantPresets.length === 0 && !loading ? (
+                  <tr><td colSpan={4} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                    <i className="bx bx-store-alt" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.2 }} />
+                    Belum ada Preset Komisi Merchant.
+                  </td></tr>
+                ) : merchantPresets.map((preset, idx) => {
+                  return (
+                    <tr key={preset.id}
+                      style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f5f7ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+                    >
+                      <td style={{ ...A.td, paddingLeft: 24 }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{preset.name}</div>
+                        {preset.description && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{preset.description}</div>}
+                      </td>
+                      <td style={A.td}>
+                        <span style={{ 
+                            padding: '4px 8px', borderRadius: 6, background: '#f0fdf4', 
+                            color: '#16a34a', fontWeight: 700, fontSize: 14 
+                        }}>
+                          {(preset.rate * 100).toFixed(1)}%
+                        </span>
+                      </td>
+                      <td style={A.td}>
+                        <span style={{ 
+                          padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                          background: preset.is_active ? '#ecfdf5' : '#fff1f2',
+                          color: preset.is_active ? '#059669' : '#e11d48'
+                        }}>
+                          {preset.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          <button style={A.iconBtn('#6366f1', '#eef2ff')} onClick={() => openMerchantPresetModal(preset)} title="Edit"><i className="bx bx-pencil" /></button>
+                          <button style={A.iconBtn('#ef4444', '#fff1f2')} onClick={() => delMerchantPreset(preset.id)} title="Hapus"><i className="bx bx-trash" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </TablePanel>
+        </div>
+      )}
+
       {/* MODAL: TIERS */}
       {modal && (
         <Modal title={modal.id ? 'Edit Jenjang' : 'Tambah Jenjang'} onClose={() => setModal(null)}>
@@ -713,6 +840,54 @@ export default function MembershipTiers() {
               <button type="button" style={A.btnGhost} onClick={() => setTierPresetModal(null)}>Batal</button>
               <button type="submit" style={A.btnPrimary} disabled={tierPresetSaving}>
                 {tierPresetSaving ? '...' : <><i className="bx bx-save" /> Simpan Preset Matrix</>}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* MODAL: MERCHANT PRESETS */}
+      {merchantPresetModal && (
+        <Modal title={merchantPresetModal.id ? 'Edit Preset Komisi Merchant' : 'Tambah Preset Komisi Merchant'} onClose={() => setMerchantPresetModal(null)}>
+          <form onSubmit={saveMerchantPreset}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+              <div>
+                <FieldLabel>Nama Preset</FieldLabel>
+                <input style={{ ...A.select, width: '100%' }} placeholder="Misal: Margin Standard Merchant" value={merchantPresetModal.name} onChange={e => setMerchantPresetModal({...merchantPresetModal, name: e.target.value})} required />
+              </div>
+              
+              <div>
+                <FieldLabel>Deskripsi</FieldLabel>
+                <textarea style={{ ...A.textarea, minHeight: 60 }} placeholder="Penjelasan preset komisi merchant ini..." value={merchantPresetModal.description} onChange={e => setMerchantPresetModal({...merchantPresetModal, description: e.target.value})} />
+              </div>
+
+              <div>
+                <FieldLabel>Rate Komisi Merchant (%)</FieldLabel>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <input 
+                    type="number" step="0.1" style={{ ...A.select, flex: 1 }} 
+                    placeholder="Rate (%)" 
+                    value={merchantPresetModal.rate} 
+                    onChange={e => setMerchantPresetModal({...merchantPresetModal, rate: parseFloat(e.target.value) || 0})} 
+                    required 
+                  />
+                  <span style={{ fontWeight: 700, color: '#64748b' }}>%</span>
+                </div>
+                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Bagian yang akan diterima oleh merchant dari subtotal produk.</p>
+              </div>
+
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={merchantPresetModal.is_active} onChange={e => setMerchantPresetModal({...merchantPresetModal, is_active: e.target.checked})} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Aktifkan preset ini</span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
+              <button type="button" style={A.btnGhost} onClick={() => setMerchantPresetModal(null)}>Batal</button>
+              <button type="submit" style={A.btnPrimary} disabled={merchantPresetSaving}>
+                {merchantPresetSaving ? '...' : <><i className="bx bx-save" /> Simpan Preset Merchant</>}
               </button>
             </div>
           </form>
