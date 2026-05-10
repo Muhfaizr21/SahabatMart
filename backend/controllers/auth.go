@@ -214,7 +214,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 
 	user, jwtToken, err := ac.Service.HandleGoogleUser(userInfo.Email, userInfo.Name, userInfo.Id, userInfo.Picture, state)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		utils.JSONErrorInternal(w, err, "")
 		return
 	}
 
@@ -250,7 +250,6 @@ func (ac *AuthController) ForgotPassword(w http.ResponseWriter, r *http.Request)
 	// but ideally it should be hidden.
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Instruksi reset password telah dikirim ke email Anda",
-		"debug_token": token, // REMOVE THIS IN PRODUCTION
 	})
 }
 

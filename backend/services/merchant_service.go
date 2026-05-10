@@ -28,7 +28,7 @@ func NewMerchantService(db *gorm.DB, notif *NotificationService) *MerchantServic
 
 func (s *MerchantService) GetCatalog(search string) ([]models.Product, error) {
 	var products []models.Product
-	query := s.DB.Where("status = ? AND is_master = ?", "active", true)
+	query := s.DB.Where("status = ? AND is_master = ?", "active", true).Preload("Variants")
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -43,30 +43,29 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 		return nil, fmt.Errorf("merchant identity not found or invalid")
 	}
 
-	// ProductResult helps in combining product data with merchant-specific inventory stock
 	type ProductResult struct {
 		models.Product
-		Stock int `json:"stock" gorm:"column:inventory_stock"` // Override Product.Stock with Inventory Stock
+		VariantID   *string `json:"variant_id" gorm:"column:v_id"`
+		VariantName *string `json:"variant_name" gorm:"column:v_name"`
+		VariantSKU  *string `json:"variant_sku" gorm:"column:v_sku"`
+		Stock       int     `json:"stock" gorm:"column:inventory_stock"`
 	}
 	var results []ProductResult
 	var total int64
 
-	// Use Session to ensure clean query state for multiple calls (Count & Find)
 	baseQuery := s.DB.Session(&gorm.Session{}).Table("products").
 		Joins("JOIN inventories inv ON inv.product_id = products.id").
+		Joins("LEFT JOIN product_variants pv ON pv.id = inv.product_variant_id").
 		Where("inv.merchant_id = ?", merchantID).
 		Where("products.deleted_at IS NULL")
 
-	// Apply Filters to baseQuery
 	if search != "" {
-		baseQuery = baseQuery.Where("products.name ILIKE ?", "%"+search+"%")
+		baseQuery = baseQuery.Where("(products.name ILIKE ? OR pv.name ILIKE ? OR pv.sku ILIKE ?)", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 	
 	if categoryID != "" && categoryID != "0" && categoryID != "all" {
 		var cat models.Category
 		if err := s.DB.First(&cat, categoryID).Error; err == nil {
-			// Filtering by category name because Product stores category as string
-			// Use ILIKE for case-insensitive matching (e.g. 'Eye Care' vs 'EYE CARE')
 			baseQuery = baseQuery.Where("products.category ILIKE ?", cat.Name)
 		}
 	}
@@ -81,18 +80,21 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 		}
 	}
 
-	// Count Total (using a separate clone of the query)
 	if err := baseQuery.Count(&total).Error; err != nil {
 		return nil, err
 	}
 
-	// Pagination
 	if limit <= 0 { limit = 10 }
 	if page <= 1 { page = 1 }
 	offset := (page - 1) * limit
 
-	// Execute Final Query
-	err := baseQuery.Select("products.*, inv.stock as inventory_stock").
+	err := baseQuery.Select(`
+		products.*, 
+		inv.stock as inventory_stock, 
+		pv.id as v_id, 
+		pv.name as v_name, 
+		pv.sku as v_sku
+	`).
 		Order("products.created_at desc").
 		Limit(limit).
 		Offset(offset).
@@ -551,18 +553,26 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 			tx.First(&prod, "id = ?", item.ProductID)
 
 			var inv models.Inventory
-			err := tx.Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).First(&inv).Error
+			dbInv := tx.Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID)
+			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+				dbInv = dbInv.Where("product_variant_id = ?", *item.ProductVariantID)
+			} else {
+				dbInv = dbInv.Where("product_variant_id IS NULL OR product_variant_id = ''")
+			}
+			
+			err := dbInv.First(&inv).Error
 			
 			stockBefore := 0
 			if err == nil { stockBefore = inv.Stock }
 
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				inv = models.Inventory{
-					MerchantID:    merchantID,
-					ProductID:     item.ProductID,
-					Stock:         item.Quantity,
-					BasePrice:     prod.COGS,
-					LastSyncPrice: time.Now(),
+					MerchantID:       merchantID,
+					ProductID:        item.ProductID,
+					ProductVariantID: item.ProductVariantID,
+					Stock:            item.Quantity,
+					BasePrice:        prod.COGS,
+					LastSyncPrice:    time.Now(),
 				}
 				if err := tx.Create(&inv).Error; err != nil { return err }
 			} else if err == nil {
@@ -578,14 +588,15 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 
 			// LOG MUTATION (Mata Elang) - Tracking Stock IN at Merchant
 			tx.Create(&models.StockMutation{
-				ProductID:   item.ProductID,
-				MerchantID:  merchantID,
-				Type:        "RESTOCK_IN",
-				Quantity:    item.Quantity,
-				Reference:   req.ID,
-				StockBefore: stockBefore,
-				StockAfter:  inv.Stock,
-				Note:        "Received from Pusat (Restock)",
+				ProductID:        item.ProductID,
+				ProductVariantID: item.ProductVariantID,
+				MerchantID:       merchantID,
+				Type:             "RESTOCK_IN",
+				Quantity:         item.Quantity,
+				Reference:        req.ID,
+				StockBefore:      stockBefore,
+				StockAfter:       inv.Stock,
+				Note:             "Received from Pusat (Restock)",
 			})
 		}
 

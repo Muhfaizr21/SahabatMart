@@ -215,14 +215,25 @@ func SeedAkuglowProducts(db *gorm.DB) {
 		}
 
 		// Create Standard Variant
-		db.Where(models.ProductVariant{ProductID: existing.ID, Name: "Standard"}).
-			Assign(models.ProductVariant{
-				ID:    uuid.New().String(),
-				SKU:   existing.SKU + "-STD",
-				Price: existing.Price,
-				COGS:  existing.COGS,
-				Stock: 1000,
-			}).FirstOrCreate(&models.ProductVariant{})
+		var v models.ProductVariant
+		db.Where("product_id = ? AND name = ?", existing.ID, "Standard").First(&v)
+		if v.ID == "" {
+			v = models.ProductVariant{
+				ID:        uuid.New().String(),
+				ProductID: existing.ID,
+				Name:      "Standard",
+				SKU:       existing.SKU + "-STD",
+				Price:     existing.Price,
+				COGS:      existing.COGS,
+				Stock:     1000,
+			}
+			db.Create(&v)
+		} else {
+			db.Model(&v).Updates(map[string]interface{}{
+				"price": existing.Price,
+				"cogs":  existing.COGS,
+			})
+		}
 
 		// Ensure Inventory for Pusat
 		db.Where(models.Inventory{MerchantID: models.PusatID, ProductID: existing.ID}).

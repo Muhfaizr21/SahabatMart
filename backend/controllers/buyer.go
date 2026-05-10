@@ -366,7 +366,7 @@ func (bc *BuyerController) GetPaymentInstructions(w http.ResponseWriter, r *http
 	// Fetch fresh instructions from TriPay
 	result, err := bc.TripayService.GetInstructions(payment.PaymentMethod, payCode, payment.Amount)
 	if err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to fetch instructions: "+err.Error())
+		utils.JSONErrorInternal(w, err, "Gagal mengambil instruksi pembayaran")
 		return
 	}
 

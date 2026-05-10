@@ -192,41 +192,68 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 				var inventory models.Inventory
 				inventoryMerchantID := merchantID
-				if err := tx.Set("gorm:query_option", "FOR UPDATE").
-					Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID).
-					First(&inventory).Error; err != nil {
+				
+				// 1. Precise Query (Variant-aware)
+				invQuery := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID)
+				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+					invQuery = invQuery.Where("product_variant_id = ?", *item.ProductVariantID)
+				} else {
+					invQuery = invQuery.Where("product_variant_id IS NULL")
+				}
+
+				if err := invQuery.First(&inventory).Error; err != nil {
+					// 2. Pusat Fallback (Variant-aware)
 					pusatFallback := "00000000-0000-0000-0000-000000000000"
-					if err2 := tx.Set("gorm:query_option", "FOR UPDATE").
-						Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID).
-						First(&inventory).Error; err2 != nil {
-						return fmt.Errorf("stok produk '%s' tidak tersedia", item.ProductName)
+					invQueryPusat := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID)
+					if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+						invQueryPusat = invQueryPusat.Where("product_variant_id = ?", *item.ProductVariantID)
+					} else {
+						invQueryPusat = invQueryPusat.Where("product_variant_id IS NULL")
+					}
+
+					if err2 := invQueryPusat.First(&inventory).Error; err2 != nil {
+						return fmt.Errorf("stok produk '%s' (%s) tidak tersedia", item.ProductName, item.VariantName)
 					}
 					inventoryMerchantID = pusatFallback
 				}
 
 				if inventory.Stock < item.Quantity {
+					// Attempt to find stock in Pusat if Merchant stock insufficient
 					pusatFallback := "00000000-0000-0000-0000-000000000000"
 					if inventoryMerchantID != pusatFallback {
-						if err2 := tx.Set("gorm:query_option", "FOR UPDATE").
-							Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID).
-							First(&inventory).Error; err2 == nil && inventory.Stock >= item.Quantity {
+						invQueryPusat := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID)
+						if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+							invQueryPusat = invQueryPusat.Where("product_variant_id = ?", *item.ProductVariantID)
+						} else {
+							invQueryPusat = invQueryPusat.Where("product_variant_id IS NULL")
+						}
+
+						if err2 := invQueryPusat.First(&inventory).Error; err2 == nil && inventory.Stock >= item.Quantity {
 							inventoryMerchantID = pusatFallback
 						} else {
-							return fmt.Errorf("stok produk '%s' tidak mencukupi", item.ProductName)
+							return fmt.Errorf("stok produk '%s' (%s) tidak mencukupi", item.ProductName, item.VariantName)
 						}
 					} else {
-						return fmt.Errorf("stok produk '%s' tidak mencukupi", item.ProductName)
+						return fmt.Errorf("stok produk '%s' (%s) tidak mencukupi", item.ProductName, item.VariantName)
 					}
 				}
 
+				// Update Inventory Record
 				if err := tx.Model(&inventory).Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 					return err
 				}
 
-				// [Sync Fix] Also decrement stock in Master Catalog (Product)
-				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-					UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-					return err
+				// Update Master Catalog Stock (Variant vs Product)
+				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+					if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+						UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+						return err
+					}
+				} else {
+					if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+						UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+						return err
+					}
 				}
 
 				item.PlatformFeeAmount = platAmt
@@ -438,9 +465,21 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	db.Where("id = ?", merchantID).First(&merchant)
 
 	// 3. Distribution Fee (Merchant cut)
-	if product.MerchantCommissionPresetID != nil && *product.MerchantCommissionPresetID != "" {
+	mPresetID := product.MerchantCommissionPresetID
+	
+	// Variant Override for Merchant Commission
+	if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+		var variant models.ProductVariant
+		if err := db.Where("id = ?", *item.ProductVariantID).First(&variant).Error; err == nil {
+			if variant.MerchantCommissionPresetID != nil && *variant.MerchantCommissionPresetID != "" {
+				mPresetID = variant.MerchantCommissionPresetID
+			}
+		}
+	}
+
+	if mPresetID != nil && *mPresetID != "" {
 		var mPreset models.MerchantCommissionPreset
-		if err := db.Where("id = ? AND is_active = true", *product.MerchantCommissionPresetID).First(&mPreset).Error; err == nil {
+		if err := db.Where("id = ? AND is_active = true", *mPresetID).First(&mPreset).Error; err == nil {
 			distAmt = subtotal * mPreset.Rate
 		}
 	}
@@ -461,12 +500,23 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	// Distribusi multi-level preset ditangani oleh DistributePresetCommissions
 	if affiliateID != nil && *affiliateID != "" {
 		if aff, err := s.UserRepo.GetAffiliateByID(*affiliateID); err == nil {
+			// 1. Determine Preset ID (Variant-aware)
+			presetID := product.CommissionPresetID
+			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+				var variant models.ProductVariant
+				if err := db.Where("id = ?", *item.ProductVariantID).First(&variant).Error; err == nil {
+					if variant.CommissionPresetID != nil && *variant.CommissionPresetID != "" {
+						presetID = variant.CommissionPresetID
+					}
+				}
+			}
+
 			// Cek apakah produk punya preset multi-level
-			if product.CommissionPresetID != nil && *product.CommissionPresetID != "" {
+			if presetID != nil && *presetID != "" {
 				// Kalau ada preset, affAmt diisi dari Level 1 rate saja (untuk order total)
 				// Distribusi lengkap akan dieksekusi via DistributePresetCommissions
 				var presetLevel models.CommissionPresetLevel
-				if err := db.Where("preset_id = ? AND level = 1", *product.CommissionPresetID).First(&presetLevel).Error; err == nil {
+				if err := db.Where("preset_id = ? AND level = 1", *presetID).First(&presetLevel).Error; err == nil {
 					affAmt = subtotal * presetLevel.Rate
 				}
 			} else {
@@ -512,14 +562,25 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 		return nil, err
 	}
 
-	// Tidak ada preset? Skip — gunakan logika lama
-	if product.CommissionPresetID == nil || *product.CommissionPresetID == "" {
+	// 1. Determine Preset ID (Variant-aware)
+	presetID := product.CommissionPresetID
+	if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+		var variant models.ProductVariant
+		if err := tx.Where("id = ?", *item.ProductVariantID).First(&variant).Error; err == nil {
+			if variant.CommissionPresetID != nil && *variant.CommissionPresetID != "" {
+				presetID = variant.CommissionPresetID
+			}
+		}
+	}
+
+	// Tidak ada preset? Skip
+	if presetID == nil || *presetID == "" {
 		return nil, nil
 	}
 
-	// Load level-level dari preset
+	// 2. Load level-level dari preset
 	var presetLevels []models.CommissionPresetLevel
-	if err := tx.Where("preset_id = ?", *product.CommissionPresetID).Order("level ASC").Find(&presetLevels).Error; err != nil {
+	if err := tx.Where("preset_id = ?", *presetID).Order("level ASC").Find(&presetLevels).Error; err != nil {
 		return nil, err
 	}
 	if len(presetLevels) == 0 {
@@ -617,11 +678,17 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 				return err
 			}
 
-			// 2. Restock Master Catalog (The product listing)
-			if err := tx.Model(&models.Product{}).
-				Where("id = ?", item.ProductID).
-				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
-				return err
+			// 2. Restock Master Catalog (Variant-Aware)
+			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+				if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+					UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+					return err
+				}
+			} else {
+				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+					UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+					return err
+				}
 			}
 		}
 
@@ -738,24 +805,12 @@ func (s *OrderService) SyncOrderStatusFromGroups(tx *gorm.DB, orderID string) er
 		return nil
 	}
 
-	// Jika status berubah menjadi COMPLETED, trigger turnover update & Reward Points
+	// Jika status berubah menjadi COMPLETED, trigger turnover update
 	if newStatus == models.OrderCompleted {
 		var order models.Order
 		tx.First(&order, "id = ?", orderID)
 		if order.Status != models.OrderCompleted {
-			// 1. Tambahkan Reward Points (Contoh: 1 poin per Rp 1.000)
-			if order.BuyerID != nil {
-				points := int64(order.GrandTotal / 1000)
-				if points > 0 {
-					tx.Model(&models.UserProfile{}).Where("user_id = ?", *order.BuyerID).
-						UpdateColumn("reward_points", gorm.Expr("reward_points + ?", points))
-					
-					_ = s.Notification.Push(*order.BuyerID, "buyer", "reward_earned", "🎁 Poin AkuGlow!", 
-						fmt.Sprintf("Selamat! Anda mendapatkan %d poin dari pesanan %s.", points, order.OrderNumber), "/profile?tab=points")
-				}
-			}
-
-			// 2. Trigger Turnover Snapshot Update untuk Affiliate secara Rekursif
+			// Trigger Turnover Snapshot Update untuk Affiliate secara Rekursif
 			if order.AffiliateID != nil {
 				go s.Affiliate.UpdateUplineSnapshotsRecursive(*order.AffiliateID)
 			}

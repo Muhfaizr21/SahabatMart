@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
@@ -16,14 +16,20 @@ export default function TeamPerformance() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [filterLevel, setFilterLevel] = useState('all');
+  const [expandedIds, setExpandedIds] = useState([]);
+  const [currentRoot, setCurrentRoot] = useState(null);
+  const [navPath, setNavPath] = useState([]);
+  const [viewMode, setViewMode] = useState('visual'); // 'table' or 'visual'
   const [pagination, setPagination] = useState({ current_page: 1, total_pages: 1, total_items: 0 });
 
   const loadStats = async () => {
     setLoading(true);
     setError(null);
     try {
+      const rootParam = currentRoot ? `&root_id=${currentRoot.id}` : '';
       const [teamRes, eligRes] = await Promise.all([
-        fetchJson(`${AFFILIATE_API_BASE}/team-stats?search=${search}&page=${page}`),
+        fetchJson(`${AFFILIATE_API_BASE}/team-stats?search=${search}&page=${page}&level=${filterLevel}${rootParam}`),
         fetchJson(`${AFFILIATE_API_BASE}/merchant-eligibility`).catch(() => null),
       ]);
       setStats(teamRes);
@@ -42,9 +48,62 @@ export default function TeamPerformance() {
       else loadStats();
     }, 500);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, filterLevel, currentRoot]);
 
   useEffect(() => { loadStats(); }, [page]);
+
+  const toggleExpand = (id) => {
+    setExpandedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  // Helper to determine if a member should be visible
+  const isMemberVisible = (m) => {
+    if (m.level === 1) return true;
+    if (search) return true;
+    return expandedIds.includes(m.upline_id);
+  };
+
+  const handleDrillDown = (member) => {
+    const newRoot = { id: member.affiliate_id, name: member.full_name, avatar: member.avatar_url };
+    setCurrentRoot(newRoot);
+    setNavPath(prev => [...prev, { id: member.affiliate_id, name: member.full_name }]);
+    setPage(1);
+  };
+
+  const handleNavigatePath = (index) => {
+    if (index === -1) {
+      setCurrentRoot(null);
+      setNavPath([]);
+    } else {
+      const target = navPath[index];
+      setCurrentRoot({ id: target.id, name: target.name });
+      setNavPath(navPath.slice(0, index + 1));
+    }
+    setPage(1);
+  };
+
+  // Build tree structure for visual mode
+  const getHierarchy = () => {
+    if (!stats || !stats.downlines) return [];
+    const map = {};
+    const tree = [];
+    
+    stats.downlines.forEach(m => {
+      map[m.affiliate_id] = { ...m, children: [] };
+    });
+
+    stats.downlines.forEach(m => {
+      if (m.upline_id && map[m.upline_id]) {
+        map[m.upline_id].children.push(map[m.affiliate_id]);
+      } else if (m.level === 1) {
+        tree.push(map[m.affiliate_id]);
+      }
+    });
+
+    return tree;
+  };
 
   if (loading && !stats) return (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -70,22 +129,59 @@ export default function TeamPerformance() {
   );
 
   // Eligibility data
-  const activeMitra = eligibility?.active_mitra || 0;
+  const totalMitra = eligibility?.active_mitra || 0;
+  const qualifiedMitra = eligibility?.qualified_mitra || 0;
   const reqMitra = eligibility?.requirements?.min_mitra || 100;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
   const reqTurnover = eligibility?.requirements?.min_turnover || 10000000;
-  const mitraProgress = Math.min((activeMitra / reqMitra) * 100, 100);
+  
+  // Use qualifiedMitra for merchant progress requirement
+  const mitraProgress = Math.min((qualifiedMitra / reqMitra) * 100, 100);
   const turnoverProgress = Math.min((monthlyTurnover / reqTurnover) * 100, 100);
   const isEligible = eligibility?.is_eligible;
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-black text-white font-['Plus_Jakarta_Sans'] tracking-tight">
-          Pusat <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Tim</span>
-        </h1>
-        <p className="text-slate-400 text-sm mt-0.5">Pantau performa jaringan mitra di bawah Anda</p>
+      {/* Header & Breadcrumbs */}
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-white font-['Plus_Jakarta_Sans'] tracking-tight">
+            Pusat <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Tim</span>
+          </h1>
+          <p className="text-slate-400 text-sm mt-0.5">Pantau performa jaringan mitra di bawah Anda</p>
+        </div>
+
+        {/* Breadcrumbs / Navigation Path */}
+        <div className="flex items-center flex-wrap gap-2 mb-2">
+          <button 
+            onClick={() => handleNavigatePath(-1)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${!currentRoot ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'bg-white/5 text-slate-500 hover:text-slate-300 border border-white/5'}`}
+          >
+            <span className="material-symbols-outlined text-sm">home</span>
+            Tim Saya
+          </button>
+
+          {navPath.map((item, idx) => (
+            <React.Fragment key={item.id}>
+              <span className="material-symbols-outlined text-slate-700 text-sm">chevron_right</span>
+              <button 
+                onClick={() => handleNavigatePath(idx)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${idx === navPath.length - 1 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-lg shadow-purple-500/10' : 'bg-white/5 text-slate-500 hover:text-slate-300 border border-white/5'}`}
+              >
+                <div className="w-4 h-4 rounded-full bg-slate-800 overflow-hidden border border-white/10 flex-shrink-0">
+                  {item.avatar ? (
+                    <img src={formatImage(item.avatar)} className="w-full h-full object-cover" alt="" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[8px]">{item.name.charAt(0)}</div>
+                  )}
+                </div>
+                {item.name}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div className="h-1 w-full bg-gradient-to-r from-purple-500/50 via-transparent to-transparent rounded-full mb-8 opacity-30" />
       </div>
 
       {/* Summary Cards */}
@@ -153,12 +249,12 @@ export default function TeamPerformance() {
           {/* Mitra Aktif Progress */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <div>
-                <span className="text-xs text-slate-300 font-semibold">Mitra Aktif</span>
-                <span className="text-[10px] text-slate-500 ml-2">(min 1 transaksi/30 hari)</span>
+              <div className="flex flex-col">
+                <span className="text-xs text-slate-300 font-semibold">Progres Mitra (Direct Berjaringan)</span>
+                <span className="text-[10px] text-slate-500">Total Tergabung: {totalMitra} Mitra</span>
               </div>
-              <span className="text-xs font-black" style={{ color: activeMitra >= reqMitra ? '#4ade80' : '#b76dff' }}>
-                {activeMitra} / {reqMitra}
+              <span className="text-xs font-black" style={{ color: qualifiedMitra >= reqMitra ? '#4ade80' : '#b76dff' }}>
+                {qualifiedMitra} / {reqMitra}
               </span>
             </div>
             <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -166,7 +262,7 @@ export default function TeamPerformance() {
                 className="h-full rounded-full transition-all duration-700"
                 style={{
                   width: `${mitraProgress}%`,
-                  background: activeMitra >= reqMitra
+                  background: qualifiedMitra >= reqMitra
                     ? 'linear-gradient(90deg, #4ade80, #22c55e)'
                     : 'linear-gradient(90deg, #7c3aed, #b76dff)'
                 }}
@@ -197,157 +293,211 @@ export default function TeamPerformance() {
         </div>
       )}
 
-      {/* Team Table */}
-      <div className="rounded-2xl overflow-hidden" style={cardStyle}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-white/5 gap-4">
-          <div>
-            <h3 className="text-white font-bold font-['Plus_Jakarta_Sans']">Daftar Anggota Tim</h3>
-            <p className="text-slate-400 text-xs mt-0.5">
-              {pagination.total_items || 0} hasil ditemukan · <span className="text-green-400">{activeMitra} aktif</span> 30 hari ini
-            </p>
+      {/* Team View Controller */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-white font-bold font-['Plus_Jakarta_Sans']">Daftar Anggota Tim</h3>
+          <p className="text-slate-400 text-xs mt-0.5">
+            {pagination.total_items || 0} hasil ditemukan · <span className="text-green-400">{activeMitra} aktif</span> 30 hari ini
+          </p>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-2 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-sm">
+          <div className="flex items-center gap-2 p-1 bg-black/20 rounded-xl border border-white/5">
+            <button 
+              onClick={() => setViewMode('visual')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'visual' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <span className="material-symbols-outlined text-sm">account_tree</span>
+              Visual Pohon
+            </button>
+            <button 
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <span className="material-symbols-outlined text-sm">table_rows</span>
+              Data Tabel
+            </button>
           </div>
+
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-grow md:w-64">
+            <div className="relative flex-1 md:w-64">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Cari nama atau User ID..."
+                className="w-full bg-black/30 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50 transition-all"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50 transition-all"
               />
             </div>
-            <button
+            <button 
               onClick={loadStats}
-              className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition-all"
+              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
             >
-              <span className="material-symbols-outlined text-xl">refresh</span>
+              <span className="material-symbols-outlined text-lg">refresh</span>
             </button>
           </div>
         </div>
 
-        {!stats?.downlines?.length ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-            <span className="material-symbols-outlined text-5xl mb-3 opacity-30">group_add</span>
-            <p className="text-sm font-semibold mb-1">Belum ada anggota tim</p>
-            <p className="text-xs text-center max-w-xs">
-              Bagikan link affiliate Anda agar orang bergabung sebagai mitra dan masuk ke tim Anda.
-            </p>
+        {viewMode === 'visual' ? (
+          <div className="min-h-[500px] p-8 rounded-3xl bg-black/20 border border-white/5 overflow-x-auto custom-scrollbar">
+            <div className="flex flex-col gap-12 items-center min-w-max">
+              {getHierarchy().map(root => (
+                <TreeNode key={root.affiliate_id} node={root} onDrillDown={handleDrillDown} />
+              ))}
+              {(!stats || !stats.downlines || stats.downlines.length === 0) && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                  <span className="material-symbols-outlined text-5xl mb-4 opacity-20">group_off</span>
+                  <p className="font-bold">Belum ada anggota tim</p>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  {['Nama Mitra', 'Level', 'Status', 'Direferensikan Oleh', 'Bergabung', 'Omset Pribadi'].map(h => (
-                    <th key={h} className="text-left px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {stats.downlines.map((m, idx) => (
-                  <tr
-                    key={m.user_id || idx}
-                    className="hover:bg-white/3 transition-colors"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center text-white text-xs font-black flex-shrink-0"
+          <div style={cardStyle} className="rounded-3xl overflow-hidden border border-white/5">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-white/[0.02] border-b border-white/5">
+                    {[
+                      { label: 'Nama Mitra', icon: 'person' },
+                      { label: 'Level', icon: 'layers' },
+                      { label: 'Status', icon: 'shield_check' },
+                      { label: 'Direferensikan Oleh', icon: 'link' },
+                      { label: 'Bergabung', icon: 'event' },
+                      { label: 'Omset Pribadi', icon: 'payments' },
+                      { label: 'Aksi', icon: 'settings', align: 'center' },
+                    ].map((h, i) => (
+                      <th key={i} className={`px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest ${h.align === 'center' ? 'text-center' : ''}`}>
+                        <div className={`flex items-center gap-2 ${h.align === 'center' ? 'justify-center' : ''}`}>
+                          <span className="material-symbols-outlined text-[14px]">{h.icon}</span>
+                          {h.label}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats?.downlines?.filter(isMemberVisible).map((m, idx) => (
+                    <tr
+                      key={m.affiliate_id || m.user_id || idx}
+                      className={`transition-all duration-300 ${m.level === 1 ? 'bg-purple-500/[0.03] hover:bg-purple-500/[0.06]' : 'hover:bg-white/3'}`}
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {m.level > 1 && (
+                            <div className="flex items-center">
+                              <div className="w-5 h-8 border-l-2 border-b-2 border-white/10 rounded-bl-xl -mt-5 mr-1" />
+                            </div>
+                          )}
+                          <div
+                            className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-black flex-shrink-0 shadow-lg"
+                            style={{ 
+                              background: m.level === 1 
+                                ? 'linear-gradient(135deg, #7c3aed, #b76dff)' 
+                                : 'linear-gradient(135deg, #334155, #475569)',
+                              boxShadow: m.level === 1 ? '0 4px 12px rgba(124, 58, 237, 0.3)' : 'none'
+                            }}
+                          >
+                            {m.avatar_url ? (
+                              <img src={formatImage(m.avatar_url)} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-sm">{(m.full_name || 'M').charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-bold ${m.level === 1 ? 'text-white' : 'text-slate-200'}`}>{m.full_name || 'Mitra'}</p>
+                              {m.level === 1 && (
+                                <span className="text-[8px] bg-purple-500 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm">Direct</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-mono mt-0.5">{m.user_id?.slice(0, 8)}…</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span 
+                          className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
                           style={{ 
-                            background: m.level === 1 
-                              ? 'linear-gradient(135deg, #7c3aed, #b76dff)' 
-                              : 'linear-gradient(135deg, #475569, #64748b)'
+                            background: m.level === 1 ? '#b76dff20' : '#47556930',
+                            color: m.level === 1 ? '#b76dff' : '#94a3b8',
+                            border: m.level === 1 ? '1px solid #b76dff30' : '1px solid #47556940'
                           }}
                         >
-                          {m.avatar_url ? (
-                            <img src={formatImage(m.avatar_url)} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            (m.full_name || 'M').charAt(0).toUpperCase()
-                          )}
+                          Lvl {m.level}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                          style={
+                            m.status === 'active'
+                              ? { color: '#4ade80', background: '#4ade8018' }
+                              : { color: '#fabc4e', background: '#fabc4e18' }
+                          }
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.status === 'active' ? '#4ade80' : '#fabc4e' }} />
+                          {m.status === 'active' ? 'Aktif' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-300 font-medium">{m.referrer_name || 'Sistem'}</span>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-white">{m.full_name || 'Mitra'}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">{m.user_id?.slice(0, 8)}…</p>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-400">
+                        {new Date(m.joined_at).toLocaleDateString('id-ID', {
+                          day: '2-digit', month: 'short', year: 'numeric'
+                        })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-bold text-green-400">{formatRp(m.turnover)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleDrillDown(m)}
+                            className="p-2 rounded-lg bg-white/5 border border-white/5 text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 transition-all"
+                            title="Masuk ke Jaringan Ini"
+                          >
+                            <span className="material-symbols-outlined text-lg">login</span>
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span 
-                        className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
-                        style={{ 
-                          background: m.level === 1 ? '#b76dff20' : '#47556930',
-                          color: m.level === 1 ? '#b76dff' : '#94a3b8',
-                          border: m.level === 1 ? '1px solid #b76dff30' : '1px solid #47556940'
-                        }}
-                      >
-                        Lvl {m.level}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                        style={
-                          m.status === 'active'
-                            ? { color: '#4ade80', background: '#4ade8018' }
-                            : { color: '#fabc4e', background: '#fabc4e18' }
-                        }
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.status === 'active' ? '#4ade80' : '#fabc4e' }} />
-                        {m.status === 'active' ? 'Aktif' : 'Pending'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-xs text-slate-300 font-medium">{m.referrer_name || 'Sistem'}</span>
-                        {m.level > 1 && (
-                          <span className="text-[9px] text-slate-500 italic mt-0.5 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[10px]">subdirectory_arrow_right</span>
-                            Jaringan ke-{m.level-1}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-400">
-                      {new Date(m.joined_at).toLocaleDateString('id-ID', {
-                        day: '2-digit', month: 'short', year: 'numeric'
-                      })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-bold text-green-400">{formatRp(m.turnover)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {pagination.total_pages > 1 && (
-          <div className="flex items-center justify-between p-6 border-t border-white/5">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-              Halaman {pagination.current_page} dari {pagination.total_pages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
-              >
-                Kembali
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(pagination.total_pages, p + 1))}
-                disabled={page >= pagination.total_pages}
-                className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
-              >
-                Selanjutnya
-              </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            
+            {/* Pagination Controls */}
+            {pagination.total_pages > 1 && (
+              <div className="flex items-center justify-between p-6 border-t border-white/5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  Halaman {pagination.current_page} dari {pagination.total_pages}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    onClick={() => setPage(p => Math.min(pagination.total_pages, p + 1))}
+                    disabled={page >= pagination.total_pages}
+                    className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -369,3 +519,95 @@ export default function TeamPerformance() {
     </div>
   );
 }
+
+// Sub-component for Tree View
+const TreeNode = ({ node, onDrillDown }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasChildren = node?.children && node.children.length > 0;
+
+  return (
+    <div className="flex flex-col items-center">
+      <div 
+        className={`relative group p-4 rounded-2xl border transition-all duration-500 flex flex-col items-center text-center w-48 ${hasChildren ? 'cursor-pointer' : ''}`}
+        style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          borderColor: node.level === 1 ? 'rgba(168, 85, 247, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)'
+        }}
+        onClick={() => hasChildren && setIsExpanded(!isExpanded)}
+      >
+        {node.level > 1 && (
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-[2px] h-12 bg-gradient-to-t from-purple-500/30 to-transparent" />
+        )}
+
+        {/* Level Indicator */}
+        <div className="absolute -top-3 -left-2 px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-[8px] font-black text-purple-400">
+          LVL {node.level}
+        </div>
+
+        <div className="relative mb-3">
+          <div 
+            className="w-14 h-14 rounded-2xl overflow-hidden border-2 p-0.5"
+            style={{ borderColor: node.level === 1 ? '#a855f7' : 'rgba(255,255,255,0.1)' }}
+          >
+            {node.avatar_url ? (
+              <img src={formatImage(node.avatar_url)} className="w-full h-full object-cover rounded-xl" alt="" />
+            ) : (
+              <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xl font-black text-white">
+                {node.full_name?.charAt(0)}
+              </div>
+            )}
+          </div>
+          {node.level === 1 && (
+            <div className="absolute -top-2 -right-2 bg-purple-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg">DIRECT</div>
+          )}
+        </div>
+
+        <h3 className="text-sm font-bold text-white truncate w-full px-2">{node.full_name}</h3>
+        <p className="text-[10px] text-slate-500 mt-0.5 font-mono">{node.user_id?.slice(0, 8)}</p>
+
+        <div className="mt-3 w-full pt-3 border-t border-white/5 flex flex-col gap-1">
+          <div className="flex items-center justify-between text-[9px] font-bold">
+            <span className="text-slate-500 uppercase tracking-tighter">Omset</span>
+            <span className="text-green-400">{Number(node.turnover).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+          </div>
+          <div className="flex items-center justify-between text-[9px] font-bold">
+            <span className="text-slate-500 uppercase tracking-tighter">Tim</span>
+            <span className="text-purple-400">{node?.children?.length || 0} Orang</span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="mt-4 flex gap-2 w-full opacity-0 group-hover:opacity-100 transition-all">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onDrillDown(node); }}
+            className="flex-1 py-2 rounded-xl bg-purple-500/20 border border-purple-500/30 text-[9px] font-black text-purple-400 hover:bg-purple-500 hover:text-white transition-all"
+          >
+            MASUK
+          </button>
+          {hasChildren && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+              className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">
+                {isExpanded ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {hasChildren && isExpanded && (
+        <div className="relative pt-12 flex gap-8">
+          {/* Connector Line to Children */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-12 bg-purple-500/20" />
+          
+          {node.children.map(child => (
+            <TreeNode key={child.affiliate_id} node={child} onDrillDown={onDrillDown} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

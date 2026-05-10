@@ -102,9 +102,10 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 		ReferenceNo string `json:"reference_no"`
 		Note        string `json:"note"`
 		Items       []struct {
-			ProductID string  `json:"product_id"`
-			Quantity  int     `json:"quantity"`
-			CostPrice float64 `json:"cost_price"`
+			ProductID        string  `json:"product_id"`
+			ProductVariantID *string `json:"product_variant_id"`
+			Quantity         int     `json:"quantity"`
+			CostPrice        float64 `json:"cost_price"`
 		} `json:"items"`
 	}
 
@@ -131,10 +132,11 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 	totalItems := 0
 	for _, item := range input.Items {
 		inboundItem := models.InboundItem{
-			InboundID: inbound.ID,
-			ProductID: item.ProductID,
-			Quantity:  item.Quantity,
-			CostPrice: item.CostPrice,
+			InboundID:        inbound.ID,
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			Quantity:         item.Quantity,
+			CostPrice:        item.CostPrice,
 		}
 		if err := tx.Create(&inboundItem).Error; err != nil {
 			tx.Rollback()
@@ -142,17 +144,25 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		// UPDATE STOK DI GUDANG PUSAT
+		// UPDATE STOK DI GUDANG PUSAT (Variant Aware)
 		var inventory models.Inventory
-		err := tx.Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID).First(&inventory).Error
+		dbInv := tx.Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID)
+		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+			dbInv = dbInv.Where("product_variant_id = ?", *item.ProductVariantID)
+		} else {
+			dbInv = dbInv.Where("product_variant_id IS NULL OR product_variant_id = ''")
+		}
+
+		err := dbInv.First(&inventory).Error
 
 		stockBefore := 0
 		if err == gorm.ErrRecordNotFound {
 			inventory = models.Inventory{
-				ProductID:  item.ProductID,
-				MerchantID: models.PusatID,
-				Stock:      item.Quantity,
-				BasePrice:  item.CostPrice,
+				ProductID:        item.ProductID,
+				ProductVariantID: item.ProductVariantID,
+				MerchantID:       models.PusatID,
+				Stock:            item.Quantity,
+				BasePrice:        item.CostPrice,
 			}
 			if err := tx.Create(&inventory).Error; err != nil {
 				tx.Rollback()
@@ -166,18 +176,23 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 			tx.Save(&inventory)
 		}
 
-		// Update Product Global Stock
-		tx.Model(&models.Product{}).Where("id = ?", item.ProductID).Update("stock", inventory.Stock)
+		// Update Product/Variant Global Stock (Sync for legacy visibility)
+		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+			tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).Update("stock", inventory.Stock)
+		} else {
+			tx.Model(&models.Product{}).Where("id = ?", item.ProductID).Update("stock", inventory.Stock)
+		}
 
 		// LOG MUTATION (Mata Elang)
 		mutation := models.StockMutation{
-			ProductID:   item.ProductID,
-			MerchantID:  models.PusatID,
-			Type:        "IN",
-			Quantity:    item.Quantity,
-			Reference:   inbound.ID,
-			StockBefore: stockBefore,
-			StockAfter:  inventory.Stock,
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			MerchantID:       models.PusatID,
+			Type:             "IN",
+			Quantity:         item.Quantity,
+			Reference:        inbound.ID,
+			StockBefore:      stockBefore,
+			StockAfter:       inventory.Stock,
 			Note:        "Inbound from Supplier: " + input.ReferenceNo,
 		}
 		tx.Create(&mutation)
@@ -237,12 +252,19 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 
 	tx := ctrl.DB.Begin()
 
-	// 1. Kurangi stok di Pusat
+	// 1. Kurangi stok di Pusat (Variant Aware)
 	for _, item := range restock.Items {
 		var pusatInv models.Inventory
-		if err := tx.Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID).First(&pusatInv).Error; err != nil {
+		dbInv := tx.Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID)
+		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+			dbInv = dbInv.Where("product_variant_id = ?", *item.ProductVariantID)
+		} else {
+			dbInv = dbInv.Where("product_variant_id IS NULL OR product_variant_id = ''")
+		}
+
+		if err := dbInv.First(&pusatInv).Error; err != nil {
 			tx.Rollback()
-			utils.JSONError(w, http.StatusBadRequest, "Stok produk tidak ditemukan di Pusat")
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Stok item '%s' (Variant: %v) tidak ditemukan di Pusat", item.ProductID, item.ProductVariantID))
 			return
 		}
 
@@ -260,23 +282,24 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 			return
 		}
 
-		// 1.2 Deduct from Product Table (Sync for Admin UI)
-		if err := tx.Model(&models.Product{}).
-			Where("id = ? AND merchant_id = ?", item.ProductID, models.PusatID).
-			Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-			tx.Rollback()
-			utils.JSONError(w, http.StatusInternalServerError, "Gagal sinkronisasi stok master produk")
-			return
+		// 1.2 Deduct from Master Tables (Sync for Admin UI)
+		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+			tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+				Update("stock", gorm.Expr("stock - ?", item.Quantity))
+		} else {
+			tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+				Update("stock", gorm.Expr("stock - ?", item.Quantity))
 		}
 
 		// 2. Log Mutasi (Mata Elang) - Tracking Stock OUT from Pusat
 		mutation := models.StockMutation{
-			ProductID:   item.ProductID,
-			MerchantID:  models.PusatID,
-			Type:        "RESTOCK_OUT",
-			Quantity:    -item.Quantity,
-			StockBefore: stockBefore,
-			StockAfter:  pusatInv.Stock,
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			MerchantID:       models.PusatID,
+			Type:             "RESTOCK_OUT",
+			Quantity:         -item.Quantity,
+			StockBefore:      stockBefore,
+			StockAfter:       pusatInv.Stock,
 			Reference:   restock.ID,
 			Note:        fmt.Sprintf("Restock untuk merchant %s (Req: %s)", restock.MerchantID, restock.ID),
 			CreatedAt:   time.Now(),

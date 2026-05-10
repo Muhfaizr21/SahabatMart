@@ -128,8 +128,12 @@ export default function MerchantInventory() {
                           <img src={formatImage(p.image)} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{p.name || 'Unnamed Product'}</div>
-                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>SKU: {String(p.id || '').split('-')[0].toUpperCase()}</div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                            {p.name} {p.variant_name && <span style={{ color: '#4f46e5', marginLeft: 4 }}>- {p.variant_name}</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>
+                            SKU: {p.variant_sku || String(p.id || '').split('-')[0].toUpperCase()}
+                          </div>
                         </div>
                       </div>
                     </td>

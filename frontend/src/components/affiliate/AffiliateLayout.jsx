@@ -51,8 +51,8 @@ const SidebarLink = ({ item, collapsed }) => {
       end={item.end}
       className={() =>
         `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${isActive
-          ? 'active bg-rose-50 text-rose-600 border-l-4 border-rose-500'
-          : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+          ? 'active bg-indigo-500/10 text-indigo-400 border-l-4 border-indigo-500'
+          : 'text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/5'
         }`
       }
       title={collapsed ? item.name : ''}
@@ -228,14 +228,14 @@ const AffiliateLayout = () => {
         {(sidebarOpen || isMobile) ? (
           <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain brightness-110" />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/20">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
              <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />
           </div>
         )}
         {!isMobile && (
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={`text-slate-400 hover:text-rose-600 transition-colors p-1 ${(!sidebarOpen && !isMobile) ? 'hidden' : 'block'}`}
+            className={`text-slate-400 hover:text-indigo-400 transition-colors p-1 ${(!sidebarOpen && !isMobile) ? 'hidden' : 'block'}`}
           >
             <span className="material-symbols-outlined text-lg">
               {sidebarOpen ? 'chevron_left' : 'chevron_right'}
@@ -265,9 +265,9 @@ const AffiliateLayout = () => {
       {/* Affiliate ID card */}
       {(sidebarOpen || isMobile) && (
         <div className="px-4 mt-auto mb-6">
-          <div className="bg-gradient-to-br from-rose-500/10 to-rose-600/10 border border-rose-500/20 p-5 rounded-2xl relative overflow-hidden">
-            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-rose-500/20 rounded-full blur-2xl" />
-            <p className="text-[9px] font-bold text-rose-400 tracking-[0.2em] uppercase mb-1">
+          <div className="bg-gradient-to-br from-indigo-500/10 to-indigo-600/10 border border-indigo-500/20 p-5 rounded-2xl relative overflow-hidden">
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-indigo-500/20 rounded-full blur-2xl" />
+            <p className="text-[9px] font-bold text-indigo-400 tracking-[0.2em] uppercase mb-1">
               Kode Referral
             </p>
             <p className="text-base font-black text-white tracking-wider">{affiliateRefCode}</p>
@@ -278,7 +278,7 @@ const AffiliateLayout = () => {
 
       {/* Bottom actions */}
       <div className="px-3 pb-8 space-y-1">
-        <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all text-left">
+        <button onClick={() => navigate('/contact')} className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all text-left">
           <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'wght' 300" }}>help</span>
           {(sidebarOpen || isMobile) && <span className="text-[12px] font-semibold uppercase tracking-wider">Bantuan</span>}
         </button>
@@ -363,7 +363,7 @@ const AffiliateLayout = () => {
           <div className="max-w-6xl mx-auto w-full flex justify-between items-center">
             <button
               onClick={() => (isMobile ? setMobileOpen(!mobileOpen) : setSidebarOpen(!sidebarOpen))}
-              className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-rose-500"
+              className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-indigo-400"
             >
               <span className="material-symbols-outlined">
                 {(isMobile ? mobileOpen : sidebarOpen) ? 'menu_open' : 'menu'}
@@ -375,12 +375,12 @@ const AffiliateLayout = () => {
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setNotifOpen(!notifOpen)}
-                  className={`p-2 rounded-xl transition-all ${notifOpen ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  className={`p-2 rounded-xl transition-all ${notifOpen ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
                 >
                   <span className="material-symbols-outlined">notifications</span>
                 </button>
                 {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-purple-400 rounded-full border border-[#0c1324] animate-pulse" />
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-400 rounded-full border border-[#0c1324] animate-pulse" />
                 )}
 
                 {/* Notification Dropdown */}
@@ -391,7 +391,7 @@ const AffiliateLayout = () => {
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-bold text-white uppercase tracking-wider">Notifikasi</span>
                           {unreadCount > 0 && (
-                            <span className="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <span className="bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                               {unreadCount}
                             </span>
                           )}
@@ -402,7 +402,7 @@ const AffiliateLayout = () => {
                               e.stopPropagation();
                               markAllAsRead();
                             }}
-                            className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-tight"
+                            className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-tight"
                           >
                             Tandai Dibaca
                           </button>
@@ -433,10 +433,10 @@ const AffiliateLayout = () => {
                                 setNotifOpen(false);
                                 if (n.link) navigate(n.link);
                               }}
-                              className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group relative ${!n.is_read ? 'bg-purple-500/5' : ''}`}
+                              className={`px-5 py-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 group relative ${!n.is_read ? 'bg-indigo-500/5' : ''}`}
                             >
                               <div className="flex gap-3">
-                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-purple-400' : 'bg-transparent'}`} />
+                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.is_read ? 'bg-indigo-400' : 'bg-transparent'}`} />
                                 <div className="flex-1 min-w-0 pr-6">
                                   <p className={`text-[12px] leading-tight mb-1 ${!n.is_read ? 'text-white font-bold' : 'text-slate-300 font-medium'}`}>
                                     {n.title}
@@ -480,7 +480,7 @@ const AffiliateLayout = () => {
                 >
                   <div
                     className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-white font-black text-sm shadow-lg border border-white/10"
-                    style={{ background: 'linear-gradient(135deg, #b76dff, #7c3aed)' }}
+                    style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
                   >
                     {user.profile?.avatar_url ? (
                        <img src={formatImage(user.profile.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
@@ -491,7 +491,7 @@ const AffiliateLayout = () => {
                   <div className="text-right hidden sm:block">
                     <p className="text-xs font-bold text-white leading-tight">{displayName}</p>
                     <div className="flex items-center justify-end gap-1">
-                      <p className="text-[10px] text-purple-400 capitalize font-medium">{tierName} Partner</p>
+                      <p className="text-[10px] text-indigo-400 capitalize font-medium">{tierName} Partner</p>
                       <span className={`material-symbols-outlined text-[12px] text-slate-500 transition-transform duration-300 ${profileOpen ? 'rotate-180' : ''}`}>expand_more</span>
                     </div>
                   </div>

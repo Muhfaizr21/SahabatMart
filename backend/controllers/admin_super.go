@@ -1559,6 +1559,22 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 	// [Akuglow Refactor] Product is now Master Product (PUSAT)
 	// Initial stock will be handled via Inventories table after creation.
 
+	if p.SKU != "" {
+		var otherP models.Product
+		ac.DB.Where("sku = ?", p.SKU).First(&otherP)
+		if otherP.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk: %s", p.SKU, otherP.Name))
+			return
+		}
+
+		var otherV models.ProductVariant
+		ac.DB.Where("sku = ?", p.SKU).First(&otherV)
+		if otherV.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian produk lain (ID: %s)", p.SKU, otherV.ProductID))
+			return
+		}
+	}
+
 	if p.Slug == "" {
 		p.Slug = strings.ToLower(strings.ReplaceAll(p.Name, " ", "-"))
 		// [Complex Sync] Gunakan UnixNano % 1000000 agar probabilitas tabrakan slug hampir nol
@@ -1643,6 +1659,23 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"commission_preset_id":          req.CommissionPresetID,
 		"tier_commission_preset_id":     req.TierCommissionPresetID,
 		"merchant_commission_preset_id": req.MerchantCommissionPresetID,
+	}
+
+	// 1. Check SKU conflicts (Cross-table)
+	if req.SKU != "" {
+		var otherP models.Product
+		ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ID).First(&otherP)
+		if otherP.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", req.SKU, otherP.Name))
+			return
+		}
+
+		var otherV models.ProductVariant
+		ac.DB.Where("sku = ?", req.SKU).First(&otherV)
+		if otherV.ID != "" && otherV.ProductID != req.ID {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian produk lain (ID: %s)", req.SKU, otherV.ProductID))
+			return
+		}
 	}
 
 	// Use Transaction for atomic sync
@@ -4063,21 +4096,23 @@ func (ac *AdminController) AddProductVariant(w http.ResponseWriter, r *http.Requ
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
-	if v.ProductID == "" || v.Name == "" || v.SKU == "" {
-		utils.JSONError(w, http.StatusBadRequest, "ProductID, Name, and SKU are required")
+	// 1. Check Product table
+	// We allow a variant to have the same SKU as its OWN parent product
+	var parent models.Product
+	ac.DB.Where("id = ?", v.ProductID).First(&parent)
+	
+	var otherProduct models.Product
+	ac.DB.Where("sku = ? AND id <> ?", v.SKU, v.ProductID).First(&otherProduct)
+	if otherProduct.ID != "" {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", v.SKU, otherProduct.Name))
 		return
 	}
 
-	// Check SKU uniqueness in both Product and ProductVariant tables
-	var count int64
-	ac.DB.Model(&models.Product{}).Where("sku = ?", v.SKU).Count(&count)
-	if count > 0 {
-		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh produk utama")
-		return
-	}
-	ac.DB.Model(&models.ProductVariant{}).Where("sku = ?", v.SKU).Count(&count)
-	if count > 0 {
-		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh varian lain")
+	// 2. Check Other Variants
+	var otherVariant models.ProductVariant
+	ac.DB.Where("sku = ?", v.SKU).First(&otherVariant)
+	if otherVariant.ID != "" {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian lain di produk ID: %s", v.SKU, otherVariant.ProductID))
 		return
 	}
 
@@ -4102,16 +4137,21 @@ func (ac *AdminController) UpdateProductVariant(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Check SKU uniqueness (excluding current variant)
-	var count int64
-	ac.DB.Model(&models.Product{}).Where("sku = ?", req.SKU).Count(&count)
-	if count > 0 {
-		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh produk utama")
+	// 1. Check Products Table
+	// Allow sharing SKU with OWN parent product, but not others
+	var otherProduct models.Product
+	ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ProductID).First(&otherProduct)
+	if otherProduct.ID != "" {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", req.SKU, otherProduct.Name))
 		return
 	}
-	ac.DB.Model(&models.ProductVariant{}).Where("sku = ? AND id <> ?", req.SKU, req.ID).Count(&count)
-	if count > 0 {
-		utils.JSONError(w, http.StatusBadRequest, "SKU sudah digunakan oleh varian lain")
+
+	// 2. Check ProductVariants Table
+	// Exclude the record we are currently updating
+	var otherVariant models.ProductVariant
+	ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ID).First(&otherVariant)
+	if otherVariant.ID != "" {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian lain di produk ID: %s", req.SKU, otherVariant.ProductID))
 		return
 	}
 

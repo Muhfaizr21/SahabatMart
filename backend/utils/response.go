@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -43,6 +44,15 @@ func JSONError(w http.ResponseWriter, statusCode int, message string) {
 		Status:  "error",
 		Message: message,
 	})
+}
+
+// JSONErrorInternal logs the actual error but sends a generic message to the client
+func JSONErrorInternal(w http.ResponseWriter, err error, message string) {
+	log.Printf("❌ [INTERNAL_ERROR] %v", err)
+	if message == "" {
+		message = "Terjadi kesalahan internal pada server"
+	}
+	JSONError(w, http.StatusInternalServerError, message)
 }
 func ToStringPtr(s string) *string {
 	if s == "" {

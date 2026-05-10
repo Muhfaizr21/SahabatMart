@@ -134,7 +134,7 @@ export default function AffiliateStatus() {
                     <p className="text-white font-black mt-0.5">{totalDownlines} mitra</p>
                   </div>
                   <div>
-                    <p className="text-slate-500 uppercase tracking-wider font-bold">Mitra Aktif (30hr)</p>
+                    <p className="text-slate-500 uppercase tracking-wider font-bold">Mitra Aktif</p>
                     <p className="text-green-400 font-black mt-0.5">{activeMitra} mitra</p>
                   </div>
                   <div>

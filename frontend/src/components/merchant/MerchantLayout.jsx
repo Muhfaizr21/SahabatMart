@@ -10,7 +10,7 @@ const SidebarLink = ({ item }) => (
     className={({ isActive }) => 
       `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group ${
         isActive 
-          ? 'text-violet-700 font-bold border-r-4 border-violet-600 bg-white shadow-sm translate-x-1' 
+          ? 'text-indigo-700 font-bold border-r-4 border-indigo-600 bg-white shadow-sm translate-x-1' 
           : 'text-slate-400 hover:text-slate-900 hover:translate-x-1'
       }`
     }
@@ -138,16 +138,16 @@ const MerchantLayout = () => {
         </nav>
 
         <div className="mt-auto pt-10 space-y-6">
-            <div className="bg-gradient-to-br from-violet-50 to-indigo-50 p-5 rounded-2xl border border-violet-100 relative overflow-hidden group hover:scale-[1.02] transition-all cursor-pointer">
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-2xl border border-indigo-100 relative overflow-hidden group hover:scale-[1.02] transition-all cursor-pointer">
                 <div className="relative z-10">
-                    <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">Keuntungan Elit</p>
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Keuntungan Elit</p>
                     <p className="text-xs text-slate-500 font-medium leading-relaxed">Nikmati akses prioritas dukungan teknis 24/7.</p>
                 </div>
-                <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-violet-200/40 rounded-full blur-2xl group-hover:bg-violet-200/60 transition-all"></div>
+                <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-indigo-200/40 rounded-full blur-2xl group-hover:bg-indigo-200/60 transition-all"></div>
             </div>
             
             <div className="space-y-1 border-t border-slate-100 pt-6">
-                <button className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-500 hover:text-slate-900 transition-all font-bold text-[11px] tracking-widest uppercase">
+                <button onClick={() => navigate('/contact')} className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-500 hover:text-slate-900 transition-all font-bold text-[11px] tracking-widest uppercase">
                     <span className="material-symbols-outlined text-xl">help</span>
                     Pusat Bantuan
                 </button>
@@ -268,7 +268,7 @@ const MerchantLayout = () => {
                             </h4>
                             <p className={`text-[10px] font-bold transition-colors ${showProfileMenu ? 'text-slate-400' : 'text-slate-400'}`}>Toko Resmi</p>
                         </div>
-                        <div className={`h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center font-black text-xs shadow-lg border-2 transition-all ${showProfileMenu ? 'bg-white text-slate-900 border-slate-800' : 'bg-gradient-to-br from-violet-600 to-indigo-800 text-white border-white'}`}>
+                        <div className={`h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center font-black text-xs shadow-lg border-2 transition-all ${showProfileMenu ? 'bg-white text-slate-900 border-slate-800' : 'bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border-white'}`}>
                             {user.profile?.avatar_url ? (
                                 <img src={formatImage(user.profile.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
                             ) : (

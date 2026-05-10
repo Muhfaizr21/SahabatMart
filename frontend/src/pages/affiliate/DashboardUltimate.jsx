@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchJson, AFFILIATE_API_BASE, API_BASE, formatImage } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 import toast from 'react-hot-toast';
+import MemberCard from '../../components/MemberCard';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 const formatNum = (n) => Number(n || 0).toLocaleString('id-ID');
@@ -87,34 +88,47 @@ export default function AffiliateDashboard() {
       </div>
 
       <div className="space-y-6 animate-in fade-in duration-500">
-        {/* Top Bar: Referral & Tier */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-[32px] flex justify-between items-center shadow-xl shadow-indigo-500/20 relative overflow-hidden">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-            <div className="relative z-10">
-              <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kode Referral Anda</p>
-              <h3 className="text-white text-3xl font-black tracking-widest">{data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || '-'}</h3>
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => { navigator.clipboard.writeText(data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || ''); toast.success('Kode disalin!'); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
-                <button onClick={() => window.open('/affiliate/links', '_self')} className="px-4 py-2 bg-indigo-900/40 text-white rounded-lg text-[10px] font-black hover:bg-indigo-900/60">GENERATE LINK</button>
+        {/* Top Bar: Referral, Member Card & Tier */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-[32px] flex justify-between items-center shadow-xl shadow-indigo-500/20 relative overflow-hidden h-full">
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+              <div className="relative z-10">
+                <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kode Referral Anda</p>
+                <h3 className="text-white text-3xl font-black tracking-widest">{data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || '-'}</h3>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => { navigator.clipboard.writeText(data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || ''); toast.success('Kode disalin!'); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
+                  <button onClick={() => window.open('/affiliate/links', '_self')} className="px-4 py-2 bg-indigo-900/40 text-white rounded-lg text-[10px] font-black hover:bg-indigo-900/60">GENERATE LINK</button>
+                </div>
               </div>
-            </div>
-            <div className="text-right hidden sm:block relative z-10">
-              <span className="material-symbols-outlined text-6xl text-white/20">qr_code_2</span>
+              <div className="text-right hidden sm:block relative z-10">
+                <span className="material-symbols-outlined text-6xl text-white/20">qr_code_2</span>
+              </div>
             </div>
           </div>
 
-          <div className="bg-slate-800/40 border border-white/5 p-8 rounded-[32px] flex flex-col justify-center">
-            <div className="flex justify-between items-end mb-3">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progress Tier</p>
-              <p className="text-indigo-400 font-black text-xs">{tierName}</p>
+          <div className="lg:col-span-1">
+            <MemberCard user={user} profile={user?.profile || data?.user?.profile} />
+          </div>
+        </div>
+
+        {/* Progress Tier Row */}
+        <div className="bg-slate-800/40 border border-white/5 p-8 rounded-[32px]">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex justify-between items-end mb-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progress Tier</p>
+                <p className="text-indigo-400 font-black text-xs">{tierName}</p>
+              </div>
+              <div className="w-full h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${Math.min((activeMitraCount / (stats.next_tier_req_mitra || 10)) * 100, 100)}%` }} />
+              </div>
             </div>
-            <div className="w-full h-2 bg-slate-700/50 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${Math.min((activeMitraCount / (stats.next_tier_req_mitra || 10)) * 100, 100)}%` }} />
+            <div className="md:w-48 text-center md:text-right">
+              <p className="text-[10px] text-slate-500 italic">
+                {activeMitraCount} / {stats.next_tier_req_mitra || 10} mitra aktif
+              </p>
             </div>
-            <p className="text-[9px] text-slate-500 mt-3 italic text-center">
-              {activeMitraCount} / {stats.next_tier_req_mitra || 10} mitra aktif
-            </p>
           </div>
         </div>
 
@@ -123,7 +137,7 @@ export default function AffiliateDashboard() {
           <StatCard icon="ads_click" label="Klik" value={formatNum(stats.total_clicks)} sub="Total klik link Anda" color="#ddb7ff" />
           <StatCard icon="shopping_cart" label="Order" value={formatNum(stats.total_orders)} sub={`${stats.total_orders_pending || 0} menunggu bayar`} color="#fabc4e" />
           <StatCard icon="payments" label="Komisi Aktif" value={formatRp(stats.balance)} sub={`Pending: ${formatRp(stats.pending_commission)}`} color="#4ade80" />
-          <StatCard icon="groups" label="Total Tim" value={formatNum(stats.total_downline)} sub={`${activeMitraCount} aktif bulan ini`} color="#f43f5e" />
+          <StatCard icon="groups" label="Total Tim" value={formatNum(stats.total_downline)} sub={`${activeMitraCount} mitra aktif`} color="#f43f5e" />
         </div>
 
         {/* Join Team Section (Only if no upline) */}

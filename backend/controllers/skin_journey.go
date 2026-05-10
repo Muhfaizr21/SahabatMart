@@ -69,45 +69,65 @@ func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) 
 
 	// Check if user already has a pretest - if so, update it
 	var existing models.SkinPreTest
-	if err := sc.DB.Where("user_id = ?", userID).First(&existing).Error; err == nil {
-		log.Printf("ℹ️ [SkinJourney] Updating existing pretest for user %s", userID)
-		pretest.ID = existing.ID // Maintain same ID
-		if err := sc.DB.Save(&pretest).Error; err != nil {
-			log.Printf("❌ [SkinJourney] UpdatePreTest DB Error: %v", err)
-			utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui data pretest: "+err.Error())
-			return
+	// --- Reset User Journey Status to "Active" dalam Transaksi ---
+	err := sc.DB.Transaction(func(tx *gorm.DB) error {
+		// [Point 1] Simpan PreTest
+		if err := tx.Where("user_id = ?", userID).First(&existing).Error; err == nil {
+			pretest.ID = existing.ID
+			if err := tx.Save(&pretest).Error; err != nil {
+				return err
+			}
+		} else {
+			if err := tx.Create(&pretest).Error; err != nil {
+				return err
+			}
 		}
-	} else {
-		log.Printf("ℹ️ [SkinJourney] Creating new pretest for user %s", userID)
-		if err := sc.DB.Create(&pretest).Error; err != nil {
-			log.Printf("❌ [SkinJourney] SubmitPreTest DB Error: %v", err)
-			utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan data pretest: "+err.Error())
-			return
-		}
-	}
 
-	// [CRITICAL] Reset user journey status for a fresh start
-	// Ensure the record exists and is fully reset
-	var journey models.UserSkinJourney
-	if err := sc.DB.Where("user_id = ?", userID).First(&journey).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			sc.DB.Create(&models.UserSkinJourney{
-				UserID: userID, ProgramID: 0, IsCompleted: false, StartedAt: time.Now(), CurrentWeek: 1,
-			})
+		// [Point 2] Reset/Create UserSkinJourney
+		var journey models.UserSkinJourney
+		if err := tx.Where("user_id = ?", userID).First(&journey).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				if err := tx.Create(&models.UserSkinJourney{
+					UserID:      userID,
+					ProgramID:   nil,
+					IsCompleted: false,
+					StartedAt:   time.Now(),
+					CurrentWeek: 1,
+				}).Error; err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			// Explicitly update all fields to ensure fresh state
+			if err := tx.Model(&journey).Updates(map[string]interface{}{
+				"is_completed":      false,
+				"program_id":        nil,
+				"current_week":      1,
+				"started_at":        time.Now(),
+				"skin_profile_json": "{}",
+			}).Error; err != nil {
+				return err
+			}
 		}
-	} else {
-		sc.DB.Model(&journey).Updates(map[string]interface{}{
-			"is_completed": false,
-			"program_id":   0, // Reset to no program
-			"current_week": 1,
-			"started_at":   time.Now(),
-			"skin_profile_json": "{}", // Clear old AI profile
-		})
-	}
 
-	// [Point 2] Clear all previous progress logs to ensure a truly fresh start
-	sc.DB.Exec("DELETE FROM skin_step_logs WHERE user_id = ?", userID)
-	sc.DB.Exec("DELETE FROM skin_progress_logs WHERE user_id = ?", userID) // BUG-07 fix: nama tabel benar
+		// [Point 3] Clear logs strictly for this user
+		if err := tx.Exec("DELETE FROM skin_step_logs WHERE user_id = ?", userID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DELETE FROM skin_progress_logs WHERE user_id = ?", userID).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("❌ [SubmitPreTest] Transaction failed: %v", err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal memproses pre-test: "+err.Error())
+		return
+	}
 
 	utils.JSONResponse(w, http.StatusOK, pretest)
 }
@@ -181,8 +201,8 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 	// Fetch active program
 	var userJourney models.UserSkinJourney
 	if err := sc.DB.Preload("Program").Where("user_id = ?", userID).Order("id desc").First(&userJourney).Error; err == nil {
-		log.Printf("🔍 [SkinJourney] Data fetch for user %s: ProgramID=%d, IsCompleted=%v", userID, userJourney.ProgramID, userJourney.IsCompleted)
-		if userJourney.ProgramID != 0 {
+		log.Printf("🔍 [SkinJourney] Data fetch for user %s: ProgramID=%v, IsCompleted=%v", userID, userJourney.ProgramID, userJourney.IsCompleted)
+		if userJourney.ProgramID != nil {
 			results.Program = &userJourney.Program
 		}
 		results.IsCompleted = userJourney.IsCompleted
@@ -580,47 +600,35 @@ func (sc *SkinController) SetUserProgram(w http.ResponseWriter, r *http.Request)
 
 	userID, _ := r.Context().Value("user_id").(string)
 	
-	// [CRITICAL FIX] Use direct Table update to ensure boolean synchronization
-	var userJourney models.UserSkinJourney
-	err := sc.DB.Where("user_id = ?", userID).First(&userJourney).Error
-	
-	updateData := map[string]interface{}{
-		"program_id":   input.ProgramID,
-		"started_at":   time.Now(),
-		"current_week": 1,
-		"is_completed": false,
-	}
+	// --- Atomic Update dalam Transaksi ---
+	err := sc.DB.Transaction(func(tx *gorm.DB) error {
+		updateData := map[string]interface{}{
+			"program_id":   input.ProgramID,
+			"started_at":   time.Now(),
+			"current_week": 1,
+			"is_completed": false,
+		}
+
+		if err := tx.Table("user_skin_journeys").Where("user_id = ?", userID).Updates(updateData).Error; err != nil {
+			return err
+		}
+
+		// [Point 3] Wipe all logs for this user to prevent state pollution from old programs
+		if err := tx.Where("user_id = ?", userID).Delete(&models.SkinStepLog{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", userID).Delete(&models.SkinProgress{}).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			log.Printf("🆕 [SkinJourney] Creating fresh journey for user %s", userID)
-			userJourney = models.UserSkinJourney{
-				UserID:      userID,
-				ProgramID:   input.ProgramID,
-				StartedAt:   time.Now(),
-				CurrentWeek: 1,
-				IsCompleted: false,
-			}
-			if err := sc.DB.Create(&userJourney).Error; err != nil {
-				utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat journey baru")
-				return
-			}
-		} else {
-			utils.JSONError(w, http.StatusInternalServerError, "Database error")
-			return
-		}
-	} else {
-		log.Printf("🔄 [SkinJourney] Forcing reset of existing journey for user %s to program %d", userID, input.ProgramID)
-		// Use Table().Where() to bypass model instance issues
-		if err := sc.DB.Table("user_skin_journeys").Where("user_id = ?", userID).Updates(updateData).Error; err != nil {
-			utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui program")
-			return
-		}
+		log.Printf("❌ [SetUserProgram] Transaction failed: %v", err)
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengaktifkan program")
+		return
 	}
-
-	// [Point 3] Wipe all logs for this user to prevent state pollution from old programs
-	sc.DB.Where("user_id = ?", userID).Delete(&models.SkinStepLog{})
-	sc.DB.Where("user_id = ?", userID).Delete(&models.SkinProgress{})
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Program berhasil diaktifkan! ✨"})
 }
@@ -968,45 +976,61 @@ func (sc *SkinController) FinishJourney(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := sc.DB.Model(&userJourney).Update("is_completed", true).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyelesaikan program")
+	// --- Security Guard: Minimal 25 hari perjalanan (DISABLED FOR TESTING) ---
+	// dayCount := int(time.Since(userJourney.StartedAt).Hours()/24) + 1
+
+	err := sc.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&userJourney).Update("is_completed", true).Error; err != nil {
+			return err
+		}
+
+		tx.Preload("Program").First(&userJourney, userJourney.ID)
+
+		var warrior models.SkinWarriorLevel
+		tx.Where("user_id = ?", userID).First(&warrior)
+
+		if userJourney.ProgramID == nil {
+			return fmt.Errorf("program belum dipilih")
+		}
+
+		var existingHistory models.UserSkinJourneyHistory
+		duplicateCheck := tx.Where("user_id = ? AND program_id = ? AND started_at = ?",
+			userID, userJourney.ProgramID, userJourney.StartedAt).First(&existingHistory)
+
+		if duplicateCheck.Error != nil && duplicateCheck.Error == gorm.ErrRecordNotFound {
+			history := models.UserSkinJourneyHistory{
+				UserID:          userID,
+				ProgramID:       *userJourney.ProgramID,
+				ProgramName:     userJourney.Program.Name,
+				StartedAt:       userJourney.StartedAt,
+				FinishedAt:      time.Now(),
+				DayCount:        int(time.Since(userJourney.StartedAt).Hours()/24) + 1,
+				FinalRank:       warrior.LevelName,
+				SkinProfileJSON: userJourney.SkinProfileJSON,
+			}
+			
+			var totalSteps, completedSteps int64
+			tx.Model(&models.SkinJourneyRoutine{}).Where("program_id = ?", userJourney.ProgramID).Count(&totalSteps)
+			expectedTotalSteps := int64(history.DayCount) * totalSteps
+			tx.Model(&models.SkinStepLog{}).Where("user_id = ? AND created_at >= ?", userID, userJourney.StartedAt).Count(&completedSteps)
+			if expectedTotalSteps > 0 {
+				history.ConsistencyScore = int((float64(completedSteps) / float64(expectedTotalSteps)) * 100)
+				if history.ConsistencyScore > 100 { history.ConsistencyScore = 100 }
+			}
+			
+			if err := tx.Create(&history).Error; err != nil {
+				return err
+			}
+		}
+		
+		tx.Model(&warrior).Update("experience", warrior.Experience+500)
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyelesaikan program: "+err.Error())
 		return
 	}
-
-	sc.DB.Preload("Program").First(&userJourney, userJourney.ID)
-
-	var warrior models.SkinWarriorLevel
-	sc.DB.Where("user_id = ?", userID).First(&warrior)
-
-	// BUG-08 fix: cek duplikat history (program_id + started_at yang sama)
-	var existingHistory models.UserSkinJourneyHistory
-	duplicateCheck := sc.DB.Where("user_id = ? AND program_id = ? AND started_at = ?",
-		userID, userJourney.ProgramID, userJourney.StartedAt).First(&existingHistory)
-	if duplicateCheck.Error == nil {
-		// History sudah ada — jangan duplikat
-		log.Printf("⚠️ [FinishJourney] History duplikat ditemukan untuk user %s program %d, skip create", userID, userJourney.ProgramID)
-	} else {
-		history := models.UserSkinJourneyHistory{
-			UserID:          userID,
-			ProgramID:       userJourney.ProgramID,
-			ProgramName:     userJourney.Program.Name,
-			StartedAt:       userJourney.StartedAt,
-			FinishedAt:      time.Now(),
-			DayCount:        int(time.Since(userJourney.StartedAt).Hours()/24) + 1,
-			FinalRank:       warrior.LevelName,
-			SkinProfileJSON: userJourney.SkinProfileJSON,
-		}
-		var totalSteps, completedSteps int64
-		sc.DB.Model(&models.SkinJourneyRoutine{}).Where("program_id = ?", userJourney.ProgramID).Count(&totalSteps)
-		expectedTotalSteps := int64(history.DayCount) * totalSteps
-		sc.DB.Model(&models.SkinStepLog{}).Where("user_id = ? AND created_at >= ?", userID, userJourney.StartedAt).Count(&completedSteps)
-		if expectedTotalSteps > 0 {
-			history.ConsistencyScore = int((float64(completedSteps) / float64(expectedTotalSteps)) * 100)
-			if history.ConsistencyScore > 100 { history.ConsistencyScore = 100 }
-		}
-		sc.DB.Create(&history)
-	}
-	sc.DB.Model(&warrior).Update("experience", warrior.Experience+500)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
 		"message": "Selamat! Program kamu telah selesai! Kamu mendapatkan +500 XP Kelulusan! 🎓✨",

@@ -101,20 +101,29 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		Where("affiliate_id = ? AND status IN ?", affiliateMemberID, []string{"approved", "paid"}).
 		Select("COALESCE(SUM(amount), 0)").Scan(&totalApproved)
 
-	// 2. Hitung mitra aktif real-time (30 hari, bertransaksi)
-	startTime := time.Now().AddDate(0, -1, 0)
-	var activeMitraCount int
+	// 2. Hitung 'Mitra Aktif' (Total Joined - Seluruh Jaringan)
+	var totalJoined int64
 	s.DB.Raw(`
-		SELECT COUNT(DISTINCT am.id)
-		FROM affiliate_members am
-		INNER JOIN orders o ON o.affiliate_id = am.id
-		WHERE am.upline_id = ?
-		  AND am.status = 'active'
-		  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
-		  AND o.created_at >= ?
-	`, affiliateMemberID, startTime).Scan(&activeMitraCount)
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a
+			INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT COUNT(*) FROM subordinates
+	`, affiliateMemberID).Scan(&totalJoined)
 
-	// 3. Hitung omset tim bulan ini (recursive downline)
+	// 3. Hitung 'Qualified Mitra' (Syarat Merchant: Directs who have downlines)
+	var qualifiedMitraCount int64
+	s.DB.Raw(`
+		SELECT COUNT(DISTINCT am.id) 
+		FROM affiliate_members am
+		JOIN affiliate_members child ON child.upline_id = am.id
+		WHERE am.upline_id = ?
+	`, affiliateMemberID).Scan(&qualifiedMitraCount)
+
+	// 4. Hitung omset tim bulan ini (recursive downline)
+	startTime := time.Now().AddDate(0, -1, 0)
 	var allDescIDs []string
 	s.DB.Raw(`
 		WITH RECURSIVE sub AS (
@@ -134,12 +143,12 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 	// Sync ke DB
 	s.DB.Model(&affiliate).Updates(map[string]interface{}{
 		"total_earned":           totalApproved,
-		"active_mitra_count":     activeMitraCount,
+		"active_mitra_count":     int(totalJoined), // Display as 'Mitra Aktif' in UI
 		"team_monthly_turnover":  teamMonthlyTurnover,
 	})
 
 	// 4. Check for Merchant Auto-Promotion
-	isEligible, _, _, _, _ := s.CheckMerchantEligibility(affiliateMemberID)
+	isEligible, _, _, _, _, _ := s.CheckMerchantEligibility(affiliateMemberID)
 	if isEligible {
 		var user models.User
 		err := s.DB.First(&user, "id = ?", affiliate.UserID).Error
@@ -211,7 +220,7 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 
 	// Evaluasi syarat upgrade berdasarkan data real-time yang baru dihitung
 	isTierEligible := true
-	if nextTier.MinActiveMitra > 0 && activeMitraCount < nextTier.MinActiveMitra {
+	if nextTier.MinActiveMitra > 0 && totalJoined < int64(nextTier.MinActiveMitra) {
 		isTierEligible = false
 	}
 	if nextTier.MinMonthlyTurnover > 0 && teamMonthlyTurnover < nextTier.MinMonthlyTurnover {
@@ -273,19 +282,27 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 // CheckMerchantEligibility: Cek kelayakan upgrade ke Merchant
 // [Sync Fix] Ambil syarat dari MembershipTier level TERTINGGI (bukan platform_config)
 // Ini menyatukan sumber kebenaran dengan TriggerTierUpgrade
-func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64) {
+func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64, qualifiedMitra int64) {
 	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
 
-	// Hitung mitra aktif real-time (bertransaksi dalam 30 hari)
+	// 1. Hitung 'Mitra Aktif' (Total Joined - Seluruh Jaringan)
 	s.DB.Raw(`
-		SELECT COUNT(DISTINCT am.id)
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a
+			INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT COUNT(*) FROM subordinates
+	`, affiliateID).Scan(&activeMitra)
+
+	// 2. Hitung 'Qualified Mitra' (Syarat Merchant: Directs who have downlines)
+	s.DB.Raw(`
+		SELECT COUNT(DISTINCT am.id) 
 		FROM affiliate_members am
-		INNER JOIN orders o ON o.affiliate_id = am.id
+		JOIN affiliate_members child ON child.upline_id = am.id
 		WHERE am.upline_id = ?
-		  AND am.status = 'active'
-		  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
-		  AND o.created_at >= ?
-	`, affiliateID, startTime).Scan(&activeMitra)
+	`, affiliateID).Scan(&qualifiedMitra)
 
 	// Hitung omset tim 30 hari (Recursive Depth - semua level)
 	var allDescendantIDs []string
@@ -330,8 +347,8 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 		log.Printf("⚠️ CheckMerchantEligibility Error: %v", err)
 	}
 
-	isEligible = activeMitra >= int64(reqMitra) && monthlyTurnover >= reqTurnover
-	return isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover
+	isEligible = qualifiedMitra >= int64(reqMitra) && monthlyTurnover >= reqTurnover
+	return isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, qualifiedMitra
 }
 
 // CheckAndDowngradeMerchants: Cek merchant yang tidak memenuhi syarat dan downgrade otomatis
@@ -365,17 +382,14 @@ func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err err
 			continue
 		}
 
-		// Hitung mitra aktif (bertransaksi dalam 30 hari)
-		var activeMitraCount int64
+		// [Sync Fix] Hitung 'Qualified Mitra' (Syarat Merchant: Directs who have downlines)
+		var qualifiedMitraCount int64
 		s.DB.Raw(`
-			SELECT COUNT(DISTINCT am.id)
+			SELECT COUNT(DISTINCT am.id) 
 			FROM affiliate_members am
-			INNER JOIN orders o ON o.affiliate_id = am.id
+			JOIN affiliate_members child ON child.upline_id = am.id
 			WHERE am.upline_id = ?
-			  AND am.status = 'active'
-			  AND o.status IN ('paid','processing','ready_to_ship','shipped','delivered','completed')
-			  AND o.created_at >= ?
-		`, m.AffiliateID, startTime).Scan(&activeMitraCount)
+		`, m.AffiliateID).Scan(&qualifiedMitraCount)
 
 		// Hitung omset tim bulan ini
 		var teamTurnover float64
@@ -397,17 +411,17 @@ func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err err
 
 		// Update statistik merchant (sync dengan field di models.Merchant)
 		s.DB.Model(&models.Merchant{}).Where("id = ?", m.MerchantID).Updates(map[string]interface{}{
-			"active_mitra_count":    int(activeMitraCount),
+			"active_mitra_count":    int(qualifiedMitraCount),
 			"team_monthly_turnover": teamTurnover,
 		})
 
 		// [Dokumen Bisnis] Jika tidak memenuhi syarat → notifikasi peringatan
 		// Downgrade hanya dilakukan oleh Admin secara manual setelah 3 bulan berturut-turut
 		// (tracking downgrade_warning_count ada di PlatformConfig, bukan auto-downgrade)
-		if activeMitraCount < int64(minActiveMitra) || teamTurnover < minTurnover {
+		if qualifiedMitraCount < int64(minActiveMitra) || teamTurnover < minTurnover {
 			if s.Notif != nil {
-				msg := fmt.Sprintf("Peringatan: Toko '%s' tidak memenuhi syarat Merchant bulan ini (Mitra aktif: %d/%d, Omset: Rp %.0f/%.0f). Harap tingkatkan performa tim Anda.",
-					m.StoreName, activeMitraCount, minActiveMitra, teamTurnover, minTurnover)
+				msg := fmt.Sprintf("Peringatan: Toko '%s' tidak memenuhi syarat Merchant bulan ini (Mitra Qualified: %d/%d, Omset: Rp %.0f/%.0f). Harap tingkatkan performa tim Anda.",
+					m.StoreName, qualifiedMitraCount, minActiveMitra, teamTurnover, minTurnover)
 				s.Notif.Push(m.MerchantID, "merchant", "merchant_warning", "⚠️ Peringatan Syarat Merchant", msg, "/merchant/dashboard")
 			}
 		}
@@ -440,7 +454,7 @@ func (s *AffiliateService) UpdateTurnoverSnapshot(affiliateID string) error {
 		return err
 	}
 
-	_, _, monthlyTurnover, _, _ := s.CheckMerchantEligibility(affiliateID)
+	_, _, monthlyTurnover, _, _, _ := s.CheckMerchantEligibility(affiliateID)
 
 	var directMitra int64
 	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&directMitra)

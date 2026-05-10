@@ -51,7 +51,7 @@ export default function SkinJourney() {
   })();
 
   // BUG-02/11 fix: Weekly lock dikendalikan oleh backend, disable TESTING_MODE
-  const TESTING_MODE = true;
+  const TESTING_MODE = false;
   
   const alreadyUploadedThisWeek = !TESTING_MODE && (journeyData?.progress_logs?.some(log => {
     const logDate = new Date(log.created_at);
@@ -134,13 +134,16 @@ export default function SkinJourney() {
 
   const handleSetProgram = async (programId) => {
     try {
+      setLoading(true); // Force loading state
       await fetchJson(`${API_BASE}/api/skin/set-program`, {
         method: 'POST',
         body: JSON.stringify({ program_id: programId })
       });
       toast.success('Program berhasil diaktifkan! ✨');
-      fetchJourney();
+      await fetchJourney(); // Ensure we wait for fetch
+      setLoading(false);
     } catch (err) {
+      setLoading(false);
       toast.error('Gagal mengaktifkan program');
     }
   };
@@ -1550,7 +1553,7 @@ export default function SkinJourney() {
                   {selectedRoutine.product?.name && (
                     <div className="flex items-center gap-4 mb-4 p-3 bg-white/5 rounded-xl border border-white/5">
                       <img 
-                        src={formatImage(selectedRoutine.product.image_url)} 
+                        src={formatImage(selectedRoutine.product.image)} 
                         className="w-12 h-12 rounded-lg object-cover"
                         alt={selectedRoutine.product.name}
                       />

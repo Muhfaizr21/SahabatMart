@@ -378,7 +378,10 @@ export default function MembershipTiers() {
                     <td style={A.td}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: '#475569' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <i className='bx bx-user' style={{color: '#94a3b8'}} /> {tier.min_active_mitra} Mitra Aktif
+                          <i className='bx bx-user' style={{color: '#94a3b8'}} /> {tier.min_active_mitra} Mitra Qualified
+                        </div>
+                        <div style={{ fontSize: 9, color: '#94a3b8', marginLeft: 22, marginTop: -2, marginBottom: 4 }}>
+                          (Direct dgn Downline)
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                           <i className='bx bx-trending-up' style={{color: '#94a3b8'}} /> {formatRp(tier.min_monthly_turnover)} / bln
@@ -653,8 +656,9 @@ export default function MembershipTiers() {
               </div>
               
               <div>
-                <FieldLabel>Min. Mitra Aktif</FieldLabel>
+                <FieldLabel>Min. Mitra Qualified</FieldLabel>
                 <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_active_mitra} onChange={e => setModal({...modal, min_active_mitra: e.target.value})} required />
+                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Jumlah mitra Level 1 yang masing-masing sudah memiliki minimal 1 downline.</p>
               </div>
 
               <div>

@@ -116,6 +116,7 @@ type Merchant struct {
 type Inventory struct {
 	ID         string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	ProductID  string    `gorm:"type:uuid;not null;index" json:"product_id"`
+	ProductVariantID *string `gorm:"type:uuid;index" json:"product_variant_id"` // NULL jika produk tidak punya varian
 	MerchantID string    `gorm:"type:uuid;not null;index" json:"merchant_id"` // ID Merchant atau ID "SYSTEM_PUSAT"
 	Stock      int       `gorm:"default:0" json:"stock"`
 	BasePrice  float64   `gorm:"type:decimal(15,2);default:0" json:"base_price"` // Harga beli/dasar saat sync terakhir
@@ -174,6 +175,7 @@ type InboundItem struct {
 	ID         string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	InboundID  string  `gorm:"type:uuid;not null;index" json:"inbound_id"`
 	ProductID  string  `gorm:"type:uuid;not null;index" json:"product_id"`
+	ProductVariantID *string `gorm:"type:uuid;index" json:"product_variant_id"`
 	Quantity   int     `json:"quantity"`
 	CostPrice  float64 `gorm:"type:decimal(15,2)" json:"cost_price"` // COGS saat barang masuk
 	CreatedAt  time.Time `json:"created_at"`
@@ -182,8 +184,9 @@ type InboundItem struct {
 // StockMutation Mata Elang: Pencatatan mutasi stok global
 type StockMutation struct {
 	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	ProductID   string    `gorm:"type:uuid;not null;index" json:"product_id"`
-	MerchantID  string    `gorm:"type:uuid;not null;index" json:"merchant_id"` // Lokasi gudang (Pusat atau Cabang)
+	ProductID        string    `gorm:"type:uuid;not null;index" json:"product_id"`
+	ProductVariantID *string   `gorm:"type:uuid;index" json:"product_variant_id"` // NULL if not a variant
+	MerchantID       string    `gorm:"type:uuid;not null;index" json:"merchant_id"` // Lokasi gudang (Pusat atau Cabang)
 	Type        string    `gorm:"type:varchar(50)" json:"type"` // IN (Supplier), OUT (Order), RESTOCK_OUT (Pusat ke Cabang), RESTOCK_IN (Cabang nerima dari Pusat), ADJUST (Manual)
 	Quantity    int       `json:"quantity"`
 	Reference   string    `gorm:"type:varchar(255)" json:"reference"` // ID Order, ID Restock, ID Inbound
@@ -197,11 +200,13 @@ type RestockItem struct {
 	ID        string `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	RestockID string `gorm:"type:uuid;not null;index" json:"restock_id"`
 	ProductID string `gorm:"type:uuid;not null" json:"product_id"`
+	ProductVariantID *string `gorm:"type:uuid;index" json:"product_variant_id"`
 	Quantity  int    `gorm:"not null" json:"quantity"`
 	UnitPrice float64 `gorm:"type:decimal(15,2);not null;default:0" json:"unit_price"`
 	Subtotal  float64 `gorm:"type:decimal(15,2);not null;default:0" json:"subtotal"`
 
-	Product   Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Product   Product         `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Variant   *ProductVariant `gorm:"foreignKey:ProductVariantID" json:"variant,omitempty"`
 }
 
 // AffiliateConfig tier/setting afiliasi
@@ -434,6 +439,11 @@ type ProductVariant struct {
 	Stock          int       `gorm:"default:0" json:"stock"`
 	Weight    int       `gorm:"default:0" json:"weight"` // Weight in grams (overrides product weight if > 0)
 	Image     string    `gorm:"type:text" json:"image"`
+	
+	// Commission Overrides (Optional)
+	CommissionPresetID         *string `gorm:"type:uuid;index" json:"commission_preset_id"`
+	MerchantCommissionPresetID *string `gorm:"type:uuid;index" json:"merchant_commission_preset_id"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

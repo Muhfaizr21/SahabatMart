@@ -69,6 +69,8 @@ type Order struct {
 	TotalCommission     float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_commission"`
 	TotalDiscount       float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_discount"`
 	GrandTotal          float64        `gorm:"type:decimal(15,2);not null" json:"grand_total"`
+	TotalAmount         float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_amount"` // Final amount after discount/fees
+	PaymentMethod       string         `gorm:"type:varchar(50)" json:"payment_method"` // cash, transfer, wallet, etc.
 	TotalWeight         float64        `gorm:"type:decimal(10,3);default:0" json:"total_weight"`
 	
 	VoucherID           *uint          `gorm:"index" json:"voucher_id"`

@@ -11,6 +11,7 @@ import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
+	"time"
 	"gorm.io/gorm"
 )
 
@@ -146,13 +147,24 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 		}
 	}
 
+	// Rate Limiting Helpers
+	withLimit := func(limit int, window time.Duration) func(http.HandlerFunc) http.HandlerFunc {
+		return func(next http.HandlerFunc) http.HandlerFunc {
+			return middleware.RateLimitMiddleware(limit, window)(next).(http.HandlerFunc)
+		}
+	}
+
+	authLimit := withLimit(10, time.Minute)    // 10 attempts per minute
+	checkoutLimit := withLimit(5, time.Minute) // 5 checkouts per minute
+	lookupLimit := withLimit(30, time.Minute)  // 30 lookups per minute
+
 	// --- Auth Routes ---
-	mux.HandleFunc("/api/auth/register", authCtrl.Register)
-	mux.HandleFunc("/api/auth/login", authCtrl.Login)
+	mux.HandleFunc("/api/auth/register", authLimit(authCtrl.Register))
+	mux.HandleFunc("/api/auth/login", authLimit(authCtrl.Login))
 	mux.HandleFunc("/api/auth/google/login", authCtrl.GoogleLogin)
 	mux.HandleFunc("/api/auth/google/callback", authCtrl.GoogleCallback)
-	mux.HandleFunc("/api/auth/forgot-password", authCtrl.ForgotPassword)
-	mux.HandleFunc("/api/auth/reset-password", authCtrl.ResetPassword)
+	mux.HandleFunc("/api/auth/forgot-password", authLimit(authCtrl.ForgotPassword))
+	mux.HandleFunc("/api/auth/reset-password", authLimit(authCtrl.ResetPassword))
 	mux.HandleFunc("/api/auth/impersonate", actorOnly("superadmin")(authCtrl.Impersonate))
 	
 	// Middleware actor check
@@ -174,7 +186,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/cart/add", buyerOnly(buyerCtrl.AddToCart))
 	mux.HandleFunc("/api/buyer/cart/item", buyerOnly(buyerCtrl.RemoveFromCart))
 	mux.HandleFunc("/api/buyer/cart/move-from-wishlist", buyerOnly(buyerCtrl.MoveToCart))
-	mux.HandleFunc("/api/buyer/checkout", buyerOnly(buyerCtrl.Checkout))
+	mux.HandleFunc("/api/buyer/checkout", checkoutLimit(buyerOnly(buyerCtrl.Checkout)))
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
 	mux.HandleFunc("/api/buyer/orders/detail", buyerOnly(buyerCtrl.GetOrderDetail))
 	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
@@ -206,8 +218,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/orders", merchantOnly(merchantCtrl.GetOrders))
 	mux.HandleFunc("/api/merchant/orders/status", merchantOnly(merchantCtrl.UpdateOrderStatus))
 	mux.HandleFunc("/api/merchant/pos/products", merchantOnly(merchantCtrl.POSGetProducts))
-	mux.HandleFunc("/api/merchant/pos/checkout", merchantOnly(merchantCtrl.POSCheckout))
-	mux.HandleFunc("/api/pos/member/", merchantOnly(merchantCtrl.GetMemberByCode))
+	mux.HandleFunc("/api/merchant/pos/checkout", merchantOnly(checkoutLimit(merchantCtrl.POSCheckout)))
+	mux.HandleFunc("/api/merchant/pos/member/", merchantOnly(lookupLimit(merchantCtrl.GetMemberByCode)))
 	
 	// Finance
 	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
@@ -561,6 +573,16 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)
+
+	// Catch-all 404 for API
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api") {
+			utils.JSONError(w, http.StatusNotFound, "Endpoint API tidak ditemukan")
+			return
+		}
+		// Fallback for other paths if needed, or just JSON error
+		utils.JSONError(w, http.StatusNotFound, "Resource tidak ditemukan")
+	})
 
 	return recover(cors(middleware.MaintenanceMiddleware(db)(mux)))
 }

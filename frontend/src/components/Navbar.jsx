@@ -106,7 +106,8 @@ export default function Navbar() {
   // List of Searchable Pages
   const searchablePages = [
     { label: 'Belanja Sekarang', href: '/shop', icon: 'shopping_bag', keywords: 'toko, produk, jualan, beli, katalog, shop, keranjang' },
-    { label: 'Tentang SahabatMart', href: '/about', icon: 'info', keywords: 'perusahaan, visi, misi, siapa kami, tentang, profil' },
+    { label: 'Tentang AkuGlow', href: '/about', icon: 'info', keywords: 'perusahaan, visi, misi, siapa kami, tentang, profil' },
+    { label: 'Peluang Bisnis', href: '/peluang-bisnis', icon: 'business_center', keywords: 'bisnis, peluang, affiliate, merchant, komisi, simulasi' },
     { label: 'Hubungi Care', href: '/contact', icon: 'support_agent', keywords: 'bantuan, telepon, email, alamat, cs, support, kontak, hubungi, wa, whatsapp' },
     { label: 'Kebijakan Privasi', href: '/privacy-policy', icon: 'security', keywords: 'aman, data, aturan, hukum' },
     { label: 'Syarat & Ketentuan', href: '/terms-conditions', icon: 'gavel', keywords: 'perjanjian, aturan, hukum, user agreement' },
@@ -314,21 +315,6 @@ export default function Navbar() {
             >
               {menuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
-          </div>
-        </div>
-
-        {/* Mobile Horizontal Sub-Navbar */}
-        <div className="lg:hidden border-t border-white/5 overflow-x-auto no-scrollbar bg-black/95 backdrop-blur-sm">
-          <div className="flex items-center gap-6 px-4 h-11 whitespace-nowrap min-w-max">
-            {navLinks.map(link => (
-              <Link 
-                key={link.label} 
-                to={link.href} 
-                className={`text-[13px] font-bold transition-all ${location.pathname === link.href ? 'text-primary border-b-2 border-primary h-full flex items-center' : 'text-gray-400 hover:text-primary'}`}
-              >
-                {link.label}
-              </Link>
-            ))}
           </div>
         </div>
 

@@ -1,181 +1,221 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
-import AboutMission from '../components/AboutMission';
+import aboutImg from '../assets/9bc151cb-21ca-4872-9afb-cad0c087c661.webp';
 
 export default function AboutPage() {
-   return (
-      <main className="min-h-screen bg-[#fafafa] text-gray-900 selection:bg-rose-600 selection:text-white">
-         {/* 1. Cinematic Hero Section - Scaled Down */}
-         <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-white">
-            {/* Background Ambient Effects */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-               <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-rose-600/10 rounded-full blur-[100px] animate-pulse"></div>
-               <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-amber-600/5 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+  return (
+    <div className="min-h-screen bg-white text-gray-900 font-['Plus_Jakarta_Sans']">
+      {/* Intro Section */}
+      <section className="pt-32 pb-24 px-6 overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            {/* Left: Image with Decorative Elements */}
+            <div className="relative">
+              <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl">
+                <img 
+                  src={aboutImg} 
+                  alt="Kenalan Lebih Dekat dengan Akuglow" 
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+              {/* Decorative Red Star/Icon */}
+              <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-rose-600 rounded-full flex items-center justify-center shadow-xl animate-pulse">
+                <span className="material-symbols-outlined text-white text-4xl">star</span>
+              </div>
+              {/* Decorative Background Shape */}
+              <div className="absolute -top-10 -left-10 w-40 h-40 bg-rose-50 rounded-full -z-10"></div>
             </div>
 
-            <div className="max-w-6xl mx-auto px-6 relative z-10 text-center">
-               <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[1.1] tracking-tight mb-8 animate-text-reveal">
-                  Wujudkan Pancaran <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-600 to-amber-500">Kecantikan Sejati.</span>
-               </h1>
-
-               <p className="max-w-2xl mx-auto text-base md:text-lg text-gray-500 leading-relaxed mb-10 animate-fade-up">
-                  AkuGlow hadir bukan sekadar produk kecantikan. Kami merancang solusi transformasi kulit yang memadukan keajaiban alam dengan teknologi mutakhir dari Korea.
-               </p>
-
-               <div className="flex flex-col sm:flex-row items-center justify-center gap-5 animate-fade-up" style={{ animationDelay: '0.4s' }}>
-                  <Link to="/shop" className="px-10 py-4 bg-gray-900 text-white font-bold rounded-2xl hover:bg-rose-600 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-gray-900/10">
-                     Lihat Koleksi
-                  </Link>
-                  <Link to="/contact" className="px-10 py-4 bg-white border border-gray-200 text-gray-900 font-bold rounded-2xl hover:bg-gray-50 transition-all">
-                     Hubungi Kami
-                  </Link>
-               </div>
+            {/* Right: Content */}
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-50 text-rose-600 rounded-full text-xs font-black uppercase tracking-widest">
+                TENTANG AKUGLOW
+              </div>
+              <h2 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight">
+                Kenalan Lebih Dekat dengan Akuglow
+              </h2>
+              <div className="space-y-4 text-gray-500 text-lg leading-relaxed">
+                <p>
+                  AkuGlow lahir dari semangat untuk memberdayakan setiap individu agar memiliki kepercayaan diri melalui kulit yang sehat dan bercahaya. Kami memahami bahwa kecantikan bukan sekadar tampilan luar, melainkan refleksi dari kesehatan dan kebahagiaan batin.
+                </p>
+                <p>
+                  Dengan riset mendalam dan kolaborasi bersama para ahli dermatologi, kami menghadirkan rangkaian produk skincare premium yang diformulasikan khusus untuk iklim tropis. Setiap tetes produk kami mengandung bahan aktif berkualitas tinggi yang aman dan teruji.
+                </p>
+              </div>
+              <div className="pt-6">
+                <Link 
+                  to="/shop" 
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-rose-600 text-white rounded-full font-black text-sm hover:bg-rose-700 hover:-translate-y-1 transition-all duration-300 shadow-lg shadow-rose-200"
+                >
+                  BELANJA SEKARANG
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </Link>
+              </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Scroll Indicator */}
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 animate-bounce opacity-30">
-               <div className="w-[1px] h-10 bg-gradient-to-b from-rose-600/0 via-rose-600 to-rose-600/0"></div>
-            </div>
-         </section>
+      {/* Our Mission Section */}
+      <section className="py-24 px-4 md:px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900">Our Mission</h2>
+          </div>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+            {[
+              { title: 'Innovation', desc: 'Terus berinovasi dalam menghadirkan formula skincare premium berbasis riset dermatologi terbaru.', icon: 'lightbulb' },
+              { title: 'Sustainability', desc: 'Berkomitmen pada praktik bisnis yang berkelanjutan dan penggunaan bahan baku yang ramah lingkungan.', icon: 'sync' },
+              { title: 'Empowerment', desc: 'Memberdayakan mitra affiliate kami dengan sistem bagi hasil yang adil dan pelatihan bisnis intensif.', icon: 'person' },
+              { title: 'Quality', desc: 'Menjamin setiap produk memiliki standar kualitas tertinggi dan telah lulus uji klinis BPOM.', icon: 'verified' },
+              { title: 'Distribution', desc: 'Membangun jaringan distribusi yang efisien untuk memastikan produk sampai ke tangan Anda dengan aman.', icon: 'local_shipping' },
+              { title: 'Target', desc: 'Menjadi solusi kecantikan utama bagi seluruh masyarakat Indonesia dengan produk yang inklusif.', icon: 'target' }
+            ].map((mission, idx) => (
+              <div key={idx} className="p-6 md:p-10 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-center flex flex-col items-center group">
+                <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-rose-50 flex items-center justify-center mb-4 md:mb-6 group-hover:bg-rose-600 transition-colors duration-300">
+                  <span className="material-symbols-outlined text-rose-600 text-2xl md:text-4xl group-hover:text-white transition-colors duration-300">{mission.icon}</span>
+                </div>
+                <h3 className="text-sm md:text-xl font-bold text-gray-900 mb-2 md:mb-3">{mission.title}</h3>
+                <p className="text-gray-500 text-[10px] md:text-sm leading-relaxed max-w-[240px]">
+                  {mission.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-         {/* 2. The Bento Grid Vision - Translated */}
-         <section className="py-24 bg-white border-t border-gray-50">
-            <div className="max-w-7xl mx-auto px-6">
-               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                  {/* Main Mission Card */}
-                  <div className="lg:col-span-7 bg-[#f8fafc] rounded-[2.5rem] p-10 flex flex-col justify-between group overflow-hidden relative border border-gray-100">
-                     <div className="relative z-10">
-                        <h2 className="text-4xl font-black mb-6 leading-tight">Misi Kami: <br /> <span className="text-rose-600 underline decoration-4 underline-offset-4">Kemurnian</span> <br /> & Inovasi.</h2>
-                        <p className="text-lg text-gray-500 max-w-sm leading-relaxed">
-                           Kami berdedikasi membawa standar kecantikan premium dunia ke tangan Anda, dengan kejujuran dan hasil yang nyata.
-                        </p>
-                     </div>
-                     <div className="relative z-10 flex flex-wrap gap-3 mt-10">
-                        <div className="px-5 py-2.5 bg-white rounded-xl shadow-md border border-gray-50 flex items-center gap-3">
-                           <i className="bx bxs-award text-rose-600"></i>
-                           <span className="text-[10px] font-black uppercase">Standar Global</span>
-                        </div>
-                        <div className="px-5 py-2.5 bg-white rounded-xl shadow-md border border-gray-50 flex items-center gap-3">
-                           <i className="bx bxs-leaf text-green-500"></i>
-                           <span className="text-[10px] font-black uppercase">Bahan Alami</span>
-                        </div>
-                     </div>
-                     {/* Image overlay with better balance */}
-                     <img
-                        src="https://images.unsplash.com/photo-1596462502278-27bfdc4033c8?w=800&h=800&fit=crop"
-                        className="absolute -bottom-10 -right-10 w-1/2 h-1/2 object-cover rounded-full opacity-10 group-hover:scale-110 transition-transform duration-1000 grayscale"
-                        alt=""
-                     />
+      {/* Cards Section */}
+      <section className="py-20 bg-[#FDFBF7] px-4 md:px-6 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { 
+                title: 'Good Quality', 
+                desc: 'Produk kami melewati standar kontrol kualitas yang ketat untuk memastikan hasil terbaik bagi kulit Anda.', 
+                icon: 'verified' 
+              },
+              { 
+                title: 'Best Service', 
+                desc: 'Kami berkomitmen memberikan pelayanan terbaik mulai dari konsultasi hingga dukungan purna jual.', 
+                icon: 'volunteer_activism' 
+              },
+              { 
+                title: 'Fast & Save', 
+                desc: 'Pengiriman cepat dan terjamin keamanannya ke seluruh wilayah Indonesia dengan partner logistik terpercaya.', 
+                icon: 'local_shipping' 
+              }
+            ].map((feature, idx) => (
+              <div 
+                key={idx} 
+                className="group relative bg-white p-8 md:p-12 rounded-[2.5rem] md:rounded-[3rem] border border-gray-100 shadow-xl hover:shadow-2xl hover:shadow-rose-600/10 hover:-translate-y-3 transition-all duration-500 overflow-hidden"
+              >
+                {/* Decorative Background Shape */}
+                <div className="absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 bg-rose-50 rounded-bl-[4rem] md:rounded-bl-[5rem] -z-0 group-hover:bg-rose-600 transition-colors duration-500"></div>
+                
+                <div className="relative z-10">
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 md:mb-10 group-hover:bg-white group-hover:rotate-12 transition-all duration-500 shadow-sm">
+                    <span className="material-symbols-outlined text-rose-600 text-2xl md:text-3xl transition-colors duration-500">
+                      {feature.icon}
+                    </span>
                   </div>
+                  <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-4 md:mb-6 group-hover:text-rose-600 transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-500 leading-relaxed text-sm md:text-lg">
+                    {feature.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                  {/* Side Stats */}
-                  <div className="lg:col-span-5 grid grid-rows-2 gap-6">
-                     <div className="bg-gradient-to-br from-rose-600 to-amber-600 rounded-[2.5rem] p-8 text-white flex flex-col justify-center relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-6">
-                           <i className="bx bx-heart text-5xl opacity-20 group-hover:scale-125 transition-transform"></i>
-                        </div>
-                        <div className="text-6xl font-black mb-1">1.2M+</div>
-                        <div className="text-[10px] font-black uppercase tracking-widest text-rose-100">Pelanggan Puas</div>
-                     </div>
-                     <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-center group">
-                        <div className="flex -space-x-3 mb-5">
-                           {[1, 2, 3, 4].map(i => (
-                              <img key={i} src={`https://i.pravatar.cc/100?img=${i + 20}`} className="w-12 h-12 rounded-full border-2 border-gray-900 shadow-lg" alt="" />
-                           ))}
-                           <div className="w-12 h-12 rounded-full border-2 border-gray-900 bg-rose-600 flex items-center justify-center text-[10px] font-black">
-                              +10K
-                           </div>
-                        </div>
-                        <div className="text-xl font-black mb-1">Komunitas Skin Warrior</div>
-                        <p className="text-gray-400 text-xs">Bergabung dengan ribuan pecinta skincare premium.</p>
-                     </div>
-                  </div>
-
-               </div>
+      {/* Vision & Mission Section */}
+      <section className="py-24 px-4 md:px-6 bg-white">
+        <div className="max-w-4xl mx-auto text-center space-y-12">
+          <div className="space-y-4">
+            <h2 className="text-4xl font-black text-gray-900">Visi & Misi Kami</h2>
+            <div className="w-20 h-1.5 bg-rose-600 mx-auto rounded-full"></div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 text-left">
+            <div className="p-6 md:p-8 rounded-3xl bg-gray-50 border border-gray-100">
+              <h4 className="text-lg md:text-xl font-bold text-gray-900 mb-4 flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs">1</span>
+                Visi
+              </h4>
+              <p className="text-gray-500 leading-relaxed text-sm md:text-base">
+                Menjadi brand skincare nomor satu yang dipercaya masyarakat Indonesia untuk solusi kecantikan kulit sehat alami yang berkelanjutan.
+              </p>
             </div>
-         </section>
-
-         {/* 3. The Science (Ingredients) - Engaging Indonesian */}
-         <section className="py-24 bg-[#fafafa]">
-            <div className="max-w-7xl mx-auto px-6">
-               <div className="flex flex-col lg:flex-row items-center gap-16">
-                  <div className="w-full lg:w-1/2 relative">
-                     <div className="aspect-[4/5] rounded-[3rem] overflow-hidden shadow-xl relative z-10">
-                        <img src="https://images.unsplash.com/photo-1612817288484-6f916006741a?w=800&h=1200&fit=crop" className="w-full h-full object-cover" alt="Sains AkuGlow" />
-                     </div>
-                     <div className="absolute bottom-8 -right-4 p-6 bg-white/90 backdrop-blur-lg rounded-3xl shadow-xl border border-white/50 z-20 max-w-[240px]">
-                        <h4 className="text-base font-black mb-2 text-rose-600">Teknologi Korea.</h4>
-                        <p className="text-xs text-gray-500 leading-relaxed italic">"Kami menggunakan proses ekstraksi dingin untuk menjaga nutrisi bahan alami tetap utuh."</p>
-                     </div>
-                  </div>
-                  <div className="w-full lg:w-1/2">
-                     <span className="text-rose-600 font-black text-xs uppercase tracking-widest mb-4 block">Kualitas Tanpa Kompromi</span>
-                     <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight mb-8">Rahasia di Balik <br /><span className="text-rose-600 italic">Kilau Sempurna Anda.</span></h2>
-
-                     <div className="space-y-6">
-                        {[
-                           { title: "Bahan Terpilih", desc: "Kami hanya menggunakan bahan mentah bersertifikat dari perkebunan terbaik dunia.", icon: "bx-check-double" },
-                           { title: "Uji Klinis", desc: "Setiap formula melalui uji sensitivitas ketat untuk memastikan keamanan bagi semua jenis kulit.", icon: "bx-shield-quarter" },
-                           { title: "Ramah Lingkungan", desc: "Komitmen kami pada kemasan berkelanjutan dan proses produksi yang etis.", icon: "bx-planet" }
-                        ].map((item, i) => (
-                           <div key={i} className="flex gap-5 items-start group p-4 rounded-2xl hover:bg-white hover:shadow-sm transition-all duration-300">
-                              <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl group-hover:bg-rose-600 group-hover:text-white transition-all">
-                                 <i className={`bx ${item.icon}`}></i>
-                              </div>
-                              <div>
-                                 <h5 className="text-lg font-black mb-1 text-gray-900">{item.title}</h5>
-                                 <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-               </div>
+            <div className="p-6 md:p-8 rounded-3xl bg-gray-50 border border-gray-100">
+              <h4 className="text-lg md:text-xl font-bold text-gray-900 mb-4 flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs">2</span>
+                Misi
+              </h4>
+              <p className="text-gray-500 leading-relaxed text-sm md:text-base">
+                Memberikan edukasi kecantikan yang tepat, menyediakan produk berkualitas tinggi dengan harga terjangkau, dan membangun komunitas yang sehat.
+              </p>
             </div>
-         </section>
+          </div>
+        </div>
+      </section>
 
-         {/* 5. Final CTA - Engaging & Balanced */}
-         <section className="py-32 bg-white text-center px-6">
-            <div className="max-w-4xl mx-auto">
-               <h2 className="text-5xl md:text-6xl font-black tracking-tight text-gray-900 mb-10">Jadilah Bagian dari <br /> <span className="text-rose-600 italic">Generasi Glowing.</span></h2>
-               <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                  <Link to="/shop" className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-rose-600 to-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-rose-600/20 hover:scale-105 transition-all active:scale-95">
-                     Mulai Belanja Sekarang
-                  </Link>
-                  <Link to="/register" className="w-full sm:w-auto px-10 py-4 bg-gray-50 text-gray-900 border border-gray-200 font-bold rounded-2xl hover:bg-gray-100 transition-all active:scale-95">
-                     Gabung Jadi Partner
-                  </Link>
-               </div>
+      {/* Values Section */}
+      <section className="py-24 px-4 md:px-6 bg-[#FDFBF7] relative overflow-hidden">
+        {/* Subtle Decorative Background Elements */}
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-rose-50/30 to-transparent -z-0"></div>
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-600/10 text-rose-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">
+              CULTURE & BELIEF
             </div>
-         </section>
-
-         <style>{`
-        @keyframes text-reveal {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fade-down {
-          from { opacity: 0; transform: translateY(-15px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fade-up {
-          from { opacity: 0; transform: translateY(25px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes scroll-marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-text-reveal { animation: text-reveal 1s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
-        .animate-fade-down { animation: fade-down 0.8s ease-out forwards; }
-        .animate-fade-up { animation: fade-up 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
-        .animate-scroll-marquee { 
-           animation: scroll-marquee 50s linear infinite; 
-           width: max-content;
-        }
-        .animate-scroll-marquee:hover { animation-play-state: paused; }
-      `}</style>
-      </main>
-   );
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight">Values of AkuGlow</h2>
+            <p className="text-gray-500 mt-4 max-w-2xl mx-auto text-sm md:text-base">Prinsip dasar yang menjadi landasan kami dalam setiap langkah dan keputusan.</p>
+          </div>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+            {[
+              { title: 'Creative and Innovative', desc: 'Solusi cerdas untuk setiap masalah.', icon: 'lightbulb' },
+              { title: 'Respect', desc: 'Menghargai setiap perbedaan.', icon: 'handshake' },
+              { title: 'Humility', desc: 'Tetap rendah hati dalam kesuksesan.', icon: 'person_check' },
+              { title: 'Skillful', desc: 'Keahlian terasah dan profesional.', icon: 'settings' },
+              { title: 'Teamwork', desc: 'Sinergi mencapai tujuan bersama.', icon: 'groups' },
+              { title: 'Ethics and Integrity', desc: 'Integritas dalam setiap tindakan.', icon: 'shield_check' },
+              { title: 'Adaptive', desc: 'Cepat beradaptasi dengan perubahan.', icon: 'sync' }
+            ].map((value, idx) => (
+              <div 
+                key={idx} 
+                className="group relative p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] bg-white border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-rose-600/5 hover:-translate-y-2 transition-all duration-500 overflow-hidden text-center flex flex-col items-center"
+              >
+                {/* Decorative Expanding Circle on Hover */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-rose-50 rounded-full group-hover:scale-[6] group-hover:bg-rose-50/50 transition-transform duration-700 -z-0"></div>
+                
+                <div className="relative z-10">
+                  <div className="w-14 h-14 md:w-20 md:h-20 mx-auto mb-4 md:mb-8 bg-white rounded-2xl md:rounded-3xl shadow-lg border border-gray-50 flex items-center justify-center group-hover:bg-rose-600 group-hover:rotate-12 transition-all duration-500">
+                    <span className="material-symbols-outlined text-rose-600 text-2xl md:text-4xl group-hover:text-white transition-colors duration-500">
+                      {value.icon}
+                    </span>
+                  </div>
+                  <h4 className="text-xs md:text-xl font-black text-gray-900 mb-2 md:mb-3 group-hover:text-rose-600 transition-colors leading-tight">
+                    {value.title}
+                  </h4>
+                  <p className="text-gray-500 text-[10px] md:text-sm leading-relaxed opacity-0 md:opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-500 hidden md:block">
+                    {value.desc}
+                  </p>
+                </div>
+                
+                {/* Bottom Accent Bar */}
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-rose-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }

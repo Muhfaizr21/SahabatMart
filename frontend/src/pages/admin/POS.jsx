@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchJson, ADMIN_API_BASE, formatImage } from '../../lib/api';
+import { fetchJson, ADMIN_API_BASE, API_BASE, formatImage } from '../../lib/api';
 import toast from 'react-hot-toast';
 import { Html5Qrcode } from 'html5-qrcode';
 
@@ -9,7 +9,7 @@ const AdminPOS = () => {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState('qris');
   const [amountPaid, setAmountPaid] = useState(0);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
@@ -55,15 +55,33 @@ const AdminPOS = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [search]);
 
-  const fetchMember = async (code) => {
+  const fetchMember = async (inputCode) => {
+    let code = inputCode.trim();
+
+    // If it's a URL, try to extract the ref code
+    if (code.includes('?ref=')) {
+      try {
+        const url = new URL(code);
+        code = url.searchParams.get('ref') || code;
+      } catch (e) {
+        // Fallback for malformed URLs
+        const parts = code.split('ref=');
+        code = parts[parts.length - 1].split(/[&?#]/)[0];
+      }
+    } else if (code.includes('/ref/')) {
+      const parts = code.split('/ref/');
+      code = parts[parts.length - 1].split(/[?#]/)[0];
+    }
+
     try {
-      const data = await fetchJson(`/api/pos/member/${code}`);
+      const data = await fetchJson(`${API_BASE}/api/merchant/pos/member/${code}`);
       setMember(data);
       setMemberCode('');
       setIsMemberScanning(false);
       toast.success(`Member: ${data.full_name}`);
     } catch (err) {
-      toast.error('Member tidak ditemukan');
+      console.error(err);
+      toast.error(err.message || 'Member tidak ditemukan');
     }
   };
 
@@ -445,35 +463,14 @@ const AdminPOS = () => {
                </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 md:gap-3">
-               <button onClick={() => setPaymentMethod('cash')} className={`py-3 md:py-3.5 rounded-2xl border-2 font-bold text-[11px] md:text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'cash' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-white bg-white text-slate-400'}`}>
-                  <i className="bx bx-money" /> TUNAI
-               </button>
-               <button onClick={() => { setPaymentMethod('qris'); setAmountPaid(calculateTotal()); }} className={`py-3 md:py-3.5 rounded-2xl border-2 font-bold text-[11px] md:text-xs flex items-center justify-center gap-2 transition-all ${paymentMethod === 'qris' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-white bg-white text-slate-400'}`}>
-                  <i className="bx bx-qr" /> NON-TUNAI
-               </button>
+            <div className="flex flex-col gap-2">
+               <div className="flex items-center gap-2 px-4 py-3 bg-indigo-50 border-2 border-indigo-200 rounded-2xl text-indigo-700 font-black text-xs uppercase">
+                  <i className="bx bx-qr text-xl" /> PEMBAYARAN: NON-TUNAI
+               </div>
+               <p className="text-[10px] text-slate-400 font-bold px-2 italic">Semua transaksi di Admin POS menggunakan metode pembayaran non-tunai.</p>
             </div>
 
-            {paymentMethod === 'cash' && (
-               <div className="space-y-3 md:space-y-4">
-                  <div className="relative">
-                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-300">Rp</span>
-                     <input type="number" placeholder="Jumlah bayar..." className="w-full pl-12 pr-4 py-3 md:py-4 rounded-2xl border-0 shadow-inner bg-white font-black text-xl md:text-2xl focus:ring-0" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} />
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5 md:gap-2">
-                     {quickPay.map(v => (
-                       <button key={v} onClick={() => setAmountPaid(v)} className="py-2.5 bg-slate-200/80 hover:bg-slate-300 rounded-xl text-[9px] md:text-[10px] font-black text-slate-600 transition-all active:scale-90">{v/1000}K</button>
-                     ))}
-                  </div>
-                  {amountPaid > 0 && amountPaid >= calculateTotal() && (
-                     <div className="bg-emerald-50 p-3 md:p-4 rounded-2xl border border-emerald-100 flex justify-between items-center group overflow-hidden relative">
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
-                        <span className="text-[10px] font-black text-emerald-600 uppercase">Kembalian</span>
-                        <span className="text-xl md:text-2xl font-black text-emerald-700 font-mono tracking-tighter">{formatIDR(amountPaid - calculateTotal())}</span>
-                     </div>
-                  )}
-               </div>
-            )}
+
 
             <button onClick={handleCheckout} disabled={processing || cart.length === 0} className="w-full bg-slate-900 hover:bg-black disabled:bg-slate-100 disabled:text-slate-400 text-white py-4 md:py-5 rounded-[24px] md:rounded-3xl font-black text-base md:text-xl shadow-xl shadow-slate-100 active:shadow-none transition-all flex items-center justify-center gap-3 active:scale-[0.98]">
               {processing ? <i className="bx bx-loader-alt animate-spin text-2xl" /> : (

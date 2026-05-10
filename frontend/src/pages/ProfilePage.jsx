@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BUYER_API_BASE, AUTH_API_BASE, fetchJson, uploadFile, formatImage } from '../lib/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { toPng } from 'html-to-image';
+import MemberCard from '../components/MemberCard';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -632,7 +633,7 @@ export default function ProfilePage() {
                   <div className="mb-10 border-b border-gray-100 pb-6 w-full text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                       <h3 className="text-3xl font-black text-gray-900 tracking-tight">Kartu Member Digital</h3>
-                      <p className="text-sm text-gray-400 mt-1">Gunakan kartu ini untuk mendapatkan poin di setiap transaksi offline.</p>
+                      <p className="text-sm text-gray-400 mt-1">Gunakan kartu ini untuk identitas saat bertransaksi di outlet fisik.</p>
                     </div>
                     <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100">
                        <i className="bx bxs-check-shield text-lg"></i>
@@ -640,90 +641,27 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* CLEAN AKUGLOW CARD */}
-                  <div className="relative w-full max-w-[440px] group flex justify-center">
-                    <div 
-                      ref={cardRef}
-                      className="relative w-full h-[280px] rounded-[2rem] p-9 text-white border border-gray-100 overflow-hidden bg-[#0f172a]"
-                    >
-                      {/* Subtle Gradient Background */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#1e293b] to-[#0f172a]"></div>
-                      
-                      {/* Subtle Pattern Overlay */}
-                      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-
-                      <div className="relative h-full flex flex-col justify-between z-10">
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-                                <i className="bx bxs-crown text-2xl text-white"></i>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="font-black tracking-tighter text-2xl bg-gradient-to-r from-white via-white to-amber-200 bg-clip-text text-transparent">AKUGLOW</span>
-                                <span className="text-[8px] font-black text-amber-500 uppercase tracking-[0.3em] leading-none">Premium Experience</span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="bg-white p-2 rounded-2xl shadow-xl border border-white/20 transform transition-transform group-hover:scale-105">
-                            <QRCodeSVG 
-                              value={userData.id} 
-                              size={65}
-                              level="H"
-                              fgColor="#0f172a"
-                              includeMargin={false}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-auto">
-                          <div className="mb-4">
-                            <h4 className="text-xl font-black tracking-tight leading-none text-white truncate">{profile.full_name || 'LOYAL MEMBER'}</h4>
-                            <div className="flex items-center gap-2 mt-1.5">
-                               <div className="h-[2px] w-6 bg-amber-500 rounded-full"></div>
-                               <p className="text-[8px] font-bold text-white/40 tracking-widest">ID: {userData.id.substring(0, 18).toUpperCase()}</p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center justify-between border-t border-white/10 pt-4">
-                            <div className="flex flex-col">
-                              <span className="text-[8px] font-black text-white/30 uppercase tracking-widest leading-none mb-1">Loyalty Points</span>
-                              <div className="flex items-center gap-1.5">
-                                <i className="bx bxs-zap text-amber-400 text-sm"></i>
-                                <span className="text-lg font-black text-amber-400">{(profile.points || 0).toLocaleString()} <span className="text-[9px] text-white/40 font-bold uppercase ml-1">Pts</span></span>
-                              </div>
-                            </div>
-                            
-                            <div className="px-3 py-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
-                               <span className="text-[8px] font-black text-white/80 uppercase tracking-widest">Platinum</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Shine Effect */}
-                      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                    </div>
+                  <div ref={cardRef}>
+                    <MemberCard user={userData} profile={profile} />
                   </div>
 
                   {/* INFO SECTION */}
                   <div className="mt-12 w-full max-w-md">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                       <div className="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-center">
-                          <div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
-                             <i className="bx bx-gift"></i>
-                          </div>
-                          <h6 className="font-bold text-gray-900 text-xs">Voucher Promo</h6>
-                          <p className="text-[10px] text-gray-400 mt-1">Tukar poin dengan diskon</p>
-                       </div>
-                       <div className="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-center">
-                          <div className="w-10 h-10 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
-                             <i className="bx bx-star"></i>
-                          </div>
-                          <h6 className="font-bold text-gray-900 text-xs">Akses Eksklusif</h6>
-                          <p className="text-[10px] text-gray-400 mt-1">Member-only event & flash sale</p>
-                       </div>
+                        <div className="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-center">
+                           <div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
+                              <i className="bx bx-history"></i>
+                           </div>
+                           <h6 className="font-bold text-gray-900 text-xs">Riwayat Belanja</h6>
+                           <p className="text-[10px] text-gray-400 mt-1">Catatan transaksi digital</p>
+                        </div>
+                        <div className="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-center">
+                           <div className="w-10 h-10 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
+                              <i className="bx bx-star"></i>
+                           </div>
+                           <h6 className="font-bold text-gray-900 text-xs">Akses Eksklusif</h6>
+                           <p className="text-[10px] text-gray-400 mt-1">Member-only event & promo</p>
+                        </div>
                     </div>
 
                     <div className="bg-gray-900 text-white rounded-[2rem] p-8 relative overflow-hidden shadow-2xl shadow-gray-900/20">
@@ -736,7 +674,7 @@ export default function ProfilePage() {
                            <h5 className="font-black text-sm tracking-wide uppercase">Cara Penggunaan</h5>
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          Tunjukkan kode QR di atas saat melakukan pembayaran di kasir outlet <span className="text-white font-bold underline decoration-rose-500 underline-offset-4">AkuGlow</span> mana saja untuk akumulasi poin dan riwayat belanja digital.
+                          Tunjukkan kode QR di atas saat melakukan pembayaran di kasir outlet <span className="text-white font-bold underline decoration-rose-500 underline-offset-4">SahabatMart</span> mana saja agar transaksi Anda tercatat otomatis di dashboard.
                         </p>
                       </div>
                     </div>

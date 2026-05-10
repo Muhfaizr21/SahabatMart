@@ -41,7 +41,12 @@ export default function AdminEditProduct() {
   const [gallery, setGallery] = useState([]);
   const [selectedAttrs, setSelectedAttrs] = useState({});
   const [variants, setVariants] = useState([]);
-  const [newVariant, setNewVariant] = useState({ name: '', sku: '', price: 0, wholesale_price: 0, cogs: 0, stock: 0, weight: 0 });
+  const [newVariant, setNewVariant] = useState({ 
+    name: '', sku: '', price: 0, wholesale_price: 0, cogs: 0, stock: 0, weight: 0,
+    commission_preset_id: '',
+    tier_commission_preset_id: '',
+    merchant_commission_preset_id: ''
+  });
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [editingVariant, setEditingVariant] = useState(null);
 
@@ -266,7 +271,12 @@ export default function AdminEditProduct() {
       body: JSON.stringify(payload)
     }).then(resp => {
       setVariants(prev => [...prev, resp.data || resp]);
-      setNewVariant({ name: '', sku: '', price: 0, wholesale_price: 0, cogs: 0, stock: 0, weight: 0 });
+      setNewVariant({ 
+        name: '', sku: '', price: 0, wholesale_price: 0, cogs: 0, stock: 0, weight: 0,
+        commission_preset_id: '',
+        tier_commission_preset_id: '',
+        merchant_commission_preset_id: ''
+      });
       setShowVariantModal(false);
       toast.success('Varian berhasil ditambahkan');
     }).catch(e => toast.error(e.message));
@@ -1043,6 +1053,28 @@ export default function AdminEditProduct() {
                 <label className="mini-label">Berat (Gram)</label>
                 <input type="number" className="form-input-small" value={newVariant.weight} onChange={e => setNewVariant({...newVariant, weight: parseInt(e.target.value)})} />
               </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="mini-label">Preset Komisi Affiliate (Override)</label>
+                <select 
+                  className="form-input-small" 
+                  value={newVariant.commission_preset_id || ''} 
+                  onChange={e => setNewVariant({...newVariant, commission_preset_id: e.target.value})}
+                >
+                  <option value="">Gunakan Default Produk</option>
+                  {presets.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="mini-label">Preset Komisi Merchant (Override)</label>
+                <select 
+                  className="form-input-small" 
+                  value={newVariant.merchant_commission_preset_id || ''} 
+                  onChange={e => setNewVariant({...newVariant, merchant_commission_preset_id: e.target.value})}
+                >
+                  <option value="">Gunakan Default Produk</option>
+                  {merchantPresets.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
+                </select>
+              </div>
             </div>
             <button onClick={handleAddVariant} className="btn-save" style={{ width: '100%', padding: '14px' }}>Tambah Varian</button>
           </div>
@@ -1085,6 +1117,28 @@ export default function AdminEditProduct() {
               <div>
                 <label className="mini-label">Berat (Gram)</label>
                 <input type="number" className="form-input-small" value={editingVariant.weight} onChange={e => setEditingVariant({...editingVariant, weight: parseInt(e.target.value)})} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="mini-label">Preset Komisi Affiliate (Override)</label>
+                <select 
+                  className="form-input-small" 
+                  value={editingVariant.commission_preset_id || ''} 
+                  onChange={e => setEditingVariant({...editingVariant, commission_preset_id: e.target.value})}
+                >
+                  <option value="">Gunakan Default Produk</option>
+                  {presets.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label className="mini-label">Preset Komisi Merchant (Override)</label>
+                <select 
+                  className="form-input-small" 
+                  value={editingVariant.merchant_commission_preset_id || ''} 
+                  onChange={e => setEditingVariant({...editingVariant, merchant_commission_preset_id: e.target.value})}
+                >
+                  <option value="">Gunakan Default Produk</option>
+                  {merchantPresets.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
+                </select>
               </div>
             </div>
             <button onClick={handleUpdateVariant} className="btn-save" style={{ width: '100%', padding: '14px' }}>Simpan Perubahan</button>

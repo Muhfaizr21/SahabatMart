@@ -276,7 +276,7 @@ type SkinJourneyAIConfig struct {
 type UserSkinJourney struct {
 	ID              uint               `gorm:"primaryKey" json:"id"`
 	UserID          string             `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
-	ProgramID       uint               `json:"program_id"`
+	ProgramID       *uint              `json:"program_id"`
 	Program         SkinJourneyProgram `gorm:"foreignKey:ProgramID" json:"program"`
 	CurrentWeek     int                `gorm:"default:1" json:"current_week"`
 	StartedAt       time.Time          `json:"started_at"`

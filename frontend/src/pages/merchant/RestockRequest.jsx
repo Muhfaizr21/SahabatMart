@@ -10,6 +10,7 @@ export default function RestockRequest() {
   const [cart, setCart] = useState([]); 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedProductForVariant, setSelectedProductForVariant] = useState(null);
 
   useEffect(() => {
     loadRequests();
@@ -47,23 +48,37 @@ export default function RestockRequest() {
     setFilteredProducts(result);
   }, [searchTerm, masterProducts]);
 
-  const addToCart = (p) => {
-    const ex = cart.find(i => i.product_id === p.id);
-    if (ex) {
-      setCart(cart.map(i => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i));
-    } else {
-      setCart([...cart, { product_id: p.id, qty: 1, name: p.name, image: p.image }]);
+  const addToCart = (p, v = null) => {
+    if (p.variants && p.variants.length > 0 && !v) {
+      setSelectedProductForVariant(p);
+      return;
     }
+
+    const itemId = v ? `${p.id}-${v.id}` : p.id;
+    const ex = cart.find(i => (i.variant_id ? `${i.product_id}-${i.variant_id}` : i.product_id) === itemId);
+    
+    if (ex) {
+      setCart(cart.map(i => (i.variant_id ? `${i.product_id}-${i.variant_id}` : i.product_id) === itemId ? { ...i, qty: i.qty + 1 } : i));
+    } else {
+      setCart([...cart, { 
+        product_id: p.id, 
+        variant_id: v?.id || null,
+        qty: 1, 
+        name: v ? `${p.name} - ${v.name}` : p.name, 
+        image: p.image 
+      }]);
+    }
+    setSelectedProductForVariant(null);
   };
 
-  const updateQty = (id, val) => {
+  const updateQty = (itemId, val) => {
     const q = parseInt(val);
     if (isNaN(q) || q < 0) return;
     if (q === 0) {
-      setCart(cart.filter(i => i.product_id !== id));
+      setCart(cart.filter(i => (i.variant_id ? `${i.product_id}-${i.variant_id}` : i.product_id) !== itemId));
       return;
     }
-    setCart(cart.map(i => i.product_id === id ? { ...i, qty: q } : i));
+    setCart(cart.map(i => (i.variant_id ? `${i.product_id}-${i.variant_id}` : i.product_id) === itemId ? { ...i, qty: q } : i));
   };
 
   const submitRestock = async () => {
@@ -73,7 +88,11 @@ export default function RestockRequest() {
       await fetchJson(`${MERCHANT_API_BASE}/restock/request`, {
         method: 'POST',
         body: JSON.stringify({ 
-          items: cart.map(i => ({ product_id: i.product_id, quantity: i.qty }))
+          items: cart.map(i => ({ 
+            product_id: i.product_id, 
+            product_variant_id: i.variant_id,
+            quantity: i.qty 
+          }))
         })
       });
       setCart([]);
@@ -292,31 +311,34 @@ export default function RestockRequest() {
                     <span className="material-symbols-outlined">shopping_basket</span>
                     <p>Pilih produk dari katalog untuk menambah daftar restok.</p>
                   </div>
-                ) : cart.map(item => (
-                  <div key={item.product_id} className="cart-card-v2">
-                    <img src={formatImage(item.image)} alt="" className="cart-item-img-v2" />
-                    <div className="cart-item-details-v2">
-                      <div className="ci-top">
-                        <h5>{item.name}</h5>
-                        <button className="btn-remove-v2" onClick={() => updateQty(item.product_id, 0)}>
-                          <span className="material-symbols-outlined">close</span>
-                        </button>
-                      </div>
-                      <div className="ci-bottom">
-                        <div className="qty-control-v2">
-                          <button onClick={() => updateQty(item.product_id, item.qty - 1)}>-</button>
-                          <input 
-                            type="number" 
-                            value={item.qty} 
-                            onChange={e => updateQty(item.product_id, e.target.value)}
-                          />
-                          <button onClick={() => updateQty(item.product_id, item.qty + 1)}>+</button>
+                ) : cart.map(item => {
+                  const itemId = item.variant_id ? `${item.product_id}-${item.variant_id}` : item.product_id;
+                  return (
+                    <div key={itemId} className="cart-card-v2">
+                      <img src={formatImage(item.image)} alt="" className="cart-item-img-v2" />
+                      <div className="cart-item-details-v2">
+                        <div className="ci-top">
+                          <h5>{item.name}</h5>
+                          <button className="btn-remove-v2" onClick={() => updateQty(itemId, 0)}>
+                            <span className="material-symbols-outlined">close</span>
+                          </button>
                         </div>
-                        <span className="unit-label">Pcs</span>
+                        <div className="ci-bottom">
+                          <div className="qty-control-v2">
+                            <button onClick={() => updateQty(itemId, item.qty - 1)}>-</button>
+                            <input 
+                              type="number" 
+                              value={item.qty} 
+                              onChange={e => updateQty(itemId, e.target.value)}
+                            />
+                            <button onClick={() => updateQty(itemId, item.qty + 1)}>+</button>
+                          </div>
+                          <span className="unit-label">Pcs</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="cart-footer-v2">
@@ -353,7 +375,78 @@ export default function RestockRequest() {
         </div>
       )}
 
+      {/* VARIANT PICKER MODAL */}
+      {selectedProductForVariant && (
+        <div className="premium-modal-overlay" style={{ zIndex: 10000 }}>
+          <div className="variant-picker-container">
+            <div className="vp-header">
+              <div className="vp-prod-info">
+                <img src={formatImage(selectedProductForVariant.image)} alt="" />
+                <div>
+                  <h4>Pilih Varian</h4>
+                  <p>{selectedProductForVariant.name}</p>
+                </div>
+              </div>
+              <button className="btn-close-vp" onClick={() => setSelectedProductForVariant(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="vp-body custom-scrollbar">
+              {selectedProductForVariant.variants.map(v => (
+                <div key={v.id} className="vp-item" onClick={() => addToCart(selectedProductForVariant, v)}>
+                  <div className="vp-item-left">
+                    <span className="vp-name">{v.name}</span>
+                    <span className="vp-sku">{v.sku}</span>
+                  </div>
+                  <div className="vp-item-right">
+                    <span className="material-symbols-outlined">add_circle</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        /* VARIANT PICKER STYLES */
+        .variant-picker-container {
+          background: white;
+          width: 100%;
+          max-width: 440px;
+          border-radius: 28px;
+          overflow: hidden;
+          box-shadow: 0 30px 60px -12px rgba(0,0,0,0.25);
+          animation: modalSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes modalSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .vp-header { padding: 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .vp-prod-info { display: flex; align-items: center; gap: 16px; }
+        .vp-prod-info img { width: 50px; height: 50px; border-radius: 12px; object-fit: cover; }
+        .vp-prod-info h4 { margin: 0; font-size: 14px; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 1px; }
+        .vp-prod-info p { margin: 2px 0 0 0; font-size: 15px; font-weight: 700; color: #1e293b; }
+        .btn-close-vp { border: none; background: #f1f5f9; color: #64748b; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
+        .btn-close-vp:hover { background: #fee2e2; color: #ef4444; }
+
+        .vp-body { max-height: 400px; overflow-y: auto; padding: 12px; }
+        .vp-item { 
+          padding: 16px 20px; 
+          border-radius: 16px; 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          cursor: pointer; 
+          transition: 0.2s;
+          margin-bottom: 4px;
+        }
+        .vp-item:hover { background: #f8faff; transform: translateX(4px); }
+        .vp-item-left { display: flex; flex-direction: column; }
+        .vp-name { font-size: 15px; font-weight: 700; color: #1e293b; }
+        .vp-sku { font-size: 12px; font-weight: 600; color: #94a3b8; font-family: monospace; }
+        .vp-item-right { color: #4338ca; opacity: 0.3; transition: 0.2s; }
+        .vp-item:hover .vp-item-right { opacity: 1; transform: scale(1.1); }
+
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
         .premium-restock-page {

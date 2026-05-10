@@ -453,9 +453,19 @@ export default function ShopPage() {
                 {(searchParam?.toLowerCase().includes('tentang') || searchParam?.toLowerCase().includes('profil')) && (
                   <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
                     <p className="text-rose-600 font-black text-sm mb-3">Ingin tahu lebih banyak tentang kami?</p>
-                    <Link to="/about" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                    <Link to="/peluang-bisnis" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
                       <span className="material-symbols-outlined text-lg">info</span>
-                      Tentang SahabatMart
+                      Tentang AkuGlow
+                    </Link>
+                  </div>
+                )}
+
+                {(searchParam?.toLowerCase().includes('bisnis') || searchParam?.toLowerCase().includes('peluang') || searchParam?.toLowerCase().includes('affiliate')) && (
+                  <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
+                    <p className="text-rose-600 font-black text-sm mb-3">Ingin tahu peluang bisnis kami?</p>
+                    <Link to="/about" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                      <span className="material-symbols-outlined text-lg">business_center</span>
+                      Peluang Bisnis AkuGlow
                     </Link>
                   </div>
                 )}

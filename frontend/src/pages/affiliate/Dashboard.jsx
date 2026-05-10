@@ -119,7 +119,7 @@ export default function AffiliateDashboard() {
             <div className="relative z-10">
               <h4 className="text-white font-black text-lg mb-2">Butuh Bantuan?</h4>
               <p className="text-indigo-100 text-sm leading-relaxed">Tim support kami siap membantu kendala teknis atau pertanyaan seputar komisi Anda 24/7.</p>
-              <button className="mt-6 px-6 py-2.5 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
+              <button onClick={() => window.location.href = '/contact'} className="mt-6 px-6 py-2.5 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
                 Hubungi Admin
               </button>
             </div>

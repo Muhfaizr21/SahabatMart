@@ -80,7 +80,7 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 	}
 
 	// 3. Unify Counts dengan logic Eligibility Service (Real-time)
-	isEligible, activeMitraCount, teamTurnover, reqMitra, reqTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+	isEligible, activeMitraCount, teamTurnover, reqMitra, reqTurnover, qualifiedMitraCount := ac.Service.CheckMerchantEligibility(affiliateID)
 
 	// 4. Hitung Order Stats (Total & Pending)
 	var totalOrders, pendingOrders int64
@@ -136,6 +136,7 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 			"total_downline":       totalDownline,
 			"active_mitra_count":   activeMitraCount,
 			"active_mitra":         activeMitraCount, // Alias for Stats.jsx
+			"qualified_mitra_count": qualifiedMitraCount,
 			"team_monthly_turnover": teamTurnover,
 			"monthly_turnover":      teamTurnover,    // Alias for Stats.jsx
 			"next_tier_req_mitra":    reqMitra,
@@ -514,15 +515,47 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Drill-down support: Get stats for a specific member in the network
+	rootID := r.URL.Query().Get("root_id")
+	targetID := affiliateID // Default to self
+	isDrillDown := false
+
+	if rootID != "" && rootID != affiliateID {
+		// Security check: Ensure rootID is indeed a descendant of affiliateID
+		var isDescendant bool
+		ac.DB.Raw(`
+			WITH RECURSIVE subordinates AS (
+				SELECT id FROM affiliate_members WHERE upline_id = ?
+				UNION ALL
+				SELECT am.id FROM affiliate_members am
+				JOIN subordinates s ON am.upline_id = s.id
+			)
+			SELECT EXISTS(SELECT 1 FROM subordinates WHERE id = ?)
+		`, affiliateID, rootID).Scan(&isDescendant)
+
+		if !isDescendant {
+			utils.JSONError(w, http.StatusForbidden, "Anda tidak memiliki akses ke data jaringan ini")
+			return
+		}
+		targetID = rootID
+		isDrillDown = true
+
+		// If drill-down, recalculate summary for this specific root
+		totalDownlines, teamTurnover, _ = ac.Service.GetTeamStats(targetID)
+	}
+
 	// Pagination & Search params
 	page := utils.QueryInt(r, "page", 1)
 	limit := utils.QueryInt(r, "limit", 10)
 	search := r.URL.Query().Get("search")
+	levelFilter := r.URL.Query().Get("level") // "all", "1", "2" (2 means 2+)
 	offset := (page - 1) * limit
 
 	// Get full downlines list using Recursive CTE
 	type DownlineRow struct {
+		AffiliateID  string    `json:"affiliate_id"`
 		UserID       string    `json:"user_id"`
+		UplineID     string    `json:"upline_id"`
 		FullName     string    `json:"full_name"`
 		Status       string    `json:"status"`
 		JoinedAt     time.Time `json:"joined_at"`
@@ -535,10 +568,18 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 	
 	searchQuery := "%" + search + "%"
 	
+	// Prepare level condition
+	levelCond := ""
+	if levelFilter == "1" {
+		levelCond = "AND level = 1"
+	} else if levelFilter == "2" {
+		levelCond = "AND level >= 2"
+	}
+
 	// Query with Recursive CTE to get all levels + Filter + Pagination
-	ac.DB.Raw(`
+	ac.DB.Raw(fmt.Sprintf(`
 		WITH RECURSIVE team AS (
-			-- Anchor: Direct downlines (Level 1)
+			-- Anchor: Direct downlines (Level 1 relative to target)
 			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
 			       1 as level, CAST('Anda' AS VARCHAR(150)) as referrer_name
 			FROM affiliate_members am
@@ -555,20 +596,20 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 			JOIN team t ON am.upline_id = t.id
 			WHERE t.level < 10 
 		)
-		SELECT t.user_id, t.full_name, t.avatar_url, t.status, t.created_at as joined_at,
+		SELECT t.id as affiliate_id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at as joined_at,
 		       t.level, t.referrer_name,
 		       COALESCE(SUM(o.subtotal), 0) as turnover
 		FROM team t
 		LEFT JOIN orders o ON o.affiliate_id = t.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
-		WHERE t.full_name ILIKE ? OR t.user_id::text ILIKE ?
-		GROUP BY t.user_id, t.full_name, t.avatar_url, t.status, t.created_at, t.level, t.referrer_name
+		WHERE (t.full_name ILIKE ? OR t.user_id::text ILIKE ?) %s
+		GROUP BY t.id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at, t.level, t.referrer_name
 		ORDER BY t.level ASC, t.created_at DESC
 		LIMIT ? OFFSET ?
-	`, affiliateID, searchQuery, searchQuery, limit, offset).Scan(&downlines)
+	`, levelCond), targetID, searchQuery, searchQuery, limit, offset).Scan(&downlines)
 
 	// Count total filtered
 	var totalFiltered int64
-	ac.DB.Raw(`
+	ac.DB.Raw(fmt.Sprintf(`
 		WITH RECURSIVE team AS (
 			SELECT am.id, am.user_id, am.upline_id, up.full_name, 1 as level
 			FROM affiliate_members am
@@ -581,15 +622,28 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 			JOIN team t ON am.upline_id = t.id
 			WHERE t.level < 10
 		)
-		SELECT COUNT(*) FROM team WHERE full_name ILIKE ? OR user_id::text ILIKE ?
-	`, affiliateID, searchQuery, searchQuery).Scan(&totalFiltered)
+		SELECT COUNT(*) FROM team WHERE (full_name ILIKE ? OR user_id::text ILIKE ?) %s
+	`, levelCond), targetID, searchQuery, searchQuery).Scan(&totalFiltered)
 
 	totalPages := (totalFiltered + int64(limit) - 1) / int64(limit)
+
+	// Get info about current root (if drilldown)
+	var rootMember map[string]interface{}
+	if isDrillDown {
+		ac.DB.Raw(`
+			SELECT am.id, up.full_name, up.avatar_url 
+			FROM affiliate_members am 
+			JOIN user_profiles up ON up.user_id = am.user_id 
+			WHERE am.id = ?
+		`, targetID).Scan(&rootMember)
+	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_downlines": totalDownlines,
 		"team_turnover":   teamTurnover,
 		"downlines":       downlines,
+		"is_drill_down":   isDrillDown,
+		"root_member":     rootMember,
 		"pagination": map[string]interface{}{
 			"current_page":   page,
 			"limit":          limit,
@@ -607,11 +661,12 @@ func (ac *AffiliateController) CheckMerchantEligibility(w http.ResponseWriter, r
 		return
 	}
 
-	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, qualifiedMitra := ac.Service.CheckMerchantEligibility(affiliateID)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"is_eligible":      isEligible,
 		"active_mitra":     activeMitra,
+		"qualified_mitra":  qualifiedMitra,
 		"monthly_turnover": monthlyTurnover,
 		"requirements": map[string]interface{}{
 			"min_mitra":    reqMitra,
@@ -753,7 +808,7 @@ func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.R
 	}
 
 	// 2. Cek eligibility
-	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover := ac.Service.CheckMerchantEligibility(affiliateID)
+	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, _ := ac.Service.CheckMerchantEligibility(affiliateID)
 	if !isEligible {
 		utils.JSONError(w, http.StatusForbidden,
 			fmt.Sprintf("Belum memenuhi syarat. Mitra aktif: %d/%d, Omset tim: Rp %.0f/%.0f", 
