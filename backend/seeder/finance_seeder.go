@@ -12,7 +12,7 @@ import (
 )
 
 func SeedFinance(db *gorm.DB) {
-	fmt.Println("🚀 Seeding MEGA High-Fidelity Finance System (Simulating 10K Users)...")
+	fmt.Println("🚀 Seeding Clean Finance System...")
 
 	// 1. Initial Configurations
 	dsList := []map[string]interface{}{
@@ -75,7 +75,7 @@ func SeedFinance(db *gorm.DB) {
 	names := []string{"Budi", "Siti", "Andi", "Dewi", "Rian", "Lulu", "Hendra", "Maya", "Joko", "Siska", "Rina", "Bambang", "Ani", "Tono", "Dina", "Eko", "Yanti", "Agus", "Ratna", "Fery"}
 	cities := []string{"Jakarta", "Surabaya", "Bandung", "Medan", "Semarang", "Makassar", "Palembang", "Yogyakarta", "Malang", "Denpasar"}
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 0; i++ {
 		uid := uuid.New().String()
 		u := models.User{
 			ID: uid,
@@ -112,6 +112,20 @@ func SeedFinance(db *gorm.DB) {
 	db.CreateInBatches(wallets, 100)
 	db.CreateInBatches(affiliates, 100)
 
+	// Fetch existing users/affiliates if arrays are still empty (e.g. shadow loop skipped)
+	if len(users) == 0 {
+		db.Limit(100).Find(&users)
+	}
+	if len(affiliates) == 0 {
+		db.Limit(100).Find(&affiliates)
+	}
+
+	// Safety check: if STILL empty, we can't generate orders
+	if len(users) == 0 || len(affiliates) == 0 {
+		fmt.Println("  ⚠️  Warning: No users or affiliates available. Skipping order generation.")
+		return
+	}
+
 	// 5. Generate 5,000+ Orders & Transactions (6 Months)
 	fmt.Println("  -> Generating 5,000+ Orders & Wallet Transactions...")
 	now := time.Now()
@@ -130,94 +144,97 @@ func SeedFinance(db *gorm.DB) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	orderCount := 0
 	
-	for d := startTime; d.Before(now); d = d.Add(time.Hour * 1) { // hourly steps for spread
-		if r.Intn(100) > 30 { continue } // 30% chance per hour to have 1-3 orders
-		
-		hourlyOrders := r.Intn(3) + 1
-		for h := 0; h < hourlyOrders; h++ {
-			buyer := users[r.Intn(len(users))]
-			affiliate := affiliates[r.Intn(len(affiliates))]
-			merchant := merchants[r.Intn(len(merchants))]
-			product := products[r.Intn(len(products))]
+	targetOrders := 0
+	if targetOrders > 0 {
+		for d := startTime; d.Before(now); d = d.Add(time.Hour * 1) { // hourly steps for spread
+			if r.Intn(100) > 30 { continue } // 30% chance per hour to have 1-3 orders
 			
-			qty := r.Intn(3) + 1
-			subtotal := product.Price * float64(qty)
-			platformFee := subtotal * 0.05
-			comm := subtotal * 0.10
-			merchAmt := subtotal - platformFee - comm
-			
-			orderDate := d.Add(time.Duration(r.Intn(59)) * time.Minute)
-			
-			order := models.Order{
-				OrderNumber: fmt.Sprintf("ORD-%s", uuid.New().String()[:8]),
-				BuyerID: &buyer.ID,
-				Subtotal: subtotal,
-				GrandTotal: subtotal,
-				Status: models.OrderCompleted,
-				CreatedAt: orderDate,
-			}
-			db.Create(&order)
-			
-			group := models.OrderMerchantGroup{
-				OrderID: order.ID,
-				MerchantID: merchant.ID,
-				Status: models.MOrderCompleted,
-				Subtotal: subtotal,
-				PlatformFee: platformFee,
-				AffiliateCommission: comm,
-				Commission: comm,
-				MerchantPayout: merchAmt,
-				CreatedAt: orderDate,
-			}
-			db.Create(&group)
-			
-			// 1. Create Order Item with COGS
-			cogsPerUnit := product.Price * 0.7 // Simulasi modal 70%
-			db.Create(&models.OrderItem{
-				OrderID: order.ID,
-				OrderMerchantGroupID: group.ID,
-				MerchantID: merchant.ID,
-				ProductID: product.ID,
-				ProductName: product.Name,
-				Quantity: qty,
-				UnitPrice: product.Price,
-				Subtotal: subtotal,
-				COGS: cogsPerUnit * float64(qty),
-				CreatedAt: orderDate,
-			})
-			
-			// 1. Admin Transaction (Platform Fee)
-			db.Create(&models.WalletTransaction{
-				WalletID: adminWallet.ID,
-				Type: models.TxPlatformFee,
-				Amount: platformFee,
-				Description: fmt.Sprintf("Platform Fee Order #%s", order.OrderNumber),
-				ReferenceID: &order.ID,
-				ReferenceType: "order",
-				IsSettled: true,
-				CreatedAt: orderDate,
-			})
-			
-			// 2. Affiliate Transaction (Commission)
-			var affWallet models.Wallet
-			db.Where("owner_id = ?", affiliate.UserID).First(&affWallet)
-			if affWallet.ID != "" {
+			hourlyOrders := r.Intn(3) + 1
+			for h := 0; h < hourlyOrders; h++ {
+				buyer := users[r.Intn(len(users))]
+				affiliate := affiliates[r.Intn(len(affiliates))]
+				merchant := merchants[r.Intn(len(merchants))]
+				product := products[r.Intn(len(products))]
+				
+				qty := r.Intn(3) + 1
+				subtotal := product.Price * float64(qty)
+				platformFee := subtotal * 0.05
+				comm := subtotal * 0.10
+				merchAmt := subtotal - platformFee - comm
+				
+				orderDate := d.Add(time.Duration(r.Intn(59)) * time.Minute)
+				
+				order := models.Order{
+					OrderNumber: fmt.Sprintf("ORD-%s", uuid.New().String()[:8]),
+					BuyerID: &buyer.ID,
+					Subtotal: subtotal,
+					GrandTotal: subtotal,
+					Status: models.OrderCompleted,
+					CreatedAt: orderDate,
+				}
+				db.Create(&order)
+				
+				group := models.OrderMerchantGroup{
+					OrderID: order.ID,
+					MerchantID: merchant.ID,
+					Status: models.MOrderCompleted,
+					Subtotal: subtotal,
+					PlatformFee: platformFee,
+					AffiliateCommission: comm,
+					Commission: comm,
+					MerchantPayout: merchAmt,
+					CreatedAt: orderDate,
+				}
+				db.Create(&group)
+				
+				// 1. Create Order Item with COGS
+				cogsPerUnit := product.Price * 0.7 // Simulasi modal 70%
+				db.Create(&models.OrderItem{
+					OrderID: order.ID,
+					OrderMerchantGroupID: group.ID,
+					MerchantID: merchant.ID,
+					ProductID: product.ID,
+					ProductName: product.Name,
+					Quantity: qty,
+					UnitPrice: product.Price,
+					Subtotal: subtotal,
+					COGS: cogsPerUnit * float64(qty),
+					CreatedAt: orderDate,
+				})
+				
+				// 1. Admin Transaction (Platform Fee)
 				db.Create(&models.WalletTransaction{
-					WalletID: affWallet.ID,
-					Type: models.TxCommissionEarned,
-					Amount: comm,
-					Description: fmt.Sprintf("Commission Order #%s", order.OrderNumber),
+					WalletID: adminWallet.ID,
+					Type: models.TxPlatformFee,
+					Amount: platformFee,
+					Description: fmt.Sprintf("Platform Fee Order #%s", order.OrderNumber),
 					ReferenceID: &order.ID,
 					ReferenceType: "order",
 					IsSettled: true,
 					CreatedAt: orderDate,
 				})
+				
+				// 2. Affiliate Transaction (Commission)
+				var affWallet models.Wallet
+				db.Where("owner_id = ?", affiliate.UserID).First(&affWallet)
+				if affWallet.ID != "" {
+					db.Create(&models.WalletTransaction{
+						WalletID: affWallet.ID,
+						Type: models.TxCommissionEarned,
+						Amount: comm,
+						Description: fmt.Sprintf("Commission Order #%s", order.OrderNumber),
+						ReferenceID: &order.ID,
+						ReferenceType: "order",
+						IsSettled: true,
+						CreatedAt: orderDate,
+					})
+				}
+				
+				orderCount++
+				if orderCount >= targetOrders { break }
 			}
-			
-			orderCount++
-			if orderCount >= 5000 { break }
+			if orderCount >= targetOrders { break }
 		}
-		if orderCount >= 5000 { break }
 	}
 	fmt.Printf("  -> Created %d orders and associated transactions.\n", orderCount)
 

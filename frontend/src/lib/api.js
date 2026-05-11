@@ -1,3 +1,6 @@
+// [DEPLOY RULE #1]: Set VITE_API_BASE di .env.production → JANGAN biarkan localhost di server!
+// Dev local: VITE_API_BASE=http://localhost:8080
+// Production: VITE_API_BASE=https://api.yourdomain.com
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 export const API_BASE = (RAW_API_BASE && RAW_API_BASE !== '/') ? RAW_API_BASE.replace(/\/+$/, '') : 'http://localhost:8080';
 export const AUTH_API_BASE = `${API_BASE}/api/auth`;

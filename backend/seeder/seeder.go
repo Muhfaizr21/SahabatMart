@@ -87,19 +87,21 @@ func SeedAll(db *gorm.DB) {
 	seedBlogs(db)
 	seedBanners(db)
 
-	// 7. Seed Network (Merchant & Affiliate relationship)
-	SeedNetwork(db)
+	// 7. Seed Network (Live Affiliate Hierarchy)
+	SeedAffiliateChain(db)
 
 	// 8. Mega Simulation (200+ Users & Real Activity)
-	SeedRealWorldData(db)
+	// [LIVE] Disabled for clean state
+	// SeedRealWorldData(db)
 
 	// 9. Akuglow Skin Journey Dynamic Data
 	SeedSkinJourney(db)
 
 	// 10. SahabatMart Dynamic Finance Data
-	SeedFinance(db)
+	// [LIVE] Disabled for clean state
+	// SeedFinance(db)
 
-	fmt.Println("✅ Seeding Completed! 200+ Users created with full ecosystem activity.")
+	fmt.Println("✅ Seeding Completed! Platform is now ready for LIVE deployment with clean data.")
 }
 
 func seedSuppliers(db *gorm.DB) []models.Supplier {

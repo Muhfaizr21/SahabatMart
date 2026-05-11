@@ -29,7 +29,7 @@ type AffiliateMember struct {
 	UserID           string          `gorm:"type:uuid;unique;not null" json:"user_id"`
 	MembershipTierID uint            `gorm:"not null" json:"membership_tier_id"`
 	RefCode          string          `gorm:"type:varchar(20);unique;not null" json:"ref_code"`
-	Status           AffiliateStatus `gorm:"type:varchar(50);default:'pending_verification';not null" json:"status"`
+	Status           AffiliateStatus `gorm:"type:varchar(50);default:'active';not null" json:"status"`
 
 	KTPNumber         string  `gorm:"type:varchar(20)" json:"ktp_number"`
 	BankName          string  `gorm:"type:varchar(100)" json:"bank_name"`

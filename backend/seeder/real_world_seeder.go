@@ -12,7 +12,7 @@ import (
 
 // SeedRealWorldData mensimulasikan aktivitas nyata dengan 200+ user
 func SeedRealWorldData(db *gorm.DB) {
-	fmt.Println("🌟 Starting Real World Simulation (200+ Users)...")
+	fmt.Println("🌟 Starting Real World Simulation (Clean State)...")
 
 	// 1. Ambil Data Referensi
 	var tiers []models.MembershipTier
@@ -40,7 +40,7 @@ func SeedRealWorldData(db *gorm.DB) {
 	cities := []string{"Jakarta", "Surabaya", "Bandung", "Medan", "Semarang", "Makassar", "Palembang", "Yogyakarta", "Malang", "Denpasar"}
 
 	fmt.Println("  -> Creating 200 Users & Profiles...")
-	for i := 1; i <= 200; i++ {
+	for i := 1; i <= 0; i++ {
 		email := fmt.Sprintf("user%d@example.com", i)
 		fullName := fmt.Sprintf("%s %s", names[rand.Intn(len(names))], names[rand.Intn(len(names))])
 		

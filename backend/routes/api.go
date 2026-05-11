@@ -432,7 +432,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliates/withdrawals", adminOnly(adminCtrl.GetAffiliateWithdrawals))
 	mux.HandleFunc("/api/admin/affiliates/withdrawals/process", adminOnly(adminCtrl.ProcessAffiliateWithdrawal))
 	mux.HandleFunc("/api/admin/affiliates/configs/delete", adminOnly(adminCtrl.DeleteAffiliateTier))
-	mux.HandleFunc("/api/admin/affiliates/member/update-tier", adminOnly(adminCtrl.UpdateMemberTier))
+	mux.HandleFunc("/api/admin/affiliates/member/update-tier", adminOnly(adminCtrl.UpdateMemberInfo))
 	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
 	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
 	mux.HandleFunc("/api/admin/commissions/category", adminOnly(adminCtrl.ManageCommissions))

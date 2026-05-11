@@ -836,8 +836,8 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// POST /api/admin/affiliates/member/update-tier
-func (ac *AdminController) UpdateMemberTier(w http.ResponseWriter, r *http.Request) {
+// POST /api/admin/affiliates/member/update-info
+func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -845,30 +845,44 @@ func (ac *AdminController) UpdateMemberTier(w http.ResponseWriter, r *http.Reque
 	var req struct {
 		UserID           string `json:"user_id"`
 		MembershipTierID uint   `json:"membership_tier_id"`
+		Status           string `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
 
-	if req.UserID == "" || req.MembershipTierID == 0 {
-		utils.JSONError(w, http.StatusBadRequest, "UserID dan MembershipTierID wajib diisi")
+	if req.UserID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "UserID wajib diisi")
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.MembershipTierID > 0 {
+		updates["membership_tier_id"] = req.MembershipTierID
+	}
+	if req.Status != "" {
+		updates["status"] = req.Status
+	}
+
+	if len(updates) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada data yang diupdate")
 		return
 	}
 
 	// Update the AffiliateMember record associated with this user
 	if err := ac.DB.Model(&models.AffiliateMember{}).
 		Where("user_id = ?", req.UserID).
-		Update("membership_tier_id", req.MembershipTierID).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate tier member: "+err.Error())
+		Updates(updates).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate data member: "+err.Error())
 		return
 	}
 
 	// Log audit
-	ac.Audit.Log(models.AdminID, "update_member_tier", "affiliate_member", req.UserID,
-		fmt.Sprintf("UserID: %s, NewTierID: %d", req.UserID, req.MembershipTierID), r.RemoteAddr)
+	ac.Audit.Log(models.AdminID, "update_member_info", "affiliate_member", req.UserID,
+		fmt.Sprintf("UserID: %s, Updates: %v", req.UserID, updates), r.RemoteAddr)
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "Tier member berhasil diperbarui"})
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "Data member berhasil diperbarui"})
 }
 
 // GET /api/admin/affiliates/configs  → list membership tiers
@@ -3099,20 +3113,27 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 	ac.DB.Model(&models.User{}).Count(&totalUsers)
 	ac.DB.Model(&models.Merchant{}).Where("status = 'active'").Count(&totalMerchants)
 	ac.DB.Model(&models.User{}).Where("role = 'affiliate'").Count(&totalAffiliates)
-	if ac.hasTable("order_merchant_groups") {
-		ac.DB.Table("order_merchant_groups").Count(&totalOrders)
+	// Sync dengan logic Finance (Single Source of Truth)
+	if ac.hasTable("orders") {
+		activeStats := []string{
+			string(models.OrderCompleted), string(models.OrderDelivered), 
+			string(models.OrderShipped), string(models.OrderReadyToShip), 
+			string(models.OrderPaid), string(models.OrderProcessing),
+		}
 
-		// [FIX] Gunakan MerchantOrderStatus yang benar agar SUM tidak 0
-		activeStats := []string{"confirmed", "processing", "packed", "handed_to_courier", "shipped", "delivered", "completed"}
+		ac.DB.Model(&models.Order{}).Where("status != ?", models.OrderCancelled).Count(&totalOrders)
 
-		ac.DB.Table("order_merchant_groups").
+		ac.DB.Model(&models.Order{}).
 			Where("status IN ?", activeStats).
-			Select("COALESCE(SUM(subtotal), 0)").Scan(&totalRevenue)
-
-		ac.DB.Table("order_merchant_groups").
-			Where("status IN ?", activeStats).
-			Select("COALESCE(SUM(platform_fee), 0)").Scan(&totalFee)
+			Select("COALESCE(SUM(grand_total), 0)").Scan(&totalRevenue)
 	}
+
+	if ac.hasTable("wallet_transactions") {
+		ac.DB.Table("wallet_transactions").
+			Where("type = ? AND amount > 0", string(models.TxPlatformFee)).
+			Select("COALESCE(SUM(amount), 0)").Scan(&totalFee)
+	}
+
 	if ac.hasTable("payout_requests") {
 		ac.DB.Table("payout_requests").
 			Where("status = 'pending'").Count(&pendingPayouts)

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE } from '../lib/api';
 
 const BusinessOpportunity = () => {
   const [activeSim, setActiveSim] = useState(5);
@@ -9,7 +10,7 @@ const BusinessOpportunity = () => {
   useEffect(() => {
     const fetchContent = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/public/config');
+        const response = await fetch(`${API_BASE}/api/public/config`);
         const result = await response.json();
         if (result.data && result.data.business_opportunity_content) {
           setDynamicContent(JSON.parse(result.data.business_opportunity_content));
@@ -143,12 +144,7 @@ const BusinessOpportunity = () => {
               </div>
             ))}
           </div>
-          <div className="text-center mt-8">
-            <button className="inline-flex items-center gap-2 px-7 py-3.5 bg-white border-2 border-[#C62828] text-[#C62828] font-bold text-sm rounded-xl hover:bg-red-50 transition-all duration-300 shadow-sm">
-              <span>📄</span>
-              Download PDF Presentasi Bisnis
-            </button>
-          </div>
+
         </div>
       </section>
 

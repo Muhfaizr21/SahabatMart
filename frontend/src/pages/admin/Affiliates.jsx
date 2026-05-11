@@ -89,10 +89,11 @@ export default function AdminAffiliates() {
       method: 'POST',
       body: JSON.stringify({
         user_id: editMemberTier.id,
-        membership_tier_id: parseInt(editMemberTier.new_tier_id)
+        membership_tier_id: parseInt(editMemberTier.new_tier_id),
+        status: editMemberTier.new_status
       }),
     }).then(() => { load(); setEditMemberTier(null); })
-      .catch(err => alert(err.message || 'Gagal mengubah tier member'))
+      .catch(err => alert(err.message || 'Gagal mengubah data member'))
       .finally(() => setSaving(false));
   };
 
@@ -210,8 +211,8 @@ export default function AdminAffiliates() {
                           </span>
                           <button 
                             style={A.iconBtn('#6366f1', '#eef2ff')} 
-                            title="Ubah Tier Member"
-                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '' })}
+                            title="Ubah Status/Tier"
+                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '', new_status: a.affiliate_status || '' })}
                           >
                             <i className="bx bx-edit-alt" />
                           </button>
@@ -455,6 +456,20 @@ export default function AdminAffiliates() {
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
                 * Perubahan tier akan langsung mempengaruhi rate komisi member ini pada transaksi berikutnya.
               </div>
+            </div>
+
+            <div>
+              <FieldLabel>Status Member</FieldLabel>
+              <select 
+                style={{ ...A.select, width: '100%' }}
+                value={editMemberTier.new_status}
+                onChange={e => setEditMemberTier(p => ({ ...p, new_status: e.target.value }))}
+              >
+                <option value="active">Active (Telah Valid)</option>
+                <option value="pending_verification">Pending Verification (Blm Valid)</option>
+                <option value="suspended">Suspended (Ditangguhkan)</option>
+                <option value="inactive">Inactive</option>
+              </select>
             </div>
           </div>
 

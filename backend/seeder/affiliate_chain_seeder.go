@@ -18,25 +18,7 @@ type AffiliateNode struct {
 }
 
 func SeedAffiliateChain(db *gorm.DB) {
-	fmt.Println("  -> [CLEANUP] Menghapus seluruh data affiliate lama...")
-	
-	// Gunakan TRUNCATE CASCADE agar constraint foreign key ikut dibersihkan secara otomatis
-	tables := []string{
-		"affiliate_commissions", "affiliate_click_logs", "affiliate_links", 
-		"affiliate_withdrawals", "affiliate_members", "merchants", "wallets",
-		"orders", "order_items", "order_merchant_groups", "carts", "cart_items",
-		"reviews", "user_skin_journeys", "skin_step_logs", "skin_progress_logs",
-		"skin_journals", "skin_community_posts", "notifications",
-	}
-	for _, table := range tables {
-		db.Exec(fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", table))
-	}
-	
-	// Hapus User profil & User yang terkait dengan affiliate/merchant atau email upline
-	db.Exec("DELETE FROM user_profiles WHERE user_id IN (SELECT id FROM users WHERE role IN ('affiliate', 'merchant') OR email LIKE '%@akuglow.com')")
-	db.Exec("DELETE FROM users WHERE role IN ('affiliate', 'merchant') OR email LIKE '%@akuglow.com'")
-
-	fmt.Println("  -> [SEEDING] Membuat rantai Affiliate kustom...")
+	fmt.Println("  -> [SEEDING] Membuat rantai Affiliate LIVE (Hierarchy Only)...")
 	
 	password, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	pwHash := string(password)
@@ -76,7 +58,7 @@ func SeedAffiliateChain(db *gorm.DB) {
 													{Name: "Ayi solina", IsValid: true},
 													{Name: "Dwi Rachmanto", IsValid: true},
 													{Name: "Harnanik Sayudi", IsValid: false},
-													{Name: "Ayi solina 2", IsValid: false}, // Variasi nama untuk membedakan email
+													{Name: "Ayi solina", IsValid: false},
 													{Name: "Miranti Juliana", IsValid: true},
 												},
 											},
@@ -118,9 +100,6 @@ func SeedAffiliateChain(db *gorm.DB) {
 		refCode := fmt.Sprintf("%s%s", refBase, uuid.New().String()[:4])
 
 		status := models.AffiliateActive
-		if !node.IsValid {
-			status = models.AffiliatePendingVerification
-		}
 
 		u := models.User{
 			ID:           uuid.New().String(),
@@ -137,7 +116,7 @@ func SeedAffiliateChain(db *gorm.DB) {
 
 		db.Create(&models.UserProfile{
 			UserID:   u.ID,
-			FullName: strings.ReplaceAll(node.Name, " 2", ""),
+			FullName: node.Name,
 		})
 
 		aff := models.AffiliateMember{

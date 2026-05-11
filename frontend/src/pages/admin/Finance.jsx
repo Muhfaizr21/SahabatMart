@@ -248,7 +248,7 @@ export default function AdminFinance() {
               
               <div className="space-y-2 mt-auto">
                 {data?.profit_shares && Object.entries(data.profit_shares)
-                  .filter(([k]) => k !== 'total')
+                  .filter(([k]) => k !== 'total') // Backend tidak mengirim key 'total' di profit_shares, filter ini aman sebagai safeguard
                   .slice(0, 4)
                   .map(([label, val], idx) => (
                     <div key={idx} className="flex justify-between text-[11px] font-bold">
@@ -276,13 +276,19 @@ export default function AdminFinance() {
         <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 finance-stat-grid">
             {data?.income_breakdown && Object.entries(data.income_breakdown).map(([label, val], idx) => {
-              const colors = ['indigo','emerald','amber','sky','rose'];
-              const c = colors[idx % colors.length];
+              const colorClasses = [
+                { bg: 'bg-indigo-50', border: 'border-indigo-100', textMain: 'text-indigo-500', textSub: 'text-indigo-400' },
+                { bg: 'bg-emerald-50', border: 'border-emerald-100', textMain: 'text-emerald-500', textSub: 'text-emerald-400' },
+                { bg: 'bg-amber-50', border: 'border-amber-100', textMain: 'text-amber-500', textSub: 'text-amber-400' },
+                { bg: 'bg-sky-50', border: 'border-sky-100', textMain: 'text-sky-500', textSub: 'text-sky-400' },
+                { bg: 'bg-rose-50', border: 'border-rose-100', textMain: 'text-rose-500', textSub: 'text-rose-400' }
+              ];
+              const c = colorClasses[idx % colorClasses.length];
               return (
-                <div key={idx} className={`p-5 bg-${c}-50 rounded-3xl border border-${c}-100`}>
-                  <div className={`text-[10px] font-black text-${c}-500 uppercase tracking-widest mb-2`}>{label}</div>
+                <div key={idx} className={`p-5 ${c.bg} rounded-3xl border ${c.border}`}>
+                  <div className={`text-[10px] font-black ${c.textMain} uppercase tracking-widest mb-2`}>{label}</div>
                   <div className="text-lg font-black text-slate-900">{idr(val)}</div>
-                  <div className={`text-[10px] font-bold text-${c}-400 mt-1`}>{pct(val, gross)}%</div>
+                  <div className={`text-[10px] font-bold ${c.textSub} mt-1`}>{pct(val, gross)}%</div>
                 </div>
               );
             })}
@@ -455,7 +461,7 @@ export default function AdminFinance() {
                           <td className="px-8 py-6">
                             <div className="text-xs font-black text-slate-900">{order.customer || 'Customer'}</div>
                             <div className="text-[10px] font-bold text-slate-400">{new Date(order.created_at).toLocaleString('id-ID')}</div>
-                            <div className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full inline-block mt-1">ID: {order.id.split('-')[0].toUpperCase()}</div>
+                            <div className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full inline-block mt-1">ID: {(order.id || '').split('-')[0].toUpperCase()}</div>
                           </td>
                           <td className="px-8 py-6">
                             {(() => {
@@ -499,6 +505,15 @@ export default function AdminFinance() {
                       </td>
                     </tr>
                   )}
+                  {data?.recent_orders?.length >= 20 && (
+                    <tr>
+                      <td colSpan="6" className="px-8 py-4 text-center">
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full inline-block">
+                          Menampilkan 20 transaksi terbaru. Gunakan filter periode untuk data historis lengkap.
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -535,15 +550,15 @@ export default function AdminFinance() {
                   data.wallet_activity.map((tx, i) => {
                     const isIn = tx.amount > 0;
                     const typeMap = {
-                      sale_revenue:      { label: 'Penjualan',       color: 'emerald' },
-                      platform_fee:      { label: 'Biaya Platform',  color: 'indigo'  },
-                      commission_earned: { label: 'Komisi Afiliasi', color: 'sky'     },
-                      restock_revenue:   { label: 'Restock',         color: 'amber'   },
-                      withdrawal:        { label: 'Penarikan',       color: 'rose'    },
-                      refund:            { label: 'Refund',          color: 'rose'    },
-                      topup:             { label: 'Top Up',          color: 'emerald' },
+                      sale_revenue:      { label: 'Penjualan',       cls: 'bg-emerald-50 text-emerald-600' },
+                      platform_fee:      { label: 'Biaya Platform',  cls: 'bg-indigo-50 text-indigo-600' },
+                      commission_earned: { label: 'Komisi Afiliasi', cls: 'bg-sky-50 text-sky-600' },
+                      restock_revenue:   { label: 'Restock',         cls: 'bg-amber-50 text-amber-600' },
+                      withdrawal:        { label: 'Penarikan',       cls: 'bg-rose-50 text-rose-600' },
+                      refund:            { label: 'Refund',          cls: 'bg-rose-50 text-rose-600' },
+                      topup:             { label: 'Top Up',          cls: 'bg-emerald-50 text-emerald-600' },
                     };
-                    const t = typeMap[tx.type] || { label: tx.type, color: 'slate' };
+                    const t = typeMap[tx.type] || { label: tx.type, cls: 'bg-slate-50 text-slate-600' };
                     return (
                       <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-8 py-4">
@@ -551,7 +566,7 @@ export default function AdminFinance() {
                           <div className="text-[9px] text-slate-400">{new Date(tx.created_at).toLocaleTimeString('id-ID')}</div>
                         </td>
                         <td className="px-8 py-4">
-                          <span className={`text-[10px] font-black px-3 py-1 rounded-full bg-${t.color}-50 text-${t.color}-600`}>
+                          <span className={`text-[10px] font-black px-3 py-1 rounded-full ${t.cls}`}>
                             {t.label}
                           </span>
                         </td>
@@ -579,9 +594,18 @@ export default function AdminFinance() {
                     </td>
                   </tr>
                 )}
-              </tbody>
-            </table>
-          </div>
+                  {data?.wallet_activity?.length >= 100 && (
+                    <tr>
+                      <td colSpan="5" className="px-8 py-4 text-center">
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full inline-block">
+                          Menampilkan 100 aktivitas wallet terbaru.
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
         </div>
       </div>
 

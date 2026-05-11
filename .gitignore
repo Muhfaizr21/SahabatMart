@@ -12,6 +12,10 @@ backend/scratch/
 backend/tmp/
 backend/tmp_server
 backend/uploads/
+backend/main
+backend/tmp_build
+backend/.mega_seed_done
+backend/.go-cache/
 
 # Frontend
 frontend/node_modules/

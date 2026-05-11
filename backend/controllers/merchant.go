@@ -893,25 +893,81 @@ func (mc *MerchantController) POSGetProducts(w http.ResponseWriter, r *http.Requ
 	}
 
 	search := r.URL.Query().Get("q")
-	var products []models.Product
+	
+	// 1. Fetch merchant inventories first
+	var inventories []models.Inventory
+	if err := mc.DB.Where("merchant_id = ?", merchantID).Find(&inventories).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data inventori")
+		return
+	}
 
+	// 2. Build mapping and unique product IDs
+	invMap := make(map[string]int)
+	var productIDs []string
+	productIDMap := make(map[string]bool)
+
+	for _, inv := range inventories {
+		key := inv.ProductID
+		if inv.ProductVariantID != nil && *inv.ProductVariantID != "" {
+			key += "_" + *inv.ProductVariantID
+		}
+		invMap[key] = inv.Stock
+		
+		if !productIDMap[inv.ProductID] {
+			productIDMap[inv.ProductID] = true
+			productIDs = append(productIDs, inv.ProductID)
+		}
+	}
+
+	if len(productIDs) == 0 {
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"data":   []models.Product{},
+		})
+		return
+	}
+
+	// 3. Fetch products based on merchant's inventory
+	var products []models.Product
 	db := mc.DB.Model(&models.Product{}).
-		Select("products.*, inv.stock as stock").
-		Joins("JOIN inventories inv ON inv.product_id = products.id").
-		Where("inv.merchant_id = ?", merchantID).
+		Where("id IN ?", productIDs).
 		Preload("Variants")
 
 	if search != "" {
 		like := "%" + strings.ToLower(search) + "%"
-		db = db.Where(mc.DB.Where("products.name ILIKE ?", like).
-			Or("products.slug ILIKE ?", like).
-			Or("products.sku ILIKE ?", like).
-			Or("products.id IN (SELECT product_id FROM product_variants WHERE sku ILIKE ?)", like))
+		db = db.Where(mc.DB.Where("name ILIKE ?", like).
+			Or("slug ILIKE ?", like).
+			Or("sku ILIKE ?", like).
+			Or("id IN (SELECT product_id FROM product_variants WHERE sku ILIKE ?)", like))
 	}
 
-	if err := db.Order("products.created_at DESC").Limit(40).Find(&products).Error; err != nil {
+	if err := db.Order("created_at DESC").Limit(40).Find(&products).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil produk")
 		return
+	}
+
+	// 4. Override master stocks with merchant's stock
+	for i := range products {
+		if stock, exists := invMap[products[i].ID]; exists {
+			products[i].Stock = stock
+		} else {
+			products[i].Stock = 0
+		}
+
+		if len(products[i].Variants) > 0 {
+			totalVariantStock := 0
+			for j := range products[i].Variants {
+				key := products[i].ID + "_" + products[i].Variants[j].ID
+				if stock, exists := invMap[key]; exists {
+					products[i].Variants[j].Stock = stock
+				} else {
+					products[i].Variants[j].Stock = 0
+				}
+				totalVariantStock += products[i].Variants[j].Stock
+			}
+			// If it has variants, base stock is total variant stock
+			products[i].Stock = totalVariantStock
+		}
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{

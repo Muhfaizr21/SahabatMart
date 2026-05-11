@@ -36,7 +36,7 @@ func SeedNetwork(db *gorm.DB) {
 	// 3. Create 30 "Elite Mitra" (Silver/Gold)
 	cities := []string{"Jakarta", "Bandung", "Surabaya", "Medan", "Makassar", "Semarang", "Yogyakarta", "Bali"}
 	
-	for i := 1; i <= 30; i++ {
+	for i := 1; i <= 0; i++ {
 		email := fmt.Sprintf("leader%d@akuglow.com", i)
 		name := fmt.Sprintf("Elite Leader %d", i)
 		city := cities[rand.Intn(len(cities))]
@@ -161,7 +161,7 @@ func SeedNetwork(db *gorm.DB) {
 	var eliteAffiliates []models.AffiliateMember
 	db.Find(&eliteAffiliates)
 
-	for i := 1; i <= 50; i++ {
+	for i := 1; i <= 0; i++ {
 		email := fmt.Sprintf("mitra_reguler%d@akuglow.com", i)
 		u := models.User{ID: uuid.New().String(), Email: email, PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 		db.Create(&u)

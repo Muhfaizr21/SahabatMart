@@ -325,6 +325,8 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	).Scan(&recentOrders)
 
 	// Fetch all wallet activity for full audit trail
+	// NOTE: Tidak ada filter type — semua tipe (sale, withdrawal, refund, topup, commission, dll)
+	// harus tampil agar audit trail benar-benar lengkap sesuai kebutuhan SuperAdmin
 	type WalletActivity struct {
 		ID          uint      `json:"id"`
 		Type        string    `json:"type"`
@@ -341,7 +343,7 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 			Joins("LEFT JOIN users u ON u.id = w.owner_id").
 			Joins("LEFT JOIN user_profiles up ON up.user_id = u.id").
 			Order("wt.created_at desc").
-			Limit(50),
+			Limit(100), // Dinaikkan dari 50 → 100 untuk audit trail lengkap
 		"wt.created_at", period,
 	).Scan(&walletActivity)
 

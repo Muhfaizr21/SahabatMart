@@ -220,7 +220,13 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 
 	frontendURL := os.Getenv("FRONTEND_URL")
 	if frontendURL == "" {
-		frontendURL = "http://localhost:5173"
+		// [Deploy Rule] FRONTEND_URL harus diset di .env / server config!
+		// Untuk dev local: FRONTEND_URL=http://localhost:5173
+		// Untuk production: FRONTEND_URL=https://yourdomain.com
+		frontendURL = os.Getenv("APP_URL")
+	}
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173" // last-resort dev fallback only
 	}
 	
 	// Redirect balik ke frontend dengan token di URL
