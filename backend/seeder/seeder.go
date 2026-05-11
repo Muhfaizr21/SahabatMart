@@ -91,15 +91,15 @@ func SeedAll(db *gorm.DB) {
 	SeedAffiliateChain(db)
 
 	// 8. Mega Simulation (200+ Users & Real Activity)
-	// [LIVE] Disabled for clean state
-	// SeedRealWorldData(db)
+	// [LIVE] Cleaned versions now only initialize essential configs/groups
+	SeedRealWorldData(db)
 
 	// 9. Akuglow Skin Journey Dynamic Data
 	SeedSkinJourney(db)
 
 	// 10. SahabatMart Dynamic Finance Data
-	// [LIVE] Disabled for clean state
-	// SeedFinance(db)
+	// [LIVE] Cleaned version now only initializes platform configs & locations
+	SeedFinance(db)
 
 	fmt.Println("✅ Seeding Completed! Platform is now ready for LIVE deployment with clean data.")
 }

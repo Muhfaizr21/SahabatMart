@@ -35,23 +35,24 @@ func main() {
 		log.Fatalf("❌ Failed to connect to database: %v", err)
 	}
 
-	fmt.Println("🚀 Starting High-Fidelity Seeder (10K Users Simulation)...")
-	fmt.Println("⚠️  This process may take 1-2 minutes. Please wait...")
+	fmt.Println("🚀 Starting Production-Ready Clean Seeder...")
+	fmt.Println("⚠️  Initializing system tables and core configurations...")
 
-	// Run AutoMigrate just in case
+	// Run AutoMigrate
 	db.AutoMigrate(
 		&models.User{}, &models.UserProfile{}, &models.Wallet{}, &models.AffiliateMember{},
 		&models.Merchant{}, &models.Product{}, &models.Order{}, &models.OrderMerchantGroup{},
 		&models.OrderItem{}, &models.WalletTransaction{}, &models.MoneyMutation{},
 		&models.FinancialLocation{}, &models.FinanceRevenueAllocation{},
+		&models.SkinCommunityGroup{},
 	)
 
 	seeder.SeedAll(db)
 
-	// Create marker file for main.go (if we still want to keep it aware)
+	// Create marker file
 	os.Create("../../.mega_seed_done")
 
-	fmt.Println("\n✅ SEEDING COMPLETE!")
-	fmt.Println("📊 5,000+ Orders & 10,000+ Shadow Users generated.")
+	fmt.Println("\n✅ SYSTEM INITIALIZATION COMPLETE!")
+	fmt.Println("All tables migrated and core configurations (Finance & Community) set to 0/Empty.")
 	fmt.Println("You can now run 'go run main.go' normally.")
 }

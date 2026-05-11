@@ -123,496 +123,390 @@ export default function AdminFinance() {
   const netProfit   = data?.net_profit        || 0;
 
   if (loading && !data) return (
-    <div className="p-20 text-center">
-      <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-      <p className="text-slate-400 font-bold text-sm">Sinkronisasi data keuangan...</p>
+    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mb-4" />
+      <p className="text-slate-500 font-medium">Memuat data keuangan...</p>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-10 pb-24 text-slate-700 admin-page-container">
-
-      {/* ── Header ── */}
-      <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm finance-header">
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
+      {/* Header Section */}
+      <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <span className="bg-indigo-100 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-2 inline-block">
-            DYNAMIC LEDGER
-          </span>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Laporan Keuangan</h1>
-          <p className="text-sm text-slate-400 mt-1">Sistem alokasi pendapatan & pencatatan kas real-time.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Keuangan & Ledger</h1>
+          <p className="text-slate-500 text-sm mt-1">Pantau arus kas, pendapatan, dan alokasi dana secara real-time.</p>
         </div>
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-3">
           <select
             value={period}
             onChange={e => setPeriod(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold shadow-sm outline-none cursor-pointer hover:bg-slate-100 transition-all"
+            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"
           >
             {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
-          <button onClick={() => setShowConfig(true)} className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl text-sm font-bold shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all border-b-4 border-slate-200 active:border-b-0 active:translate-y-1">
+          <button onClick={() => setShowConfig(true)} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all">
             <i className='bx bx-cog text-lg' /> Konfigurasi
           </button>
-          <button onClick={fetchData} disabled={loading} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-black shadow-lg shadow-indigo-100 flex items-center gap-2 hover:bg-indigo-700 transition-all border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 disabled:opacity-60">
+          <button onClick={fetchData} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition-all disabled:opacity-70">
             <i className={`bx bx-refresh text-lg ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
       </div>
 
-      {/* ── Section 1: Alur Perhitungan ── */}
-      <div className="space-y-5">
-        <SectionTitle n="1" title="Alur Perhitungan Keuangan" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-          {/* Gross Revenue */}
-          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm flex flex-col relative overflow-hidden group finance-card">
-            <div>
-              <div className="w-14 h-14 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 mb-6 transition-transform group-hover:scale-110 duration-500">
-                <i className='bx bx-trending-up text-2xl' />
-              </div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GROSS REVENUE</div>
-              <div className="text-3xl font-black text-slate-900 tracking-tighter mb-2">{idr(gross)}</div>
-            </div>
-
-            {/* Rincian Sumber Pendapatan */}
-            <div className="mt-8 space-y-3 border-t border-slate-50 pt-6 relative z-10">
-              {/* Harga Modal Section */}
-              <div className="flex justify-between text-[11px] font-black mb-1 p-2 bg-slate-50 rounded-xl">
-                <span className="text-slate-500">HARGA MODAL (COGS)</span>
-                <span className="text-rose-500">{idr(capitalCost)}</span>
-              </div>
-              <div className="flex justify-between text-[11px] font-black mb-4 p-2 bg-emerald-50 rounded-xl">
-                <span className="text-emerald-700">LABA KOTOR</span>
-                <span className="text-emerald-600">{idr(grossProfit)}</span>
-              </div>
-
-              <div className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2 px-2">Sumber Pendapatan</div>
-              {data?.income_breakdown && Object.entries(data.income_breakdown)
-                .sort((a, b) => b[1] - a[1]) // Urutkan dari yang terbesar
-                .map(([label, val], idx) => (
-                  <div key={idx} className="group/item px-2">
-                    <div className="flex justify-between text-[11px] font-bold mb-1.5">
-                      <span className="text-slate-400 group-hover/item:text-indigo-600 transition-colors">{label}</span>
-                      <span className="text-slate-700">{idr(val)}</span>
-                    </div>
-                    <div className="w-full h-1 bg-slate-50 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
-                        style={{ width: `${(val / gross * 100) || 0}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-            </div>
-
-            <p className="text-[10px] font-bold text-slate-300 mt-8 leading-relaxed italic opacity-60">
-              Total pendapatan kotor dari semua kanal platform.
-            </p>
-            <i className='bx bx-trending-up absolute -bottom-6 -right-6 text-9xl text-slate-50 opacity-10 group-hover:scale-120 transition-all duration-700' />
-          </div>
-
-          {/* Data Saving */}
-          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm flex flex-col finance-card">
-            <div className="flex justify-between items-start mb-6">
-              <div className="w-14 h-14 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-100">
-                <i className='bx bx-pie-chart-alt-2 text-2xl' />
-              </div>
-              <a href={`/admin/finance/data-saving?period=${period}`} className="text-indigo-600 text-[10px] font-black hover:underline flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-full">
-                DETAIL <i className='bx bx-right-arrow-alt' />
-              </a>
-            </div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ALOKASI BIAYA (DATA SAVING)</div>
-            <div className="text-3xl font-black text-rose-500 tracking-tighter mb-1">- {idr(totalSaved)}</div>
-            <div className="text-[10px] font-bold text-slate-400 mb-6">{pct(totalSaved, gross)}% dari Gross Revenue</div>
-            <div className="space-y-2 mt-auto">
-              {data?.data_saving && Object.entries(data.data_saving)
-                .filter(([k]) => k !== 'total')
-                .slice(0, 4)
-                .map(([label, val], idx) => (
-                  <div key={idx} className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 capitalize">{label}</span>
-                    <span className="text-slate-700">{idr(val.value)}</span>
-                  </div>
-                ))}
+      {/* Main Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Gross Revenue Card */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i className='bx bx-trending-up text-xl'></i>
             </div>
           </div>
+          <div className="text-sm font-medium text-slate-500 mb-1">Gross Revenue</div>
+          <div className="text-3xl font-bold text-slate-900 mb-4">{idr(gross)}</div>
+          
+          <div className="space-y-3 pt-4 border-t border-slate-100">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-500">Harga Modal (COGS)</span>
+              <span className="font-medium text-slate-900">{idr(capitalCost)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-emerald-600 font-medium">Laba Kotor</span>
+              <span className="font-bold text-emerald-600">{idr(grossProfit)}</span>
+            </div>
+          </div>
+        </div>
 
-          {/* Net Profit */}
-          <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl shadow-slate-200 flex flex-col justify-between relative overflow-hidden finance-card">
-            <div className="relative z-10">
-              <div className="w-14 h-14 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 mb-6">
-                <i className='bx bx-check-shield text-2xl' />
-              </div>
-              <div className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">NET PROFIT (LABA BERSIH)</div>
-              <div className="text-3xl font-black tracking-tighter text-white">{idr(netProfit)}</div>
-              <div className="text-[10px] font-bold text-indigo-300/60 mt-1 mb-6">{pct(netProfit, gross)}% dari Gross Revenue</div>
-              
-              <div className="space-y-2 mt-auto">
-                {data?.profit_shares && Object.entries(data.profit_shares)
-                  .filter(([k]) => k !== 'total') // Backend tidak mengirim key 'total' di profit_shares, filter ini aman sebagai safeguard
-                  .slice(0, 4)
-                  .map(([label, val], idx) => (
-                    <div key={idx} className="flex justify-between text-[11px] font-bold">
-                      <span className="text-indigo-300 capitalize">{label}</span>
-                      <span className="text-white">{idr(val.value)}</span>
-                    </div>
-                  ))}
+        {/* Data Saving Card */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <i className='bx bx-pie-chart-alt-2 text-xl'></i>
+            </div>
+            <a href={`/admin/finance/data-saving?period=${period}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+              Detail Alokasi
+            </a>
+          </div>
+          <div className="text-sm font-medium text-slate-500 mb-1">Alokasi Biaya / Saving</div>
+          <div className="text-3xl font-bold text-slate-900 mb-4">{idr(totalSaved)}</div>
+          
+          <div className="space-y-3 pt-4 border-t border-slate-100">
+            {data?.data_saving && Object.entries(data.data_saving)
+              .filter(([k]) => k !== 'total')
+              .slice(0, 2)
+              .map(([label, val], idx) => (
+                <div key={idx} className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 capitalize">{label}</span>
+                  <span className="font-medium text-slate-900">{idr(val.value)}</span>
+                </div>
+            ))}
+            <div className="text-xs text-slate-400 pt-1">{pct(totalSaved, gross)}% dari Pendapatan</div>
+          </div>
+        </div>
+
+        {/* Net Profit Card */}
+        <div className="bg-slate-900 rounded-3xl p-6 shadow-lg shadow-slate-200/50 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-6 opacity-10">
+            <i className='bx bx-wallet text-8xl'></i>
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center">
+                <i className='bx bx-check-shield text-xl'></i>
               </div>
             </div>
+            <div className="text-sm font-medium text-slate-300 mb-1">Net Profit (Bersih)</div>
+            <div className="text-3xl font-bold text-white mb-4">{idr(netProfit)}</div>
             
-            <div className="mt-8 flex justify-between items-center relative z-10">
-              <p className="text-[11px] text-indigo-200/50 max-w-[120px]">Siap dibagikan ke stakeholder.</p>
-              <a href={`/admin/finance/profit-share?period=${period}`} className="bg-indigo-500/20 text-indigo-300 text-[10px] font-black px-4 py-2 rounded-xl hover:bg-indigo-500 hover:text-white transition-all">
-                BAGI HASIL <i className='bx bx-right-arrow-alt ml-1' />
-              </a>
-            </div>
-            <i className='bx bxs-coin-stack absolute -bottom-8 -right-8 text-9xl text-white opacity-5' />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Section 2: Rincian Arus Uang Masuk ── */}
-      <div className="space-y-5">
-        <SectionTitle n="2" title="Rincian Sumber Arus Masuk" />
-        <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 finance-stat-grid">
-            {data?.income_breakdown && Object.entries(data.income_breakdown).map(([label, val], idx) => {
-              const colorClasses = [
-                { bg: 'bg-indigo-50', border: 'border-indigo-100', textMain: 'text-indigo-500', textSub: 'text-indigo-400' },
-                { bg: 'bg-emerald-50', border: 'border-emerald-100', textMain: 'text-emerald-500', textSub: 'text-emerald-400' },
-                { bg: 'bg-amber-50', border: 'border-amber-100', textMain: 'text-amber-500', textSub: 'text-amber-400' },
-                { bg: 'bg-sky-50', border: 'border-sky-100', textMain: 'text-sky-500', textSub: 'text-sky-400' },
-                { bg: 'bg-rose-50', border: 'border-rose-100', textMain: 'text-rose-500', textSub: 'text-rose-400' }
-              ];
-              const c = colorClasses[idx % colorClasses.length];
-              return (
-                <div key={idx} className={`p-5 ${c.bg} rounded-3xl border ${c.border}`}>
-                  <div className={`text-[10px] font-black ${c.textMain} uppercase tracking-widest mb-2`}>{label}</div>
-                  <div className="text-lg font-black text-slate-900">{idr(val)}</div>
-                  <div className={`text-[10px] font-bold ${c.textSub} mt-1`}>{pct(val, gross)}%</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Section 3: Pemantauan Kas & Mutasi ── */}
-      <div className="space-y-5">
-        <SectionTitle n="3" title="Kas & Pencatatan Mutasi" />
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-
-          {/* Locations */}
-          <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Lokasi Saldo Riil</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full">
-                  TOTAL: {idr(data?.locations?.reduce((a, l) => a + l.balance, 0))}
-                </span>
-                <button onClick={() => handleLocationAction('create')} className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black hover:bg-indigo-500 hover:text-white transition-all">
-                  + TAMBAH KAS
-                </button>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {data?.locations?.map((loc, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-100 shadow-sm group-hover:text-indigo-500 transition-all">
-                      <i className={`bx ${loc.name.toLowerCase().includes('kas') ? 'bx-wallet-alt' : 'bx-credit-card'} text-sm`} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-slate-700 leading-tight">{loc.name}</div>
-                      {loc.is_primary && <div className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest">Rekening Utama</div>}
-                    </div>
+            <div className="space-y-3 pt-4 border-t border-white/10">
+              {data?.profit_shares && Object.entries(data.profit_shares)
+                .filter(([k]) => k !== 'total')
+                .slice(0, 2)
+                .map(([label, val], idx) => (
+                  <div key={idx} className="flex justify-between items-center text-sm">
+                    <span className="text-slate-300 capitalize">{label}</span>
+                    <span className="font-medium text-white">{idr(val.value)}</span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm font-black text-slate-900">{idr(loc.balance)}</div>
-                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleLocationAction('edit', loc)} className="text-slate-400 hover:text-indigo-500"><i className='bx bx-edit text-xs'></i></button>
-                      <button onClick={() => handleLocationAction('delete', loc)} className="text-slate-400 hover:text-rose-500"><i className='bx bx-trash text-xs'></i></button>
-                    </div>
-                  </div>
-                </div>
               ))}
             </div>
+            <div className="mt-6">
+               <a href={`/admin/finance/profit-share?period=${period}`} className="inline-flex items-center justify-center w-full py-2.5 px-4 text-sm font-medium bg-white text-slate-900 rounded-xl hover:bg-slate-50 transition-colors">
+                  Bagi Hasil Stakeholder
+               </a>
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Mutation Form */}
-          <div className="lg:col-span-3 bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm finance-card">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Catat Mutasi Kas</h3>
+      {/* Breakdown Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Income Breakdown */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Rincian Arus Masuk</h2>
+          <div className="space-y-4">
+            {data?.income_breakdown && Object.entries(data.income_breakdown)
+              .sort((a, b) => b[1] - a[1])
+              .map(([label, val], idx) => (
+                <div key={idx}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="text-slate-600 font-medium">{label}</span>
+                    <span className="font-bold text-slate-900">{idr(val)}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${(val / gross * 100) || 0}%` }}></div>
+                  </div>
+                </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Kas / Rekening */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm lg:col-span-2">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-slate-900">Manajemen Kas & Rekening</h2>
+            <button onClick={() => handleLocationAction('create')} className="text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-4 py-2 rounded-xl transition-colors">
+              + Tambah Kas
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {data?.locations?.map((loc, idx) => (
+              <div key={idx} className="p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 bg-slate-50/50 transition-colors group relative">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-sm">
+                      <i className={`bx ${loc.name.toLowerCase().includes('kas') ? 'bx-wallet-alt' : 'bx-credit-card'} text-xl`} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">{loc.name}</div>
+                      {loc.is_primary && <div className="text-xs font-medium text-indigo-600">Rekening Utama</div>}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-slate-200 flex items-end justify-between">
+                  <div>
+                    <div className="text-xs text-slate-500 mb-0.5">Saldo Aktif</div>
+                    <div className="text-lg font-bold text-slate-900">{idr(loc.balance)}</div>
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => handleLocationAction('edit', loc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 flex items-center justify-center shadow-sm">
+                      <i className='bx bx-edit'></i>
+                    </button>
+                    <button onClick={() => handleLocationAction('delete', loc)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-rose-600 flex items-center justify-center shadow-sm">
+                      <i className='bx bx-trash'></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Mutasi Form & Riwayat */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+          
+          {/* Form */}
+          <div className="p-6 lg:p-8 lg:col-span-2 bg-slate-50/50">
+            <h2 className="text-lg font-bold text-slate-900 mb-6">Catat Mutasi Baru</h2>
             <form onSubmit={handleMutation} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <select
-                  value={mutation.type}
-                  onChange={e => setMutation({...mutation, type: e.target.value})}
-                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:border-indigo-300 transition-all"
-                >
-                  {MUTATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-                <select
-                  value={mutation.status}
-                  onChange={e => setMutation({...mutation, status: e.target.value})}
-                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:border-indigo-300 transition-all"
-                >
-                  {MUTATION_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipe Mutasi</label>
+                  <select value={mutation.type} onChange={e => setMutation({...mutation, type: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    {MUTATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Status</label>
+                  <select value={mutation.status} onChange={e => setMutation({...mutation, status: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    {MUTATION_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  value={mutation.category}
-                  onChange={e => setMutation({...mutation, category: e.target.value})}
-                  placeholder="Kategori (misal: Biaya Operasional)"
-                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:bg-white focus:border-indigo-300 transition-all"
-                />
-                <input
-                  type="number"
-                  value={mutation.amount}
-                  onChange={e => setMutation({...mutation, amount: e.target.value})}
-                  placeholder="Nominal (Rp)"
-                  className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-black outline-none focus:bg-white focus:border-indigo-300 transition-all text-indigo-600"
-                />
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Kategori / Judul</label>
+                <input type="text" value={mutation.category} onChange={e => setMutation({...mutation, category: e.target.value})} placeholder="Contoh: Operasional" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
-
-              <input
-                type="text"
-                value={mutation.description}
-                onChange={e => setMutation({...mutation, description: e.target.value})}
-                placeholder="Keterangan / Deskripsi transaksi"
-                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:bg-white focus:border-indigo-300 transition-all"
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <select value={mutation.from_location_id} onChange={e => setMutation({...mutation, from_location_id: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none">
-                  <option value="">Dari Rekening (Opsional)</option>
-                  {data?.locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-                <select value={mutation.to_location_id} onChange={e => setMutation({...mutation, to_location_id: e.target.value})} className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none">
-                  <option value="">Ke Rekening (Opsional)</option>
-                  {data?.locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Nominal (Rp)</label>
+                <input type="number" value={mutation.amount} onChange={e => setMutation({...mutation, amount: e.target.value})} placeholder="0" className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
               </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full bg-slate-900 text-white py-4 rounded-2xl text-xs font-black shadow-lg hover:bg-slate-800 transition-all border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Menyimpan...</> : <><i className='bx bx-save' /> Simpan Mutasi</>}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Dari Rekening</label>
+                  <select value={mutation.from_location_id} onChange={e => setMutation({...mutation, from_location_id: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    <option value="">- Kosong -</option>
+                    {data?.locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Ke Rekening</label>
+                  <select value={mutation.to_location_id} onChange={e => setMutation({...mutation, to_location_id: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    <option value="">- Kosong -</option>
+                    {data?.locations?.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Keterangan Tambahan</label>
+                <textarea rows="2" value={mutation.description} onChange={e => setMutation({...mutation, description: e.target.value})} placeholder="Catatan opsional..." className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></textarea>
+              </div>
+              <button type="submit" disabled={saving} className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-70 flex justify-center items-center gap-2">
+                {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className='bx bx-save text-lg' />}
+                Simpan Mutasi
               </button>
             </form>
+          </div>
 
-            {/* Recent Mutations */}
-            {data?.mutations?.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-50 space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mutasi Terkini</h4>
-                {data.mutations.slice(0, 5).map((m, i) => (
-                  <div key={i} className="flex justify-between items-center group relative p-2 -mx-2 hover:bg-slate-50 rounded-2xl transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs ${m.type === 'income' ? 'bg-emerald-50 text-emerald-600' : m.type === 'transfer' ? 'bg-sky-50 text-sky-600' : 'bg-rose-50 text-rose-500'}`}>
-                        <i className={`bx ${m.type === 'income' ? 'bx-plus' : m.type === 'transfer' ? 'bx-transfer' : 'bx-minus'}`} />
+          {/* History */}
+          <div className="p-6 lg:p-8 lg:col-span-3">
+            <h2 className="text-lg font-bold text-slate-900 mb-6">Mutasi Terakhir</h2>
+            {data?.mutations?.length > 0 ? (
+              <div className="space-y-4">
+                {data.mutations.slice(0, 6).map((m, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${m.type === 'income' ? 'bg-emerald-100 text-emerald-600' : m.type === 'transfer' ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-100 text-rose-600'}`}>
+                        <i className={`bx ${m.type === 'income' ? 'bx-down-arrow-alt' : m.type === 'transfer' ? 'bx-transfer' : 'bx-up-arrow-alt'} text-xl`} />
                       </div>
                       <div>
-                        <div className="text-[11px] font-black text-slate-700">{m.category}</div>
-                        <div className="text-[9px] text-slate-400">{m.description || '-'}</div>
+                        <div className="font-bold text-slate-900 text-sm">{m.category}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{m.description || 'Tidak ada catatan'}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className={`text-xs font-black ${m.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`}>{idr(m.amount)}</div>
-                        <div className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${m.status === 'processed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{m.status}</div>
+                    <div className="text-right flex items-center gap-4">
+                      <div>
+                        <div className={`font-bold text-sm ${m.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>{idr(m.amount)}</div>
+                        <div className="text-[10px] font-medium text-slate-400 mt-0.5 px-2 bg-slate-100 rounded-full inline-block">{m.status}</div>
                       </div>
-                      <button onClick={() => handleDeleteMutation(m.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-500 transition-all">
-                        <i className='bx bx-trash text-sm'></i>
+                      <button onClick={() => handleDeleteMutation(m.id)} className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100">
+                        <i className='bx bx-trash'></i>
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[300px] border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                <i className='bx bx-receipt text-4xl text-slate-300 mb-3'></i>
+                <p className="text-slate-500 font-medium text-sm">Belum ada mutasi manual</p>
+              </div>
             )}
-          </div>
-        </div>
-
-        {/* ── Section 4: Audit Transaksi & Harga Modal ── */}
-        <div className="space-y-5 pt-8">
-          <SectionTitle n="4" title="Audit Transaksi & Harga Modal" />
-          <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu / Customer</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gross Amount</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Harga Modal (COGS)</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gross Profit</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {data?.recent_orders?.length > 0 ? (
-                    data.recent_orders.map((order, i) => {
-                      const profit = order.total_amount - order.total_cogs;
-                      const margin = (profit / order.total_amount) * 100;
-                      return (
-                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-8 py-6">
-                            <div className="text-xs font-black text-slate-900">{order.customer || 'Customer'}</div>
-                            <div className="text-[10px] font-bold text-slate-400">{new Date(order.created_at).toLocaleString('id-ID')}</div>
-                            <div className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full inline-block mt-1">ID: {(order.id || '').split('-')[0].toUpperCase()}</div>
-                          </td>
-                          <td className="px-8 py-6">
-                            {(() => {
-                              const statusMap = {
-                                completed:     { label: 'Selesai',       cls: 'bg-emerald-50 text-emerald-600' },
-                                delivered:     { label: 'Terkirim',      cls: 'bg-emerald-50 text-emerald-600' },
-                                shipped:       { label: 'Dikirim',       cls: 'bg-sky-50 text-sky-600'         },
-                                ready_to_ship: { label: 'Siap Kirim',    cls: 'bg-indigo-50 text-indigo-600'   },
-                                paid:          { label: 'Dibayar',       cls: 'bg-amber-50 text-amber-600'     },
-                                processing:    { label: 'Diproses',      cls: 'bg-amber-50 text-amber-600'     },
-                                cancelled:     { label: 'Dibatalkan',    cls: 'bg-rose-50 text-rose-500'       },
-                              };
-                              const s = statusMap[order.status] || { label: order.status, cls: 'bg-slate-50 text-slate-500' };
-                              return <span className={`text-[9px] font-black px-2 py-1 rounded-full ${s.cls}`}>{s.label}</span>;
-                            })()}
-                          </td>
-                          <td className="px-8 py-6 text-right">
-                            <div className="text-xs font-black text-slate-900">{idr(order.total_amount)}</div>
-                          </td>
-                          <td className="px-8 py-6 text-right">
-                            <div className="text-xs font-black text-rose-500">{idr(order.total_cogs)}</div>
-                          </td>
-                          <td className="px-8 py-6 text-right">
-                            <div className="text-xs font-black text-emerald-600">{idr(profit)}</div>
-                          </td>
-                          <td className="px-8 py-6 text-right">
-                            <div className={`text-[10px] font-black px-2 py-1 rounded-lg inline-block ${margin > 20 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                              {margin.toFixed(1)}%
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan="6" className="px-8 py-20 text-center">
-                        <div className="flex flex-col items-center opacity-30">
-                          <i className='bx bx-data text-4xl mb-2' />
-                          <span className="text-xs font-bold">Belum ada data transaksi untuk audit</span>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  {data?.recent_orders?.length >= 20 && (
-                    <tr>
-                      <td colSpan="6" className="px-8 py-4 text-center">
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full inline-block">
-                          Menampilkan 20 transaksi terbaru. Gunakan filter periode untuk data historis lengkap.
-                        </span>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Section 5: Riwayat Aktivitas Wallet (Audit Trail Lengkap) ── */}
-      <div className="space-y-5">
-        <SectionTitle n="5" title="Audit Trail — Seluruh Aktivitas Wallet" />
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden finance-card">
-          <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50">
-            <div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Real-time Feed</div>
-              <div className="text-sm font-black text-slate-900">Semua pergerakan uang di sistem</div>
-            </div>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">
-              {data?.wallet_activity?.length || 0} transaksi
-            </span>
+      {/* Audit Tables Container */}
+      <div className="space-y-6 pt-6">
+        <h2 className="text-xl font-bold text-slate-900">Audit & Laporan Lanjutan</h2>
+        
+        {/* Orders Table */}
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+            <h3 className="font-bold text-slate-900">Laporan Transaksi & COGS</h3>
+            <span className="text-xs font-medium text-slate-500">{data?.recent_orders?.length || 0} Transaksi</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-sm text-left">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu</th>
-                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
-                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pemilik Wallet</th>
-                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Keterangan</th>
-                  <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Jumlah</th>
+                <tr className="bg-white border-b border-slate-200 text-slate-500">
+                  <th className="px-6 py-4 font-medium">Customer & Waktu</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
+                  <th className="px-6 py-4 font-medium text-right">Gross Amount</th>
+                  <th className="px-6 py-4 font-medium text-right">COGS (Modal)</th>
+                  <th className="px-6 py-4 font-medium text-right">Gross Profit</th>
+                  <th className="px-6 py-4 font-medium text-right">Margin</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {data?.wallet_activity?.length > 0 ? (
-                  data.wallet_activity.map((tx, i) => {
-                    const isIn = tx.amount > 0;
-                    const typeMap = {
-                      sale_revenue:      { label: 'Penjualan',       cls: 'bg-emerald-50 text-emerald-600' },
-                      platform_fee:      { label: 'Biaya Platform',  cls: 'bg-indigo-50 text-indigo-600' },
-                      commission_earned: { label: 'Komisi Afiliasi', cls: 'bg-sky-50 text-sky-600' },
-                      restock_revenue:   { label: 'Restock',         cls: 'bg-amber-50 text-amber-600' },
-                      withdrawal:        { label: 'Penarikan',       cls: 'bg-rose-50 text-rose-600' },
-                      refund:            { label: 'Refund',          cls: 'bg-rose-50 text-rose-600' },
-                      topup:             { label: 'Top Up',          cls: 'bg-emerald-50 text-emerald-600' },
-                    };
-                    const t = typeMap[tx.type] || { label: tx.type, cls: 'bg-slate-50 text-slate-600' };
-                    return (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-8 py-4">
-                          <div className="text-[10px] font-black text-slate-700">{new Date(tx.created_at).toLocaleDateString('id-ID')}</div>
-                          <div className="text-[9px] text-slate-400">{new Date(tx.created_at).toLocaleTimeString('id-ID')}</div>
-                        </td>
-                        <td className="px-8 py-4">
-                          <span className={`text-[10px] font-black px-3 py-1 rounded-full ${t.cls}`}>
-                            {t.label}
-                          </span>
-                        </td>
-                        <td className="px-8 py-4">
-                          <div className="text-[11px] font-bold text-slate-600">{tx.wallet_owner}</div>
-                        </td>
-                        <td className="px-8 py-4">
-                          <div className="text-[10px] text-slate-400 max-w-[200px] truncate">{tx.description || '-'}</div>
-                        </td>
-                        <td className="px-8 py-4 text-right">
-                          <div className={`text-xs font-black ${isIn ? 'text-emerald-600' : 'text-rose-500'}`}>
-                            {isIn ? '+' : ''}{idr(tx.amount)}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="px-8 py-16 text-center">
-                      <div className="flex flex-col items-center opacity-30">
-                        <i className='bx bx-wallet text-4xl mb-2' />
-                        <span className="text-xs font-bold">Belum ada aktivitas wallet untuk periode ini</span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                  {data?.wallet_activity?.length >= 100 && (
-                    <tr>
-                      <td colSpan="5" className="px-8 py-4 text-center">
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full inline-block">
-                          Menampilkan 100 aktivitas wallet terbaru.
+              <tbody className="divide-y divide-slate-100">
+                {data?.recent_orders?.length > 0 ? data.recent_orders.slice(0, 15).map((order, i) => {
+                  const profit = order.total_amount - order.total_cogs;
+                  const margin = (profit / order.total_amount) * 100;
+                  return (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-slate-900">{order.customer || 'Customer'}</div>
+                        <div className="text-xs text-slate-500">{new Date(order.created_at).toLocaleString('id-ID')}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 capitalize">
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-medium text-slate-900">{idr(order.total_amount)}</td>
+                      <td className="px-6 py-4 text-right text-rose-600">{idr(order.total_cogs)}</td>
+                      <td className="px-6 py-4 text-right font-medium text-emerald-600">{idr(profit)}</td>
+                      <td className="px-6 py-4 text-right">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-bold ${margin > 20 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                          {margin.toFixed(1)}%
                         </span>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  )
+                }) : (
+                  <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-500">Belum ada data transaksi</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* Wallet Activity */}
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+            <h3 className="font-bold text-slate-900">Audit Trail Wallet (Real-time)</h3>
+            <span className="text-xs font-medium text-slate-500">{data?.wallet_activity?.length || 0} Aktivitas</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-white border-b border-slate-200 text-slate-500">
+                  <th className="px-6 py-4 font-medium">Waktu</th>
+                  <th className="px-6 py-4 font-medium">Tipe</th>
+                  <th className="px-6 py-4 font-medium">Pemilik Wallet</th>
+                  <th className="px-6 py-4 font-medium">Keterangan</th>
+                  <th className="px-6 py-4 font-medium text-right">Nominal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data?.wallet_activity?.length > 0 ? data.wallet_activity.slice(0, 15).map((tx, i) => {
+                  const isIn = tx.amount > 0;
+                  return (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-slate-900">{new Date(tx.created_at).toLocaleDateString('id-ID')}</div>
+                        <div className="text-xs text-slate-500">{new Date(tx.created_at).toLocaleTimeString('id-ID')}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 capitalize">
+                          {tx.type.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-medium text-slate-700">{tx.wallet_owner}</td>
+                      <td className="px-6 py-4 text-slate-500 max-w-[200px] truncate" title={tx.description}>{tx.description || '-'}</td>
+                      <td className={`px-6 py-4 text-right font-bold ${isIn ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isIn ? '+' : ''}{idr(tx.amount)}
+                      </td>
+                    </tr>
+                  )
+                }) : (
+                  <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-500">Belum ada aktivitas wallet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
       <FinanceConfigModal isOpen={showConfig} onClose={() => setShowConfig(false)} onRefresh={fetchData} />
     </div>
   );
 }
+
 
 function SectionTitle({ n, title }) {
   return (
