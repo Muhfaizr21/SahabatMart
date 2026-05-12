@@ -10,8 +10,12 @@ import (
 func MaintenanceMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip check for admin routes
-			if len(r.URL.Path) >= 10 && r.URL.Path[:10] == "/api/admin" {
+			// Skip check for critical webhooks and admin routes
+			path := r.URL.Path
+			if (len(path) >= 10 && path[:10] == "/api/admin") || 
+			   path == "/api/shipping/webhook" || 
+			   path == "/api/tripay/webhook" ||
+			   path == "/api/callback/tripay" {
 				next.ServeHTTP(w, r)
 				return
 			}

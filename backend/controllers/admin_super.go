@@ -235,6 +235,7 @@ func (ac *AdminController) fetchDownlineTree(uplineID string, currentLevel, maxL
 
 // PUT /api/admin/users/update
 func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	if r.Method != http.MethodPut {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -315,7 +316,7 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ac.Audit.Log(models.AdminID, "update_user", "user", req.UserID,
+	ac.Audit.Log(adminID, "update_user", "user", req.UserID,
 		fmt.Sprintf("status=%s role=%s admin_role=%s", req.Status, req.Role, req.AdminRole),
 		r.RemoteAddr)
 
@@ -352,6 +353,7 @@ func (ac *AdminController) ResetUserPassword(w http.ResponseWriter, r *http.Requ
 
 // DELETE /api/admin/users/delete?id=xxx  (soft delete)
 func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	if r.Method != http.MethodDelete {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -361,7 +363,7 @@ func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus user")
 		return
 	}
-	ac.Audit.Log(models.AdminID, "delete_user", "user", id, "suspended", r.RemoteAddr)
+	ac.Audit.Log(adminID, "delete_user", "user", id, "suspended", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -412,6 +414,7 @@ func (ac *AdminController) GetMerchants(w http.ResponseWriter, r *http.Request) 
 
 // PUT /api/admin/merchants/status
 func (ac *AdminController) UpdateMerchantStatus(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	var req struct {
 		MerchantID  string `json:"merchant_id"`
 		Status      string `json:"status"`
@@ -467,7 +470,7 @@ func (ac *AdminController) UpdateMerchantStatus(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "update_merchant_status", "merchant", req.MerchantID,
+	ac.Audit.Log(adminID, "update_merchant_status", "merchant", req.MerchantID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.SuspendNote),
 		r.RemoteAddr)
 
@@ -509,7 +512,7 @@ func (ac *AdminController) UpdateMerchant(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "update_merchant", "merchant", req.MerchantID,
+	ac.Audit.Log(r.Context().Value("user_id").(string), "update_merchant", "merchant", req.MerchantID,
 		fmt.Sprintf("updates=%v", updates), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -517,6 +520,7 @@ func (ac *AdminController) UpdateMerchant(w http.ResponseWriter, r *http.Request
 
 // PUT /api/admin/merchants/verify
 func (ac *AdminController) VerifyMerchant(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	if r.Method != http.MethodPut {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -527,7 +531,7 @@ func (ac *AdminController) VerifyMerchant(w http.ResponseWriter, r *http.Request
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Model(&models.Merchant{}).Where("id = ?", req.MerchantID).Update("is_verified", req.Verified)
-	ac.Audit.Log(models.AdminID, "verify_merchant", "merchant", req.MerchantID,
+	ac.Audit.Log(adminID, "verify_merchant", "merchant", req.MerchantID,
 		fmt.Sprintf("verified=%v", req.Verified), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -567,6 +571,7 @@ func (ac *AdminController) GetCategories(w http.ResponseWriter, r *http.Request)
 
 // POST /api/admin/categories
 func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	if r.Method != http.MethodPost {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -614,7 +619,7 @@ func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
 	if cat.ID > 0 {
 		action = "update_category"
 	}
-	ac.Audit.Log(models.AdminID, action, "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
+	ac.Audit.Log(adminID, action, "category", fmt.Sprintf("%d", cat.ID), cat.Name, r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -624,13 +629,14 @@ func (ac *AdminController) AddCategory(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/admin/categories/delete?id=xxx
 func (ac *AdminController) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	if r.Method != http.MethodDelete {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 	id := r.URL.Query().Get("id")
 	ac.DB.Where("id = ?", id).Delete(&models.Category{})
-	ac.Audit.Log(models.AdminID, "delete_category", "category", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log(adminID, "delete_category", "category", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -838,6 +844,7 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 
 // POST /api/admin/affiliates/member/update-info
 func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	if r.Method != http.MethodPost {
 		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -879,7 +886,7 @@ func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Log audit
-	ac.Audit.Log(models.AdminID, "update_member_info", "affiliate_member", req.UserID,
+	ac.Audit.Log(adminID, "update_member_info", "affiliate_member", req.UserID,
 		fmt.Sprintf("UserID: %s, Updates: %v", req.UserID, updates), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "Data member berhasil diperbarui"})
@@ -897,6 +904,7 @@ func (ac *AdminController) GetAffiliateConfigs(w http.ResponseWriter, r *http.Re
 
 // POST/PUT /api/admin/affiliates/config → upsert membership_tier
 func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	var req struct {
 		ID                 uint    `json:"id"`
 		Name               string  `json:"tier_name"`
@@ -944,7 +952,7 @@ func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.
 	} else {
 		ac.DB.Save(&tier)
 	}
-	ac.Audit.Log(models.AdminID, "upsert_membership_tier", "membership_tier",
+	ac.Audit.Log(adminID, "upsert_membership_tier", "membership_tier",
 		fmt.Sprintf("%d", tier.ID), tier.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -983,7 +991,7 @@ func (ac *AdminController) DeleteAffiliateTier(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "delete_membership_tier", "membership_tier", id, "Hapus Tier ID "+id, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_membership_tier", "membership_tier", id, "Hapus Tier ID "+id, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 }
 
@@ -1100,7 +1108,7 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 			"Update Penarikan Komisi", msg, "/affiliate/withdrawals")
 	}
 
-	ac.Audit.Log(models.AdminID, "process_affiliate_withdrawal", "affiliate_withdrawal",
+	ac.Audit.Log(r.Context().Value("user_id").(string), "process_affiliate_withdrawal", "affiliate_withdrawal",
 		req.ID, newStatus, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success", "result": newStatus})
 }
@@ -1466,7 +1474,7 @@ func (ac *AdminController) ModerateProduct(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	ac.Audit.Log(models.AdminID, "moderate_product", "product", req.ID,
+	ac.Audit.Log(r.Context().Value("user_id").(string), "moderate_product", "product", req.ID,
 		fmt.Sprintf("status=%s note=%s", req.Status, req.Note), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -1511,7 +1519,7 @@ func (ac *AdminController) DeleteProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "delete_product_permanent", "product", id, "purged from database with all relations", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_product_permanent", "product", id, "purged from database with all relations", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1554,7 +1562,7 @@ func (ac *AdminController) BulkDeleteProducts(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "bulk_delete_products", "product", fmt.Sprintf("%d items", len(req.IDs)), "bulk purged", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "bulk_delete_products", "product", fmt.Sprintf("%d items", len(req.IDs)), "bulk purged", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1610,7 +1618,7 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 		BasePrice:  p.COGS, // Set initial modal
 	})
 
-	ac.Audit.Log(models.AdminID, "create_product", "product", p.ID, p.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "create_product", "product", p.ID, p.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{"status": "success", "data": p})
 }
 
@@ -1723,7 +1731,7 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "update_product", "product", req.ID, req.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "update_product", "product", req.ID, req.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -1764,7 +1772,7 @@ func (ac *AdminController) UpdateProductTierCommission(w http.ResponseWriter, r 
 		ac.DB.Save(&config)
 	}
 
-	ac.Audit.Log(models.AdminID, "update_product_tier_commission", "product", req.ProductID, fmt.Sprintf("Tier %d Rate %f", req.TierID, req.CommissionRate), r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "update_product_tier_commission", "product", req.ProductID, fmt.Sprintf("Tier %d Rate %f", req.TierID, req.CommissionRate), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": config})
 }
 
@@ -2095,7 +2103,7 @@ func (ac *AdminController) FreezeOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "freeze_order", "order", req.OrderID, req.Reason, r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
 		"status":  "success",
@@ -2123,7 +2131,7 @@ func (ac *AdminController) ManageCommissions(w http.ResponseWriter, r *http.Requ
 		var comm models.CategoryCommission
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
-		ac.Audit.Log(models.AdminID, "upsert_commission", "category_commission",
+		ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_commission", "category_commission",
 			fmt.Sprintf("%d", comm.ID), fmt.Sprintf("cat=%s fee=%.4f", comm.CategoryName, comm.FeePercent),
 			r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -2144,7 +2152,7 @@ func (ac *AdminController) ManageCommissions(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		ac.DB.Delete(&comm)
-		ac.Audit.Log(models.AdminID, "delete_commission", "category_commission", id, comm.CategoryName, r.RemoteAddr)
+		ac.Audit.Log(r.Context().Value("user_id").(string), "delete_commission", "category_commission", id, comm.CategoryName, r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 	}
 }
@@ -2170,7 +2178,7 @@ func (ac *AdminController) ManageMerchantCommissions(w http.ResponseWriter, r *h
 		var comm models.MerchantCommission
 		json.NewDecoder(r.Body).Decode(&comm)
 		ac.DB.Save(&comm)
-		ac.Audit.Log(models.AdminID, "upsert_merchant_commission", "merchant_commission",
+		ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_merchant_commission", "merchant_commission",
 			comm.MerchantID, fmt.Sprintf("fee=%.4f", comm.FeePercent), r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
@@ -2190,7 +2198,7 @@ func (ac *AdminController) ManageMerchantCommissions(w http.ResponseWriter, r *h
 			return
 		}
 		ac.DB.Delete(&comm)
-		ac.Audit.Log(models.AdminID, "delete_merchant_commission", "merchant_commission", id, comm.MerchantID, r.RemoteAddr)
+		ac.Audit.Log(r.Context().Value("user_id").(string), "delete_merchant_commission", "merchant_commission", id, comm.MerchantID, r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 	}
 }
@@ -2227,7 +2235,7 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 			return
 		}
 
-		ac.Audit.Log(models.AdminID, "update_product_commission", "product", req.ProductID,
+		ac.Audit.Log(r.Context().Value("user_id").(string), "update_product_commission", "product", req.ProductID,
 			fmt.Sprintf("Aff=%.2f%% Dist=%.2f%%", req.BaseAffiliateFee, req.BaseDistFee), r.RemoteAddr)
 
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -2252,7 +2260,7 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 			utils.JSONError(w, http.StatusInternalServerError, "Failed to reset product commission")
 			return
 		}
-		ac.Audit.Log(models.AdminID, "reset_product_commission", "product", id, "Reset to 0", r.RemoteAddr)
+		ac.Audit.Log(r.Context().Value("user_id").(string), "reset_product_commission", "product", id, "Reset to 0", r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 	}
 }
@@ -2274,7 +2282,7 @@ func (ac *AdminController) ManageCommissionPresets(w http.ResponseWriter, r *htt
 		var preset models.CommissionPreset
 		json.NewDecoder(r.Body).Decode(&preset)
 		ac.DB.Save(&preset)
-		ac.Audit.Log(models.AdminID, "upsert_commission_preset", "commission_preset",
+		ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_commission_preset", "commission_preset",
 			fmt.Sprintf("%d", preset.ID), preset.Name, r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
@@ -2289,7 +2297,7 @@ func (ac *AdminController) ManageCommissionPresets(w http.ResponseWriter, r *htt
 			return
 		}
 		ac.DB.Delete(&models.CommissionPreset{}, id)
-		ac.Audit.Log(models.AdminID, "delete_commission_preset", "commission_preset", id, "", r.RemoteAddr)
+		ac.Audit.Log(r.Context().Value("user_id").(string), "delete_commission_preset", "commission_preset", id, "", r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
 	}
 }
@@ -2308,7 +2316,7 @@ func (ac *AdminController) BulkUpdateCommissions(w http.ResponseWriter, r *http.
 	for _, comm := range comms {
 		ac.DB.Save(&comm)
 	}
-	ac.Audit.Log(models.AdminID, "bulk_update_commissions", "category_commission", "", fmt.Sprintf("updated %d items", len(comms)), r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "bulk_update_commissions", "category_commission", "", fmt.Sprintf("updated %d items", len(comms)), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -2570,14 +2578,14 @@ func (ac *AdminController) UpsertBrand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "upsert_brand", "brand", fmt.Sprintf("%d", brand.ID), brand.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_brand", "brand", fmt.Sprintf("%d", brand.ID), brand.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, brand)
 }
 
 func (ac *AdminController) DeleteBrand(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Brand{}, id)
-	ac.Audit.Log(models.AdminID, "delete_brand", "brand", id, "", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_brand", "brand", id, "", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -2599,14 +2607,14 @@ func (ac *AdminController) UpsertAttribute(w http.ResponseWriter, r *http.Reques
 	} else {
 		ac.DB.Save(&attr)
 	}
-	ac.Audit.Log(models.AdminID, "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_attribute", "attribute", fmt.Sprintf("%d", attr.ID), attr.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, attr)
 }
 
 func (ac *AdminController) DeleteAttribute(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Attribute{}, id)
-	ac.Audit.Log(models.AdminID, "delete_attribute", "attribute", id, "", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_attribute", "attribute", id, "", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -2627,7 +2635,7 @@ func (ac *AdminController) ToggleLogistic(w http.ResponseWriter, r *http.Request
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	ac.DB.Model(&models.LogisticChannel{}).Where("id = ?", req.ID).Update("is_active", req.Active)
-	ac.Audit.Log(models.AdminID, "toggle_logistic", "logistic", fmt.Sprintf("%d", req.ID), fmt.Sprintf("active=%v", req.Active), r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "toggle_logistic", "logistic", fmt.Sprintf("%d", req.ID), fmt.Sprintf("active=%v", req.Active), r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -2645,11 +2653,11 @@ func (ac *AdminController) SyncCouriers(w http.ResponseWriter, r *http.Request) 
 
 		var channel models.LogisticChannel
 		if err := ac.DB.Where("code = ?", code).First(&channel).Error; err != nil {
-			// Create new
+			// Create new - Default to Inactive
 			ac.DB.Create(&models.LogisticChannel{
 				Code:     code,
 				Name:     name,
-				IsActive: true,
+				IsActive: false,
 			})
 		} else {
 			// Update name if changed
@@ -2769,7 +2777,7 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 	} else {
 		ac.DB.Save(&v)
 	}
-	ac.Audit.Log(models.AdminID, "upsert_voucher", "voucher", v.Code, v.Title, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_voucher", "voucher", v.Code, v.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, v)
 }
 
@@ -2780,7 +2788,7 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 func (ac *AdminController) GetAffiliateClicks(w http.ResponseWriter, r *http.Request) {
 	var clicks []models.AffiliateClick
 	ac.DB.Order("created_at DESC").Limit(1000).Find(&clicks)
-	ac.Audit.Log(models.AdminID, "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": clicks})
 }
 
@@ -2805,7 +2813,7 @@ func (ac *AdminController) UpsertRegion(w http.ResponseWriter, r *http.Request) 
 	var reg models.Region
 	json.NewDecoder(r.Body).Decode(&reg)
 	ac.DB.Save(&reg)
-	ac.Audit.Log(models.AdminID, "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_region", "region", fmt.Sprintf("%d", reg.ID), reg.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, reg)
 }
 
@@ -2848,7 +2856,7 @@ func (ac *AdminController) UpsertSettings(w http.ResponseWriter, r *http.Request
 			Assign(models.PlatformConfig{Value: cfg.Value, Description: cfg.Description}).
 			FirstOrCreate(&models.PlatformConfig{Key: cfg.Key})
 	}
-	ac.Audit.Log(models.AdminID, "upsert_settings", "platform_config", "",
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_settings", "platform_config", "",
 		fmt.Sprintf("updated %d keys", len(configs)), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -2886,6 +2894,17 @@ func (ac *AdminController) GetAuditLogs(w http.ResponseWriter, r *http.Request) 
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 
+	// [Feature] Pagination
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 {
+		limit = 50
+	}
+	offset := (page - 1) * limit
+
 	query := ac.DB.Model(&models.AuditLog{})
 	if adminID != "" {
 		query = query.Where("admin_id = ?", adminID)
@@ -2903,12 +2922,19 @@ func (ac *AdminController) GetAuditLogs(w http.ResponseWriter, r *http.Request) 
 		query = query.Where("created_at <= ?", to+" 23:59:59")
 	}
 
+	var total int64
+	query.Count(&total)
+
 	var logs []models.AuditLog
-	query.Order("created_at DESC").Limit(500).Find(&logs)
+	query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"total":  len(logs),
-		"data":   logs,
+		"status":      "success",
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": (total + int64(limit) - 1) / int64(limit),
+		"data":        logs,
 	})
 }
 
@@ -3203,14 +3229,14 @@ func (ac *AdminController) UpsertBlog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_blog", "blog", fmt.Sprintf("%d", post.ID), post.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, post)
 }
 
 func (ac *AdminController) DeleteBlog(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.BlogPost{}, id)
-	ac.Audit.Log(models.AdminID, "delete_blog", "blog", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_blog", "blog", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -3224,14 +3250,14 @@ func (ac *AdminController) ManageBanners(w http.ResponseWriter, r *http.Request)
 	var b models.Banner
 	json.NewDecoder(r.Body).Decode(&b)
 	ac.DB.Save(&b)
-	ac.Audit.Log(models.AdminID, "upsert_banner", "banner", fmt.Sprintf("%d", b.ID), b.Title, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_banner", "banner", fmt.Sprintf("%d", b.ID), b.Title, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, b)
 }
 
 func (ac *AdminController) DeleteBanner(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.Banner{}, id)
-	ac.Audit.Log(models.AdminID, "delete_banner", "banner", id, "deleted", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_banner", "banner", id, "deleted", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -3283,9 +3309,11 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 	}
 	var sellers []MerchantStock
 	ac.DB.Table("inventories inv").
-		Select("inv.merchant_id, m.store_name, m.city, inv.stock").
+		Select("inv.merchant_id, m.store_name, m.city, SUM(inv.stock) as stock").
 		Joins("JOIN merchants m ON m.id = inv.merchant_id").
-		Where("inv.product_id = ? AND inv.stock > 0 AND m.status = 'active'", product.ID).
+		Where("inv.product_id = ? AND m.status = 'active'", product.ID).
+		Group("inv.merchant_id, m.store_name, m.city").
+		Having("SUM(inv.stock) > 0").
 		Scan(&sellers)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
@@ -4142,7 +4170,7 @@ func (ac *AdminController) AddProductVariant(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "add_variant", "product_variant", v.ID, v.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "add_variant", "product_variant", v.ID, v.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": v})
 }
 
@@ -4192,7 +4220,7 @@ func (ac *AdminController) UpdateProductVariant(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "update_variant", "product_variant", req.ID, req.Name, r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "update_variant", "product_variant", req.ID, req.Name, r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -4209,6 +4237,6 @@ func (ac *AdminController) DeleteProductVariant(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ac.Audit.Log(models.AdminID, "delete_variant", "product_variant", id, "", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_variant", "product_variant", id, "", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }

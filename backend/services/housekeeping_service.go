@@ -136,13 +136,23 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *NotificationService) error 
 	}
 
 	// Update total_earned per affiliate & kirim notifikasi
-	for affiliateID, earned := range earningsByAffiliate {
-		db.Model(&models.AffiliateMember{}).Where("id = ?", affiliateID).
-			UpdateColumn("total_earned", gorm.Expr("total_earned + ?", earned))
+	configService := NewConfigService(db)
+	withdrawPct := configService.GetFloat("affiliate_withdraw_pct", 70) / 100.0
+	shoppingPct := configService.GetFloat("affiliate_shopping_pct", 30) / 100.0
 
-		msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair dan siap untuk ditarik!", earned)
+	for affiliateID, earned := range earningsByAffiliate {
+		// Update TotalEarned for tiering eligibility
+		if err := db.Model(&models.AffiliateMember{}).Where("id = ?", affiliateID).UpdateColumn("total_earned", gorm.Expr("total_earned + ?", earned)).Error; err != nil {
+			log.Printf("❌ Error updating TotalEarned for Affiliate %s: %v", affiliateID, err)
+		}
+
+		withdrawableAmt := earned * withdrawPct
+		shoppingAmt := earned * shoppingPct
+
+		msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair! (Rp %.0f Bisa Ditarik, Rp %.0f Saldo Belanja)", 
+			earned, withdrawableAmt, shoppingAmt)
 		notif.Push(affiliateID, "affiliate", "commission_released", "Komisi Siap Cair! 🎉", msg, "/affiliate/commissions")
-		log.Printf("✅ Affiliate %s: Released Rp %.0f in commissions", affiliateID, earned)
+		log.Printf("✅ Affiliate %s: Released Rp %.0f (Notified)", affiliateID, earned)
 	}
 	return nil
 }

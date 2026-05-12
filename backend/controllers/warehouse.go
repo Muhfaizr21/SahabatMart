@@ -263,14 +263,29 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 		}
 
 		if err := dbInv.First(&pusatInv).Error; err != nil {
-			tx.Rollback()
-			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Stok item '%s' (Variant: %v) tidak ditemukan di Pusat", item.ProductID, item.ProductVariantID))
-			return
+			if err == gorm.ErrRecordNotFound {
+				// Initialize missing inventory record at Pusat
+				pusatInv = models.Inventory{
+					ProductID:        item.ProductID,
+					ProductVariantID: item.ProductVariantID,
+					MerchantID:       models.PusatID,
+					Stock:            0,
+				}
+				if err := tx.Create(&pusatInv).Error; err != nil {
+					tx.Rollback()
+					utils.JSONError(w, http.StatusInternalServerError, "Gagal inisialisasi stok pusat")
+					return
+				}
+			} else {
+				tx.Rollback()
+				utils.JSONError(w, http.StatusInternalServerError, "Gagal akses database inventori")
+				return
+			}
 		}
 
 		if pusatInv.Stock < item.Quantity {
 			tx.Rollback()
-			utils.JSONError(w, http.StatusBadRequest, "Stok Pusat tidak mencukupi untuk item "+item.ProductID)
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Stok Pusat tidak mencukupi untuk item %s (Stok: %d, Dibutuhkan: %d)", item.ProductID, pusatInv.Stock, item.Quantity))
 			return
 		}
 
@@ -367,4 +382,53 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 		fmt.Sprintf("Restock %s dalam pengiriman (Resi: %s).", restock.ID, input.TrackingNumber), "/merchant/restock")
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Barang dalam pengiriman B2B", "tracking_number": input.TrackingNumber})
+}
+
+func (ctrl *WarehouseController) SyncInventory(w http.ResponseWriter, r *http.Request) {
+	var products []models.Product
+	ctrl.DB.Find(&products)
+	var variants []models.ProductVariant
+	ctrl.DB.Find(&variants)
+
+	count := 0
+	for _, p := range products {
+		var variantCount int64
+		ctrl.DB.Model(&models.ProductVariant{}).Where("product_id = ?", p.ID).Count(&variantCount)
+		
+		initialStock := 1000
+		if variantCount > 0 {
+			initialStock = 0 // Base stock should be 0 if variants exist
+		}
+
+		var inv models.Inventory
+		err := ctrl.DB.Where("product_id = ? AND merchant_id = ? AND (product_variant_id IS NULL OR product_variant_id = '')", p.ID, models.PusatID).First(&inv).Error
+		if err == gorm.ErrRecordNotFound {
+			ctrl.DB.Create(&models.Inventory{
+				ProductID: p.ID,
+				MerchantID: models.PusatID,
+				Stock: initialStock,
+			})
+			count++
+		} else if variantCount > 0 && inv.Stock > 0 {
+			// If it already exists but should be 0 because variants exist
+			ctrl.DB.Model(&inv).Update("stock", 0)
+		}
+	}
+
+	for _, v := range variants {
+		var inv models.Inventory
+		idCopy := v.ID
+		err := ctrl.DB.Where("product_id = ? AND product_variant_id = ? AND merchant_id = ?", v.ProductID, idCopy, models.PusatID).First(&inv).Error
+		if err == gorm.ErrRecordNotFound {
+			ctrl.DB.Create(&models.Inventory{
+				ProductID: v.ProductID,
+				ProductVariantID: &idCopy,
+				MerchantID: models.PusatID,
+				Stock: 1000,
+			})
+			count++
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Sync complete", "created": count})
 }

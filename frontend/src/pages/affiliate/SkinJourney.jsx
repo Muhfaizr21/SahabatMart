@@ -837,9 +837,22 @@ export default function SkinJourney() {
                   <div>
                     <h4 className={`font-black text-lg mb-2 leading-tight ${completedSteps[routine.id] ? 'text-emerald-500 line-through' : 'text-white'}`}>{routine.step?.name}</h4>
                     {routine.product?.name && (
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="px-2 py-0.5 bg-rose-500/10 text-rose-400 text-[8px] font-black uppercase rounded-lg border border-rose-500/20">Produk</span>
-                        <p className="text-slate-500 text-[10px] font-bold truncate max-w-[120px]">{routine.product.name}</p>
+                      <div className="flex flex-col gap-1 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-rose-500/10 text-rose-400 text-[8px] font-black uppercase rounded-lg border border-rose-500/20">Produk</span>
+                          <p className="text-slate-500 text-[10px] font-bold truncate max-w-[120px]">{routine.product.name}</p>
+                        </div>
+                        {journeyData?.purchased_product_ids?.includes(routine.product_id) ? (
+                          <div className="flex items-center gap-1 text-[8px] font-black text-emerald-400 uppercase tracking-widest">
+                            <span className="material-symbols-outlined text-[10px]">check_circle</span>
+                            Sudah Dibeli
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-[8px] font-black text-amber-400 uppercase tracking-widest">
+                            <span className="material-symbols-outlined text-[10px]">shopping_cart</span>
+                            Belum Dibeli
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-slate-600">
@@ -1582,6 +1595,29 @@ export default function SkinJourney() {
                       </div>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* Marketing Alert for Unpurchased Product */}
+              {selectedRoutine.product_id && !journeyData?.purchased_product_ids?.includes(selectedRoutine.product_id) && (
+                <div className="p-6 rounded-[32px] bg-amber-500/10 border border-amber-500/20 animate-pulse-slow">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-amber-500">shopping_cart_checkout</span>
+                    </div>
+                    <div>
+                      <p className="text-amber-200 text-xs font-black uppercase tracking-tight mb-1">Produk Belum Dibeli</p>
+                      <p className="text-amber-200/60 text-[10px] leading-relaxed">
+                        "Produk kamu belum beli, silakan beli agar journey kamu maksimal!" ✨
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => window.location.href=`/product/${selectedRoutine.product_id}`}
+                    className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-amber-500/20 active:scale-95"
+                  >
+                    BELI SEKARANG
+                  </button>
                 </div>
               )}
             </div>

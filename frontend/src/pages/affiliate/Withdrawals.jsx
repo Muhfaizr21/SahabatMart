@@ -26,6 +26,7 @@ const StatusBadge = ({ status }) => {
 export default function AffiliateWithdrawals() {
   const [withdrawals, setWithdrawals] = useState([]);
   const [balance, setBalance] = useState(0);
+  const [shoppingBalance, setShoppingBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -45,6 +46,7 @@ export default function AffiliateWithdrawals() {
       ]);
       setWithdrawals(Array.isArray(wRes) ? wRes : []);
       setBalance(dRes?.stats?.balance || 0);
+      setShoppingBalance(dRes?.stats?.shopping_balance || 0);
       setConfig(cRes || {});
     } catch (err) {
       console.error(err);
@@ -104,32 +106,51 @@ export default function AffiliateWithdrawals() {
         <p className="text-slate-400 text-sm mt-0.5">Cairkan komisi Anda ke rekening bank</p>
       </div>
 
-      {/* Balance Card */}
-      <div
-        className="p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-5"
-        style={{
-          background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(91, 33, 182, 0.15))',
-          border: '1px solid rgba(167, 139, 250, 0.2)',
-        }}
-      >
-        <div>
-          <p className="text-[10px] font-bold text-purple-400 tracking-[0.2em] uppercase mb-1">
-            Komisi Tersedia
-          </p>
-          <p className="text-4xl font-black text-white font-['Plus_Jakarta_Sans']">
-            {formatRp(balance)}
-          </p>
-          <p className="text-slate-400 text-xs mt-2">Minimum penarikan: Rp {Number(config.payout_min_amount || 50000).toLocaleString('id-ID')}</p>
-        </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          disabled={balance < 50000}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div
+          className="lg:col-span-2 p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-5"
+          style={{
+            background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(91, 33, 182, 0.15))',
+            border: '1px solid rgba(167, 139, 250, 0.2)',
+          }}
         >
-          <span className="material-symbols-outlined">account_balance_wallet</span>
-          Tarik Sekarang
-        </button>
+          <div>
+            <p className="text-[10px] font-bold text-purple-400 tracking-[0.2em] uppercase mb-1">
+              Komisi Bisa Ditarik
+            </p>
+            <p className="text-4xl font-black text-white font-['Plus_Jakarta_Sans']">
+              {formatRp(balance)}
+            </p>
+            <p className="text-slate-400 text-xs mt-2">Minimum penarikan: Rp {Number(config.payout_min_amount || 50000).toLocaleString('id-ID')}</p>
+          </div>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            disabled={balance < (config.payout_min_amount || 50000)}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
+          >
+            <span className="material-symbols-outlined">account_balance_wallet</span>
+            Tarik Sekarang
+          </button>
+        </div>
+
+        <div
+          className="p-6 rounded-2xl flex flex-col justify-center gap-2"
+          style={{
+            background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(219, 39, 119, 0.1))',
+            border: '1px solid rgba(236, 72, 153, 0.2)',
+          }}
+        >
+          <p className="text-[10px] font-bold text-pink-400 tracking-[0.2em] uppercase">
+            Saldo Belanja (Bonus)
+          </p>
+          <p className="text-2xl font-black text-white">
+            {formatRp(shoppingBalance)}
+          </p>
+          <p className="text-slate-400 text-[10px] leading-relaxed">
+            Dapat digunakan langsung untuk belanja di aplikasi (tidak bisa ditarik).
+          </p>
+        </div>
       </div>
 
       {/* Alert messages */}

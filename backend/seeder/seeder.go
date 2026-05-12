@@ -154,23 +154,48 @@ func finalizeWarehouse(db *gorm.DB, suppliers []models.Supplier) {
 				CostPrice: p.Price * 0.50,
 			})
 
-			// Update Pusat Inventory
-			var inv models.Inventory
-			err := db.Where("product_id = ? AND merchant_id = ?", p.ID, models.PusatID).First(&inv).Error
-			if err == gorm.ErrRecordNotFound {
-				inv = models.Inventory{
-					ProductID:  p.ID,
-					MerchantID: models.PusatID,
-					Stock:      500,
-					BasePrice:  p.Price * 0.50,
+			// Update Pusat Inventory (Handle Variants)
+			var variants []models.ProductVariant
+			db.Where("product_id = ?", p.ID).Find(&variants)
+			
+			if len(variants) > 0 {
+				for _, v := range variants {
+					idCopy := v.ID
+					var inv models.Inventory
+					err := db.Where("product_id = ? AND merchant_id = ? AND product_variant_id = ?", p.ID, models.PusatID, idCopy).First(&inv).Error
+					if err == gorm.ErrRecordNotFound {
+						inv = models.Inventory{
+							ProductID:        p.ID,
+							ProductVariantID: &idCopy,
+							MerchantID:       models.PusatID,
+							Stock:            500,
+							BasePrice:        p.Price * 0.50,
+						}
+						db.Create(&inv)
+					} else {
+						db.Model(&inv).Update("stock", inv.Stock+500)
+					}
 				}
-				db.Create(&inv)
 			} else {
-				db.Model(&inv).Update("stock", inv.Stock + 500)
+				var inv models.Inventory
+				err := db.Where("product_id = ? AND merchant_id = ? AND (product_variant_id IS NULL OR product_variant_id = '')", p.ID, models.PusatID).First(&inv).Error
+				if err == gorm.ErrRecordNotFound {
+					inv = models.Inventory{
+						ProductID:  p.ID,
+						MerchantID: models.PusatID,
+						Stock:      500,
+						BasePrice:  p.Price * 0.50,
+					}
+					db.Create(&inv)
+				} else {
+					db.Model(&inv).Update("stock", inv.Stock+500)
+				}
 			}
 
-			// Update Global Stock
-			db.Model(&models.Product{}).Where("id = ?", p.ID).Update("stock", inv.Stock)
+			// Update Global Stock (Legacy Sync)
+			var totalPusatStock int64
+			db.Model(&models.Inventory{}).Where("product_id = ? AND merchant_id = ?", p.ID, models.PusatID).Select("sum(stock)").Row().Scan(&totalPusatStock)
+			db.Model(&models.Product{}).Where("id = ?", p.ID).Update("stock", totalPusatStock)
 
 			// Log Mutation (Mata Elang)
 			db.Create(&models.StockMutation{
@@ -180,7 +205,7 @@ func finalizeWarehouse(db *gorm.DB, suppliers []models.Supplier) {
 				Quantity:    500,
 				Reference:   inbound.ID,
 				StockBefore: 0,
-				StockAfter:  500,
+				StockAfter:  int(totalPusatStock),
 				Note:        "Auto-seeded Inbound",
 			})
 		}
@@ -211,10 +236,10 @@ func seedCategories(db *gorm.DB) map[string]uint {
 func seedTiers(db *gorm.DB) {
 	fmt.Println("  -> Seeding Membership Tiers...")
 	tiers := []models.MembershipTier{
-		{Name: "Mitra Dasar", Level: 1, BaseCommissionRate: 0.05, MinWithdrawalAmount: 50000, CommissionHoldDays: 14, IsActive: true},
-		{Name: "Mitra Silver", Level: 2, BaseCommissionRate: 0.10, MinWithdrawalAmount: 100000, CommissionHoldDays: 10, IsActive: true, MinEarningsUpgrade: 5000000},
-		{Name: "Mitra Gold", Level: 3, BaseCommissionRate: 0.15, MinWithdrawalAmount: 250000, CommissionHoldDays: 7, IsActive: true, MinEarningsUpgrade: 25000000},
-		{Name: "Mitra Platinum", Level: 4, BaseCommissionRate: 0.20, MinWithdrawalAmount: 500000, CommissionHoldDays: 3, IsActive: true, MinEarningsUpgrade: 100000000},
+		{Name: "Mitra Dasar", Level: 1, BaseCommissionRate: 0.05, MinWithdrawalAmount: 50000, CommissionHoldDays: 14, IsActive: true, MinCommissionDepth: 1, MaxCommissionDepth: 1},
+		{Name: "Mitra Silver", Level: 2, BaseCommissionRate: 0.10, MinWithdrawalAmount: 100000, CommissionHoldDays: 10, IsActive: true, MinEarningsUpgrade: 5000000, MinCommissionDepth: 1, MaxCommissionDepth: 2},
+		{Name: "Mitra Gold", Level: 3, BaseCommissionRate: 0.15, MinWithdrawalAmount: 250000, CommissionHoldDays: 7, IsActive: true, MinEarningsUpgrade: 25000000, MinCommissionDepth: 1, MaxCommissionDepth: 3},
+		{Name: "Mitra Platinum", Level: 4, BaseCommissionRate: 0.20, MinWithdrawalAmount: 500000, CommissionHoldDays: 3, IsActive: true, MinEarningsUpgrade: 100000000, MinCommissionDepth: 1, MaxCommissionDepth: 10},
 	}
 	for _, t := range tiers {
 		db.Create(&t)

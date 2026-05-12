@@ -9,6 +9,8 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
   { key: 'default_platform_fee',    value: '5',                description: 'Fee Layanan Merchant (Platform Fee) (%)',   group: 'platform',  type: 'number' },
   { key: 'default_affiliate_commission', value: '10',          description: 'Komisi Mitra Default (%)',               group: 'platform',  type: 'number' },
+  { key: 'affiliate_withdraw_pct',  value: '70',                description: 'Porsi Komisi Bisa Ditarik (%)',            group: 'affiliate', type: 'number' },
+  { key: 'affiliate_shopping_pct',  value: '30',                description: 'Porsi Komisi Untuk Belanja (%)',           group: 'affiliate', type: 'number' },
   { key: 'platform_currency',       value: 'IDR',              description: 'Mata Uang',                  group: 'platform',  type: 'text' },
   { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
   { key: 'merchant_min_active_mitra',  value: '100',          description: 'Min. Mitra Aktif (Merchant)', group: 'platform',  type: 'number' },
@@ -59,6 +61,7 @@ const GROUP_META = {
   stats:        { icon: 'bx-bar-chart-alt-2', label: 'Statistik Beranda', color: '#0ea5e9' },
   contact:      { icon: 'bx-phone-call',  label: 'Informasi Kontak', color: '#f59e0b' },
   security:     { icon: 'bx-lock-alt',    label: 'Keamanan',      color: '#ef4444' },
+  affiliate:    { icon: 'bx-share-alt',   label: 'Sistem Afiliasi', color: '#6366f1' },
 };
 
 const S = {

@@ -28,8 +28,9 @@ export default function CheckoutPage() {
   const [shippingRates, setShippingRates] = useState({}); // { [merchant_id]: [rates] }
   const [shippingWarning, setShippingWarning] = useState("");
   const [loadingRates, setLoadingRates] = useState(false);
-  const [openGroups, setOpenGroups] = useState({ "Virtual Account": true });
+  const [openGroups, setOpenGroups] = useState({ "Virtual Account": true, "Internal": true });
   const [user, setUser] = useState(null);
+  const [wallet, setWallet] = useState(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -56,11 +57,14 @@ export default function CheckoutPage() {
         }
 
         // Parallel fetch for speed
-        const [cartData, profileData, channelsData] = await Promise.all([
+        const [cartData, profileData, channelsData, walletData] = await Promise.all([
           fetchJson(`${BUYER_API_BASE}/cart`),
           fetchJson(`${BUYER_API_BASE}/profile`),
-          fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels err:", e); return null; })
+          fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels err:", e); return null; }),
+          fetchJson(`${BUYER_API_BASE}/wallet`).catch(e => null)
         ]);
+
+        if (walletData) setWallet(walletData);
 
         // [Fix] Handle unwrapped channels data from fetchJson
         const channelsList = channelsData?.data || (Array.isArray(channelsData) ? channelsData : []);
@@ -78,6 +82,19 @@ export default function CheckoutPage() {
             min_amount: c.minimum_amount || 0,
             max_amount: c.maximum_amount || 0,
           }));
+
+          // Add Shopping Balance if available
+          if (walletData?.shopping_balance > 0) {
+            mapped.unshift({
+              id: 'shopping_balance',
+              label: 'Saldo Bonus Belanja',
+              icon: 'https://cdn-icons-png.flaticon.com/512/2331/2331716.png',
+              desc: 'Internal',
+              type: 'direct',
+              balance: walletData.shopping_balance
+            });
+          }
+
           setPaymentMethods(mapped);
           if (mapped.length > 0) setPaymentMethod(mapped[0].id);
         }
@@ -605,9 +622,13 @@ export default function CheckoutPage() {
                         const mName = cart.items.find(i => (i.merchant_id || '00000000-0000-0000-0000-000000000000') === mID)?.merchant?.store_name || 'AkuGlow (Pusat)';
                         return (
                           <div key={mID} className="animate-in fade-in slide-in-from-top-2 duration-500">
-                            <div className="flex items-center gap-2 mb-4 bg-gray-50 p-3 rounded-xl">
-                              <i className="bx bx-store text-blue-600"></i>
-                              <span className="text-[10px] font-black text-gray-800 uppercase tracking-widest">Kirim dari: {mName}</span>
+                            <div className="flex items-center gap-2 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                              <span className="material-symbols-outlined text-sm text-blue-600">
+                                {mID === '00000000-0000-0000-0000-000000000000' ? 'verified' : 'storefront'}
+                              </span>
+                              <span className="text-[10px] font-black text-gray-800 uppercase tracking-widest">
+                                {mID === '00000000-0000-0000-0000-000000000000' ? 'Kirim Langsung Dari: OFFICIAL PUSAT' : `Kirim dari: ${mName}`}
+                              </span>
                             </div>
                             <div className="space-y-3">
                               {rates.map((method, idx) => (
@@ -765,13 +786,18 @@ export default function CheckoutPage() {
                               const feePercent = method.fee_customer_pct || 0;
                               const totalPaymentFee = Math.round((total * (feePercent / 100)) + feeFlat);
 
+                              const isInsufficient = method.id === 'shopping_balance' && method.balance < total;
+
                               return (
                                 <button
                                   key={method.id}
                                   type="button"
+                                  disabled={isInsufficient}
                                   onClick={() => setPaymentMethod(method.id)}
                                   className={`flex items-center gap-3 border-2 rounded-xl p-4 text-left transition-all relative overflow-hidden ${
-                                    paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-300'
+                                    paymentMethod === method.id ? 'border-blue-500 bg-blue-50' : 
+                                    isInsufficient ? 'opacity-50 grayscale cursor-not-allowed bg-gray-50 border-gray-100' :
+                                    'border-gray-100 hover:border-gray-300'
                                   }`}
                                 >
                                   {paymentMethod === method.id && (
@@ -782,7 +808,12 @@ export default function CheckoutPage() {
                                   <img src={method.icon} alt={method.label} className="w-10 h-10 object-contain bg-white rounded border border-gray-100 p-1" />
                                   <div className="flex-1 min-w-0">
                                     <div className="font-semibold text-gray-800 text-sm truncate leading-tight">{method.label}</div>
-                                    {totalPaymentFee > 0 && (
+                                    {method.id === 'shopping_balance' ? (
+                                      <div className={`text-[10px] font-bold mt-1 ${isInsufficient ? 'text-red-500' : 'text-green-600'}`}>
+                                        Sisa: Rp{method.balance.toLocaleString('id-ID')}
+                                        {isInsufficient && ' (Kurang)'}
+                                      </div>
+                                    ) : totalPaymentFee > 0 && (
                                       <div className="text-[10px] font-bold text-orange-500 mt-1">
                                         + Biaya: Rp{totalPaymentFee.toLocaleString('id-ID')}
                                       </div>

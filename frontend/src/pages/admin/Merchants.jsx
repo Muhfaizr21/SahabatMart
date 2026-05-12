@@ -18,6 +18,7 @@ export default function AdminMerchants() {
   const [commission, setCommission] = useState({ fee_percent: 0, loading: false });
   const [areas, setAreas] = useState([]);
   const [searchingArea, setSearchingArea] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [logisticChannels, setLogisticChannels] = useState([]);
 
   const loadLogistics = () => {
@@ -90,17 +91,30 @@ export default function AdminMerchants() {
     }).then(() => { load(); setModal(null); setNote(''); });
   };
 
+  const [verifying, setVerifying] = useState(false);
   const toggleVerify = (id, current) => {
+    setVerifying(true);
     fetchJson(`${API}/merchants/verify`, {
       method: 'PUT',
       body: JSON.stringify({ merchant_id: id, verified: !current }),
     }).then(() => {
+      if (modal && modal.id === id) {
+        setModal({ ...modal, is_verified: !current });
+      }
       load();
+    }).catch(err => {
+      alert("Gagal mengupdate status verifikasi: " + err.message);
+    }).finally(() => {
+      setVerifying(false);
     });
   };
 
   const handleSearchArea = async (input) => {
-    if (input.length < 3) return;
+    setSearchInput(input);
+    if (input.length < 3) {
+      setAreas([]);
+      return;
+    }
     setSearchingArea(true);
     try {
       const res = await fetchJson(`/api/shipping/areas?input=${input}`);
@@ -108,8 +122,7 @@ export default function AdminMerchants() {
     } catch (err) {
       console.error(err);
     } finally {
-      setSearchingArea(true);
-      setTimeout(() => setSearchingArea(false), 500);
+      setSearchingArea(false);
     }
   };
 
@@ -125,6 +138,7 @@ export default function AdminMerchants() {
     }).then(() => {
       setModal({ ...modal, biteship_area_id: area.id });
       setAreas([]);
+      setSearchInput('');
       load();
     }).catch(alert);
   };
@@ -405,15 +419,22 @@ export default function AdminMerchants() {
 
               <button
                 onClick={() => toggleVerify(modal.id, modal.is_verified)}
+                disabled={verifying}
                 style={{
                   ...A.btnGhost, width: '100%', justifyContent: 'center', padding: '12px', fontSize: 12,
                   borderColor: modal.is_verified ? '#64748b' : '#10b981',
                   color: modal.is_verified ? '#64748b' : '#10b981',
-                  marginBottom: 16
+                  marginBottom: 16,
+                  opacity: verifying ? 0.6 : 1,
+                  cursor: verifying ? 'not-allowed' : 'pointer'
                 }}
               >
-                <i className={`bx ${modal.is_verified ? 'bxs-badge-check' : 'bx-badge'}`} />
-                {modal.is_verified ? 'Cabut Verifikasi' : 'Berikan Label Terverifikasi'}
+                {verifying ? (
+                  <div style={{ width: 14, height: 14, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                ) : (
+                  <i className={`bx ${modal.is_verified ? 'bxs-badge-check' : 'bx-badge'}`} />
+                )}
+                {verifying ? 'Memproses...' : (modal.is_verified ? 'Cabut Verifikasi' : 'Berikan Label Terverifikasi')}
               </button>
 
               <div style={{ marginTop: 8, padding: 16, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
@@ -422,6 +443,7 @@ export default function AdminMerchants() {
                   <input 
                     style={{ ...A.input, padding: '10px 12px', fontSize: 12 }} 
                     placeholder="Cari Kecamatan..." 
+                    value={searchInput}
                     onChange={e => handleSearchArea(e.target.value)}
                   />
                   {searchingArea && <div style={{ position: 'absolute', right: 10, top: 12, fontSize: 10, color: '#4f46e5' }}>Mencari...</div>}
@@ -448,30 +470,7 @@ export default function AdminMerchants() {
                 )}
               </div>
 
-              <div style={{ marginTop: 12, padding: 16, background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                <FieldLabel>Kurir yang Aktif</FieldLabel>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                  {logisticChannels.filter(lc => lc.is_active).map(c => {
-                    const active = modal.enabled_couriers?.split(',').includes(c.code);
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => toggleCourier(c.code)}
-                        style={{
-                          padding: '6px 4px', borderRadius: 8, fontSize: 10, fontWeight: 800,
-                          border: active ? '1px solid #4f46e5' : '1px solid #e2e8f0',
-                          background: active ? '#f5f7ff' : '#fff',
-                          color: active ? '#4f46e5' : '#64748b',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {c.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p style={{ fontSize: 9, color: '#94a3b8', marginTop: 8 }}>Pilih kurir yang tersedia untuk merchant ini. Kosong berarti mengikuti default platform.</p>
-              </div>
+
             </div>
           </div>
 

@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -73,7 +74,9 @@ func (bc *BuyerController) GetShippingAreas(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	utils.JSONResponse(w, http.StatusOK, areas)
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"areas": areas,
+	})
 }
 
 // POST /api/shipping/rates
@@ -131,7 +134,6 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 		bc.DB.First(&merchant, "id = ?", mID)
 		
 		origin := merchant.BiteshipAreaID
-		couriers := merchant.EnabledCouriers
 		
 		if origin == "" {
 			// Ambil BiteshipAreaID dari Merchant Pusat sebagai fallback
@@ -147,26 +149,8 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 
 		var activeGlobalCouriers []string
 		bc.DB.Model(&models.LogisticChannel{}).Where("is_active = ?", true).Pluck("code", &activeGlobalCouriers)
-		
-		isGlobalActive := make(map[string]bool)
-		for _, code := range activeGlobalCouriers {
-			isGlobalActive[strings.ToLower(code)] = true
-		}
 
-		merchantCouriers := strings.Split(couriers, ",")
-		var filteredCouriers []string
-		for _, c := range merchantCouriers {
-			c = strings.TrimSpace(strings.ToLower(c))
-			if c != "" && isGlobalActive[c] {
-				filteredCouriers = append(filteredCouriers, c)
-			}
-		}
-		
-		finalCouriers := strings.Join(filteredCouriers, ",")
-		if finalCouriers == "" {
-			finalCouriers = strings.Join(activeGlobalCouriers, ",")
-		}
-
+		finalCouriers := strings.Join(activeGlobalCouriers, ",")
 		if finalCouriers == "" {
 			continue
 		}
@@ -287,7 +271,48 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 
 	// Integrasi TriPay: Jika metode pembayaran dipilih, buat transaksi di TriPay
 	var paymentData map[string]interface{}
-	if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
+
+	if req.PaymentMethod == "shopping_balance" {
+		err := bc.DB.Transaction(func(tx *gorm.DB) error {
+			var user models.User
+			if err := tx.First(&user, "id = ?", buyerID).Error; err != nil {
+				return err
+			}
+
+			// Determine owner type based on role
+			ownerType := models.WalletAffiliate
+			if user.Role == "merchant" {
+				ownerType = models.WalletMerchant
+			} else if user.Role == "buyer" {
+				ownerType = models.WalletBuyer
+			}
+
+			financeSvc := services.NewFinanceService(tx)
+			wallet, err := financeSvc.GetWallet(buyerID, ownerType)
+			if err != nil {
+				return fmt.Errorf("dompet tidak ditemukan")
+			}
+
+			if wallet.ShoppingBalance < order.GrandTotal {
+				return fmt.Errorf("saldo bonus belanja tidak mencukupi (Tersedia: Rp %.0f, Dibutuhkan: Rp %.0f)", wallet.ShoppingBalance, order.GrandTotal)
+			}
+
+			// Deduct from ShoppingBalance
+			desc := fmt.Sprintf("Pembayaran Pesanan #%s menggunakan Bonus Belanja", order.OrderNumber)
+			if err := financeSvc.ProcessTransaction(tx, buyerID, ownerType, models.TxShoppingPayment, -order.GrandTotal, order.ID, "order", desc, nil); err != nil {
+				return err
+			}
+
+			// Complete Payment
+			orderSvc := services.NewOrderService(tx)
+			return orderSvc.CompletePayment(tx, order.ID)
+		})
+
+		if err != nil {
+			utils.JSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	} else if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
 		// Ambil data item lengkap untuk TriPay
 		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
 		
@@ -835,15 +860,33 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 
 // POST /api/shipping/webhook
 func (bc *BuyerController) ShippingWebhook(w http.ResponseWriter, r *http.Request) {
+	// Biteship installation verification often sends an empty body or a GET request.
+	// We should respond with 200 OK to allow installation.
+	if r.ContentLength == 0 && (r.Method == http.MethodPost || r.Method == http.MethodGet) {
+		log.Println("[ShippingWebhook] Empty body or GET request received, responding with OK for installation.")
+		utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok", "message": "Webhook installed successfully"})
+		return
+	}
+
 	var payload map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	err := json.NewDecoder(r.Body).Decode(&payload)
+	if err != nil {
+		if err == io.EOF {
+			log.Println("[ShippingWebhook] EOF received, responding with OK.")
+			utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok"})
+			return
+		}
+		log.Printf("[ShippingWebhook] JSON Decode Error: %v", err)
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
 	}
 
 	if err := bc.ShippingService.HandleWebhook(payload); err != nil {
-		log.Printf("[ShippingWebhook] ERROR: %v", err)
-		utils.JSONError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("[ShippingWebhook] HandleWebhook ERROR: %v", err)
+		// We still return 200 OK to Biteship to avoid retries if the error is on our side processing the data,
+		// but log it for debugging. Or keep it as error if we want Biteship to retry.
+		// For installation phase, let's just return OK if it's missing data.
+		utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok", "warning": err.Error()})
 		return
 	}
 
@@ -956,4 +999,30 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 	}
 
 	utils.JSONResponse(w, http.StatusOK, response)
+}
+
+func (bc *BuyerController) GetWallet(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+
+	var user models.User
+	if err := bc.DB.First(&user, "id = ?", buyerID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
+	ownerType := models.WalletAffiliate
+	if user.Role == "merchant" {
+		ownerType = models.WalletMerchant
+	} else if user.Role == "buyer" {
+		ownerType = models.WalletBuyer
+	}
+
+	financeSvc := services.NewFinanceService(bc.DB)
+	wallet, err := financeSvc.GetWallet(buyerID, ownerType)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data dompet: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, wallet)
 }

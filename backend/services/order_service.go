@@ -613,11 +613,22 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			continue
 		}
 
-		// Hitung hold period berdasarkan tier affiliate
+		// Hitung hold period dan validasi kedalaman (depth) berdasarkan tier affiliate
 		holdDays := s.ConfigService.GetInt("default_commission_hold_days", 7)
 		var tier models.MembershipTier
 		if err := tx.First(&tier, "id = ?", aff.MembershipTierID).Error; err == nil {
 			holdDays = tier.CommissionHoldDays
+			
+			// Cek apakah level transaksi ini diperbolehkan untuk tier si Affiliate
+			if pl.Level < tier.MinCommissionDepth || pl.Level > tier.MaxCommissionDepth {
+				// Tidak berhak mendapat komisi di level ini, lompat ke upline berikutnya
+				if aff.UplineID != nil {
+					currentAffiliateID = *aff.UplineID
+				} else {
+					break
+				}
+				continue
+			}
 		}
 		holdUntil := time.Now().AddDate(0, 0, holdDays)
 

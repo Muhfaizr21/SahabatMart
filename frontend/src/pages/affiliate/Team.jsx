@@ -139,6 +139,7 @@ export default function TeamPerformance() {
   const mitraProgress = Math.min((qualifiedMitra / reqMitra) * 100, 100);
   const turnoverProgress = Math.min((monthlyTurnover / reqTurnover) * 100, 100);
   const isEligible = eligibility?.is_eligible;
+  const activeMitra = stats?.active_mitra || 0; // Derived from stats
 
   return (
     <div className="space-y-8">

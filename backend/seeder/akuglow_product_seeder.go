@@ -235,8 +235,13 @@ func SeedAkuglowProducts(db *gorm.DB) {
 			})
 		}
 
-		// Ensure Inventory for Pusat
-		db.Where(models.Inventory{MerchantID: models.PusatID, ProductID: existing.ID}).
+		// Ensure Inventory for Pusat (Base Product - Set to 0 if variants exist)
+		db.Where(models.Inventory{MerchantID: models.PusatID, ProductID: existing.ID, ProductVariantID: nil}).
+			Assign(models.Inventory{Stock: 0}).
+			FirstOrCreate(&models.Inventory{})
+
+		// Ensure Inventory for Pusat (Standard Variant - Set to 1000)
+		db.Where(models.Inventory{MerchantID: models.PusatID, ProductID: existing.ID, ProductVariantID: &v.ID}).
 			Assign(models.Inventory{Stock: 1000}).
 			FirstOrCreate(&models.Inventory{})
 	}

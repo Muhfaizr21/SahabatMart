@@ -9,6 +9,8 @@ export default function ResetPasswordPage() {
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -119,27 +121,49 @@ export default function ResetPasswordPage() {
                 <>
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Password Baru</label>
-                    <input 
-                      type="password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••" 
-                      className="w-full border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
-                      required
-                      minLength={6}
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••" 
+                        className="w-full border border-gray-100 rounded-2xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          {showPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Konfirmasi Password</label>
-                    <input 
-                      type="password" 
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••" 
-                      className="w-full border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
-                      required
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••" 
+                        className="w-full border border-gray-100 rounded-2xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                   
                   <button 

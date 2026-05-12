@@ -15,6 +15,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const location = useLocation();
@@ -141,14 +142,25 @@ export default function LoginPage() {
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Kata Sandi</label>
                 <Link to="/forgot-password" size="sm" className="text-[10px] font-black text-rose-600 hover:underline uppercase tracking-wider">Lupa Sandi?</Link>
               </div>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••" 
-                className="w-full border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••" 
+                  className="w-full border border-gray-100 rounded-2xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
             </div>
             
             <div className="flex items-center gap-3 mt-1">

@@ -192,6 +192,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
 	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
 	mux.HandleFunc("/api/buyer/profile/update", buyerOnly(buyerCtrl.UpdateProfile))
+	mux.HandleFunc("/api/buyer/wallet", buyerOnly(buyerCtrl.GetWallet))
 	mux.HandleFunc("/api/buyer/wishlist", buyerOnly(buyerCtrl.GetWishlist))
 	mux.HandleFunc("/api/buyer/wishlist/add", buyerOnly(buyerCtrl.AddToWishlist))
 	mux.HandleFunc("/api/buyer/wishlist/check", buyerOnly(buyerCtrl.CheckWishlist))
@@ -532,6 +533,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliate-clicks", adminOnly(adminCtrl.GetAffiliateClicks))
 	mux.HandleFunc("/api/admin/upload", adminOnly(adminCtrl.UploadImage))
 
+	// [New SuperAdmin Features] System & Control
+	mux.HandleFunc("/api/admin/system/maintenance", superAdminOnly(adminCtrl.ToggleMaintenanceMode))
+	mux.HandleFunc("/api/admin/system/broadcast", superAdminOnly(adminCtrl.BroadcastNotification))
+	mux.HandleFunc("/api/admin/system/stats", superAdminOnly(adminCtrl.GetSystemStats))
+	mux.HandleFunc("/api/admin/system/health", superAdminOnly(adminCtrl.GetSystemHealth))
+
 	// Commission Presets (Multi-Level Upline Distribution)
 	mux.HandleFunc("/api/admin/commission-presets", adminOnly(adminCtrl.GetCommissionPresets))
 	mux.HandleFunc("/api/admin/commission-presets/upsert", adminOnly(adminCtrl.UpsertCommissionPreset))
@@ -552,6 +559,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/warehouse/stock-history", adminOnly(warehouseCtrl.GetStockHistory))
 	mux.HandleFunc("/api/admin/warehouse/restock/approve/", adminOnly(warehouseCtrl.ApproveRestock))
 	mux.HandleFunc("/api/admin/warehouse/restock/ship/", adminOnly(warehouseCtrl.ShipRestock))
+	mux.HandleFunc("/api/admin/warehouse/sync", adminOnly(warehouseCtrl.SyncInventory))
 
 	// --- Public Routes (Continued) ---
 	mux.HandleFunc("/api/public/categories", adminCtrl.GetPublicCategories)

@@ -31,6 +31,7 @@ const (
 	TxRestockPayment      WalletTransactionType = "restock_payment" // Merchant pays HQ
 	TxRestockRevenue      WalletTransactionType = "restock_revenue" // HQ receives money
 	TxPayoutOutflow       WalletTransactionType = "payout_outflow"  // HQ pays out to Merchant/Affiliate
+	TxShoppingPayment     WalletTransactionType = "shopping_payment" // Affiliate uses bonus to shop
 )
 
 type Wallet struct {
@@ -39,6 +40,7 @@ type Wallet struct {
 	OwnerType      WalletOwnerType `gorm:"type:varchar(20);not null;index:idx_wallet_owner" json:"owner_type"`
 	Balance        float64         `gorm:"type:decimal(15,2);not null;default:0" json:"balance"`         // Ready for withdrawal
 	PendingBalance float64         `gorm:"type:decimal(15,2);not null;default:0" json:"pending_balance"` // Hold balance
+	ShoppingBalance float64        `gorm:"type:decimal(15,2);not null;default:0" json:"shopping_balance"` // For shopping only
 	TotalEarned    float64         `gorm:"type:decimal(15,2);not null;default:0" json:"total_earned"`
 	TotalWithdrawn float64         `gorm:"type:decimal(15,2);not null;default:0" json:"total_withdrawn"`
 	IsActive       bool            `gorm:"default:true" json:"is_active"`

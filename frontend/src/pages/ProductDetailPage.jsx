@@ -363,11 +363,11 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* [Akuglow] Merchant Source Selector */}
+            {/* [Akuglow] Delivery Source Selector */}
             {sellers.length > 0 ? (
               <div className="mb-10">
                 <div className="flex items-center justify-between mb-4">
-                   <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Pilih Pengiriman (Merchant)</h4>
+                   <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Opsi Lokasi Pengiriman</h4>
                    {user?.profile?.city && (
                      <div className="flex items-center gap-1 bg-blue-100 text-blue-600 px-2 py-1 rounded-lg">
                         <span className="material-symbols-outlined text-[12px]">location_on</span>
@@ -375,75 +375,114 @@ export default function ProductDetailPage() {
                      </div>
                    )}
                 </div>
+                
                 <div className="flex flex-col gap-3">
-                  {sellers.slice((merchantPage - 1) * 3, merchantPage * 3).map((s) => {
-                    const isNear = user?.profile?.city && s.city && s.city.toLowerCase() === user.profile.city.toLowerCase();
-                    const isPusat = s.merchant_id === '00000000-0000-0000-0000-000000000000' || (s.city && s.city.toLowerCase() === 'pusat') || s.store_name?.toLowerCase().includes('pusat');
+                  {/* 1. OFFICIAL STORE (COMPANY DEFAULT) */}
+                  {sellers.filter(s => s.merchant_id === '00000000-0000-0000-0000-000000000000' || (s.city && s.city.toLowerCase() === 'pusat') || s.store_name?.toLowerCase().includes('pusat')).map(s => (
+                    <button
+                      key={s.merchant_id}
+                      onClick={() => setSelectedMerchant(s)}
+                      className={`p-5 rounded-[2rem] border-2 transition-all flex items-center justify-between group relative overflow-hidden ${
+                        selectedMerchant?.merchant_id === s.merchant_id
+                          ? 'border-blue-600 bg-blue-50/50 text-blue-600 shadow-xl shadow-blue-500/10'
+                          : 'border-blue-100 bg-white text-gray-500 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="absolute top-0 right-0">
+                         <div className="bg-gradient-to-l from-blue-600 to-blue-400 text-white text-[8px] font-black px-4 py-1.5 rounded-bl-2xl shadow-sm uppercase tracking-[0.1em]">Official HQ</div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white transition-all shadow-inner ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-blue-600 scale-110' : 'bg-blue-400 opacity-60'}`}>
+                          <span className="material-symbols-outlined text-2xl">verified_user</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="font-black text-sm tracking-tight">{s.store_name}</p>
+                          <p className="text-[9px] uppercase tracking-widest text-blue-500 font-black">Pengiriman Langsung Dari Pusat</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1">Stok Pusat</p>
+                        <p className="font-black text-xs">{s.stock} Unit</p>
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* 2. DISTRIBUTORS (MERCHANTS) */}
+                  {(() => {
+                    const others = sellers.filter(s => !(s.merchant_id === '00000000-0000-0000-0000-000000000000' || (s.city && s.city.toLowerCase() === 'pusat') || s.store_name?.toLowerCase().includes('pusat')));
+                    if (others.length === 0) return null;
                     
                     return (
-                      <button
-                        key={s.merchant_id}
-                        onClick={() => setSelectedMerchant(s)}
-                        className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between group relative overflow-hidden ${
-                          selectedMerchant?.merchant_id === s.merchant_id
-                            ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md'
-                            : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
-                        }`}
-                      >
-                        {isPusat ? (
-                          <div className="absolute top-0 right-0">
-                             <div className="bg-gradient-to-l from-blue-600 to-blue-400 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl shadow-sm uppercase tracking-tighter">Official Pusat</div>
-                          </div>
-                        ) : isNear ? (
-                          <div className="absolute top-0 right-0">
-                             <div className="bg-gradient-to-l from-orange-500 to-amber-400 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl shadow-sm uppercase tracking-tighter">Terdekat</div>
-                          </div>
-                        ) : null}
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white transition-colors ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                            {s.store_name.charAt(0)}
-                          </div>
-                          <div className="text-left">
-                            <div className="flex items-center gap-2">
-                                <p className="font-black text-sm">{s.store_name}</p>
-                                {isNear && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>}
-                            </div>
-                            <p className="text-[10px] uppercase tracking-tighter opacity-70 font-bold">{s.city || 'Pusat'}</p>
-                          </div>
+                      <div className="mt-4">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">— Distributor Terdekat —</p>
+                        <div className="flex flex-col gap-3">
+                          {others.slice((merchantPage - 1) * 3, merchantPage * 3).map((s) => {
+                            const isNear = user?.profile?.city && s.city && s.city.toLowerCase() === user.profile.city.toLowerCase();
+                            return (
+                              <button
+                                key={s.merchant_id}
+                                onClick={() => setSelectedMerchant(s)}
+                                className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between group relative overflow-hidden ${
+                                  selectedMerchant?.merchant_id === s.merchant_id
+                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-md'
+                                    : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
+                                }`}
+                              >
+                                {isNear && (
+                                  <div className="absolute top-0 right-0">
+                                     <div className="bg-gradient-to-l from-orange-500 to-amber-400 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl shadow-sm uppercase tracking-tighter">Terdekat</div>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white transition-colors ${selectedMerchant?.merchant_id === s.merchant_id ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                    {s.store_name.charAt(0)}
+                                  </div>
+                                  <div className="text-left">
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-black text-sm">{s.store_name}</p>
+                                        {isNear && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>}
+                                    </div>
+                                    <p className="text-[10px] uppercase tracking-tighter opacity-70 font-bold">{s.city || 'Regional'}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Stok</p>
+                                  <p className="font-black text-xs">{s.stock} Unit</p>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Stok</p>
-                          <p className="font-black text-xs">{s.stock} Unit</p>
-                        </div>
-                      </button>
-                    );
-                  })}
 
-                  {/* Pagination Controls */}
-                  {sellers.length > 3 && (
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                      <button 
-                        onClick={() => setMerchantPage(prev => Math.max(prev - 1, 1))}
-                        disabled={merchantPage === 1}
-                        className="text-xs font-bold text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-400 flex items-center gap-1 px-2 py-1"
-                      >
-                        <i className="bx bx-chevron-left text-lg"></i> Prev
-                      </button>
-                      <span className="text-xs font-bold text-gray-400">
-                        {merchantPage} / {Math.ceil(sellers.length / 3)}
-                      </span>
-                      <button 
-                        onClick={() => setMerchantPage(prev => Math.min(prev + 1, Math.ceil(sellers.length / 3)))}
-                        disabled={merchantPage === Math.ceil(sellers.length / 3)}
-                        className="text-xs font-bold text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-400 flex items-center gap-1 px-2 py-1"
-                      >
-                        Next <i className="bx bx-chevron-right text-lg"></i>
-                      </button>
-                    </div>
-                  )}
+                        {/* Pagination for Distributors */}
+                        {others.length > 3 && (
+                          <div className="flex items-center justify-between mt-4 pt-2 border-t border-gray-100">
+                            <button 
+                              onClick={() => setMerchantPage(prev => Math.max(prev - 1, 1))}
+                              disabled={merchantPage === 1}
+                              className="text-xs font-bold text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-400 flex items-center gap-1 px-2 py-1"
+                            >
+                              <i className="bx bx-chevron-left text-lg"></i> Prev
+                            </button>
+                            <span className="text-xs font-bold text-gray-400">
+                              {merchantPage} / {Math.ceil(others.length / 3)}
+                            </span>
+                            <button 
+                              onClick={() => setMerchantPage(prev => Math.min(prev + 1, Math.ceil(others.length / 3)))}
+                              disabled={merchantPage === Math.ceil(others.length / 3)}
+                              className="text-xs font-bold text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-gray-400 flex items-center gap-1 px-2 py-1"
+                            >
+                              Next <i className="bx bx-chevron-right text-lg"></i>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : (
+
                 <div className="mb-10 p-6 rounded-3xl bg-red-50 border border-red-100 flex items-center gap-4">
                     <div className="text-2xl text-red-500">📵</div>
                     <div>

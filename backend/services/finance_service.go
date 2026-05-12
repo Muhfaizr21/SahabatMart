@@ -177,7 +177,9 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 		isPending = true
 	}
 
-	if isPending {
+	if txType == models.TxShoppingPayment {
+		wallet.ShoppingBalance += amount // amount should be negative for payments
+	} else if isPending {
 		wallet.PendingBalance += amount
 	} else {
 		wallet.Balance += amount
@@ -233,8 +235,21 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 				continue
 			}
 
-			wallet.PendingBalance -= txn.Amount
-			wallet.Balance += txn.Amount
+			if txn.Type == models.TxCommissionEarned && wallet.OwnerType == models.WalletAffiliate {
+				configSvc := NewConfigService(tx)
+				withdrawPct := configSvc.GetFloat("affiliate_withdraw_pct", 70) / 100.0
+				shoppingPct := configSvc.GetFloat("affiliate_shopping_pct", 30) / 100.0
+
+				withdrawableAmt := txn.Amount * withdrawPct
+				shoppingAmt := txn.Amount * shoppingPct
+
+				wallet.PendingBalance -= txn.Amount
+				wallet.Balance += withdrawableAmt
+				wallet.ShoppingBalance += shoppingAmt
+			} else {
+				wallet.PendingBalance -= txn.Amount
+				wallet.Balance += txn.Amount
+			}
 			
 			if err := tx.Save(&wallet).Error; err != nil {
 				return err

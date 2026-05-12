@@ -178,6 +178,7 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		UserName          string                            `json:"user_name"`
 		StartedAt         *time.Time                        `json:"started_at,omitempty"` // BUG-01 fix
 		SkinProfileJSON   string                            `json:"skin_profile_json,omitempty"`
+		PurchasedProductIDs []string                        `json:"purchased_product_ids"`
 	}
 
 	if pretest.ID != 0 {
@@ -237,6 +238,28 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 					},
 				})
 			}
+		}
+
+		// --- [Psychological Logic] Check Product Purchase Status ---
+		requiredProductIDs := []string{}
+		for _, r := range results.Routines {
+			if r.ProductID != "" {
+				requiredProductIDs = append(requiredProductIDs, r.ProductID)
+			}
+		}
+		
+		if len(requiredProductIDs) > 0 {
+			var boughtProductIDs []string
+			sc.DB.Table("order_items oi").
+				Joins("JOIN orders o ON o.id = oi.order_id").
+				Where("o.buyer_id = ? AND o.status IN (?, ?, ?, ?, ?)", userID, 
+					models.OrderPaid, models.OrderProcessing, models.OrderReadyToShip, 
+					models.OrderShipped, models.OrderCompleted).
+				Where("oi.product_id IN ?", requiredProductIDs).
+				Distinct("oi.product_id").
+				Pluck("oi.product_id", &boughtProductIDs)
+			
+			results.PurchasedProductIDs = boughtProductIDs
 		}
 	}
 	

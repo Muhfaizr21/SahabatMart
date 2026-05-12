@@ -63,6 +63,8 @@ type MembershipTier struct {
 	Name                 string  `gorm:"type:varchar(50);unique;not null" json:"name"`
 	Level                int     `gorm:"unique;not null" json:"level"`
 	BaseCommissionRate   float64 `gorm:"type:decimal(5,4);not null" json:"base_commission_rate"`
+	MinCommissionDepth   int     `gorm:"default:1" json:"min_commission_depth"`
+	MaxCommissionDepth   int     `gorm:"default:1" json:"max_commission_depth"`
 	MonthlyFee           float64 `gorm:"type:decimal(15,2);default:0" json:"monthly_fee"`
 	MinEarningsUpgrade   float64 `gorm:"type:decimal(15,2)" json:"min_earnings_upgrade"`
 	MaxWithdrawalMonthly float64 `gorm:"type:decimal(15,2)" json:"max_withdrawal_monthly"`

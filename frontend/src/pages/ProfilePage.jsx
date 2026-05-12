@@ -80,6 +80,10 @@ export default function ProfilePage() {
     }
   }, [navigate]);
 
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
   useEffect(() => {
@@ -589,31 +593,64 @@ export default function ProfilePage() {
                   >
                     <div>
                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kata Sandi Lama</label>
-                      <input 
-                        type="password" 
-                        name="old_password"
-                        required
-                        className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
-                      />
+                      <div className="relative">
+                        <input 
+                          type={showOldPassword ? "text" : "password"}
+                          name="old_password"
+                          required
+                          className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 pr-12 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowOldPassword(!showOldPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                        >
+                          <span className="material-symbols-outlined text-xl">
+                            {showOldPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Kata Sandi Baru</label>
-                      <input 
-                        type="password" 
-                        name="new_password"
-                        required
-                        minLength={6}
-                        className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
-                      />
+                      <div className="relative">
+                        <input 
+                          type={showNewPassword ? "text" : "password"}
+                          name="new_password"
+                          required
+                          minLength={6}
+                          className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 pr-12 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                        >
+                          <span className="material-symbols-outlined text-xl">
+                            {showNewPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Konfirmasi Kata Sandi Baru</label>
-                      <input 
-                        type="password" 
-                        name="confirm_password"
-                        required
-                        className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
-                      />
+                      <div className="relative">
+                        <input 
+                          type={showConfirmPassword ? "text" : "password"}
+                          name="confirm_password"
+                          required
+                          className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 pr-12 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                        >
+                          <span className="material-symbols-outlined text-xl">
+                            {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="pt-4">

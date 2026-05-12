@@ -38,6 +38,8 @@ export default function MembershipTiers() {
     min_total_transactions: 0,
     min_referrals: 0,
     min_performance_points: 0,
+    min_commission_depth: 1,
+    max_commission_depth: 1,
     color: '#6366f1',
     icon: 'military_tech',
     description: '',
@@ -90,7 +92,10 @@ export default function MembershipTiers() {
         min_monthly_turnover: parseFloat(modal.min_monthly_turnover),
         min_total_transactions: parseInt(modal.min_total_transactions),
         min_referrals: parseInt(modal.min_referrals),
-        min_performance_points: parseInt(modal.min_performance_points)
+        min_performance_points: parseInt(modal.min_performance_points),
+        min_commission_depth: parseInt(modal.min_commission_depth),
+        max_commission_depth: parseInt(modal.max_commission_depth),
+        max_commission_depth: parseInt(modal.max_commission_depth)
     };
 
     fetchJson(`${API}/membership-tiers/upsert`, { 
@@ -391,6 +396,11 @@ export default function MembershipTiers() {
                            {tier.min_referrals > 0 && <span>• {tier.min_referrals} Ref</span>}
                            {tier.min_performance_points > 0 && <span>• {tier.min_performance_points} Pts</span>}
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <span style={{ background: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+                            Kedalaman Komisi: {tier.min_commission_depth || 1} - {tier.max_commission_depth || 1} Level
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td style={A.td}>
@@ -662,6 +672,16 @@ export default function MembershipTiers() {
               </div>
 
               <div>
+                <FieldLabel>Min. Level Komisi</FieldLabel>
+                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_commission_depth} onChange={e => setModal({...modal, min_commission_depth: parseInt(e.target.value)})} required />
+              </div>
+
+              <div>
+                <FieldLabel>Max. Level Komisi</FieldLabel>
+                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.max_commission_depth} onChange={e => setModal({...modal, max_commission_depth: parseInt(e.target.value)})} required />
+              </div>
+
+              <div>
                 <FieldLabel>Min. Omset Bulanan</FieldLabel>
                 <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_monthly_turnover} onChange={e => setModal({...modal, min_monthly_turnover: e.target.value})} required />
               </div>
@@ -720,6 +740,7 @@ export default function MembershipTiers() {
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Aktifkan jenjang ini</span>
                 </label>
               </div>
+
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>

@@ -110,6 +110,7 @@ import SkinJourney from './pages/affiliate/SkinJourney';
 import SkinJourneyAdmin from './pages/admin/SkinJourneyAdmin';
 import PusatInventory from './pages/admin/PusatInventory';
 import SkinCommunity from './pages/SkinCommunity';
+import SkinCommunityAdmin from './pages/admin/SkinCommunityAdmin';
 import MembershipTiers from './pages/admin/MembershipTiers';
 import AdminReviews from './pages/admin/AdminReviews';
 import CommissionPresets from './pages/admin/CommissionPresets';
@@ -301,6 +302,7 @@ function AppContent() {
             <Route path="events" element={<AdminEvents />} />
             <Route path="promo" element={<AdminPromo />} />
             <Route path="skin-journey" element={<SkinJourneyAdmin />} />
+            <Route path="skin-community" element={<SkinCommunityAdmin />} />
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
             <Route path="membership-tiers" element={<MembershipTiers />} />

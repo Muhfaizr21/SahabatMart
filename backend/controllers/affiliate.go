@@ -126,6 +126,7 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		"affiliate": affiliateMember,
 		"stats": map[string]interface{}{
 			"balance":              wallet.Balance,
+			"shopping_balance":     wallet.ShoppingBalance,
 			"pending_commission":   wallet.PendingBalance,
 			"total_commission":     wallet.TotalEarned,
 			"paid_commission":      wallet.TotalWithdrawn,

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -141,6 +142,8 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 	}
 
 	body, _ := json.Marshal(payload)
+	log.Printf("📦 [Biteship Request Payload]: %s", string(body))
+
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
@@ -158,10 +161,10 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 		json.Unmarshal(respBody, &errBody)
 		log.Printf("⚠️ Biteship API Error (Status %d): %+v", resp.StatusCode, errBody)
 
-		// Fallback untuk mode development jika saldo habis
+		// Fallback untuk mode development jika terjadi error apa pun (misal: saldo habis, belum set kurir, dll)
 		errorMessage, _ := errBody["error"].(string)
-		if os.Getenv("GO_ENV") != "production" && strings.Contains(strings.ToLower(errorMessage), "balance") {
-			log.Println("💡 Insufficient balance detected. Returning mock rates for development...")
+		if os.Getenv("GO_ENV") != "production" {
+			log.Printf("💡 Development Mode: Biteship error detected ('%s'). Returning mock rates...", errorMessage)
 			return []map[string]interface{}{
 				{
 					"courier_name":            "JNE (Simulasi)",
@@ -337,7 +340,7 @@ func (s *ShippingService) GetTracking(biteshipOrderID string) (map[string]interf
 // HandleWebhook memproses update status dari Biteship
 func (s *ShippingService) HandleWebhook(payload map[string]interface{}) error {
 	log.Printf("[Biteship Webhook] Incoming payload: %+v", payload)
-	
+
 	event, ok := payload["event"].(string)
 	if !ok || event != "order.status_updated" {
 		log.Printf("[Biteship Webhook] Skipping event: %s", event)
@@ -347,8 +350,14 @@ func (s *ShippingService) HandleWebhook(payload map[string]interface{}) error {
 	biteshipOrderID, _ := payload["order_id"].(string)
 	status, _ := payload["status"].(string)
 
+	if biteshipOrderID == "" {
+		log.Println("[Biteship Webhook] Missing order_id, skipping.")
+		return nil
+	}
+
 	var group models.OrderMerchantGroup
 	if err := s.DB.First(&group, "biteship_order_id = ?", biteshipOrderID).Error; err != nil {
+		log.Printf("[Biteship Webhook] Group not found for biteship_order_id=%s: %v", biteshipOrderID, err)
 		return err
 	}
 
@@ -364,13 +373,39 @@ func (s *ShippingService) HandleWebhook(payload map[string]interface{}) error {
 		newStatus = models.MOrderCancelled
 	}
 
-	if newStatus != group.Status {
-		group.Status = newStatus
-		if err := s.DB.Save(&group).Error; err != nil {
-			return err
+	if newStatus == group.Status {
+		log.Printf("[Biteship Webhook] No status change for group %s (status: %s)", group.ID, group.Status)
+		return nil
+	}
+
+	group.Status = newStatus
+
+	// Set timestamps
+	now := time.Now()
+	if newStatus == models.MOrderShipped {
+		group.ShippedAt = &now
+	} else if newStatus == models.MOrderDelivered {
+		group.DeliveredAt = &now
+	}
+
+	if err := s.DB.Save(&group).Error; err != nil {
+		return err
+	}
+
+	log.Printf("[Biteship Webhook] Group %s updated to status: %s", group.ID, newStatus)
+
+	// Trigger settlement countdown when delivered (same as manual update flow)
+	if newStatus == models.MOrderDelivered {
+		financeService := NewFinanceService(s.DB)
+		if err := financeService.UpdateSettlementDatesOnDelivery(s.DB, group.OrderID); err != nil {
+			log.Printf("⚠️ [Biteship Webhook] Failed to update settlement dates for order %s: %v", group.OrderID, err)
 		}
-		
-		// Logic to update parent Order status if all groups are completed...
+	}
+
+	// Sync parent Order status from all groups
+	orderService := NewOrderService(s.DB)
+	if err := orderService.SyncOrderStatusFromGroups(s.DB, group.OrderID); err != nil {
+		log.Printf("⚠️ [Biteship Webhook] Failed to sync parent order status for %s: %v", group.OrderID, err)
 	}
 
 	return nil

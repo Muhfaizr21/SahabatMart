@@ -21,6 +21,9 @@ func (s *ConfigService) Get(key string, defaultValue string) string {
 	if err := s.DB.Where("key = ?", key).First(&cfg).Error; err != nil {
 		return defaultValue
 	}
+	if cfg.Value == "" {
+		return defaultValue
+	}
 	return cfg.Value
 }
 
@@ -71,6 +74,8 @@ func (s *ConfigService) SeedFinancialConfigs() {
 		{Key: "payout_min_amount", Value: "50000", Description: "Minimum jumlah penarikan dana"},
 		{Key: "settlement_delay_hours", Value: "24", Description: "Penundaan pencairan dana setelah barang sampai (jam)"},
 		{Key: "platform_fee_percent", Value: "5", Description: "Persentase biaya layanan platform (%)"},
+		{Key: "affiliate_withdraw_pct", Value: "70", Description: "Porsi Komisi Bisa Ditarik (%)"},
+		{Key: "affiliate_shopping_pct", Value: "30", Description: "Porsi Komisi Untuk Belanja (%)"},
 	}
 
 	for _, c := range configs {

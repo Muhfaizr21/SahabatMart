@@ -79,6 +79,7 @@ const rawMenu = [
       { name: 'Edukasi Afiliasi', path: '/admin/education', perm: 'content_education' },
       { name: 'Event Afiliasi', path: '/admin/events', perm: 'content_event' },
       { name: 'Bahan Promosi', path: '/admin/promo', perm: 'content_promo_material' },
+      { name: 'Komunitas Skin', path: '/admin/skin-community', perm: 'content_education' },
     ]
   },
 

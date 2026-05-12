@@ -226,8 +226,18 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 	if nextTier.MinMonthlyTurnover > 0 && teamMonthlyTurnover < nextTier.MinMonthlyTurnover {
 		isTierEligible = false
 	}
+	if nextTier.MinTotalTransactions > 0 && affiliate.TotalConversions < nextTier.MinTotalTransactions {
+		isTierEligible = false
+	}
+	// Referrals = users who successfully linked using their code (this can be represented by totalJoined or a separate direct referrals count).
+	// Currently we will map MinReferrals to DirectMitra
+	var directMitraCount int64
+	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateMemberID).Count(&directMitraCount)
+	if nextTier.MinReferrals > 0 && directMitraCount < int64(nextTier.MinReferrals) {
+		isTierEligible = false
+	}
 
-	if isTierEligible && (nextTier.MinActiveMitra > 0 || nextTier.MinMonthlyTurnover > 0) {
+	if isTierEligible && (nextTier.MinActiveMitra > 0 || nextTier.MinMonthlyTurnover > 0 || nextTier.MinTotalTransactions > 0 || nextTier.MinReferrals > 0) {
 		if err := s.DB.Model(&affiliate).Update("membership_tier_id", nextTier.ID).Error; err != nil {
 			return err
 		}
