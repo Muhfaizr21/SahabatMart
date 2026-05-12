@@ -92,7 +92,7 @@ export default function AdminCommissions() {
         setModal(null); 
         toast.success('Aturan komisi berhasil disimpan!');
       }).catch(err => {
-        toast.error('Gagal menyimpan: ' + err.message);
+        toast.error('Gagal menyimpan: ' + _err.message);
       });
   };
 

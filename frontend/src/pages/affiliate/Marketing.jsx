@@ -19,8 +19,8 @@ export default function MarketingMaterials() {
       setAssets(res.data || []);
       setTotalPages(res.total_pages || 1);
       setPage(res.page || p);
-    } catch (err) {
-      console.error("Gagal memuat materi promo", err);
+    } catch (_err) {
+      console.error("Gagal memuat materi promo", _err);
     } finally {
       setLoading(false);
     }
@@ -32,7 +32,7 @@ export default function MarketingMaterials() {
     // Load affiliate profile for ref_code
     fetchJson(`${AFFILIATE_API_BASE}/profile`)
       .then(res => setAffiliate(res))
-      .catch(err => console.error("Gagal memuat profile affiliate", err));
+      .catch(err => console.error("Gagal memuat profile affiliate", _err));
   }, [fetchMaterials]);
 
   const handlePageChange = (p) => {

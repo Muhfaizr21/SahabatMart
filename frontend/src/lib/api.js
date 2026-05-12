@@ -40,7 +40,7 @@ export async function fetchJson(url, options = {}) {
       try {
         const data = await response.json();
         message = data?.message || message;
-      } catch (e) {
+      } catch (_e) {
         // If not JSON, ignore body
       }
       throw new Error(message);
@@ -52,7 +52,7 @@ export async function fetchJson(url, options = {}) {
     let result;
     try {
       result = JSON.parse(text);
-    } catch (e) {
+    } catch (_e) {
       console.error("Server returned non-JSON response:", text);
       throw new Error("Format respons server tidak valid");
     }
@@ -64,8 +64,8 @@ export async function fetchJson(url, options = {}) {
     }
     
     return result;
-  } catch (err) {
-    throw err;
+  } catch (_err) {
+    throw _err;
   }
 }
 
@@ -163,8 +163,8 @@ export async function captureAffiliate() {
         localStorage.setItem('affiliate_id', res.affiliate_id);
         console.log('✅ Affiliate Tracked:', res.affiliate_id);
       }
-    } catch (err) {
-      console.warn('⚠️ Affiliate tracking failed:', err);
+    } catch (_err) {
+      console.warn('⚠️ Affiliate tracking failed:', _err);
     }
   }
 }
@@ -182,8 +182,8 @@ export function subscribeToNotifications(userId, onMessage) {
     try {
       const data = JSON.parse(event.data);
       onMessage(data);
-    } catch (err) {
-      console.error('SSE Error:', err);
+    } catch (_err) {
+      console.error('SSE Error:', _err);
     }
   };
 

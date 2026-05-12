@@ -92,8 +92,8 @@ export default function MerchantDashboard() {
         });
 
         setProducts(prodList.slice(0, 4));
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
+      } catch (_err) {
+        console.error('Failed to load dashboard data:', _err);
       } finally {
         setLoading(false);
       }

@@ -192,8 +192,8 @@ const AdminLayout = () => {
           localStorage.setItem('user', JSON.stringify(res));
           setUser(res);
         }
-      } catch (err) {
-        console.error("Failed to sync user", err);
+      } catch (_err) {
+        console.error("Failed to sync user", _err);
       }
     };
     syncUser();
@@ -227,8 +227,8 @@ const AdminLayout = () => {
         setNotifs(data);
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
-    } catch (err) {
-      console.error("Failed to fetch notifs", err);
+    } catch (_err) {
+      console.error("Failed to fetch notifs", _err);
     }
   };
 

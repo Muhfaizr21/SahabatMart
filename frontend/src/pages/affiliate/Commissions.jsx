@@ -46,8 +46,8 @@ export default function AffiliateCommissions() {
       if (res.summary) {
         setSummary(res.summary);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
       toast.error('Gagal mengambil data komisi');
     } finally {
       setLoading(false);

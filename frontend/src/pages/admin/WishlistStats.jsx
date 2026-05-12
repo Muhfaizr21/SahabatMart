@@ -17,11 +17,11 @@ export default function WishlistStats() {
         setStats(data || []);
       })
       .catch(err => {
-        console.error("WISH-FETCH-ERROR:", err);
-        if (err.message === "Load failed") {
+        console.error("WISH-FETCH-ERROR:", _err);
+        if (_err.message === "Load failed") {
           toast.error('Gagal terhubung ke server (CORS/Down)');
         } else {
-          toast.error('Gagal mengambil data wishlist: ' + err.message);
+          toast.error('Gagal mengambil data wishlist: ' + _err.message);
         }
       })
       .finally(() => setLoading(false));

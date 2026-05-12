@@ -84,8 +84,8 @@ export default function ShopPage() {
         const likedMap = {};
         products.forEach(p => { likedMap[p.id] = true; });
         setLiked(likedMap);
-      } catch (err) {
-        console.error('Wishlist Fetch Error:', err);
+      } catch (_err) {
+        console.error('Wishlist Fetch Error:', _err);
       }
     };
     fetchWishlist();
@@ -104,8 +104,8 @@ export default function ShopPage() {
         body: JSON.stringify({ product_id: productId })
       });
       setLiked(prev => ({ ...prev, [productId]: res.saved }));
-    } catch (err) {
-      alert('Gagal mengelola wishlist: ' + err.message);
+    } catch (_err) {
+      alert('Gagal mengelola wishlist: ' + _err.message);
     }
   };
 
@@ -132,8 +132,8 @@ export default function ShopPage() {
       // Global sync for Navbar & others
       window.dispatchEvent(new Event('cartUpdate'));
       window.dispatchEvent(new Event('openCart'));
-    } catch (err) {
-      alert('Gagal menambah ke keranjang: ' + err.message);
+    } catch (_err) {
+      alert('Gagal menambah ke keranjang: ' + _err.message);
     }
   };
 

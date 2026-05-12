@@ -48,8 +48,8 @@ export default function AdminPromo() {
       } else {
         throw new Error('Format response tidak valid');
       }
-    } catch (err) {
-      toast.error(err.message);
+    } catch (_err) {
+      toast.error(_err.message);
     } finally {
       setUploading(false);
     }
@@ -66,7 +66,7 @@ export default function AdminPromo() {
       toast.success('Materi promo disimpan');
       setShowModal(false);
       loadData();
-    }).catch(err => toast.error(err.message))
+    }).catch(err => toast.error(_err.message))
     .finally(() => setSaving(false));
   };
 

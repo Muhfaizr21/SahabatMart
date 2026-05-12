@@ -38,8 +38,8 @@ export default function TeamPerformance() {
       setStats(teamRes);
       if (teamRes.pagination) setPagination(teamRes.pagination);
       if (eligRes) setEligibility(eligRes);
-    } catch (err) {
-      setError(err.message || 'Gagal memuat data tim');
+    } catch (_err) {
+      setError(_err.message || 'Gagal memuat data tim');
     } finally {
       setLoading(false);
     }

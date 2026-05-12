@@ -17,7 +17,7 @@ export default function BlogDetailPage() {
         const blog = d?.data || d;
         if (blog) setBlog(blog);
       })
-      .catch(err => console.error(err))
+      .catch(err => console.error(_err))
       .finally(() => setLoading(false));
 
     // Fetch latest posts for sidebar
@@ -27,7 +27,7 @@ export default function BlogDetailPage() {
         // BUG-06 fix: filter by slug (same type as URL param id), fallback to string id
         setLatestPosts(posts.filter(p => (p.slug || String(p.id)) !== id).slice(0, 5));
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error(_err));
   }, [id]);
 
   if (loading) {

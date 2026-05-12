@@ -23,8 +23,8 @@ export default function ProfilePage() {
       link.download = `AkuGlow-Member-${userData.id.substring(0, 8)}.png`;
       link.href = dataUrl;
       link.click();
-    } catch (err) {
-      console.error('Download failed', err);
+    } catch (_err) {
+      console.error('Download failed', _err);
     } finally {
       setIsDownloading(false);
     }
@@ -69,9 +69,9 @@ export default function ProfilePage() {
       const res = await fetchJson(`${BUYER_API_BASE}/profile`);
       setUserData(res.user);
       setOrders(res.orders || []);
-    } catch (err) {
-      console.error(err);
-      if (err.message.includes('401')) {
+    } catch (_err) {
+      console.error(_err);
+      if (_err.message.includes('401')) {
         localStorage.removeItem('token');
         navigate('/login');
       }
@@ -144,8 +144,8 @@ export default function ProfilePage() {
       });
       alert('Profil berhasil diperbarui!');
       loadProfile();
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     } finally {
       setSaving(false);
     }
@@ -176,8 +176,8 @@ export default function ProfilePage() {
           body: JSON.stringify(updatedFormData)
         });
       }
-    } catch (err) {
-      alert("Gagal mengupload foto: " + err.message);
+    } catch (_err) {
+      alert("Gagal mengupload foto: " + _err.message);
     } finally {
       setUploadingAvatar(false);
     }
@@ -189,8 +189,8 @@ export default function ProfilePage() {
     try {
       const res = await fetchJson(`${BUYER_API_BASE}/shipping/areas?input=${input}`);
       setAreas(res.areas || []);
-    } catch (err) {
-      console.error('Area search failed:', err);
+    } catch (_err) {
+      console.error('Area search failed:', _err);
     } finally {
       setSearchingArea(false);
     }
@@ -586,8 +586,8 @@ export default function ProfilePage() {
                         });
                         alert('Password berhasil diubah!');
                         e.target.reset();
-                      } catch (err) {
-                        alert(err.message);
+                      } catch (_err) {
+                        alert(_err.message);
                       }
                     }}
                   >

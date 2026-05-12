@@ -51,8 +51,8 @@ export default function AffiliateStatus() {
     try {
       await fetchJson(`${AFFILIATE_API_BASE}/apply-merchant`, { method: 'POST' });
       setSuccessMsg('Permohonan berhasil dikirim! Admin akan menghubungi Anda.');
-    } catch (err) {
-      alert('Gagal mengajukan: ' + err.message);
+    } catch (_err) {
+      alert('Gagal mengajukan: ' + _err.message);
     } finally {
       setApplying(false);
     }

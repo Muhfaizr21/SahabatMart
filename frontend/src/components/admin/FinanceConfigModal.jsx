@@ -41,7 +41,7 @@ export default function FinanceConfigModal({ isOpen, onClose, onRefresh }) {
       setPlatformFee(res.config?.platform_fee_percent || 5);
       setGrossRevenue(res.gross_revenue || 0);
       setNetProfit(res.net_profit || 0);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Gagal memuat konfigurasi");
     } finally {
       setLoading(false);
@@ -72,7 +72,7 @@ export default function FinanceConfigModal({ isOpen, onClose, onRefresh }) {
         onRefresh();
         onClose();
       }
-    } catch (e) {
+    } catch (_e) {
       toast.error("Gagal update konfigurasi");
     } finally {
       setSaving(false);

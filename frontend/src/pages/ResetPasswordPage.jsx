@@ -41,8 +41,8 @@ export default function ResetPasswordPage() {
       setTimeout(() => {
         navigate('/login');
       }, 3000);
-    } catch (err) {
-      setError(err.message || 'Gagal mereset password.');
+    } catch (_err) {
+      setError(_err.message || 'Gagal mereset password.');
     } finally {
       setIsLoading(false);
     }

@@ -79,8 +79,8 @@ export default function SkinJourneyAdmin() {
 
       const prodRes = await fetchJson(`${API_BASE}/api/admin/products`);
       setProducts(prodRes.data || []);
-    } catch (err) {
-      console.error("Admin Load Error:", err);
+    } catch (_err) {
+      console.error("Admin Load Error:", _err);
       toast.error('Gagal memuat data monitoring');
     } finally {
       setLoading(false);
@@ -149,7 +149,7 @@ export default function SkinJourneyAdmin() {
       toast.success('Materi edukasi berhasil diterbitkan!');
       setShowAddEdu(false);
       loadData();
-    } catch (err) { toast.error('Gagal menyimpan materi.'); }
+    } catch (_err) { toast.error('Gagal menyimpan materi.'); }
   };
 
   const handleAddPretest = async () => {
@@ -161,7 +161,7 @@ export default function SkinJourneyAdmin() {
       toast.success('Journey member berhasil didaftarkan!');
       setShowAddPretest(false);
       loadData();
-    } catch (err) { toast.error('Gagal menambah journey member'); }
+    } catch (_err) { toast.error('Gagal menambah journey member'); }
   };
 
   // --- 4-FLOW ADMIN HANDLERS ---
@@ -183,7 +183,7 @@ export default function SkinJourneyAdmin() {
       setFaqData(detail.faqs || []);
       setProductStepData(detail.product_steps || []);
       setWizardStep(1);
-    } catch (err) {
+    } catch (_err) {
       toast.error("Gagal memuat detail program");
     } finally {
       setLoading(false);
@@ -206,7 +206,7 @@ export default function SkinJourneyAdmin() {
       toast.success("Flow 1: Program Initiation Saved!");
       setWizardStep(2);
       loadData();
-    } catch (err) { toast.error("Gagal simpan Flow 1"); }
+    } catch (_err) { toast.error("Gagal simpan Flow 1"); }
   };
 
   const handleSaveFlow2 = async () => {
@@ -221,7 +221,7 @@ export default function SkinJourneyAdmin() {
       await Promise.all(promises);
       toast.success("Flow 2: Detailed Descriptions Saved!");
       setWizardStep(3);
-    } catch (err) { toast.error("Gagal simpan Flow 2 detail"); }
+    } catch (_err) { toast.error("Gagal simpan Flow 2 detail"); }
   };
 
   const handleSaveFlow3And4 = async () => {
@@ -260,9 +260,9 @@ export default function SkinJourneyAdmin() {
       setWizardStep(0);
       setActiveProgram(null);
       loadData();
-    } catch (err) { 
-      console.error("Save Flow 3/4 Error:", err);
-      toast.error(`Gagal simpan Flow 3/4: ${err.message}`); 
+    } catch (_err) { 
+      console.error("Save Flow 3/4 Error:", _err);
+      toast.error(`Gagal simpan Flow 3/4: ${_err.message}`); 
     }
   };
 
@@ -272,7 +272,7 @@ export default function SkinJourneyAdmin() {
       await fetchJson(`${API_BASE}/api/admin/skin/programs/delete?id=${id}`, { method: 'DELETE' });
       toast.success('Program dihapus.');
       loadData();
-    } catch (err) { toast.error('Gagal menghapus.'); }
+    } catch (_err) { toast.error('Gagal menghapus.'); }
   };
 
   const handleDeleteStep = async (id) => {
@@ -281,7 +281,7 @@ export default function SkinJourneyAdmin() {
       await fetchJson(`${API_BASE}/api/admin/skin/steps/delete?id=${id}`, { method: 'DELETE' });
       toast.success('Step dihapus.');
       loadData();
-    } catch (err) { toast.error('Gagal menghapus.'); }
+    } catch (_err) { toast.error('Gagal menghapus.'); }
   };
 
   const handleDeleteRoutine = async (id) => {
@@ -290,7 +290,7 @@ export default function SkinJourneyAdmin() {
       await fetchJson(`${API_BASE}/api/admin/skin/routines/delete?id=${id}`, { method: 'DELETE' });
       toast.success('Langkah routine dihapus.');
       loadData();
-    } catch (err) { toast.error('Gagal menghapus.'); }
+    } catch (_err) { toast.error('Gagal menghapus.'); }
   };
 
   const handleDeleteMapping = async (id) => {
@@ -299,7 +299,7 @@ export default function SkinJourneyAdmin() {
       await fetchJson(`${API_BASE}/api/admin/skin/product-mappings/delete?id=${id}`, { method: 'DELETE' });
       toast.success('Mapping dihapus.');
       loadData();
-    } catch (err) { toast.error('Gagal menghapus.'); }
+    } catch (_err) { toast.error('Gagal menghapus.'); }
   };
 
 

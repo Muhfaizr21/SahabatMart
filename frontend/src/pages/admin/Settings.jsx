@@ -196,8 +196,8 @@ export default function AdminSettings() {
                 });
                 alert('Password berhasil diubah!');
                 e.target.reset();
-              } catch (err) {
-                alert(err.message);
+              } catch (_err) {
+                alert(_err.message);
               } finally {
                 setSaving(false);
               }

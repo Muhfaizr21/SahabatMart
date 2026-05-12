@@ -65,8 +65,8 @@ export default function AffiliateSettings() {
         bank_account_name: aff.bank_account_name || '',
         postback_url: aff.postback_url || '',
       });
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setLoading(false);
     }
@@ -97,8 +97,8 @@ export default function AffiliateSettings() {
         });
         toast('Foto profil berhasil diperbarui!');
       }
-    } catch (err) {
-      toast('Gagal upload foto: ' + err.message, 'error');
+    } catch (_err) {
+      toast('Gagal upload foto: ' + _err.message, 'error');
     } finally {
       setUploadingAvatar(false);
     }
@@ -113,8 +113,8 @@ export default function AffiliateSettings() {
         body: JSON.stringify(form),
       });
       toast('Profil berhasil diperbarui!');
-    } catch (err) {
-      toast(err.message || 'Gagal menyimpan', 'error');
+    } catch (_err) {
+      toast(_err.message || 'Gagal menyimpan', 'error');
     } finally {
       setSaving(false);
     }

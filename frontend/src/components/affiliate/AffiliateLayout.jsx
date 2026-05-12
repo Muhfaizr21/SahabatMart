@@ -119,7 +119,7 @@ const AffiliateLayout = () => {
         setNotifications(data);
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
-    } catch (e) {
+    } catch (_e) {
       console.error('Failed to fetch notifications:', e);
     }
   };
@@ -128,7 +128,7 @@ const AffiliateLayout = () => {
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/profile`);
       if (res?.status === 'success') setLiveProfile(res.affiliate);
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   useEffect(() => {
@@ -145,7 +145,7 @@ const AffiliateLayout = () => {
         if (payload.type === 'notification') {
           fetchNotifs(); // Refresh list on new notif
         }
-      } catch (err) {}
+      } catch (_err) {}
     };
 
     return () => sse.close();
@@ -155,14 +155,14 @@ const AffiliateLayout = () => {
     try {
       await fetchJson(`${AFFILIATE_API_BASE}/notifications/read?id=${id}`, { method: 'POST' });
       fetchNotifs();
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const markAllAsRead = async () => {
     try {
       await fetchJson(`${AFFILIATE_API_BASE}/notifications/read-all`, { method: 'POST' });
       fetchNotifs();
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const deleteNotif = async (e, id) => {
@@ -170,7 +170,7 @@ const AffiliateLayout = () => {
     try {
       await fetchJson(`${AFFILIATE_API_BASE}/notifications/delete?id=${id}`, { method: 'DELETE' });
       fetchNotifs();
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const deleteAllNotifs = async () => {
@@ -178,7 +178,7 @@ const AffiliateLayout = () => {
     try {
       await fetchJson(`${AFFILIATE_API_BASE}/notifications/all`, { method: 'DELETE' });
       fetchNotifs();
-    } catch (e) {}
+    } catch (_e) {}
   };
 
   const sidebarRef = React.useRef(null);

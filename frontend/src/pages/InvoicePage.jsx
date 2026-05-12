@@ -15,8 +15,8 @@ export default function InvoicePage() {
         setLoading(true);
         const res = await fetchJson(`${BUYER_API_BASE}/orders/detail?id=${id}`);
         setData(res);
-      } catch (err) {
-        console.error(err);
+      } catch (_err) {
+        console.error(_err);
         toast.error("Gagal memuat invoice");
       } finally {
         setLoading(false);

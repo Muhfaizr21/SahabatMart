@@ -51,7 +51,7 @@ export default function SkinCommunity() {
     try {
       const data = await fetchJson(`${API_BASE}/api/skin/community/groups`);
       if (data) setGroups(data);
-    } catch (err) { console.error(err); }
+    } catch (_err) { console.error(_err); }
   };
 
   const loadFeed = async () => {
@@ -60,7 +60,7 @@ export default function SkinCommunity() {
       const url = activeFilter ? `${API_BASE}/api/skin/community?group_id=${activeFilter}` : `${API_BASE}/api/skin/community`;
       const data = await fetchJson(url);
       if (data) setPosts(data);
-    } catch (err) { toast.error('Gagal memuat feed'); }
+    } catch (_err) { toast.error('Gagal memuat feed'); }
     finally { setLoading(false); }
   };
 
@@ -141,7 +141,7 @@ export default function SkinCommunity() {
         setPreviewUrl('');
         toast.success('Postingan Terkirim!');
       }
-    } catch (err) { toast.error('Gagal mengirim postingan'); }
+    } catch (_err) { toast.error('Gagal mengirim postingan'); }
     finally { setIsPosting(false); }
   };
 
@@ -149,7 +149,7 @@ export default function SkinCommunity() {
     try {
       await fetchJson(`${API_BASE}/api/skin/community/like?id=${postId}`, { method: 'POST' });
       setPosts(posts.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
-    } catch (err) { toast.error('Gagal menyukai'); }
+    } catch (_err) { toast.error('Gagal menyukai'); }
   };
 
   const handleComment = async (postId) => {
@@ -166,7 +166,7 @@ export default function SkinCommunity() {
         setCommentInputs({ ...commentInputs, [postId]: '' });
         toast.success('Balasan terkirim');
       }
-    } catch (err) { toast.error('Gagal mengirim balasan'); }
+    } catch (_err) { toast.error('Gagal mengirim balasan'); }
   };
 
   const handleDeletePost = async (postId) => {
@@ -175,7 +175,7 @@ export default function SkinCommunity() {
       await fetchJson(`${API_BASE}/api/skin/community/post/delete?id=${postId}`, { method: 'DELETE' });
       setPosts(posts.filter(p => p.id !== postId));
       toast.success('Postingan dihapus');
-    } catch (err) { toast.error('Gagal menghapus postingan'); }
+    } catch (_err) { toast.error('Gagal menghapus postingan'); }
   };
 
   const handleDeleteComment = async (postId, commentId) => {
@@ -187,7 +187,7 @@ export default function SkinCommunity() {
         comments: p.comments.filter(c => c.id !== commentId) 
       } : p));
       toast.success('Balasan dihapus');
-    } catch (err) { toast.error('Gagal menghapus balasan'); }
+    } catch (_err) { toast.error('Gagal menghapus balasan'); }
   };
 
   return (

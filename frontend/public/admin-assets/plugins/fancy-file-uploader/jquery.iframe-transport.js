@@ -50,7 +50,7 @@
     if (options.async) {
       // javascript:false as initial iframe src
       // prevents warning popups on HTTPS in IE6:
-      // eslint-disable-next-line no-script-url
+       
       var initialIframeSrc = options.initialIframeSrc || 'javascript:false;',
         form,
         iframe,

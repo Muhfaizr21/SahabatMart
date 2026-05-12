@@ -40,8 +40,8 @@ const AdminPOS = () => {
           toast.success(`${p.name} ditambahkan`);
         }
       }
-    } catch (err) {
-      console.error('POS Fetch Error:', err);
+    } catch (_err) {
+      console.error('POS Fetch Error:', _err);
       toast.error('Gagal mengambil produk');
     } finally {
       setLoading(false);
@@ -63,7 +63,7 @@ const AdminPOS = () => {
       try {
         const url = new URL(code);
         code = url.searchParams.get('ref') || code;
-      } catch (e) {
+      } catch (_e) {
         // Fallback for malformed URLs
         const parts = code.split('ref=');
         code = parts[parts.length - 1].split(/[&?#]/)[0];
@@ -79,9 +79,9 @@ const AdminPOS = () => {
       setMemberCode('');
       setIsMemberScanning(false);
       toast.success(`Member: ${data.full_name}`);
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || 'Member tidak ditemukan');
+    } catch (_err) {
+      console.error(_err);
+      toast.error(_err.message || 'Member tidak ditemukan');
     }
   };
 
@@ -169,7 +169,7 @@ const AdminPOS = () => {
       } else {
         toast.error('Produk tidak ditemukan');
       }
-    } catch (err) { console.error(err); }
+    } catch (_err) { console.error(_err); }
   };
 
   useEffect(() => {
@@ -183,7 +183,7 @@ const AdminPOS = () => {
         config, 
         (text) => handleCameraScan(text)
       ).catch(err => {
-        console.error("Camera start error:", err);
+        console.error("Camera start error:", _err);
         toast.error("Gagal membuka kamera. Pastikan izin diberikan.");
       });
 
@@ -232,9 +232,9 @@ const AdminPOS = () => {
       setSearch('');
       setMember(null);
       toast.success('Checkout Berhasil!');
-    } catch (err) {
-      console.error('Checkout Error:', err);
-      toast.error('Gagal memproses checkout: ' + err.message);
+    } catch (_err) {
+      console.error('Checkout Error:', _err);
+      toast.error('Gagal memproses checkout: ' + _err.message);
     } finally {
       setProcessing(false);
     }

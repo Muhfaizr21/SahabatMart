@@ -21,8 +21,8 @@ export default function SkinCommunityAdmin() {
       ]);
       setGroups(g || []);
       setAllPosts(ap || []);
-    } catch (err) {
-      console.error("Admin Load Error:", err);
+    } catch (_err) {
+      console.error("Admin Load Error:", _err);
       toast.error('Gagal memuat data komunitas');
     } finally {
       setLoading(false);
@@ -40,7 +40,7 @@ export default function SkinCommunityAdmin() {
       toast.success('Grup Komunitas baru aktif!');
       setShowAddGroup(false);
       loadData();
-    } catch (err) { toast.error('Gagal membuat grup.'); }
+    } catch (_err) { toast.error('Gagal membuat grup.'); }
   };
 
   const handleDeletePost = async (id) => {
@@ -49,7 +49,7 @@ export default function SkinCommunityAdmin() {
       await fetchJson(`${API_BASE}/api/skin/community/post/delete?id=${id}`, { method: 'DELETE' });
       toast.success('Postingan berhasil dihapus dari feed.');
       loadData();
-    } catch (err) { toast.error('Gagal menghapus.'); }
+    } catch (_err) { toast.error('Gagal menghapus.'); }
   };
 
   const handleDeleteGroup = async (id) => {
@@ -58,7 +58,7 @@ export default function SkinCommunityAdmin() {
       await fetchJson(`${API_BASE}/api/admin/skin/community/group/delete?id=${id}`, { method: 'DELETE' });
       toast.success('Grup dihapus.');
       loadData();
-    } catch (err) { toast.error('Gagal menghapus grup.'); }
+    } catch (_err) { toast.error('Gagal menghapus grup.'); }
   };
 
   if (loading) return <div style={{ padding: 100, textAlign: 'center', color: '#94a3b8' }}>Synchronizing community data...</div>;

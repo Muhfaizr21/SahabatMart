@@ -28,8 +28,8 @@ export default function AdminReviews() {
       } else {
         setReviews([]);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
       alert("Gagal memuat ulasan");
     } finally {
       setLoading(false);
@@ -41,7 +41,7 @@ export default function AdminReviews() {
     try {
       await deleteJson(`${ADMIN_API_BASE}/reviews/delete?id=${id}`);
       fetchReviews();
-    } catch (err) {
+    } catch (_err) {
       alert("Gagal menghapus ulasan");
     }
   };

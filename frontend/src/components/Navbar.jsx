@@ -52,8 +52,8 @@ export default function Navbar() {
       if (wishlistData) {
         setWishCount(Array.isArray(wishlistData) ? wishlistData.length : (wishlistData.data?.length || 0));
       }
-    } catch (err) {
-      console.error('Navbar Sync Error:', err);
+    } catch (_err) {
+      console.error('Navbar Sync Error:', _err);
     }
   };
 
@@ -74,8 +74,8 @@ export default function Navbar() {
            if (payload.type === 'cart_update' || payload.type === 'wishlist_update' || payload.type === 'notification') {
              fetchCounts(); // Auto sync state navbar
            }
-         } catch (err) {
-           console.error('SSE Error:', err);
+         } catch (_err) {
+           console.error('SSE Error:', _err);
          }
        };
 

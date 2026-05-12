@@ -4,7 +4,7 @@
  * Copyright jQuery Foundation and other contributors; Licensed MIT */
 
 /* global define, require */
-/* eslint-disable no-param-reassign, new-cap, jsdoc/require-jsdoc */
+/* eslint-disable jsdoc/require-jsdoc */
 
 (function (factory) {
   'use strict';
@@ -59,7 +59,7 @@
   $.cleanData = (function (orig) {
     return function (elems) {
       var events, elem, i;
-      // eslint-disable-next-line eqeqeq
+       
       for (i = 0; (elem = elems[i]) != null; i++) {
         // Only trigger remove when necessary to save time
         events = $._data(elem, 'events');

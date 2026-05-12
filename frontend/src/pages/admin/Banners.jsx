@@ -49,7 +49,7 @@ export default function AdminBanners() {
       toast.success('Config banner berhasil disimpan');
       setShowModal(false);
       load();
-    }).catch(err => toast.error(err.message));
+    }).catch(err => toast.error(_err.message));
   };
 
   const deleteBanner = (id) => {

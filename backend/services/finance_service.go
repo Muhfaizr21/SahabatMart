@@ -3,8 +3,10 @@ package services
 import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/repositories"
+	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"gorm.io/gorm"
@@ -193,6 +195,51 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 		return err
 	}
 
+	// [Financial Sync] Auto-Sync Revenue/Outflow to Primary Bank Location
+	// If this is an inflow/outflow to Admin (Platform Revenue), update physical bank balance
+	if ownerType == models.WalletAdmin {
+		// INFLOW: Real money coming into the system
+		isPlatformInflow := amount > 0 && (txType == models.TxSaleRevenue || txType == models.TxRestockRevenue || txType == models.TxPlatformFee)
+		
+		// OUTFLOW: Physical money leaving the system (Withdrawals/Payouts)
+		// We ignore internal allocations (refType 'order' or 'affiliate_commission') because those are just digital moves
+		isPhysicalOutflow := amount < 0 && txType == models.TxPayoutOutflow && 
+			refType != "order" && refType != "affiliate_commission"
+
+		if isPlatformInflow || isPhysicalOutflow {
+			// Find primary financial location (e.g. Bank BCA)
+			var primaryLoc models.FinancialLocation
+			if err := tx.Where("is_primary = ?", true).First(&primaryLoc).Error; err == nil {
+				tx.Model(&primaryLoc).Update("balance", gorm.Expr("balance + ?", amount))
+				
+				// Record mutation for audit trail
+				now := time.Now()
+				mutType := "income"
+				mutCat := "Pendapatan Real-time"
+				if amount < 0 {
+					mutType = "expense"
+					mutCat = "Pengeluaran Payout"
+				}
+
+				tx.Create(&models.MoneyMutation{
+					ToLocationID: &primaryLoc.ID,
+					Amount:       math.Abs(amount),
+					Category:     mutCat,
+					Description:  fmt.Sprintf("Auto-Sync: %s", desc),
+					Type:         mutType,
+					Status:       "processed",
+					CreatedAt:    now,
+					ProcessedAt:  &now,
+				})
+			}
+
+			// [SNAPSHOT] Record exact allocation breakdown for this transaction
+			if isPlatformInflow {
+				s.RecordTransactionAllocation(tx, amount, refID, refType)
+			}
+		}
+	}
+
 	txn := &models.WalletTransaction{
 		WalletID:      wallet.ID,
 		Type:          txType,
@@ -303,6 +350,13 @@ func (s *FinanceService) UpdateSettlementDatesOnDelivery(tx *gorm.DB, orderID st
 
 
 func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error {
+	// [Idempotency] Check if already reversed
+	var existingRev models.WalletTransaction
+	if err := tx.Where("reference_id = ? AND reference_type = 'order_reversal'", orderID).First(&existingRev).Error; err == nil {
+		log.Printf("⚠️ Order %s already reversed, skipping ReverseDistribution", orderID)
+		return nil
+	}
+
 	var txs []models.WalletTransaction
 	
 	// Direct order transactions
@@ -368,6 +422,27 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 		if err := tx.Create(revTxn).Error; err != nil {
 			return err
 		}
+
+		// [Financial Sync] Reverse Bank Balance if it was a platform inflow
+		if wallet.OwnerType == models.WalletAdmin && txn.Amount > 0 && (txn.Type == models.TxSaleRevenue || txn.Type == models.TxRestockRevenue || txn.Type == models.TxPlatformFee) {
+			var primaryLoc models.FinancialLocation
+			if err := tx.Where("is_primary = ?", true).First(&primaryLoc).Error; err == nil {
+				tx.Model(&primaryLoc).Update("balance", gorm.Expr("balance - ?", txn.Amount))
+				
+				// Record reversal mutation
+				now := time.Now()
+				tx.Create(&models.MoneyMutation{
+					ToLocationID: &primaryLoc.ID,
+					Amount:       txn.Amount,
+					Category:     "Pembalasan Pendapatan",
+					Description:  fmt.Sprintf("Auto-Reverse: %s", txn.Description),
+					Type:         "expense",
+					Status:       "processed",
+					CreatedAt:    now,
+					ProcessedAt:  &now,
+				})
+			}
+		}
 	}
 
 	// [SYNC] Mark all commissions for this order as cancelled
@@ -394,3 +469,46 @@ func (s *FinanceService) SyncPlatformLedger() (*PlatformLedger, error) {
 	
 	return &ledger, nil
 }
+
+// RecordTransactionAllocation snapshots the profit distribution configuration for a specific transaction.
+func (s *FinanceService) RecordTransactionAllocation(tx *gorm.DB, gross float64, refID, refType string) {
+	var dsCfg, psCfg models.PlatformConfig
+	var dsList, psList []map[string]interface{}
+	if err := tx.Where("key = ?", "finance_data_saving_list").First(&dsCfg).Error; err == nil {
+		json.Unmarshal([]byte(dsCfg.Value), &dsList)
+	}
+	if err := tx.Where("key = ?", "finance_profit_share_list").First(&psCfg).Error; err == nil {
+		json.Unmarshal([]byte(psCfg.Value), &psList)
+	}
+
+	allocMap := make(map[string]float64)
+	totalSaving := 0.0
+	for _, it := range dsList {
+		pct, _ := it["percent"].(float64)
+		val := gross * pct / 100.0
+		allocMap[it["name"].(string)] = val
+		totalSaving += val
+	}
+	netProfit := gross - totalSaving
+	totalPSValue := 0.0
+	for _, it := range psList {
+		pct, _ := it["percent"].(float64)
+		val := netProfit * pct / 100.0
+		allocMap[it["name"].(string)] = val
+		totalPSValue += val
+	}
+	// Always include Retained Earnings (Laba Ditahan)
+	allocMap["Laba Ditahan"] = netProfit - totalPSValue
+
+	b, _ := json.Marshal(allocMap)
+	tx.Create(&models.FinanceRevenueAllocation{
+		Period:      time.Now().Format("2006-01"),
+		SourceType:  refType,
+		SourceID:    refID,
+		SourceHash:  fmt.Sprintf("%s_%s_%d", refType, refID, time.Now().Unix()),
+		GrossAmount: gross,
+		Allocation:  string(b),
+		CreatedAt:   time.Now(),
+	})
+}
+

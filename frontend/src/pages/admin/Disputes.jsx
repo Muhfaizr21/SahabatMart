@@ -28,7 +28,7 @@ export default function AdminDisputes() {
       body:JSON.stringify({ id:selected.id, status:decision.status, decision_note:decision.note, decided_by:'judicial-admin' }),
     }).then(() => {
       load(); setSelected(null); setDecision({ status:'refund_approved', note:'' });
-    }).catch(err => alert(err.message))
+    }).catch(err => alert(_err.message))
     .finally(() => setSubmitting(false));
   };
 

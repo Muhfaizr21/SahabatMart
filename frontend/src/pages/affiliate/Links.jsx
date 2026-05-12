@@ -38,8 +38,8 @@ export default function AffiliateLinks() {
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/links`);
       setLinks(Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []));
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setLoading(false);
     }
@@ -50,8 +50,8 @@ export default function AffiliateLinks() {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/products`);
       const dataArr = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
       setProducts(dataArr.slice(0, 50));
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     }
   }, []);
 
@@ -90,8 +90,8 @@ export default function AffiliateLinks() {
       setShowForm(false);
       setForm({ target_url: '', title: '', product_id: '' });
       fetchLinks();
-    } catch (err) {
-      toast(err.message || 'Gagal membuat link', 'error');
+    } catch (_err) {
+      toast(_err.message || 'Gagal membuat link', 'error');
     } finally {
       setCreating(false);
     }
@@ -103,8 +103,8 @@ export default function AffiliateLinks() {
       await fetchJson(`${AFFILIATE_API_BASE}/links/delete?id=${id}`, { method: 'DELETE' });
       toast('Link dihapus');
       fetchLinks();
-    } catch (err) {
-      toast(err.message, 'error');
+    } catch (_err) {
+      toast(_err.message, 'error');
     }
   };
 

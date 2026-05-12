@@ -39,8 +39,8 @@ export default function PusatInventory() {
       const lowStock = pList.filter(p => p.stock < 10).length;
       setStats({ totalItems, totalValue, lowStock });
 
-    } catch (err) {
-      console.error("Warehouse Sync Error:", err);
+    } catch (_err) {
+      console.error("Warehouse Sync Error:", _err);
       toast.error('Gagal sinkronisasi data gudang');
     } finally {
       setLoading(false);
@@ -108,8 +108,8 @@ export default function PusatInventory() {
       setShowInboundModal(false);
       loadAllData();
       setInboundForm({ supplier_id: '', reference_no: '', note: '', items: [{ product_id: '', quantity: 1, cost_price: 0 }] });
-    } catch (err) {
-      toast.error(err.message);
+    } catch (_err) {
+      toast.error(_err.message);
     }
   };
 
@@ -125,8 +125,8 @@ export default function PusatInventory() {
       setShowSupplierModal(false);
       loadAllData();
       setSupplierForm({ id: null, name: '', contact: '', phone: '', email: '', address: '' });
-    } catch (err) {
-      toast.error(err.message);
+    } catch (_err) {
+      toast.error(_err.message);
     }
   };
 
@@ -148,8 +148,8 @@ export default function PusatInventory() {
       await fetchJson(`${ADMIN_API_BASE}/warehouse/suppliers/delete/${id}`, { method: 'DELETE' });
       toast.success('Supplier dihapus!');
       loadAllData();
-    } catch (err) {
-      toast.error('Gagal menghapus supplier: ' + err.message);
+    } catch (_err) {
+      toast.error('Gagal menghapus supplier: ' + _err.message);
     }
   };
 

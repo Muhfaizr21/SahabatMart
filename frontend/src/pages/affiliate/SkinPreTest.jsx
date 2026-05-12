@@ -36,9 +36,9 @@ export default function SkinPreTest() {
         toast.success('Pendaftaran Skin Journey Berhasil!');
         setStep(4);
       }
-    } catch (err) {
-      toast.error(`Gagal menyimpan data pretest: ${err.message}`);
-      console.error('DEBUG PRETEST:', err);
+    } catch (_err) {
+      toast.error(`Gagal menyimpan data pretest: ${_err.message}`);
+      console.error('DEBUG PRETEST:', _err);
     } finally {
       setLoading(false);
     }

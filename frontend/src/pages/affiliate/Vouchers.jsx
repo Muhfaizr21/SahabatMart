@@ -16,8 +16,8 @@ export default function AffiliateVouchers() {
         setLoading(false);
       })
       .catch(err => {
-        console.error('Failed to fetch vouchers:', err);
-        setError(err.message);
+        console.error('Failed to fetch vouchers:', _err);
+        setError(_err.message);
         setLoading(false);
       });
   }, []);

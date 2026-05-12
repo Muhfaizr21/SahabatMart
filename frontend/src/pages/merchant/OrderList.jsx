@@ -37,8 +37,8 @@ export default function MerchantOrders() {
           completed: list.filter(o => o.status === 'completed').length
         });
       }
-    } catch (err) {
-      console.error('Failed to load orders:', err);
+    } catch (_err) {
+      console.error('Failed to load orders:', _err);
     } finally {
       setLoading(false);
     }
@@ -64,8 +64,8 @@ export default function MerchantOrders() {
       if (selectedOrder?.id === groupId) {
          setSelectedOrder(null);
       }
-    } catch (err) {
-      alert('Gagal update status: ' + err.message);
+    } catch (_err) {
+      alert('Gagal update status: ' + _err.message);
     } finally {
       setUpdating(null);
     }

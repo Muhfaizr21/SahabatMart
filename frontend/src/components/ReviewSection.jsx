@@ -43,7 +43,7 @@ export default function ReviewSection({ productID }) {
     try {
       const res = await fetchJson(`${PUBLIC_API_BASE.replace('/public', '')}/public/products/reviews?product_id=${productID}`);
       setReviews(res || []);
-    } catch (e) { console.error(e); }
+    } catch (_e) { console.error(_e); }
     setLoading(false);
   };
 
@@ -53,7 +53,7 @@ export default function ReviewSection({ productID }) {
       const res = await fetchJson(`${BUYER_API_BASE.replace('/buyer', '')}/buyer/products/can-review?product_id=${productID}`);
       setCanReview(res.can_review);
       setOrderID(res.order_id);
-    } catch (e) { console.error(e); }
+    } catch (_e) { console.error(_e); }
   };
 
   const handleSubmit = async (e) => {

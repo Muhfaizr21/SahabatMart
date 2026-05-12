@@ -51,8 +51,8 @@ export default function OrderDetailPage() {
       alert("Ulasan berhasil dikirim!");
       setReviewModalOpen(false);
       loadDetail(); // Refresh order data to update review buttons
-    } catch (err) {
-      alert(err.message || "Gagal mengirim ulasan, mungkin Anda sudah memberikan ulasan untuk produk ini.");
+    } catch (_err) {
+      alert(_err.message || "Gagal mengirim ulasan, mungkin Anda sudah memberikan ulasan untuk produk ini.");
     } finally {
       setSubmittingReview(false);
     }
@@ -63,8 +63,8 @@ export default function OrderDetailPage() {
       setLoading(true);
       const res = await fetchJson(`${BUYER_API_BASE}/orders/detail?id=${id}`);
       setData(res);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setLoading(false);
     }

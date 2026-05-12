@@ -15,9 +15,9 @@ export default function Events() {
       setEvents(res.data || []);
       setTotalPages(res.total_pages || 1);
       setPage(res.page || p);
-    } catch (err) {
-      console.error('Failed to fetch events:', err);
-      setError(err.message);
+    } catch (_err) {
+      console.error('Failed to fetch events:', _err);
+      setError(_err.message);
     } finally {
       setLoading(false);
     }

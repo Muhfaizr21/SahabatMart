@@ -60,7 +60,7 @@ export default function CheckoutPage() {
         const [cartData, profileData, channelsData, walletData] = await Promise.all([
           fetchJson(`${BUYER_API_BASE}/cart`),
           fetchJson(`${BUYER_API_BASE}/profile`),
-          fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels err:", e); return null; }),
+          fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels _err:", e); return null; }),
           fetchJson(`${BUYER_API_BASE}/wallet`).catch(e => null)
         ]);
 
@@ -137,8 +137,8 @@ export default function CheckoutPage() {
              setAreaSearch('');
           }
         }
-      } catch (err) {
-        console.error('Failed to pre-fill checkout:', err);
+      } catch (_err) {
+        console.error('Failed to pre-fill checkout:', _err);
       }
     };
     fetchCheckoutData();
@@ -195,8 +195,8 @@ export default function CheckoutPage() {
       } else {
         throw new Error("Format voucher tidak dikenali");
       }
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
       setAppliedVoucher(null);
     } finally {
       setCheckingVoucher(false);
@@ -209,8 +209,8 @@ export default function CheckoutPage() {
     try {
       const res = await fetchJson(`${API_BASE}/api/shipping/areas?input=${input}`);
       setAreas(res || []);
-    } catch (err) {
-      console.error('Area search failed:', err);
+    } catch (_err) {
+      console.error('Area search failed:', _err);
     } finally {
       setSearchingArea(false);
     }
@@ -271,8 +271,8 @@ export default function CheckoutPage() {
       const totalCost = Object.values(initialSelected).reduce((sum, r) => sum + (r?.price || 0), 0);
       setShippingCost(totalCost);
 
-    } catch (err) {
-      console.error('Fetch rates failed:', err);
+    } catch (_err) {
+      console.error('Fetch rates failed:', _err);
       setShippingRates({});
     } finally {
       setLoadingRates(false);
@@ -400,8 +400,8 @@ export default function CheckoutPage() {
           payment: res.payment 
         } 
       });
-    } catch (err) {
-      alert('Checkout gagal: ' + err.message);
+    } catch (_err) {
+      alert('Checkout gagal: ' + _err.message);
     } finally {
       setLoading(false);
     }

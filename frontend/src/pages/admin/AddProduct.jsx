@@ -115,8 +115,8 @@ export default function AdminAddProduct() {
       } else {
         throw new Error(responseData.message || 'Gagal mengunggah gambar');
       }
-    } catch (err) { 
-      toast.error('Upload gagal: ' + err.message); 
+    } catch (_err) { 
+      toast.error('Upload gagal: ' + _err.message); 
     } finally { 
       setUploading(false); 
     }
@@ -146,7 +146,7 @@ export default function AdminAddProduct() {
       navigate('/admin/products');
     })
     .catch(err => {
-      toast.error('Gagal: ' + err.message);
+      toast.error('Gagal: ' + _err.message);
     })
     .finally(() => setSaving(false));
   };

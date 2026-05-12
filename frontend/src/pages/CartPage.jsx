@@ -26,8 +26,8 @@ export default function CartPage() {
       
       const cartItems = resp.items || resp.Items || [];
       setItems(cartItems);
-    } catch (err) {
-      console.error('Cart Load Error:', err);
+    } catch (_err) {
+      console.error('Cart Load Error:', _err);
       setError('Gagal memuat keranjang');
     } finally {
       setLoading(false);
@@ -55,8 +55,8 @@ export default function CartPage() {
       });
       window.dispatchEvent(new Event('cartUpdate'));
       loadCart();
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     }
   };
 
@@ -69,8 +69,8 @@ export default function CartPage() {
       const cartData = await fetchJson(url, { method: 'DELETE' });
       window.dispatchEvent(new Event('cartUpdate'));
       setItems(prev => prev.filter(item => !(item.product_id === productId && item.product_variant_id === variantId)));
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     }
   };
 

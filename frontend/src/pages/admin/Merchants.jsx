@@ -79,7 +79,7 @@ export default function AdminMerchants() {
       alert('Merchant specific commission rate updated successfully.');
       setCommission({ ...commission, loading: false });
     }).catch(err => {
-      alert(err.message);
+      alert(_err.message);
       setCommission({ ...commission, loading: false });
     });
   };
@@ -103,7 +103,7 @@ export default function AdminMerchants() {
       }
       load();
     }).catch(err => {
-      alert("Gagal mengupdate status verifikasi: " + err.message);
+      alert("Gagal mengupdate status verifikasi: " + _err.message);
     }).finally(() => {
       setVerifying(false);
     });
@@ -119,8 +119,8 @@ export default function AdminMerchants() {
     try {
       const res = await fetchJson(`/api/shipping/areas?input=${input}`);
       setAreas(res.areas || []);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setSearchingArea(false);
     }

@@ -49,8 +49,8 @@ const MerchantLayout = () => {
       } else if (Array.isArray(res)) {
         setNotifications(res);
       }
-    } catch (err) {
-      console.error("Failed to fetch merchant notifs", err);
+    } catch (_err) {
+      console.error("Failed to fetch merchant notifs", _err);
     }
   };
 
@@ -64,8 +64,8 @@ const MerchantLayout = () => {
     try {
       await fetchJson(`${MERCHANT_API_BASE}/notifications/read-all`, { method: 'POST' });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    } catch (err) {
-      console.error("Failed to clear notifs", err);
+    } catch (_err) {
+      console.error("Failed to clear notifs", _err);
     }
   };
 
@@ -74,8 +74,8 @@ const MerchantLayout = () => {
     try {
       await fetchJson(`${MERCHANT_API_BASE}/notifications/all`, { method: 'DELETE' });
       setNotifications([]);
-    } catch (err) {
-      console.error("Failed to delete all notifs", err);
+    } catch (_err) {
+      console.error("Failed to delete all notifs", _err);
     }
   };
 
@@ -86,8 +86,8 @@ const MerchantLayout = () => {
         body: JSON.stringify({ id })
       });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-    } catch (err) {
-      console.error("Failed to read notif", err);
+    } catch (_err) {
+      console.error("Failed to read notif", _err);
     }
   };
 
@@ -96,8 +96,8 @@ const MerchantLayout = () => {
     try {
       await fetchJson(`${MERCHANT_API_BASE}/notifications/delete?id=${id}`, { method: 'DELETE' });
       setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (err) {
-      console.error("Failed to delete notif", err);
+    } catch (_err) {
+      console.error("Failed to delete notif", _err);
     }
   };
 

@@ -80,7 +80,7 @@ const AdminRBAC = () => {
             toast.success('Security Profile berhasil disinkronisasi');
             setShowRoleModal(false);
             loadData();
-        }).catch(err => toast.error(err.message));
+        }).catch(err => toast.error(_err.message));
     };
 
     const handleDeleteRole = (id) => {
@@ -89,7 +89,7 @@ const AdminRBAC = () => {
             .then(() => {
                 toast.success("Role berhasil dihapus");
                 loadData();
-            }).catch(err => toast.error(err.message));
+            }).catch(err => toast.error(_err.message));
     };
 
     const handleCloneRole = (role) => {
@@ -124,7 +124,7 @@ const AdminRBAC = () => {
             setNewUser(initialUserState);
             setSelectedUser(null);
             loadData();
-        }).catch(err => toast.error(err.message));
+        }).catch(err => toast.error(_err.message));
     };
 
     const handleEditUser = (user) => {
@@ -148,7 +148,7 @@ const AdminRBAC = () => {
         }).then(() => {
             toast.success(`Status admin diubah menjadi ${newStatus}`);
             loadData();
-        }).catch(err => toast.error(err.message));
+        }).catch(err => toast.error(_err.message));
     };
 
     const handleDeleteUser = (id) => {
@@ -157,7 +157,7 @@ const AdminRBAC = () => {
             .then(() => {
                 toast.success("Admin berhasil dihapus");
                 loadData();
-            }).catch(err => toast.error(err.message));
+            }).catch(err => toast.error(_err.message));
     };
 
     const toggleGroup = (groupName, select) => {

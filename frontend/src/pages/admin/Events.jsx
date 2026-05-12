@@ -39,7 +39,7 @@ export default function AdminEvents() {
       toast.success('Event disimpan');
       setShowModal(false);
       loadData();
-    }).catch(err => toast.error(err.message))
+    }).catch(err => toast.error(_err.message))
     .finally(() => setSaving(false));
   };
 

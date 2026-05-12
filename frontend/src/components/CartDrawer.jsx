@@ -17,8 +17,8 @@ export default function CartDrawer() {
       const resp = await fetchJson(`${BUYER_API_BASE}/cart`);
       const cartItems = resp.items || resp.Items || [];
       setItems(cartItems);
-    } catch (err) {
-      console.error('CartDrawer Load Error:', err);
+    } catch (_err) {
+      console.error('CartDrawer Load Error:', _err);
     } finally {
       setLoading(false);
     }
@@ -57,8 +57,8 @@ export default function CartDrawer() {
         })
       });
       window.dispatchEvent(new Event('cartUpdate'));
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     } finally {
       setActing(null);
     }
@@ -71,8 +71,8 @@ export default function CartDrawer() {
       
       await fetchJson(url, { method: 'DELETE' });
       window.dispatchEvent(new Event('cartUpdate'));
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     }
   };
 

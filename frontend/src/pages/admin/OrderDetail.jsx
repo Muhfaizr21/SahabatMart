@@ -36,7 +36,7 @@ export default function AdminOrderDetail() {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/orders/${id}`)
       .then(d => setOrder(d))
-      .catch(err => console.error(err))
+      .catch(err => console.error(_err))
       .finally(() => setLoading(false));
   };
 
@@ -51,7 +51,7 @@ export default function AdminOrderDetail() {
     }).then(() => {
       load();
       setNote('');
-    }).catch(err => alert(err.message))
+    }).catch(err => alert(_err.message))
       .finally(() => setUpdating(false));
   };
 
@@ -341,7 +341,7 @@ export default function AdminOrderDetail() {
                                   ))}
                                 </div>
                               );
-                            } catch (e) { return null; }
+                            } catch (_e) { return null; }
                           })()}
 
                           <div style={{

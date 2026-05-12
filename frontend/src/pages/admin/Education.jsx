@@ -33,7 +33,7 @@ export default function AdminEducation() {
         setFormData(prev => ({ ...prev, image_url: res.url }));
         toast.success('Gambar terunggah');
       }
-    } catch (err) { toast.error('Upload gagal'); }
+    } catch (_err) { toast.error('Upload gagal'); }
     finally { setUploading(false); }
   };
 
@@ -48,7 +48,7 @@ export default function AdminEducation() {
       toast.success(formData.id ? 'Materi diperbarui' : 'Materi ditambahkan');
       setShowModal(false);
       loadData();
-    }).catch(err => toast.error(err.message))
+    }).catch(err => toast.error(_err.message))
     .finally(() => setSaving(false));
   };
 
@@ -59,7 +59,7 @@ export default function AdminEducation() {
         toast.success('Materi dihapus');
         loadData();
       })
-      .catch(err => toast.error(err.message));
+      .catch(err => toast.error(_err.message));
   };
 
   return (

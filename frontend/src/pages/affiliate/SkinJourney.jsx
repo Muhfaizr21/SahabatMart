@@ -95,11 +95,11 @@ export default function SkinJourney() {
       try {
         const histData = await fetchJson(`${API_BASE}/api/skin/history`);
         setHistory(histData || []);
-      } catch (e) { console.error("History fetch error:", e); }
+      } catch (_e) { console.error("History fetch error:", e); }
       
       setShowSelector(false);
-    } catch (err) { 
-      console.error('Journey Fetch Error:', err);
+    } catch (_err) { 
+      console.error('Journey Fetch Error:', _err);
       toast.error('Gagal memuat data skin journey');
     } finally {
       setLoading(false);
@@ -111,8 +111,8 @@ export default function SkinJourney() {
     try {
       const data = await fetchJson(`${API_BASE}/api/skin/programs`);
       setPrograms(data);
-    } catch (err) {
-      console.error('Failed to fetch programs:', err);
+    } catch (_err) {
+      console.error('Failed to fetch programs:', _err);
     } finally {
       setLoadingPrograms(false);
     }
@@ -142,7 +142,7 @@ export default function SkinJourney() {
       toast.success('Program berhasil diaktifkan! ✨');
       await fetchJourney(); // Ensure we wait for fetch
       setLoading(false);
-    } catch (err) {
+    } catch (_err) {
       setLoading(false);
       toast.error('Gagal mengaktifkan program');
     }
@@ -171,7 +171,7 @@ export default function SkinJourney() {
         // Refresh to update EXP/Rank
         fetchJourney();
       }
-    } catch (err) {
+    } catch (_err) {
       toast.error('Gagal menyimpan progres');
     }
   };
@@ -184,7 +184,7 @@ export default function SkinJourney() {
       toast.success('Jurnal harian tersimpan!');
       setJournalText('');
       fetchJourney();
-    } catch (err) { toast.error('Gagal mengirim jurnal'); }
+    } catch (_err) { toast.error('Gagal mengirim jurnal'); }
     finally { setSavingJournal(false); }
   };
 
@@ -195,8 +195,8 @@ export default function SkinJourney() {
       await fetchJson(`${API_BASE}/api/skin/finish-program`, { method: 'POST' });
       toast.success('🎉 Selamat! Program kamu telah selesai!');
       fetchJourney();
-    } catch (err) {
-      toast.error(err.message || 'Gagal menyelesaikan program');
+    } catch (_err) {
+      toast.error(_err.message || 'Gagal menyelesaikan program');
     }
   };
 
@@ -284,8 +284,8 @@ export default function SkinJourney() {
             if (blob) resolve(blob);
             else reject(new Error("Gagal mengompres gambar"));
           }, 'image/jpeg', 0.85);
-        } catch (err) {
-          reject(err);
+        } catch (_err) {
+          reject(_err);
         }
       };
 
@@ -311,7 +311,7 @@ export default function SkinJourney() {
         let processedBlob;
         try {
           processedBlob = await processAndValidateImage(skinPhoto);
-        } catch (e) {
+        } catch (_e) {
           toast.error(e.message, { id: 'ai-analyze' });
           setAnalyzing(false);
           return;
@@ -345,8 +345,8 @@ export default function SkinJourney() {
         }
         
         toast.success('✨ Analisis AI selesai!', { id: 'ai-analyze' });
-      } catch (err) {
-        toast.error(err.message || 'Gagal menganalisis foto', { id: 'ai-analyze' });
+      } catch (_err) {
+        toast.error(_err.message || 'Gagal menganalisis foto', { id: 'ai-analyze' });
       } finally {
         setAnalyzing(false);
       }
@@ -373,8 +373,8 @@ export default function SkinJourney() {
       setSkinPhoto(null);
       setAiAnalysis(null);
       fetchJourney();
-    } catch (err) {
-      toast.error(err.message || 'Gagal menyimpan progres');
+    } catch (_err) {
+      toast.error(_err.message || 'Gagal menyimpan progres');
     } finally {
       setSavingProgress(false);
     }
@@ -394,7 +394,7 @@ export default function SkinJourney() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-    } catch (err) {
+    } catch (_err) {
       toast.error('Gagal mengakses kamera');
       setIsCameraActive(false);
     }
@@ -459,9 +459,9 @@ export default function SkinJourney() {
       link.click();
       
       toast.success('Sertifikat berhasil diunduh! ✨', { id: tid });
-    } catch (err) {
-      console.error("Download Error:", err);
-      toast.error(`Gagal mengunduh: ${err.message || 'Error teknis'}`, { id: tid });
+    } catch (_err) {
+      console.error("Download Error:", _err);
+      toast.error(`Gagal mengunduh: ${_err.message || 'Error teknis'}`, { id: tid });
     } finally {
       // Clear active certificate after a while
       setTimeout(() => setActiveCertificate(null), 1000);

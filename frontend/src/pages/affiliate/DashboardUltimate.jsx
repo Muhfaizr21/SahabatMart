@@ -39,8 +39,8 @@ export default function AffiliateDashboard() {
       setLoading(true);
       const res = await fetchJson(`${AFFILIATE_API_BASE}/dashboard`);
       setData(res);
-    } catch (err) {
-      console.error('Affiliate Dashboard Load Error:', err);
+    } catch (_err) {
+      console.error('Affiliate Dashboard Load Error:', _err);
       toast.error('Gagal memuat data dasbor');
     } finally {
       setLoading(false);
@@ -62,8 +62,8 @@ export default function AffiliateDashboard() {
       toast.success('Berhasil bergabung dengan tim!');
       setJoinRefCode('');
       fetchDashboardData();
-    } catch (err) {
-      toast.error(err.message || 'Gagal bergabung tim');
+    } catch (_err) {
+      toast.error(_err.message || 'Gagal bergabung tim');
     } finally {
       setJoining(false);
     }

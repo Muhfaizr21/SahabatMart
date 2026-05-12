@@ -18,9 +18,9 @@ export default function RestockModeration() {
     try {
       const data = await fetchJson(`${ADMIN_API_BASE}/merchants/restock?status=${filter}`);
       setRequests(data || []);
-    } catch (err) {
-      console.error(err);
-      toast.error('Gagal memuat data: ' + err.message);
+    } catch (_err) {
+      console.error(_err);
+      toast.error('Gagal memuat data: ' + _err.message);
     } finally {
       setLoading(false);
     }
@@ -53,8 +53,8 @@ export default function RestockModeration() {
       setNote('');
       setTrackingNumber('');
       load();
-    } catch (err) {
-      toast.error('Gagal: ' + err.message, { id: loadingToast });
+    } catch (_err) {
+      toast.error('Gagal: ' + _err.message, { id: loadingToast });
     }
   };
 

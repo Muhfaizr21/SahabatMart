@@ -39,7 +39,7 @@ export default function LoginPage() {
           localStorage.setItem('user', JSON.stringify(user));
           navigate(getRedirectPath(user), { replace: true });
       }).catch(err => {
-          setError('Gagal sinkronisasi data Google: ' + err.message);
+          setError('Gagal sinkronisasi data Google: ' + _err.message);
           setLoading(false);
       });
     }
@@ -64,8 +64,8 @@ export default function LoginPage() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       navigate(getRedirectPath(data.user), { replace: true });
-    } catch (err) {
-      setError(err.message);
+    } catch (_err) {
+      setError(_err.message);
     } finally {
       setLoading(false);
     }

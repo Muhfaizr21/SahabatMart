@@ -17,8 +17,8 @@ export default function RecommendedSection({
       try {
         const data = await fetchJson(`${PUBLIC_API_BASE}/products/recommended?limit=${limit}`);
         setRecommended(Array.isArray(data) ? data : (data.data || []));
-      } catch (err) {
-        console.error('Failed to load recommendations:', err);
+      } catch (_err) {
+        console.error('Failed to load recommendations:', _err);
       } finally {
         setLoading(false);
       }

@@ -21,8 +21,8 @@ export default function ForgotPasswordPage() {
       if (response.debug_token) {
         setDebugToken(response.debug_token);
       }
-    } catch (err) {
-      setError(err.message || 'Gagal mengirim instruksi reset password.');
+    } catch (_err) {
+      setError(_err.message || 'Gagal mengirim instruksi reset password.');
     } finally {
       setIsLoading(false);
     }

@@ -26,7 +26,7 @@ export default function MerchantInventory() {
       const data = await fetchJson(`${PUBLIC_API_BASE}/categories`);
       // API returns { data: [...] }
       setCategories(data.data || data || []);
-    } catch (err) { console.error('Failed to load categories'); }
+    } catch (_err) { console.error('Failed to load categories'); }
   };
 
   const loadProducts = async (targetPage = page) => {
@@ -44,8 +44,8 @@ export default function MerchantInventory() {
       const data = await fetchJson(`${MERCHANT_API_BASE}/products?${query}`);
       setProducts(data.data || []);
       setTotalPages(Math.ceil((data.total || 0) / limit) || 1);
-    } catch (err) {
-      console.error('Failed to load products:', err);
+    } catch (_err) {
+      console.error('Failed to load products:', _err);
     } finally {
       setLoading(false);
     }

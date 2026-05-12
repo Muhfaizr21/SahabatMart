@@ -128,7 +128,7 @@ export default function BusinessEducation() {
         setLoading(false);
       })
       .catch(err => {
-        console.error("Gagal memuat edukasi", err);
+        console.error("Gagal memuat edukasi", _err);
         setLoading(false);
       });
   }, []);

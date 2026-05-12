@@ -34,8 +34,8 @@ export default function StatusMitra() {
       
       setApplyResult({ success: true, message: 'Pengajuan berhasil dikirim! Silakan tunggu konfirmasi admin.' });
       setShowForm(false);
-    } catch (err) {
-      setApplyResult({ success: false, message: err.message });
+    } catch (_err) {
+      setApplyResult({ success: false, message: _err.message });
     } finally {
       setApplying(false);
     }

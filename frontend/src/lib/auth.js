@@ -8,8 +8,8 @@ export const getStoredUser = () => {
     const user = localStorage.getItem('user');
     if (!user) return null;
     return JSON.parse(user);
-  } catch (err) {
-    console.error('Failed to parse stored user', err);
+  } catch (_err) {
+    console.error('Failed to parse stored user', _err);
     return null;
   }
 };

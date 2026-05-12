@@ -43,8 +43,8 @@ export default function MerchantWallet() {
       setWithdrawAmount('');
       setWithdrawNote('');
       loadData();
-    } catch (err) {
-      alert("Gagal melakukan penarikan: " + err.message);
+    } catch (_err) {
+      alert("Gagal melakukan penarikan: " + _err.message);
     } finally {
       setRequesting(false);
     }

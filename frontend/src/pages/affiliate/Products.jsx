@@ -19,8 +19,8 @@ export default function AffiliateProducts() {
     try {
       const res = await fetchJson(`${AFFILIATE_API_BASE}/products`);
       setProducts(Array.isArray(res) ? res : []);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setLoading(false);
     }

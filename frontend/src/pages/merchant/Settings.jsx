@@ -31,8 +31,8 @@ const MerchantSettings = () => {
             setStore(res.data || res);
             setToast('Profil identitas berhasil diperbarui.');
             setTimeout(() => setToast(''), 4000);
-        } catch (err) {
-            alert('Update failed: ' + err.message);
+        } catch (_err) {
+            alert('Update failed: ' + _err.message);
         } finally {
             setSaving(false);
         }
@@ -44,8 +44,8 @@ const MerchantSettings = () => {
         try {
             const res = await fetchJson(`/api/shipping/areas?input=${input}`);
             setAreas(res.areas || []);
-        } catch (err) {
-            console.error('Area search failed:', err);
+        } catch (_err) {
+            console.error('Area search failed:', _err);
         } finally {
             setSearchingArea(true);
             setTimeout(() => setSearchingArea(false), 500);

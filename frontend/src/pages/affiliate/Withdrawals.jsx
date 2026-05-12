@@ -48,8 +48,8 @@ export default function AffiliateWithdrawals() {
       setBalance(dRes?.stats?.balance || 0);
       setShoppingBalance(dRes?.stats?.shopping_balance || 0);
       setConfig(cRes || {});
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setLoading(false);
     }
@@ -83,8 +83,8 @@ export default function AffiliateWithdrawals() {
       setAmount('');
       setShowForm(false);
       fetchData();
-    } catch (err) {
-      setError(err.message || 'Gagal mengirim permintaan');
+    } catch (_err) {
+      setError(_err.message || 'Gagal mengirim permintaan');
     } finally {
       setRequesting(false);
     }

@@ -74,7 +74,7 @@ export default function AdminAffiliates() {
         status: editMemberTier.new_status
       }),
     }).then(() => { load(); setEditMemberTier(null); })
-      .catch(err => alert(err.message || 'Gagal mengubah data member'))
+      .catch(err => alert(_err.message || 'Gagal mengubah data member'))
       .finally(() => setSaving(false));
   };
 

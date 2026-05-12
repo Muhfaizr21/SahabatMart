@@ -53,7 +53,7 @@ export default function ProductDetailPage() {
             console.log('Affiliate tracked:', res.affiliate_id);
           }
         })
-        .catch(err => console.error('Tracking failed:', err));
+        .catch(err => console.error('Tracking failed:', _err));
     }
   }, [id]);
 
@@ -119,8 +119,8 @@ export default function ProductDetailPage() {
             body: JSON.stringify({ product_id: productData.id, type: 'view' })
           }).catch(e => console.error('Tracking failed:', e));
         }
-      } catch (err) {
-        console.error(err);
+      } catch (_err) {
+        console.error(_err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -166,8 +166,8 @@ export default function ProductDetailPage() {
         method: 'POST',
         body: JSON.stringify({ product_id: product.id, type: 'click' })
       }).catch(() => {});
-    } catch (err) {
-      alert('Gagal menambah ke keranjang: ' + err.message);
+    } catch (_err) {
+      alert('Gagal menambah ke keranjang: ' + _err.message);
       setAddedToCart(false);
     }
   };
@@ -187,7 +187,7 @@ export default function ProductDetailPage() {
       try {
         const d = await fetchJson(`${BUYER_API_BASE}/wishlist/check?product_id=${id}`);
         if (!cancelled) setIsWishlisted(d.is_wishlisted);
-      } catch (e) { console.error('Wishlist check failed:', e); }
+      } catch (_e) { console.error('Wishlist check failed:', e); }
     };
     checkWish();
     return () => { cancelled = true; };

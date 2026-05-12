@@ -2,13 +2,16 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
-	"sort"
+
 	"gorm.io/gorm"
 )
 
@@ -198,65 +201,103 @@ func buildAllocMap(gross float64, dsList, psList []map[string]interface{}) (map[
 		totalSaving += val
 	}
 	netProfit := gross - totalSaving
+	totalPSValue := 0.0
 	for _, item := range psList {
 		pct := item["percent"].(float64)
-		allocMap[item["name"].(string)] = netProfit * pct / 100.0
+		val := netProfit * pct / 100.0
+		allocMap[item["name"].(string)] = val
+		totalPSValue += val
 	}
+
+	// [Crucial] Add Retained Earnings to the snapshot
+	allocMap["Laba Ditahan"] = netProfit - totalPSValue
+
 	return allocMap, netProfit
 }
 
-// ensureAllocations re-calculates per-period seeded allocations when config changes.
+// ensureAllocations ensures that a FinanceRevenueAllocation record exists for the given period.
+// If it doesn't exist, it clones the configuration from the previous period.
+// If it exists but the config changed, it updates the allocation JSON.
 func (fc *AdminFinanceController) ensureAllocations(period string) {
-	if period == "all" || period == "today" || period == "week" {
-		return // Don't bulk-recompute for wide ranges – too expensive
+	if period == "all" || period == "today" || period == "week" || len(period) != 7 {
+		return 
 	}
 
 	fc.DB.Transaction(func(tx *gorm.DB) error {
-		var dsCfg, psCfg models.PlatformConfig
-		var dsList, psList []map[string]interface{}
-		if err := tx.Where("key = ?", "finance_data_saving_list").First(&dsCfg).Error; err == nil {
-			json.Unmarshal([]byte(dsCfg.Value), &dsList)
-		}
-		if err := tx.Where("key = ?", "finance_profit_share_list").First(&psCfg).Error; err == nil {
-			json.Unmarshal([]byte(psCfg.Value), &psList)
-		}
-		if len(dsList) == 0 && len(psList) == 0 {
+		var alloc models.FinanceRevenueAllocation
+		err := tx.Where("period = ? AND source_type = 'period_summary'", period).First(&alloc).Error
+		
+		dsList, psList, _ := fc.loadConfig()
+		
+		if err != nil {
+			// Record NOT FOUND -> CLONING LOGIC
+			log.Printf("🆕 Period %s not found. Attempting to clone from previous period...", period)
+			
+			// Find previous period (YYYY-MM)
+			t, _ := time.Parse("2006-01", period)
+			prevPeriod := t.AddDate(0, -1, 0).Format("2006-01")
+			
+			var prevAlloc models.FinanceRevenueAllocation
+			if errPrev := tx.Where("period = ? AND source_type = 'period_summary'", prevPeriod).First(&prevAlloc).Error; errPrev == nil {
+				// Clone from previous
+				newAlloc := models.FinanceRevenueAllocation{
+					Period:      period,
+					SourceType:  "period_summary",
+					SourceID:    "auto_clone",
+					SourceHash:  "summary_" + period,
+					GrossAmount: 0, // Fresh month
+					Allocation:  prevAlloc.Allocation, // Copy the distribution map
+					CreatedAt:   time.Now(),
+				}
+				tx.Create(&newAlloc)
+			} else {
+				// No previous period? Use current config
+				newMap, _ := buildAllocMap(0, dsList, psList)
+				b, _ := json.Marshal(newMap)
+				newAlloc := models.FinanceRevenueAllocation{
+					Period:      period,
+					SourceType:  "period_summary",
+					SourceID:    "initial",
+					SourceHash:  "summary_" + period,
+					GrossAmount: 0,
+					Allocation:  string(b),
+					CreatedAt:   time.Now(),
+				}
+				tx.Create(&newAlloc)
+			}
 			return nil
 		}
 
-		var allocs []models.FinanceRevenueAllocation
-		tx.Where("period = ?", period).Find(&allocs)
+		// Record EXISTS -> SYNC LOGIC (Update if config changed)
+		var currentMap map[string]float64
+		json.Unmarshal([]byte(alloc.Allocation), &currentMap)
 
-		for _, alloc := range allocs {
-			var currentMap map[string]float64
-			json.Unmarshal([]byte(alloc.Allocation), &currentMap)
-
-			// Check if config changed (new categories added/removed/renamed)
-			configChanged := len(currentMap) != (len(dsList) + len(psList))
-			if !configChanged {
-				for _, item := range dsList {
-					if _, ok := currentMap[item["name"].(string)]; !ok {
-						configChanged = true
-						break
-					}
+		configChanged := len(currentMap) != (len(dsList) + len(psList))
+		if !configChanged {
+			for _, item := range dsList {
+				if _, ok := currentMap[item["name"].(string)]; !ok {
+					configChanged = true
+					break
 				}
-			}
-			if !configChanged {
-				for _, item := range psList {
-					if _, ok := currentMap[item["name"].(string)]; !ok {
-						configChanged = true
-						break
-					}
-				}
-			}
-
-			if configChanged {
-				newMap, _ := buildAllocMap(alloc.GrossAmount, dsList, psList)
-				b, _ := json.Marshal(newMap)
-				alloc.Allocation = string(b)
-				tx.Save(&alloc)
 			}
 		}
+		if !configChanged {
+			for _, item := range psList {
+				if _, ok := currentMap[item["name"].(string)]; !ok {
+					configChanged = true
+					break
+				}
+			}
+		}
+
+		if configChanged {
+			log.Printf("⚙️ Config changed for period %s. Updating allocations...", period)
+			newMap, _ := buildAllocMap(alloc.GrossAmount, dsList, psList)
+			b, _ := json.Marshal(newMap)
+			alloc.Allocation = string(b)
+			tx.Save(&alloc)
+		}
+		
 		return nil
 	})
 }
@@ -290,10 +331,18 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	netProfit := gross - totalSaving
 
 	profitShares := make(map[string]interface{})
+	totalPSPercent := 0.0
+	totalPSValue := 0.0
 	for _, it := range psList {
 		pct := it["percent"].(float64)
 		val := netProfit * pct / 100.0
 		profitShares[it["name"].(string)] = map[string]interface{}{"percent": pct, "value": val}
+		totalPSPercent += pct
+		totalPSValue += val
+	}
+	profitShares["Laba Ditahan"] = map[string]interface{}{
+		"percent": 100.0 - totalPSPercent,
+		"value":   netProfit - totalPSValue,
 	}
 
 	var locations []models.FinancialLocation
@@ -460,6 +509,22 @@ func (fc *AdminFinanceController) GetProfitShareDetail(w http.ResponseWriter, r 
 		totalPlanned += planned
 	}
 
+	// [Visual Sync] Add Retained Earnings (Laba Ditahan) as a dynamic card
+	psPercentSum := 0.0
+	for _, it := range psList {
+		psPercentSum += it["percent"].(float64)
+	}
+	rdName := "Laba Ditahan"
+	catNames = append(catNames, rdName)
+	rdAlloc := sums[rdName]
+	rdPaid := fc.getMutSum(rdName, "processed", period)
+	rdPlanned := fc.getMutSum(rdName, "pending", period)
+	posData = append(posData, map[string]interface{}{
+		"name": rdName, "percent": 100.0 - psPercentSum,
+		"allocated": rdAlloc, "paid": rdPaid, "planned": rdPlanned,
+		"sisa": rdAlloc - rdPaid - rdPlanned,
+	})
+
 	history := fc.buildHistory(period, catNames, true)
 
 	var locs []models.FinancialLocation
@@ -556,6 +621,27 @@ func (fc *AdminFinanceController) UpdateConfig(w http.ResponseWriter, r *http.Re
 		utils.JSONError(w, http.StatusBadRequest, "invalid payload")
 		return
 	}
+
+	// ─── VALIDATION ───
+	for k, v := range req {
+		if k == "finance_data_saving_list" || k == "finance_profit_share_list" {
+			list, ok := v.([]interface{})
+			if !ok { continue }
+			totalPct := 0.0
+			for _, item := range list {
+				m, ok := item.(map[string]interface{})
+				if !ok { continue }
+				if pct, ok := m["percent"].(float64); ok {
+					totalPct += pct
+				}
+			}
+			if totalPct > 100.0 {
+				utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Total persentase %s tidak boleh lebih dari 100%% (saat ini %.2f%%)", k, totalPct))
+				return
+			}
+		}
+	}
+
 	for k, v := range req {
 		b, _ := json.Marshal(v)
 		var pc models.PlatformConfig
@@ -638,12 +724,21 @@ func (fc *AdminFinanceController) UpdateLocation(w http.ResponseWriter, r *http.
 		utils.JSONError(w, http.StatusBadRequest, "id required")
 		return
 	}
-	fc.DB.Model(&models.FinancialLocation{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"name":       req.Name,
-		"balance":    req.Balance,
-		"is_primary": req.IsPrimary,
-		"updated_at": time.Now(),
+
+	fc.DB.Transaction(func(tx *gorm.DB) error {
+		if req.IsPrimary {
+			// Set others to false
+			tx.Model(&models.FinancialLocation{}).Where("id != ?", id).Update("is_primary", false)
+		}
+		
+		return tx.Model(&models.FinancialLocation{}).Where("id = ?", id).Updates(map[string]interface{}{
+			"name":       req.Name,
+			"balance":    req.Balance,
+			"is_primary": req.IsPrimary,
+			"updated_at": time.Now(),
+		}).Error
 	})
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
@@ -658,12 +753,21 @@ func (fc *AdminFinanceController) CreateLocation(w http.ResponseWriter, r *http.
 		utils.JSONError(w, http.StatusBadRequest, "name required")
 		return
 	}
-	req.CreatedAt = time.Now()
-	req.UpdatedAt = time.Now()
-	if err := fc.DB.Create(&req).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "failed to create location")
-		return
-	}
+
+	fc.DB.Transaction(func(tx *gorm.DB) error {
+		if req.IsPrimary {
+			// Set others to false
+			tx.Model(&models.FinancialLocation{}).Where("is_primary = ?", true).Update("is_primary", false)
+		}
+		
+		req.CreatedAt = time.Now()
+		req.UpdatedAt = time.Now()
+		if err := tx.Create(&req).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "created", "data": req})
 }
 

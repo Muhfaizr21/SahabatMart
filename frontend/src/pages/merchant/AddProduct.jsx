@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchJson, MERCHANT_API_BASE, formatImage, PUBLIC_API_BASE } from '../../lib/api';
+import { fetchJson, MERCHANT_API_BASE, ADMIN_API_BASE, formatImage, PUBLIC_API_BASE } from '../../lib/api';
 import { PageHeader, A, FieldLabel } from '../../lib/adminStyles.jsx';
 
 const CustomComboBox = ({ value, onChange, name, options, placeholder }) => {
@@ -48,6 +48,7 @@ export default function AddEditProduct() {
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [attrs, setAttrs] = useState([]);
@@ -141,7 +142,7 @@ export default function AddEditProduct() {
           });
         }
       }
-    } catch (err) { alert('Upload gagal: ' + err.message); }
+    } catch (_err) { alert('Upload gagal: ' + _err.message); }
     finally { setUploading(false); }
   };
 
@@ -172,8 +173,8 @@ export default function AddEditProduct() {
       });
       alert(isEdit ? 'Produk berhasil diubah!' : 'Produk berhasil ditambah! Menunggu review admin.');
       navigate('/merchant/products');
-    } catch (err) {
-      alert('Gagal menyimpan: ' + err.message);
+    } catch (_err) {
+      alert('Gagal menyimpan: ' + _err.message);
     } finally {
       setSaving(false);
     }

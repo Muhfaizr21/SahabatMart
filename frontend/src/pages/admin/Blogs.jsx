@@ -34,8 +34,8 @@ export default function AdminBlogs() {
         setFormData(prev => ({ ...prev, image: url }));
         toast.success('Gambar terunggah');
       }
-    } catch (err) { 
-      toast.error('Upload gagal: ' + err.message); 
+    } catch (_err) { 
+      toast.error('Upload gagal: ' + _err.message); 
     } finally { 
       setUploading(false); 
     }
@@ -55,7 +55,7 @@ export default function AdminBlogs() {
       toast.success(isEdit ? 'Artikel diperbarui' : 'Artikel diterbitkan');
       setShowModal(false);
       loadBlogs();
-    }).catch(err => toast.error(err.message))
+    }).catch(err => toast.error(_err.message))
     .finally(() => setSaving(false));
   };
 
@@ -66,7 +66,7 @@ export default function AdminBlogs() {
         toast.success('Artikel dihapus');
         loadBlogs();
       })
-      .catch(err => toast.error(err.message));
+      .catch(err => toast.error(_err.message));
   };
 
   return (

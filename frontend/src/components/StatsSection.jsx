@@ -19,7 +19,7 @@ export default function StatsSection() {
           value: config[item.key] || item.value
         })));
       })
-      .catch(err => console.error('Error fetching stats:', err));
+      .catch(err => console.error('Error fetching stats:', _err));
   }, []);
 
   return (

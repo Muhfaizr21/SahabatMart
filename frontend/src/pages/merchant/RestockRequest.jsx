@@ -21,8 +21,8 @@ export default function RestockRequest() {
     try {
       const data = await fetchJson(`${MERCHANT_API_BASE}/restock`);
       setRequests(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
     } finally {
       setLoading(false);
     }
@@ -34,7 +34,7 @@ export default function RestockRequest() {
       const prodRaw = await fetchJson(`${MERCHANT_API_BASE}/catalog`);
       setMasterProducts(prodRaw || []);
       setFilteredProducts(prodRaw || []);
-    } catch (err) {}
+    } catch (_err) {}
   };
 
   useEffect(() => {
@@ -98,8 +98,8 @@ export default function RestockRequest() {
       setCart([]);
       setShowModal(false);
       loadRequests();
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -123,8 +123,8 @@ export default function RestockRequest() {
         body: JSON.stringify({ request_id: rid })
       });
       loadRequests();
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     }
   };
 

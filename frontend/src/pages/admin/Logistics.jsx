@@ -24,7 +24,7 @@ const AdminLogistics = () => {
                     inactive: data.filter(c => !c.is_active).length
                 });
             })
-            .catch(err => console.error("Error loading logistics:", err))
+            .catch(err => console.error("Error loading logistics:", _err))
             .finally(() => setLoading(false));
     };
 
@@ -47,8 +47,8 @@ const AdminLogistics = () => {
         try {
             const res = await fetchJson(`/api/shipping/areas?input=${input}`);
             setAreas(res.areas || []);
-        } catch (err) {
-            console.error(err);
+        } catch (_err) {
+            console.error(_err);
         } finally {
             setSearchingArea(false);
         }
@@ -67,7 +67,7 @@ const AdminLogistics = () => {
             setAreas([]);
             loadPusatData();
             alert('Origin Gudang Pusat berhasil diperbarui!');
-        }).catch(err => alert(err.message));
+        }).catch(err => alert(_err.message));
     };
 
     const syncLogistics = () => {
@@ -76,7 +76,7 @@ const AdminLogistics = () => {
             .then(() => {
                 loadLogistics();
             })
-            .catch(err => alert("Gagal sinkronisasi: " + err.message))
+            .catch(err => alert("Gagal sinkronisasi: " + _err.message))
             .finally(() => setLoading(false));
     };
 
@@ -87,7 +87,7 @@ const AdminLogistics = () => {
             method: 'POST',
             body: JSON.stringify({ id, active }),
         }).then(() => loadLogistics())
-          .catch(err => alert("Gagal ubah status: " + err.message));
+          .catch(err => alert("Gagal ubah status: " + _err.message));
     };
 
     return (

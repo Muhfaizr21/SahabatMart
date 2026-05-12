@@ -32,8 +32,8 @@ export default function RegisterPage() {
         const storedRef = localStorage.getItem('pending_ref');
         if (storedRef) setFormData(prev => ({ ...prev, referralCode: storedRef }));
       }
-    } catch (err) {
-      console.warn('Affiliate capture error:', err);
+    } catch (_err) {
+      console.warn('Affiliate capture error:', _err);
     }
   }, [location.search]);
 
@@ -69,8 +69,8 @@ export default function RegisterPage() {
         // Sesuai dokumen: "Setelah registrasi selesai, mitra dapat login ke Mitra Area"
         navigate('/affiliate');
       }
-    } catch (err) {
-      setError(err.message || 'Pendaftaran gagal');
+    } catch (_err) {
+      setError(_err.message || 'Pendaftaran gagal');
     } finally {
       setLoading(false);
     }

@@ -10,7 +10,7 @@
  */
 
 /* global define, require */
-/* eslint-disable new-cap */
+ 
 
 (function (factory) {
   'use strict';
@@ -186,11 +186,11 @@
       // Translation function, gets the message key to be translated
       // and an object with context specific data as arguments:
       i18n: function (message, context) {
-        // eslint-disable-next-line no-param-reassign
+         
         message = this.messages[message] || message.toString();
         if (context) {
           $.each(context, function (key, value) {
-            // eslint-disable-next-line no-param-reassign
+             
             message = message.replace('{' + key + '}', value);
           });
         }
@@ -475,10 +475,10 @@
     },
 
     _getUniqueFilename: function (name, map) {
-      // eslint-disable-next-line no-param-reassign
+       
       name = String(name);
       if (map[name]) {
-        // eslint-disable-next-line no-param-reassign
+         
         name = name.replace(/(?: \(([\d]+)\))?(\.[^.]+)?$/, function (
           _,
           p1,
@@ -713,7 +713,7 @@
     _getXHRPromise: function (resolveOrReject, context, args) {
       var dfd = $.Deferred(),
         promise = dfd.promise();
-      // eslint-disable-next-line no-param-reassign
+       
       context = context || this.options.context || promise;
       if (resolveOrReject === true) {
         dfd.resolveWith(context, args);
@@ -1221,7 +1221,7 @@
             }
           }, errorHandler);
         };
-      // eslint-disable-next-line no-param-reassign
+       
       path = path || '';
       if (entry.isFile) {
         if (entry._file) {
@@ -1260,7 +1260,7 @@
     },
 
     _getDroppedFiles: function (dataTransfer) {
-      // eslint-disable-next-line no-param-reassign
+       
       dataTransfer = dataTransfer || {};
       var items = dataTransfer.items;
       if (
@@ -1287,7 +1287,7 @@
     },
 
     _getSingleFileInputFiles: function (fileInput) {
-      // eslint-disable-next-line no-param-reassign
+       
       fileInput = $(fileInput);
       var entries =
           fileInput.prop('webkitEntries') || fileInput.prop('entries'),

@@ -44,7 +44,7 @@ export default function AffiliateDashboard() {
       setLoading(true);
       const res = await fetchJson(`${AFFILIATE_API_BASE}/dashboard`);
       setData(res);
-    } catch (err) { toast.error('Gagal memuat dashboard'); }
+    } catch (_err) { toast.error('Gagal memuat dashboard'); }
     finally { setLoading(false); }
   }, []);
 

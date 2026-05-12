@@ -52,8 +52,8 @@ export function ProductCard({ product }) {
         });
         setIsSaved(true);
       }
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     } finally {
       setWishlisting(false);
     }
@@ -89,8 +89,8 @@ export function ProductCard({ product }) {
         method: 'POST',
         body: JSON.stringify({ product_id: product.id, type: 'click' })
       }).catch(() => {});
-    } catch (err) {
-      alert(err.message);
+    } catch (_err) {
+      alert(_err.message);
     } finally {
       setAdding(false);
     }

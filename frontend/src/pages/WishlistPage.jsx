@@ -17,9 +17,9 @@ export default function WishlistPage() {
       // Standardizing data access
       const products = Array.isArray(d) ? d : (d.data || d.products || []);
       setItems(products);
-    } catch (err) {
-      console.error('Wishlist Fetch Error:', err);
-      setError(err.message || 'Gagal terhubung ke server');
+    } catch (_err) {
+      console.error('Wishlist Fetch Error:', _err);
+      setError(_err.message || 'Gagal terhubung ke server');
       // Set items to null to trigger the "Server Sync Failed" UI segment
       setItems(null);
     } finally {
@@ -35,7 +35,7 @@ export default function WishlistPage() {
       await fetchJson(`${BUYER_API_BASE}/wishlist/remove?product_id=${id}`, { method: 'DELETE' });
       window.dispatchEvent(new Event('cartUpdate'));
       setItems(prev => prev.filter(x => x.id !== id));
-    } catch (err) { alert(err.message); }
+    } catch (_err) { alert(_err.message); }
   };
 
   const moveToCart = async (p) => {
@@ -58,8 +58,8 @@ export default function WishlistPage() {
       // Update UI: Remove from list after successful move
       setItems(prev => prev.filter(x => x.id !== p.id));
       window.dispatchEvent(new Event('openCart'));
-    } catch (err) { 
-      alert(err.message || 'Gagal memindahkan produk'); 
+    } catch (_err) { 
+      alert(_err.message || 'Gagal memindahkan produk'); 
     } finally { 
       setActing(null); 
     }

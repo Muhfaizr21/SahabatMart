@@ -27,7 +27,7 @@ export default function ProfitShareDetail() {
       });
       const res = await r.json();
       setData(res);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Gagal memuat detail profit share");
     } finally {
       setLoading(false);

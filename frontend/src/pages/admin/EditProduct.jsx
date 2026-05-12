@@ -108,8 +108,8 @@ export default function AdminEditProduct() {
       }
     })
     .catch(err => {
-      console.error("Fetch error:", err);
-      setError(err.message || "Gagal mengambil data produk");
+      console.error("Fetch error:", _err);
+      setError(_err.message || "Gagal mengambil data produk");
     })
     .finally(() => setLoading(false));
   }, [productId]);
@@ -185,8 +185,8 @@ export default function AdminEditProduct() {
       } else {
         throw new Error(responseData.error || responseData.message || "Respon dari server kosong atau tidak valid.");
       }
-    } catch (err) { 
-      toast.error("Gagal mengunggah ke server: " + err.message);
+    } catch (_err) { 
+      toast.error("Gagal mengunggah ke server: " + _err.message);
       // Rollback ke foto awal kalau gagal (biar Blob URL gak kesimpen)
       if (type === 'main') {
         setP(prev => ({ ...prev, image: previousMainImage }));
@@ -259,7 +259,7 @@ export default function AdminEditProduct() {
       navigate('/admin/products');
     })
     .catch(err => {
-      toast.error("Gagal update: " + err.message);
+      toast.error("Gagal update: " + _err.message);
     })
     .finally(() => setSaving(false));
   };

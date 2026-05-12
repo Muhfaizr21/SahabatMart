@@ -21,8 +21,8 @@ export default function ContactPage() {
       });
       toast.success(res.message || 'Pesan berhasil dikirim!');
       setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (err) {
-      toast.error(err.message || 'Gagal mengirim pesan');
+    } catch (_err) {
+      toast.error(_err.message || 'Gagal mengirim pesan');
     } finally {
       setLoading(false);
     }
