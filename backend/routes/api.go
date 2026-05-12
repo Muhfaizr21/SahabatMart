@@ -111,7 +111,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 		return func(next http.HandlerFunc) http.HandlerFunc {
 			return func(w http.ResponseWriter, r *http.Request) {
 				authHeader := r.Header.Get("Authorization")
-				if authHeader == "" {
+				if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 					utils.JSONError(w, http.StatusUnauthorized, "Login diperlukan")
 					return
 				}
@@ -123,18 +123,30 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 					return
 				}
 
-				// Check Permission in DB via Role
+				// Hot Sync: Ambil data user terbaru termasuk role & admin_role
+				var user models.User
+				if err := db.Select("role", "admin_role", "status").First(&user, "id = ?", claims.UserID).Error; err != nil {
+					utils.JSONError(w, http.StatusUnauthorized, "User tidak ditemukan")
+					return
+				}
+
+				if user.Status != "active" {
+					utils.JSONError(w, http.StatusForbidden, "Akun tidak aktif")
+					return
+				}
+
+				// Check Permission in DB
+				// Admin/Superadmin bisa punya role spesifik di 'admin_role'
 				var count int64
 				err = db.Table("role_permissions").
 					Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
-					Joins("JOIN users ON users.role::text = (SELECT name::text FROM roles WHERE id = role_permissions.role_id)").
-					Where("users.id = ? AND permissions.code = ?", claims.UserID, permissionCode).
+					Joins("JOIN roles ON roles.id = role_permissions.role_id").
+					Where("permissions.code = ? AND (LOWER(roles.name) = LOWER(?) OR LOWER(roles.name) = LOWER(?))",
+						permissionCode, user.Role, user.AdminRole).
 					Count(&count).Error
 
 				if err != nil || count == 0 {
 					// Fallback: Superadmin always has access
-					var user models.User
-					db.Select("role").First(&user, "id = ?", claims.UserID)
 					if strings.ToLower(user.Role) != "superadmin" {
 						utils.JSONError(w, http.StatusForbidden, "Akses ditolak: Anda tidak memiliki izin "+permissionCode)
 						return
@@ -142,6 +154,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 				}
 
 				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+				ctx = context.WithValue(ctx, "user_role", strings.ToLower(user.Role))
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
 		}

@@ -39,7 +39,17 @@ func (ac *AffiliateController) TrackClick(w http.ResponseWriter, r *http.Request
 	sub3 := r.URL.Query().Get("sub3")
 	lc := r.URL.Query().Get("lc")
 
-	affiliate, err := ac.Service.TrackClick(refCode, productID, r.Referer(), r.RemoteAddr, r.UserAgent(), sub1, sub2, sub3, lc)
+	affiliate, err := ac.Service.TrackClick(services.TrackClickRequest{
+		RefCode:   refCode,
+		ProductID: productID,
+		Referrer:  r.Referer(),
+		IP:        r.RemoteAddr,
+		UA:        r.UserAgent(),
+		SubID1:    sub1,
+		SubID2:    sub2,
+		SubID3:    sub3,
+		LinkCode:  lc,
+	})
 	if err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Affiliate tidak ditemukan")
 		return
@@ -573,8 +583,11 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 	levelCond := ""
 	if levelFilter == "1" {
 		levelCond = "AND level = 1"
-	} else if levelFilter == "2" {
+	} else if levelFilter == "2plus" {
 		levelCond = "AND level >= 2"
+	} else if levelFilter != "" && levelFilter != "all" {
+		// Specific level filter (e.g., "2", "3")
+		levelCond = fmt.Sprintf("AND level = %s", levelFilter)
 	}
 
 	// Query with Recursive CTE to get all levels + Filter + Pagination

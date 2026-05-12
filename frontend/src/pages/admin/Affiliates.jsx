@@ -21,7 +21,6 @@ export default function AdminAffiliates() {
   const [withdrawals, setWithdrawals] = useState([]);
   const [tab, setTab]               = useState('members');
   const [loading, setLoading]       = useState(true);
-  const [editTier, setEditTier]     = useState(null);
   const [editMemberTier, setEditMemberTier] = useState(null);
   const [processWd, setProcessWd]   = useState(null);
   const [saving, setSaving]         = useState(false);
@@ -53,24 +52,6 @@ export default function AdminAffiliates() {
   // Reset page on search
   useEffect(() => { setPage(1); }, [search, limit]);
 
-  const saveTier = () => {
-    if (!editTier) return;
-    setSaving(true);
-    fetchJson(`${API}/affiliates/config`, {
-      method: 'POST',
-      body: JSON.stringify(editTier),
-    }).then(() => { load(); setEditTier(null); })
-      .catch(console.error).finally(() => setSaving(false));
-  };
-
-  const deleteTier = (id) => {
-    if (!window.confirm('Hapus tier ini? Pastikan tidak ada member yang menggunakannya.')) return;
-    setSaving(true);
-    fetchJson(`${API}/affiliates/configs/delete?id=${id}`, { method: 'DELETE' })
-      .then(() => load())
-      .catch(err => alert(err.message || 'Gagal menghapus tier'))
-      .finally(() => setSaving(false));
-  };
 
   const processWithdrawal = (action) => {
     if (!processWd) return;
@@ -102,26 +83,18 @@ export default function AdminAffiliates() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Affiliate Program" subtitle="Kelola anggota, tier komisi, dan pencairan komisi afiliasi.">
-        {tab === 'tiers' && (
-          <button style={A.btnPrimary} onClick={() => setEditTier({ id: 0, tier_name: '', level: 1, comm_rate: 0.03, min_sales: 0, commission_hold_days: 7, is_active: true })}>
-            <i className="bx bx-plus" /> Tambah Tier
-          </button>
-        )}
-      </PageHeader>
+      <PageHeader title="Affiliate Program" subtitle="Kelola anggota dan pencairan komisi afiliasi." />
 
       <StatRow stats={[
         { label: 'Total Affiliate', val: total, icon: 'bxs-group', color: '#6366f1' },
         { label: 'Aktif', val: affiliates.filter(a => a.affiliate_status === 'active').length, icon: 'bxs-check-circle', color: '#10b981' },
         { label: 'Pencairan Pending', val: pendingWd, icon: 'bxs-wallet', color: '#f59e0b' },
-        { label: 'Konfigurasi Tier', val: tiers.length, icon: 'bxs-layer', color: '#8b5cf6' },
       ]} />
 
       {/* Tab Switch */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, background: '#f8fafc', padding: 6, borderRadius: 14, border: '1px solid #f1f5f9' }}>
         {[
           { val: 'members', label: 'Members' },
-          { val: 'tiers', label: 'Tiers' },
           { val: 'withdrawals', label: `Payouts${pendingWd > 0 ? ` (${pendingWd})` : ''}` },
         ].map(t => (
           <button key={t.val} style={{
@@ -244,53 +217,6 @@ export default function AdminAffiliates() {
         </>
       )}
 
-      {/* ── TIERS TAB ──────────────────────────────────────────────── */}
-      {tab === 'tiers' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-          {tiers.length === 0 && !loading && (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
-              <i className="bx bxs-layer" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
-              Belum ada konfigurasi tier. Klik "Tambah Tier" untuk mulai.
-            </div>
-          )}
-          {tiers.map(t => {
-            const tc = t.color || '#94a3b8';
-            return (
-              <div key={t.id} style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <div style={{ height: 5, background: tc }} />
-                <div style={{ padding: '20px 22px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 900, color: tc }}>{t.name}</div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Level {t.level}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button style={A.iconBtn(tc, `${tc}14`)} onClick={() => setEditTier({ ...t, tier_name: t.name, comm_rate: t.base_commission_rate, min_sales: t.min_earnings_upgrade })} title="Edit">
-                        <i className="bx bx-pencil" />
-                      </button>
-                      <button style={A.iconBtn('#ef4444', '#fee2e2')} onClick={() => deleteTier(t.id)} title="Hapus">
-                        <i className="bx bx-trash" />
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {[
-                      { label: 'Komisi Dasar', val: `${((t.base_commission_rate || 0) * 100).toFixed(1)}%`, color: '#10b981' },
-                      { label: 'Min. Earnings Upgrade', val: idr(t.min_earnings_upgrade || 0) },
-                      { label: 'Hold Period', val: `${t.commission_hold_days || 7} hari` },
-                    ].map(r => (
-                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 12.5, color: '#94a3b8', fontWeight: 500 }}>{r.label}</span>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: r.color || '#0f172a' }}>{r.val}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* ── WITHDRAWALS TAB ────────────────────────────────────────── */}
       {tab === 'withdrawals' && (
@@ -351,48 +277,6 @@ export default function AdminAffiliates() {
         </div>
       )}
 
-      {/* ── MODAL: Edit Tier ────────────────────────────────────────── */}
-      {editTier && (
-        <Modal title={`${editTier.id === 0 ? 'Tambah' : 'Edit'} Tier Komisi`} onClose={() => setEditTier(null)}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div style={{ gridColumn: '1/-1' }}>
-              <FieldLabel>Nama Tier</FieldLabel>
-              <input type="text" style={{ ...A.select, width: '100%' }} value={editTier.tier_name}
-                onChange={e => setEditTier(p => ({ ...p, tier_name: e.target.value }))} placeholder="Contoh: Mitra Emas" />
-            </div>
-            <div>
-              <FieldLabel>Level (urutan)</FieldLabel>
-              <input type="number" min="1" style={{ ...A.select, width: '100%' }}
-                value={editTier.level}
-                onChange={e => setEditTier(p => ({ ...p, level: parseInt(e.target.value) || 1 }))} />
-            </div>
-            <div>
-              <FieldLabel>Komisi Dasar (%)</FieldLabel>
-              <input type="number" step="0.1" min="0" max="100" style={{ ...A.select, width: '100%' }}
-                value={(editTier.comm_rate * 100).toFixed(1)}
-                onChange={e => setEditTier(p => ({ ...p, comm_rate: parseFloat(e.target.value) / 100 }))} />
-            </div>
-            <div>
-              <FieldLabel>Min. Earnings Upgrade (Rp)</FieldLabel>
-              <input type="number" min="0" style={{ ...A.select, width: '100%' }}
-                value={editTier.min_sales}
-                onChange={e => setEditTier(p => ({ ...p, min_sales: parseFloat(e.target.value) || 0 }))} />
-            </div>
-            <div>
-              <FieldLabel>Hold Period (hari)</FieldLabel>
-              <input type="number" min="1" style={{ ...A.select, width: '100%' }}
-                value={editTier.commission_hold_days || 7}
-                onChange={e => setEditTier(p => ({ ...p, commission_hold_days: parseInt(e.target.value) || 7 }))} />
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
-            <button onClick={() => setEditTier(null)} style={A.btnGhost}>Batal</button>
-            <button onClick={saveTier} disabled={saving} style={A.btnPrimary}>
-              {saving ? '...' : <><i className="bx bx-save" /> Simpan</>}
-            </button>
-          </div>
-        </Modal>
-      )}
 
       {/* ── MODAL: Process Withdrawal ─────────────────────────────── */}
       {processWd && (

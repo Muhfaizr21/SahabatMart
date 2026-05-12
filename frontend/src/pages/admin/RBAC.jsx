@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
-import { A, PageHeader, TablePanel, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
+import { A, PageHeader, TablePanel, Modal, FieldLabel, StatRow, roleBadge } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
 // Helper for formatting
@@ -188,9 +188,44 @@ const AdminRBAC = () => {
     };
 
     return (
-        <div style={{ ...A.page, maxWidth: 1400, margin: '0 auto' }}>
+        <div style={{ ...A.page, maxWidth: 1400, margin: '0 auto', paddingBottom: 60 }}>
+            <style>{`
+                .rbac-grid-main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+                .rbac-perm-cols { column-count: 2; column-gap: 24px; }
+                .rbac-role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+                .rbac-modal-grid { display: grid; grid-template-columns: 350px 1fr; gap: 32px; }
+                .rbac-user-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; }
+                .rbac-hero-content { display: flex; justify-content: space-between; align-items: center; }
+                .rbac-toolbar { display: flex; gap: 12px; align-items: center; width: 100%; }
+                .rbac-tab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; }
+                .rbac-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px; }
+
+                @media (max-width: 1024px) {
+                    .rbac-grid-main { grid-template-columns: 1fr; }
+                    .rbac-perm-cols { column-count: 1; }
+                    .rbac-modal-grid { grid-template-columns: 1fr; }
+                    .rbac-user-grid { grid-template-columns: 1fr; gap: 40px; }
+                    .rbac-toolbar { flex-wrap: wrap; }
+                }
+
+                @media (max-width: 768px) {
+                    .rbac-hero-content { flex-direction: column; align-items: flex-start; gap: 24px; }
+                    .rbac-toolbar > * { flex: 1 1 auto; min-width: 150px; }
+                    .rbac-table-hide { display: none; }
+                    .rbac-tab-header { flex-direction: column; align-items: stretch; text-align: left; }
+                    .rbac-tab-header button { width: 100%; justify-content: flex-start; }
+                    .rbac-card-head { flex-direction: column; align-items: flex-start; gap: 16px; }
+                    .admin-tab-group { width: 100%; overflow-x: auto; padding-bottom: 10px; display: flex !important; }
+                }
+
+                @media (max-width: 640px) {
+                    .rbac-role-grid { grid-template-columns: 1fr; }
+                    .admin-header-stack { flex-direction: column; align-items: flex-start !important; gap: 20px !important; }
+                }
+            `}</style>
+
             <PageHeader title="IDENTITY & ACCESS MANAGEMENT" subtitle="Kontrol granular otoritas sistem dan manajemen staf tingkat enterprise">
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="admin-tab-group" style={{ display: 'flex', gap: 6 }}>
                     {['dashboard', 'personnel', 'roles', 'permissions'].map(t => (
                         <button key={t} style={A.tab(activeTab === t)} onClick={() => setActiveTab(t)}>
                             {t === 'dashboard' && <i className="bx bx-pie-chart-alt-2" style={{marginRight: 6}}/>}
@@ -205,200 +240,274 @@ const AdminRBAC = () => {
 
             {/* --- DASHBOARD TAB --- */}
             {activeTab === 'dashboard' && (
-                <div style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
-                        <div style={{ ...A.card, padding: 24, borderTop: '4px solid #6366f1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ animation: 'fadeIn 0.3s ease', display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    
+                    {/* HERO COMMAND CENTER */}
+                    <div style={{ 
+                        background: 'linear-gradient(135deg, #1e1b4b, #312e81)', 
+                        borderRadius: 32, 
+                        padding: '40px', 
+                        color: '#fff', 
+                        position: 'relative', 
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 50px rgba(49,46,129,0.3)'
+                    }}>
+                        <div style={{ position: 'absolute', right: -50, top: -50, width: 300, height: 300, background: 'rgba(99,102,241,0.1)', borderRadius: '50%', blur: '50px' }} />
+                        <div className="rbac-hero-content" style={{ position: 'relative', zIndex: 1 }}>
                             <div>
-                                <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Security Profiles</div>
-                                <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', marginTop: 8 }}>{stats.total_roles}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                                    <div style={{ padding: '6px 12px', background: 'rgba(16,185,129,0.2)', borderRadius: 20, color: '#10b981', fontSize: 11, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                                        SYSTEM LIVE & SECURE
+                                    </div>
+                                    <span style={{ fontSize: 13, color: '#94a3b8' }}>Last audit: Just now</span>
+                                </div>
+                                <h1 style={{ margin: 0, fontSize: 32, fontWeight: 900, letterSpacing: '-1px' }}>RBAC Command Center</h1>
+                                <p style={{ margin: '8px 0 0 0', fontSize: 15, color: '#a5b4fc', maxWidth: 500, lineHeight: 1.6 }}>
+                                    Pusat kendali otoritas sistem SahabatMart. Pantau, kelola, dan audit seluruh akses personel secara real-time.
+                                </p>
                             </div>
-                            <div style={{ width: 60, height: 60, borderRadius: 16, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <i className="bx bx-shield-quarter" style={{ fontSize: 32, color: '#6366f1' }} />
-                            </div>
-                        </div>
-                        <div style={{ ...A.card, padding: 24, borderTop: '4px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Active Personnel</div>
-                                <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', marginTop: 8 }}>{stats.active_admins}</div>
-                            </div>
-                            <div style={{ width: 60, height: 60, borderRadius: 16, background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <i className="bx bx-user-check" style={{ fontSize: 32, color: '#10b981' }} />
-                            </div>
-                        </div>
-                        <div style={{ ...A.card, padding: 24, borderTop: '4px solid #f59e0b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>System Capabilities</div>
-                                <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', marginTop: 8 }}>{stats.total_perms}</div>
-                            </div>
-                            <div style={{ width: 60, height: 60, borderRadius: 16, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <i className="bx bx-slider-alt" style={{ fontSize: 32, color: '#f59e0b' }} />
-                            </div>
-                        </div>
-                        <div style={{ ...A.card, padding: 24, borderTop: '4px solid #8b5cf6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Recent Logins (7d)</div>
-                                <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', marginTop: 8 }}>{stats.recent_logins}</div>
-                            </div>
-                            <div style={{ width: 60, height: 60, borderRadius: 16, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <i className="bx bx-log-in-circle" style={{ fontSize: 32, color: '#8b5cf6' }} />
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Security Health</div>
+                                <div style={{ fontSize: 48, fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                                    98<span style={{ fontSize: 20, color: '#6366f1' }}>%</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                        <div style={{ ...A.card, padding: 24 }}>
-                            <h3 style={{ margin: '0 0 20px 0', fontSize: 15, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <i className="bx bx-buildings" style={{ color: '#6366f1', fontSize: 20 }} /> STAFF BY DEPARTMENT
-                            </h3>
-                            {stats.dept_stats?.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    {stats.dept_stats.map(ds => (
-                                        <div key={ds.department || 'Unassigned'} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <div style={{ width: 140, fontSize: 13, fontWeight: 700, color: '#475569' }}>{ds.department || 'Unassigned'}</div>
-                                            <div style={{ flex: 1, height: 12, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
-                                                <div style={{ width: `${(ds.count / Math.max(1, stats.active_admins + stats.inactive_admins)) * 100}%`, height: '100%', background: '#6366f1', borderRadius: 6 }} />
-                                            </div>
-                                            <div style={{ width: 30, textAlign: 'right', fontSize: 12, fontWeight: 800 }}>{ds.count}</div>
-                                        </div>
-                                    ))}
+                    <StatRow stats={[
+                        { label: 'Security Profiles', val: stats.total_roles, icon: 'bx-shield-quarter', color: '#6366f1' },
+                        { label: 'Active Personnel', val: stats.active_admins, icon: 'bx-user-check', color: '#10b981' },
+                        { label: 'Capabilities', val: stats.total_perms, icon: 'bx-key', color: '#f59e0b' },
+                        { label: 'Recent Access', val: stats.recent_logins, icon: 'bx-history', color: '#8b5cf6' }
+                    ]} />
+
+                    <div className="rbac-grid-main">
+                        {/* DISTRIBUTION CHARTS */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <div style={{ ...A.card, padding: 30 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
+                                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <i className="bx bx-buildings" style={{ color: '#6366f1', fontSize: 22 }} /> Personnel Allocation by Department
+                                    </h3>
+                                    <button style={{ ...A.iconBtn('#94a3b8', 'transparent') }}><i className="bx bx-dots-horizontal-rounded" /></button>
                                 </div>
-                            ) : (
-                                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No department data available</div>
-                            )}
+                                {stats.dept_stats?.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                        {stats.dept_stats.map(ds => (
+                                            <div key={ds.department || 'Unassigned'} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                                                <div style={{ width: 140, fontSize: 13, fontWeight: 800, color: '#475569' }}>{ds.department || 'Unassigned'}</div>
+                                                <div style={{ flex: 1, height: 10, background: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                                                    <div style={{ width: `${(ds.count / Math.max(1, stats.active_admins + stats.inactive_admins)) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #818cf8)', borderRadius: 5 }} />
+                                                </div>
+                                                <div style={{ width: 40, textAlign: 'right', fontSize: 13, fontWeight: 900, color: '#1e293b' }}>{ds.count}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Data tidak tersedia</div>
+                                )}
+                            </div>
+
+                            <div style={{ ...A.card, padding: 30 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
+                                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <i className="bx bx-shield-alt-2" style={{ color: '#10b981', fontSize: 22 }} /> Security Profile Distribution
+                                    </h3>
+                                    <button style={{ ...A.iconBtn('#94a3b8', 'transparent') }}><i className="bx bx-dots-horizontal-rounded" /></button>
+                                </div>
+                                {stats.role_stats?.length > 0 ? (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+                                        {stats.role_stats.map(rs => (
+                                            <div key={rs.admin_role || 'No Role'} style={{ padding: 20, background: '#f8fafc', borderRadius: 20, border: '1px solid #f1f5f9' }}>
+                                                <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>{rs.admin_role || 'Unassigned'}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <div style={{ fontSize: 24, fontWeight: 900, color: '#1e293b' }}>{rs.count}</div>
+                                                    <div style={{ width: 32, height: 32, borderRadius: 10, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                                                        <i className="bx bx-user" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Data tidak tersedia</div>
+                                )}
+                            </div>
                         </div>
 
-                        <div style={{ ...A.card, padding: 24 }}>
-                            <h3 style={{ margin: '0 0 20px 0', fontSize: 15, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <i className="bx bx-id-card" style={{ color: '#10b981', fontSize: 20 }} /> STAFF BY ROLE
-                            </h3>
-                            {stats.role_stats?.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    {stats.role_stats.map(rs => (
-                                        <div key={rs.admin_role || 'No Role'} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <div style={{ width: 140, fontSize: 13, fontWeight: 700, color: '#475569' }}>{rs.admin_role || 'No Role'}</div>
-                                            <div style={{ flex: 1, height: 12, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
-                                                <div style={{ width: `${(rs.count / Math.max(1, stats.active_admins + stats.inactive_admins)) * 100}%`, height: '100%', background: '#10b981', borderRadius: 6 }} />
-                                            </div>
-                                            <div style={{ width: 30, textAlign: 'right', fontSize: 12, fontWeight: 800 }}>{rs.count}</div>
+                        {/* RIGHT SIDE: RECENT ACTIVITY & QUICK ACTIONS */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <div style={{ ...A.card, padding: 30, background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
+                                <h3 style={{ margin: '0 0 20px 0', fontSize: 15, fontWeight: 900, color: '#1e293b' }}>SECURITY QUICK ACTIONS</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                                    <button onClick={()=>toast.success('System Scan Initiated')} style={{ padding: '14px 20px', borderRadius: 16, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.borderColor='#6366f1'}>
+                                        <i className="bx bx-scan" style={{ fontSize: 20, color: '#6366f1' }} />
+                                        <div style={{ textAlign: 'left' }}>
+                                            <div style={{ fontSize: 13, fontWeight: 800 }}>Initiate System Scan</div>
+                                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Check for access anomalies</div>
                                         </div>
-                                    ))}
+                                    </button>
+                                    <button onClick={()=>toast.success('Security Log Exported')} style={{ padding: '14px 20px', borderRadius: 16, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.borderColor='#6366f1'}>
+                                        <i className="bx bx-download" style={{ fontSize: 20, color: '#10b981' }} />
+                                        <div style={{ textAlign: 'left' }}>
+                                            <div style={{ fontSize: 13, fontWeight: 800 }}>Export Audit Logs</div>
+                                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Download PDF/CSV reports</div>
+                                        </div>
+                                    </button>
+                                    <button onClick={()=>setActiveTab('personnel')} style={{ padding: '14px 20px', borderRadius: 16, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.borderColor='#6366f1'}>
+                                        <i className="bx bx-user-plus" style={{ fontSize: 20, color: '#f59e0b' }} />
+                                        <div style={{ textAlign: 'left' }}>
+                                            <div style={{ fontSize: 13, fontWeight: 800 }}>Onboard New Staff</div>
+                                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Grant access to new personnel</div>
+                                        </div>
+                                    </button>
                                 </div>
-                            ) : (
-                                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No role data available</div>
-                            )}
+                            </div>
+
+                            <div style={{ ...A.card, padding: 30 }}>
+                                <h3 style={{ margin: '0 0 20px 0', fontSize: 15, fontWeight: 900, color: '#1e293b' }}>PLATFORM ADVISORY</h3>
+                                <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', padding: 20, borderRadius: 20 }}>
+                                    <div style={{ display: 'flex', gap: 14 }}>
+                                        <i className="bx bx-info-circle" style={{ fontSize: 24, color: '#d97706' }} />
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 900, color: '#92400e' }}>Multi-Factor Authentication</div>
+                                            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#b45309', lineHeight: 1.5 }}>
+                                                Disarankan untuk mewajibkan MFA bagi seluruh pengguna dengan role **Superadmin** untuk keamanan maksimal.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                    <style>{`
+                        @keyframes pulse {
+                            0% { transform: scale(1); opacity: 1; }
+                            50% { transform: scale(2); opacity: 0.5; }
+                            100% { transform: scale(1); opacity: 1; }
+                        }
+                    `}</style>
                 </div>
             )}
-
             {/* --- PERSONNEL TAB --- */}
             {activeTab === 'personnel' && (
                 <div style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', background: '#fff', padding: 16, borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                        <div style={{ flex: 1, position: 'relative' }}>
-                            <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 20 }} />
-                            <input 
-                                style={{ ...A.input, paddingLeft: 44, margin: 0 }} 
-                                placeholder="Cari berdasarkan nama atau email..." 
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <select style={{ ...A.select, width: 200, margin: 0 }} value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)}>
-                            <option value="">Semua Departemen</option>
-                            <option value="IT & SYSTEMS">IT & SYSTEMS</option>
-                            <option value="MARKETING">MARKETING</option>
-                            <option value="FINANCE">FINANCE</option>
-                            <option value="CUSTOMER SERVICE">CUSTOMER SERVICE</option>
-                            <option value="LOGISTICS">LOGISTICS</option>
-                        </select>
-                        <select style={{ ...A.select, width: 160, margin: 0 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                            <option value="">Semua Status</option>
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
-                        </select>
-                        <button style={{ ...A.btnPrimary, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 8 }} onClick={() => { setSelectedUser(null); setNewUser(initialUserState); setShowUserModal(true); }}>
-                            <i className="bx bx-user-plus" style={{ fontSize: 18 }} /> Onboard Staff
-                        </button>
-                    </div>
-
-                    <TablePanel loading={loading}>
+                    <TablePanel 
+                        loading={loading}
+                        toolbar={(
+                            <div className="rbac-toolbar">
+                                <div style={{ ...A.searchWrap, flex: 1 }}>
+                                    <i className="bx bx-search" style={A.searchIcon} />
+                                    <input 
+                                        style={{ ...A.searchInput, width: '100%' }} 
+                                        placeholder="Cari berdasarkan nama atau email..." 
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <select style={A.select} value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)}>
+                                    <option value="">Semua Departemen</option>
+                                    <option value="IT & SYSTEMS">IT & SYSTEMS</option>
+                                    <option value="MARKETING">MARKETING</option>
+                                    <option value="FINANCE">FINANCE</option>
+                                    <option value="CUSTOMER SERVICE">CUSTOMER SERVICE</option>
+                                    <option value="LOGISTICS">LOGISTICS</option>
+                                </select>
+                                <select style={A.select} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                                    <option value="">Semua Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="suspended">Suspended</option>
+                                </select>
+                                <button style={A.btnPrimary} onClick={() => { setSelectedUser(null); setNewUser(initialUserState); setShowUserModal(true); }}>
+                                    <i className="bx bx-user-plus" /> Onboard Staff
+                                </button>
+                            </div>
+                        )}
+                    >
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr>
                                     <th style={{ ...A.th, paddingLeft: 24 }}>Personnel Details</th>
-                                    <th style={A.th}>Department</th>
-                                    <th style={A.th}>Security Profile</th>
+                                    <th style={A.th} className="rbac-table-hide">Department</th>
+                                    <th style={A.th} className="rbac-table-hide">Security Profile</th>
                                     <th style={A.th}>Access Level</th>
-                                    <th style={A.th}>Status & Activity</th>
+                                    <th style={A.th} className="rbac-table-hide">Status & Activity</th>
                                     <th style={{ ...A.th, textAlign: 'right', paddingRight: 24 }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {admins.map(user => (
-                                    <tr key={user.id} style={{ ...A.tr, transition: 'all 0.2s' }}>
+                                    <tr key={user.id} style={{ ...A.tr }}>
                                         <td style={{ ...A.td, paddingLeft: 24 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1', fontSize: 18, fontWeight: 800 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                                <div style={{ 
+                                                    width: 40, height: 40, borderRadius: 12, 
+                                                    background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0)', 
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                                    color: '#475569', fontSize: 16, fontWeight: 900,
+                                                    boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.8)'
+                                                }}>
                                                     {(user.profile?.full_name || 'U')[0].toUpperCase()}
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 800, color: '#1e293b', fontSize: 14 }}>{user.profile?.full_name}</div>
-                                                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{user.email}</div>
+                                                    <div style={{ fontWeight: 800, color: '#1e293b', fontSize: 13.5 }}>{user.profile?.full_name}</div>
+                                                    <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 1, fontFamily: 'monospace' }}>{user.email}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={A.td}>
-                                            <div style={{ fontWeight: 700, color: '#334155' }}>{user.department || 'Unassigned'}</div>
+                                        <td style={A.td} className="rbac-table-hide">
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '4px 10px', borderRadius: 8 }}>
+                                                {user.department || 'Unassigned'}
+                                            </span>
                                         </td>
-                                        <td style={A.td}>
-                                            <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 800 }}>
+                                        <td style={A.td} className="rbac-table-hide">
+                                            <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 {user.role === 'superadmin' ? (
-                                                    <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 11 }}>SYSTEM CONTROL ACCESS</span>
+                                                    <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 11, letterSpacing: '0.05em' }}>SYSTEM CONTROL ACCESS</span>
                                                 ) : (
-                                                    user.admin_role || 'No Profile Assigned'
+                                                    <>
+                                                        <i className="bx bx-shield-quarter" />
+                                                        {user.admin_role || 'No Profile Assigned'}
+                                                    </>
                                                 )}
                                             </div>
                                         </td>
                                         <td style={A.td}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span style={{ 
-                                                    padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, textTransform: 'uppercase',
-                                                    background: user.role === 'superadmin' ? '#fef2f2' : '#f0fdf4',
-                                                    color: user.role === 'superadmin' ? '#ef4444' : '#16a34a',
-                                                    border: `1px solid ${user.role === 'superadmin' ? '#fecaca' : '#bbf7d0'}`
-                                                }}>
+                                                <span style={roleBadge(user.role)}>
                                                     {user.role}
                                                 </span>
                                                 <button 
-                                                    style={{ border: 'none', background: '#f1f5f9', width: 26, height: 26, borderRadius: '50%', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} 
-                                                    onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
-                                                    onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                                                    style={A.iconBtn('#94a3b8', '#f8fafc')}
+                                                    onMouseEnter={e => { e.currentTarget.style.color = '#6366f1'; e.currentTarget.style.background = '#eef2ff'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = '#f8fafc'; }}
                                                     onClick={() => setPreviewUser(user)}
                                                     title="View Permissions"
                                                 >
-                                                    <i className="bx bx-shield-quarter" />
+                                                    <i className="bx bx-key" />
                                                 </button>
                                             </div>
                                         </td>
-                                        <td style={A.td}>
+                                        <td style={A.td} className="rbac-table-hide">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: user.status === 'active' ? '#10b981' : '#f43f5e' }} />
-                                                <span style={{ fontSize: 12, fontWeight: 700, color: user.status === 'active' ? '#10b981' : '#f43f5e', textTransform: 'capitalize' }}>
+                                                <div style={{ width: 7, height: 7, borderRadius: '50%', background: user.status === 'active' ? '#10b981' : '#f43f5e' }} />
+                                                <span style={{ fontSize: 11, fontWeight: 800, color: user.status === 'active' ? '#10b981' : '#f43f5e', textTransform: 'uppercase' }}>
                                                     {user.status}
                                                 </span>
                                             </div>
-                                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Login: {formatDate(user.last_login_at)}</div>
+                                            <div style={{ fontSize: 10.5, color: '#94a3b8' }}>Last Login: {formatDate(user.last_login_at)}</div>
                                         </td>
                                         <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
                                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                                <button style={{...A.iconBtn('#6366f1'), background: '#f8fafc', border: '1px solid #e2e8f0'}} onClick={() => handleEditUser(user)} title="Edit Profile">
+                                                <button style={A.iconBtn('#6366f1')} onClick={() => handleEditUser(user)} title="Edit Profile">
                                                     <i className="bx bx-edit-alt" />
                                                 </button>
-                                                <button style={{...A.iconBtn(user.status === 'active' ? '#f59e0b' : '#10b981'), background: '#f8fafc', border: '1px solid #e2e8f0'}} onClick={() => handleToggleStatus(user.id, user.status)} title={user.status === 'active' ? 'Suspend' : 'Activate'}>
+                                                <button style={A.iconBtn(user.status === 'active' ? '#f59e0b' : '#10b981', user.status === 'active' ? '#fff7ed' : '#f0fdf4')} onClick={() => handleToggleStatus(user.id, user.status)} title={user.status === 'active' ? 'Suspend' : 'Activate'}>
                                                     <i className={`bx ${user.status === 'active' ? 'bx-block' : 'bx-check-circle'}`} />
                                                 </button>
-                                                <button style={{...A.iconBtn('#ef4444'), background: '#f8fafc', border: '1px solid #e2e8f0'}} onClick={() => handleDeleteUser(user.id)} title="Delete Staff">
+                                                <button style={A.iconBtn('#ef4444', '#fef2f2')} onClick={() => handleDeleteUser(user.id)} title="Delete Staff">
                                                     <i className="bx bx-trash" />
                                                 </button>
                                             </div>
@@ -407,62 +516,82 @@ const AdminRBAC = () => {
                                 ))}
                                 {admins.length === 0 && (
                                     <tr>
-                                        <td colSpan="6" style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
-                                            <i className="bx bx-user-x" style={{ fontSize: 48, marginBottom: 16, color: '#cbd5e1', display: 'block' }} />
-                                            Tidak ada personel yang ditemukan
+                                        <td colSpan="6" style={{ padding: 60, textAlign: 'center' }}>
+                                            <i className="bx bx-user-x" style={{ fontSize: 54, marginBottom: 16, color: '#e2e8f0' }} />
+                                            <div style={{ fontSize: 15, fontWeight: 700, color: '#94a3b8' }}>Tidak ada personel yang ditemukan</div>
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </TablePanel>
+
                 </div>
             )}
 
             {/* --- ROLES TAB --- */}
             {activeTab === 'roles' && (
                 <div style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-                        <button style={{ ...A.btnPrimary, display: 'flex', alignItems: 'center', gap: 8 }} onClick={() => { setSelectedRole({ name: '', description: '', permission_ids: [] }); setShowRoleModal(true); }}>
-                            <i className="bx bx-plus-circle" style={{ fontSize: 18 }} /> Create Security Profile
+                    <div className="rbac-tab-header">
+                        <div style={{ fontSize: 14, color: '#64748b', fontWeight: 600 }}>
+                            Manage security profiles and their associated capability matrices.
+                        </div>
+                        <button style={A.btnPrimary} onClick={() => { setSelectedRole({ name: '', description: '', permission_ids: [] }); setShowRoleModal(true); }}>
+                            <i className="bx bx-plus-circle" /> Create Security Profile
                         </button>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 24 }}>
+                    <div className="rbac-role-grid">
                         {roles.map(role => (
-                            <div key={role.id} style={{ ...A.card, borderTop: '4px solid #6366f1', display: 'flex', flexDirection: 'column' }}>
+                            <div key={role.id} style={{ ...A.card, borderTop: '4px solid #6366f1', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s', cursor: 'default' }} 
+                                 onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                                 onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
                                 <div style={{ padding: 24, flex: 1 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>{role.name}</h3>
+                                    <div className="rbac-card-head">
+                                        <div style={{ minWidth: 0 }}>
+                                            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.3px' }}>{role.name}</h3>
+                                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, fontWeight: 700, textTransform: 'uppercase' }}>UUID: {role.id.split('-')[0]}...</div>
+                                        </div>
                                         <div style={{ display: 'flex', gap: 6 }}>
-                                            <button style={{...A.iconBtn('#10b981'), background: '#f0fdf4'}} onClick={() => handleCloneRole(role)} title="Clone Profile"><i className="bx bx-copy" /></button>
-                                            <button style={{...A.iconBtn('#6366f1'), background: '#eef2ff'}} onClick={() => { setSelectedRole({...role, permission_ids: role.permissions.map(p=>p.id)}); setShowRoleModal(true); }}><i className="bx bx-edit-alt" /></button>
-                                            <button style={{...A.iconBtn('#ef4444'), background: '#fef2f2'}} onClick={() => handleDeleteRole(role.id)} title="Delete Profile"><i className="bx bx-trash" /></button>
+                                            <button style={A.iconBtn('#10b981', '#f0fdf4')} onClick={() => handleCloneRole(role)} title="Clone Profile"><i className="bx bx-copy" /></button>
+                                            <button style={A.iconBtn('#6366f1', '#eef2ff')} onClick={() => { setSelectedRole({...role, permission_ids: role.permissions.map(p=>p.id)}); setShowRoleModal(true); }}><i className="bx bx-edit-alt" /></button>
+                                            <button style={A.iconBtn('#ef4444', '#fef2f2')} onClick={() => handleDeleteRole(role.id)} title="Delete Profile"><i className="bx bx-trash" /></button>
                                         </div>
                                     </div>
-                                    <p style={{ margin: '0 0 20px 0', fontSize: 13, color: '#64748b', lineHeight: 1.5, minHeight: 40 }}>{role.description || 'Tidak ada deskripsi'}</p>
+                                    <p style={{ margin: '0 0 20px 0', fontSize: 13, color: '#64748b', lineHeight: 1.6, minHeight: 40 }}>{role.description || 'No description provided for this profile.'}</p>
                                     
-                                    <div style={{ background: '#f8fafc', padding: 16, borderRadius: 12 }}>
+                                    <div style={{ background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #f1f5f9' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                            <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Assigned Permissions</span>
-                                            <span style={{ background: '#e0e7ff', color: '#4f46e5', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 800 }}>{role.permissions?.length || 0}</span>
+                                            <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Capabilities</span>
+                                            <span style={{ background: '#6366f1', color: '#fff', padding: '2px 8px', borderRadius: 8, fontSize: 10, fontWeight: 800 }}>{role.permissions?.length || 0}</span>
                                         </div>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                            {role.permissions?.slice(0, 8).map(p => (
-                                                <span key={p.id} style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#334155', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
+                                            {role.permissions?.slice(0, 6).map(p => (
+                                                <span key={p.id} style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#475569', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700 }}>
                                                     {p.name}
                                                 </span>
                                             ))}
-                                            {role.permissions?.length > 8 && (
-                                                <span style={{ background: '#f1f5f9', color: '#64748b', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700 }}>
-                                                    +{role.permissions.length - 8} more
+                                            {role.permissions?.length > 6 && (
+                                                <span style={{ background: '#eef2ff', color: '#6366f1', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800 }}>
+                                                    +{role.permissions.length - 6} more
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottomLeftRadius: 16, borderBottomRightRadius: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Used by <strong style={{ color: '#0f172a' }}>{stats.role_stats?.find(rs => rs.admin_role === role.name)?.count || 0}</strong> personnel</span>
-                                    <span style={{ fontSize: 11, color: '#94a3b8' }}>Updated {formatDate(role.updated_at).split(',')[0]}</span>
+                                <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ display: 'flex', marginLeft: 4 }}>
+                                            {[1,2,3].map(i => (
+                                                <div key={i} style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #f8fafc', background: '#e2e8f0', marginLeft: -8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#94a3b8' }}>
+                                                    <i className="bx bx-user" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+                                            {stats.role_stats?.find(rs => rs.admin_role === role.name)?.count || 0} Personnel
+                                        </span>
+                                    </div>
+                                    <span style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 600 }}>Sync: {formatDate(role.updated_at).split(',')[0]}</span>
                                 </div>
                             </div>
                         ))}
@@ -473,34 +602,112 @@ const AdminRBAC = () => {
             {/* --- PERMISSIONS TAB --- */}
             {activeTab === 'permissions' && (
                 <div style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-                        {Object.entries(permissions.reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})).map(([group, perms]) => (
-                            <div key={group} style={{ ...A.card, flex: '1 1 400px', padding: 0, overflow: 'hidden' }}>
-                                <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <i className="bx bx-layer" style={{ color: '#4f46e5', fontSize: 18 }} />
-                                    </div>
-                                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#1e293b' }}>{group} Module</h3>
-                                    <span style={{ marginLeft: 'auto', background: '#fff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 800, color: '#64748b' }}>
-                                        {perms.length} Functions
-                                    </span>
+                    <div style={{ 
+                        background: 'linear-gradient(135deg, #0f172a, #1e293b)', 
+                        padding: '40px', 
+                        borderRadius: 32, 
+                        marginBottom: 32, 
+                        color: '#fff', 
+                        position: 'relative', 
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 40px rgba(15,23,42,0.15)'
+                    }}>
+                        <div style={{ position: 'absolute', right: -20, bottom: -20, fontSize: 200, color: 'rgba(255,255,255,0.03)', transform: 'rotate(-15deg)' }}>
+                            <i className="bx bx-key" />
+                        </div>
+                        <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 20 }}>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#6366f1' }} />
+                                    <span style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Registry Otoritas</span>
                                 </div>
-                                <div style={{ padding: 24 }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                                        {perms.map(p => (
-                                            <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                                                <i className="bx bx-check-shield" style={{ color: '#10b981', fontSize: 18, marginTop: 2 }} />
-                                                <div>
-                                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{p.name}</div>
-                                                    <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', marginTop: 4, background: '#e2e8f0', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>{p.code}</div>
-                                                    {p.description && <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>{p.description}</div>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>Capability Registry</h2>
+                                <p style={{ margin: '12px 0 0 0', fontSize: 15, color: '#94a3b8', maxWidth: 600, lineHeight: 1.6 }}>
+                                    Daftar lengkap seluruh kapabilitas atomik dalam ekosistem SahabatMart. 
+                                    Gunakan registry ini untuk memetakan fungsi teknis ke dalam kebijakan akses bisnis.
+                                </p>
                             </div>
-                        ))}
+                            <div style={{ ...A.searchWrap, width: 300 }}>
+                                <i className="bx bx-search" style={{ ...A.searchIcon, color: '#fff' }} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Cari kapabilitas..." 
+                                    style={{ ...A.searchInput, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', width: '100%' }}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="rbac-perm-cols">
+                        {Object.entries(
+                            permissions
+                                .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.code.toLowerCase().includes(searchTerm.toLowerCase()) || p.group.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})
+                        ).map(([group, perms]) => {
+                            const groupIcons = {
+                                'Inventory': 'bx-package',
+                                'Orders': 'bx-cart',
+                                'Users': 'bx-user',
+                                'Admin': 'bx-shield-quarter',
+                                'Finance': 'bx-wallet',
+                                'Marketing': 'bx-megaphone',
+                                'Education': 'bx-book-open'
+                            };
+                            const icon = groupIcons[group] || 'bx-cube';
+
+                            return (
+                                <div key={group} style={{ 
+                                    ...A.card, 
+                                    breakInside: 'avoid', 
+                                    marginBottom: 24, 
+                                    display: 'flex', 
+                                    flexDirection: 'column',
+                                    border: '1px solid #f1f5f9'
+                                }}>
+                                    <div className="rbac-card-head" style={{ padding: '24px 30px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                            <div style={{ width: 44, height: 44, borderRadius: 14, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
+                                                <i className={`bx ${icon}`} style={{ color: '#6366f1', fontSize: 22 }} />
+                                            </div>
+                                            <div>
+                                                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#1e293b' }}>{group}</h3>
+                                                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{perms.length} Kapabilitas Aktif</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ padding: 30 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            {perms.map(p => (
+                                                <div key={p.id} style={{ 
+                                                    display: 'flex', 
+                                                    alignItems: 'flex-start', 
+                                                    gap: 16, 
+                                                    padding: '16px', 
+                                                    background: '#fff', 
+                                                    borderRadius: 16, 
+                                                    border: '1px solid #f1f5f9', 
+                                                    transition: '0.2s cubic-bezier(0.16, 1, 0.3, 1)' 
+                                                }} onMouseEnter={e=>{e.currentTarget.style.borderColor='#6366f1'; e.currentTarget.style.transform='translateX(4px)';}} onMouseLeave={e=>{e.currentTarget.style.borderColor='#f1f5f9'; e.currentTarget.style.transform='none';}}>
+                                                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                                                        <i className="bx bx-check" style={{ color: '#059669', fontSize: 16 }} />
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                                            <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{p.name}</div>
+                                                            <div style={{ fontSize: 9, color: '#6366f1', fontWeight: 900, background: '#e0e7ff', padding: '2px 6px', borderRadius: 6, textTransform: 'uppercase' }}>{p.code}</div>
+                                                        </div>
+                                                        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+                                                            {p.description || `Memberikan akses untuk mengelola fungsi ${p.name.toLowerCase()} dalam sistem.`}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -556,7 +763,7 @@ const AdminRBAC = () => {
             {showRoleModal && selectedRole && (
                 <Modal title={selectedRole.id ? "UPDATE SECURITY PROFILE" : "CREATE NEW SECURITY PROFILE"} onClose={() => setShowRoleModal(false)} wide>
                     <form onSubmit={handleSaveRole}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: 32 }}>
+                        <div className="rbac-modal-grid">
                             <div>
                                 <div style={{ background: '#f8fafc', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0' }}>
                                     <h4 style={{ margin: '0 0 20px 0', fontSize: 14, fontWeight: 800, color: '#1e293b' }}>Detail Profile</h4>
@@ -582,45 +789,51 @@ const AdminRBAC = () => {
                             </div>
                             
                             <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                               <div className="rbac-tab-header">
                                     <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Matrix Kapabilitas</h4>
                                     <div style={{ fontSize: 12, color: '#64748b', background: '#f1f5f9', padding: '6px 12px', borderRadius: 20 }}>
                                         Pilih fungsi yang diizinkan untuk role ini
                                     </div>
                                 </div>
                                 
-                                <div style={{ background: '#f8fafc', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0', maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
+                                <div style={{ background: '#f8fafc', padding: 24, borderRadius: 24, border: '1px solid #e2e8f0', maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
                                     {Object.entries(permissions.reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})).map(([g, ps]) => (
-                                        <div key={g} style={{ marginBottom: 28, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
-                                                <div style={{ fontSize: 13, fontWeight: 900, color: '#334155', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <i className="bx bx-folder" style={{ color: '#64748b' }}/> {g.toUpperCase()}
+                                        <div key={g} style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                                <div style={{ fontSize: 13, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <div style={{ width: 30, height: 30, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <i className="bx bx-folder" style={{ color: '#6366f1' }}/>
+                                                    </div>
+                                                    {g.toUpperCase()} MODULE
                                                 </div>
                                                 <div style={{ display: 'flex', gap: 8 }}>
-                                                    <button type="button" style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 10, fontWeight: 800, color: '#4f46e5', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => toggleGroup(g, true)} onMouseEnter={e=>e.currentTarget.style.background='#eef2ff'} onMouseLeave={e=>e.currentTarget.style.background='#fff'}>SELECT ALL</button>
-                                                    <button type="button" style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 10, fontWeight: 800, color: '#64748b', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => toggleGroup(g, false)} onMouseEnter={e=>e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e=>e.currentTarget.style.background='#fff'}>CLEAR</button>
+                                                    <button type="button" style={{ border: 'none', background: '#eef2ff', borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#4f46e5', cursor: 'pointer' }} onClick={() => toggleGroup(g, true)}>SELECT ALL</button>
+                                                    <button type="button" style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#64748b', cursor: 'pointer' }} onClick={() => toggleGroup(g, false)}>CLEAR</button>
                                                 </div>
                                             </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, padding: 20 }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, padding: 20 }}>
                                                 {ps.map(p => {
                                                     const isChecked = (selectedRole.permission_ids || []).includes(p.id);
                                                     return (
                                                         <label key={p.id} style={{ 
-                                                            display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px', 
-                                                            background: isChecked ? '#eef2ff' : '#fff', 
-                                                            border: `1px solid ${isChecked ? '#818cf8' : '#e2e8f0'}`, 
-                                                            borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s',
-                                                            boxShadow: isChecked ? '0 2px 4px rgba(99,102,241,0.1)' : 'none'
-                                                        }}
-                                                        onMouseEnter={e => { if(!isChecked) e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                                                        onMouseLeave={e => { if(!isChecked) e.currentTarget.style.borderColor = '#e2e8f0'; }}>
-                                                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, border: `2px solid ${isChecked ? '#6366f1' : '#cbd5e1'}`, background: isChecked ? '#6366f1' : '#fff', flexShrink: 0, marginTop: 2 }}>
-                                                                {isChecked && <i className="bx bx-check" style={{ color: '#fff', fontSize: 16, position: 'absolute' }} />}
-                                                                <input type="checkbox" style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer' }} checked={isChecked} onChange={() => togglePermission(p.id)} />
+                                                            display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px', 
+                                                            background: isChecked ? '#f5f7ff' : '#fff', 
+                                                            border: `2px solid ${isChecked ? '#6366f1' : '#f1f5f9'}`, 
+                                                            borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s'
+                                                        }}>
+                                                            <div style={{ 
+                                                                width: 20, height: 20, borderRadius: 6, 
+                                                                border: `2px solid ${isChecked ? '#6366f1' : '#cbd5e1'}`, 
+                                                                background: isChecked ? '#6366f1' : '#fff', 
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                flexShrink: 0, marginTop: 2
+                                                            }}>
+                                                                {isChecked && <i className="bx bx-check" style={{ color: '#fff', fontSize: 16 }} />}
+                                                                <input type="checkbox" style={{ display: 'none' }} checked={isChecked} onChange={() => togglePermission(p.id)} />
                                                             </div>
-                                                            <div>
-                                                                <div style={{ fontSize: 12, fontWeight: 700, color: isChecked ? '#312e81' : '#334155' }}>{p.name}</div>
-                                                                {p.description && <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>}
+                                                            <div style={{ minWidth: 0 }}>
+                                                                <div style={{ fontSize: 12.5, fontWeight: 800, color: isChecked ? '#1e1b4b' : '#334155' }}>{p.name}</div>
+                                                                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, fontFamily: 'monospace' }}>{p.code}</div>
                                                             </div>
                                                         </label>
                                                     );
@@ -637,48 +850,43 @@ const AdminRBAC = () => {
 
             {/* User Onboarding Modal */}
             {showUserModal && (
-                <Modal title={selectedUser ? "UPDATE PERSONNEL PROFILE" : "SYSTEM PERSONNEL ONBOARDING"} onClose={() => { setShowUserModal(false); setSelectedUser(null); }}>
-                    <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: 8 }}>
+                <Modal 
+                    title={selectedUser ? "MANAGE PERSONNEL ACCESS" : "ONBOARD NEW PERSONNEL"} 
+                    onClose={() => { setShowUserModal(false); setSelectedUser(null); }}
+                    wide
+                >
+                    <form onSubmit={handleSaveUser} className="rbac-user-grid" style={{ marginTop: 10 }}>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                            <div>
-                                <FieldLabel>Full Name</FieldLabel>
-                                <div style={{ position: 'relative' }}>
-                                    <i className="bx bx-user" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-                                    <input style={{...A.input, paddingLeft: 42}} placeholder="Nama Lengkap Staff" value={newUser.full_name} onChange={e=>setNewUser({...newUser, full_name: e.target.value})} required />
-                                </div>
+                        {/* LEFT COLUMN: BASIC INFO */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <div style={{ padding: '0 0 10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <i className="bx bx-user" style={{ color: '#d97706' }} />
+                                    </div>
+                                    Identity Profile
+                                </h4>
                             </div>
-                            <div>
-                                <FieldLabel>Email Address</FieldLabel>
-                                <div style={{ position: 'relative' }}>
-                                    <i className="bx bx-envelope" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-                                    <input style={{...A.input, paddingLeft: 42}} type="email" placeholder="email@perusahaan.com" value={newUser.email} onChange={e=>setNewUser({...newUser, email: e.target.value})} required={!selectedUser} disabled={!!selectedUser} />
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                <div>
+                                    <FieldLabel>Full Name</FieldLabel>
+                                    <input style={A.input} placeholder="Nama Lengkap Staff" value={newUser.full_name} onChange={e=>setNewUser({...newUser, full_name: e.target.value})} required />
                                 </div>
-                                {selectedUser && <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}><i className="bx bx-info-circle"/> Email cannot be changed</div>}
-                            </div>
-                        </div>
-
-                        {!selectedUser && (
-                            <div>
-                                <FieldLabel>System Password</FieldLabel>
-                                <div style={{ position: 'relative' }}>
-                                    <i className="bx bx-lock-alt" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-                                    <input style={{...A.input, paddingLeft: 42}} type="password" placeholder="Password minimal 8 karakter" value={newUser.password} onChange={e=>setNewUser({...newUser, password: e.target.value})} required />
+                                <div>
+                                    <FieldLabel>Email Address</FieldLabel>
+                                    <input style={{...A.input, background: selectedUser ? '#f8fafc' : '#f8fafc'}} type="email" placeholder="email@perusahaan.com" value={newUser.email} onChange={e=>setNewUser({...newUser, email: e.target.value})} required={!selectedUser} disabled={!!selectedUser} />
+                                    {selectedUser && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 6 }}>Email cannot be modified for existing personnel.</div>}
                                 </div>
-                            </div>
-                        )}
-
-                        <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }} />
-                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <i className="bx bx-shield-quarter" style={{ color: '#6366f1' }} /> Placement & Authorization
-                        </h4>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                            <div>
-                                <FieldLabel>Corporate Department</FieldLabel>
-                                <div style={{ position: 'relative' }}>
-                                    <i className="bx bx-buildings" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-                                    <select style={{...A.select, paddingLeft: 42}} value={newUser.department} onChange={e=>setNewUser({...newUser, department: e.target.value})}>
+                                {!selectedUser && (
+                                    <div>
+                                        <FieldLabel>System Password</FieldLabel>
+                                        <input style={A.input} type="password" placeholder="Password minimal 8 karakter" value={newUser.password} onChange={e=>setNewUser({...newUser, password: e.target.value})} required />
+                                    </div>
+                                )}
+                                <div>
+                                    <FieldLabel>Corporate Department</FieldLabel>
+                                    <select style={A.select} value={newUser.department} onChange={e=>setNewUser({...newUser, department: e.target.value})}>
                                         <option value="">No Department / General</option>
                                         <option value="IT & SYSTEMS">IT & SYSTEMS</option>
                                         <option value="MARKETING">MARKETING</option>
@@ -689,71 +897,82 @@ const AdminRBAC = () => {
                                     </select>
                                 </div>
                             </div>
-                            <div>
-                                <FieldLabel>Privilege Level</FieldLabel>
-                                <div style={{ position: 'relative' }}>
-                                    <i className="bx bx-key" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-                                    <select style={{...A.select, paddingLeft: 42, background: newUser.role === 'superadmin' ? '#fef2f2' : '#fff', borderColor: newUser.role === 'superadmin' ? '#fecaca' : '#e2e8f0'}} value={newUser.role} onChange={e=>setNewUser({...newUser, role: e.target.value})}>
-                                        <option value="admin">Admin (Restricted Access)</option>
-                                        <option value="superadmin">Superadmin (Root Access)</option>
-                                    </select>
-                                </div>
-                            </div>
                         </div>
 
-                        <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0', opacity: newUser.role === 'superadmin' ? 0.6 : 1 }}>
-                            <FieldLabel>Security Profile Assignment {newUser.role === 'superadmin' && '(Not Required for Superadmin)'}</FieldLabel>
-                            <select 
-                                style={{...A.select, background: newUser.role === 'superadmin' ? '#f1f5f9' : '#fff'}} 
-                                value={newUser.admin_role} 
-                                onChange={e=>setNewUser({...newUser, admin_role: e.target.value})} 
-                                disabled={newUser.role === 'superadmin'}
-                                required={newUser.role !== 'superadmin'}
-                            >
-                                <option value="">-- {roles.length === 0 ? 'No Profiles Available' : 'Assign a security profile'} --</option>
-                                {Array.isArray(roles) && roles.map(r => (
-                                    <option key={r.id} value={r.name}>{r.name}</option>
-                                ))}
-                            </select>
+                        {/* RIGHT COLUMN: ACCESS CONTROL */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <div style={{ padding: '0 0 10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <i className="bx bx-shield-quarter" style={{ color: '#6366f1' }} />
+                                    </div>
+                                    Security & Privileges
+                                </h4>
+                            </div>
 
-                            {newUser.role === 'superadmin' ? (
-                                <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>
-                                    <i className="bx bxs-check-shield" /> SUPERADMIN: Akses penuh diberikan secara otomatis.
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                <div>
+                                    <FieldLabel>Privilege Level</FieldLabel>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                        <button type="button" onClick={()=>setNewUser({...newUser, role: 'admin'})} style={{
+                                            padding: '16px', borderRadius: 16, border: `2px solid ${newUser.role === 'admin' ? '#6366f1' : '#f1f5f9'}`,
+                                            background: newUser.role === 'admin' ? '#f5f7ff' : '#fff', cursor: 'pointer', textAlign: 'left', transition: '0.2s'
+                                        }}>
+                                            <div style={{ fontSize: 13, fontWeight: 900, color: '#1e293b' }}>RESTRICTED</div>
+                                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Standard staff access with specific roles.</div>
+                                        </button>
+                                        <button type="button" onClick={()=>setNewUser({...newUser, role: 'superadmin'})} style={{
+                                            padding: '16px', borderRadius: 16, border: `2px solid ${newUser.role === 'superadmin' ? '#ef4444' : '#f1f5f9'}`,
+                                            background: newUser.role === 'superadmin' ? '#fef2f2' : '#fff', cursor: 'pointer', textAlign: 'left', transition: '0.2s'
+                                        }}>
+                                            <div style={{ fontSize: 13, fontWeight: 900, color: '#991b1b' }}>SUPERADMIN</div>
+                                            <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 4 }}>Full system access & root control.</div>
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : (
-                                <>
-                                    {newUser.admin_role ? (
-                                        <div style={{ marginTop: 16 }}>
-                                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase' }}>Profile Capabilities Preview</div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                {getAdminPermissions(newUser.admin_role).slice(0, 5).map(p => (
-                                                    <span key={p.id} style={{ fontSize: 10, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>{p.name}</span>
-                                                ))}
-                                                {getAdminPermissions(newUser.admin_role).length > 5 && (
-                                                    <span style={{ fontSize: 10, background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>+{getAdminPermissions(newUser.admin_role).length - 5} more</span>
-                                                )}
-                                            </div>
+
+                                <div style={{ background: '#f8fafc', padding: 24, borderRadius: 24, border: '1px solid #e2e8f0', flex: 1 }}>
+                                    <FieldLabel>Security Profile Assignment</FieldLabel>
+                                    {newUser.role === 'superadmin' ? (
+                                        <div style={{ padding: '16px', background: '#fff', borderRadius: 14, border: '2px dashed #fecaca', textAlign: 'center', color: '#ef4444' }}>
+                                            <i className="bx bxs-check-shield" style={{ fontSize: 24, marginBottom: 8 }} />
+                                            <div style={{ fontSize: 12, fontWeight: 800 }}>NOT REQUIRED</div>
+                                            <div style={{ fontSize: 11, marginTop: 4 }}>Superadmins bypass all role-based checks.</div>
                                         </div>
                                     ) : (
-                                        roles.length === 0 && (
-                                            <div style={{ marginTop: 12, background: '#fff1f2', padding: 10, borderRadius: 8, border: '1px solid #fecaca', display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                <i className="bx bx-error-circle" style={{ color: '#ef4444' }} />
-                                                <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 600 }}>
-                                                    Belum ada Security Profile. Silakan buat di tab <strong>ROLES</strong> terlebih dahulu.
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            <select 
+                                                style={{...A.select, width: '100%', height: 44}} 
+                                                value={newUser.admin_role} 
+                                                onChange={e=>setNewUser({...newUser, admin_role: e.target.value})} 
+                                                required={newUser.role === 'admin'}
+                                            >
+                                                <option value="">-- Choose a Security Profile --</option>
+                                                {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                            </select>
+                                            
+                                            {newUser.admin_role && (
+                                                <div style={{ padding: 12, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                                                    <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>Enabled Capabilities</div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                        {getAdminPermissions(newUser.admin_role).slice(0, 6).map(p => (
+                                                            <span key={p.id} style={{ fontSize: 9, background: '#eef2ff', color: '#6366f1', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>{p.name}</span>
+                                                        ))}
+                                                        {getAdminPermissions(newUser.admin_role).length > 6 && (
+                                                            <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700 }}>+{getAdminPermissions(newUser.admin_role).length - 6} more</span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )
+                                            )}
+                                        </div>
                                     )}
-                                </>
-                            )}
-                        </div>
+                                </div>
 
-
-                        <div style={{ marginTop: 12 }}>
-                            <button style={{ ...A.btnPrimary, width: '100%', height: 48, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }} type="submit">
-                                <i className="bx bx-check-shield" style={{ fontSize: 20 }} /> 
-                                {selectedUser ? 'UPDATE PERSONNEL PROFILE' : 'SYNCHRONIZE PERSONNEL ACCESS'}
-                            </button>
+                                <button style={{ ...A.btnPrimary, width: '100%', height: 54, borderRadius: 16, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 10 }} type="submit">
+                                    <i className="bx bx-check-shield" style={{ fontSize: 22 }} /> 
+                                    {selectedUser ? 'SAVE ACCESS CHANGES' : 'AUTHORIZE PERSONNEL'}
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </Modal>

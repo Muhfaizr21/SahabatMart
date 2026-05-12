@@ -188,7 +188,10 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				item.OrderID = order.ID
 				item.OrderMerchantGroupID = group.ID
 
-				affAmt, distAmt, platAmt, cogs, _ := s.CalculateCommissions(tx, item, affiliateID, merchantID)
+				affAmt, affRate, distAmt, platAmt, cogs, err := s.CalculateCommissions(tx, item, affiliateID, merchantID)
+				if err != nil {
+					return fmt.Errorf("gagal menghitung komisi: %v", err)
+				}
 
 				var inventory models.Inventory
 				inventoryMerchantID := merchantID
@@ -258,6 +261,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 				item.PlatformFeeAmount = platAmt
 				item.CommissionAmount = affAmt
+				item.CommissionRate = affRate
 				item.DistributionFeeAmount = distAmt
 				item.MerchantAmount = distAmt // Merchant only gets their commission/fee
 				item.COGS = cogs
@@ -441,7 +445,7 @@ type PresetCommissionEntry struct {
 // CalculateCommissions menghitung distribusi komisi untuk satu order item.
 // Jika produk memiliki CommissionPreset, akan berjalan naik ke seluruh jaringan upline
 // sesuai kedalaman preset. Jika tidak, hanya hitung untuk referrer langsung (Level 1).
-func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, distAmt float64, platAmt float64, cogs float64, err error) {
+func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, affiliateID *string, merchantID string) (affAmt float64, affRate float64, distAmt float64, platAmt float64, cogs float64, err error) {
 	subtotal := item.UnitPrice * float64(item.Quantity)
 
 	// 1. Platform Fee (DISABLED per User Request)
@@ -513,11 +517,15 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 
 			// Cek apakah produk punya preset multi-level
 			if presetID != nil && *presetID != "" {
-				// Kalau ada preset, affAmt diisi dari Level 1 rate saja (untuk order total)
-				// Distribusi lengkap akan dieksekusi via DistributePresetCommissions
-				var presetLevel models.CommissionPresetLevel
-				if err := db.Where("preset_id = ? AND level = 1", *presetID).First(&presetLevel).Error; err == nil {
-					affAmt = subtotal * presetLevel.Rate
+				// [Sync Fix] Hitung TOTAL seluruh level dalam preset untuk liabilitas keuangan Admin
+				var levels []models.CommissionPresetLevel
+				if err := db.Where("preset_id = ?", *presetID).Order("level ASC").Find(&levels).Error; err == nil {
+					var totalRate float64
+					for _, l := range levels {
+						totalRate += l.Rate
+					}
+					affRate = totalRate
+					affAmt = subtotal * affRate
 				}
 			} else {
 				// Fallback ke logika lama (no preset)
@@ -527,22 +535,28 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 				if product.TierCommissionPresetID != nil && *product.TierCommissionPresetID != "" {
 					// Gunakan Preset Matrix
 					if err := db.Where("preset_id = ? AND membership_tier_id = ?", *product.TierCommissionPresetID, aff.MembershipTierID).First(&tpItem).Error; err == nil {
-						affAmt = subtotal * tpItem.CommissionRate
+						affRate = tpItem.CommissionRate
+						affAmt = subtotal * affRate
 					}
 				}
 
 				if affAmt == 0 {
 					// Fallback ke manual matrix per produk
 					if err := db.Where("product_id = ? AND membership_tier_id = ?", item.ProductID, aff.MembershipTierID).First(&tierComm).Error; err == nil {
-						affAmt = subtotal * tierComm.CommissionRate
+						affRate = tierComm.CommissionRate
+						affAmt = subtotal * affRate
 					} else if product.BaseAffiliateFee > 0 {
-						affAmt = subtotal * (product.BaseAffiliateFee / 100.0)
+						affRate = product.BaseAffiliateFee / 100.0
+						affAmt = subtotal * affRate
 					} else if product.BaseAffiliateFeeNominal > 0 {
 						affAmt = product.BaseAffiliateFeeNominal * float64(item.Quantity)
+						if subtotal > 0 {
+							affRate = affAmt / subtotal
+						}
 					} else {
 						// Standardize: Assume input is percentage (e.g. 3 = 3% = 0.03)
 						rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
-						affRate := rawComm / 100.0
+						affRate = rawComm / 100.0
 						affAmt = subtotal * affRate
 					}
 				}
@@ -550,7 +564,7 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 		}
 	}
 
-	return affAmt, distAmt, platAmt, cogs, nil
+	return affAmt, affRate, distAmt, platAmt, cogs, nil
 }
 
 // DistributePresetCommissions: Jika produk memiliki CommissionPreset, fungsi ini
@@ -682,10 +696,16 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 
 		// [Sync Fix] Return Stock to BOTH Inventory and Master Product Catalog
 		for _, item := range order.Items {
-			// 1. Restock Merchant's Warehouse
-			if err := tx.Model(&models.Inventory{}).
-				Where("merchant_id = ? AND product_id = ?", item.MerchantID, item.ProductID).
-				UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+			// 1. Restock Merchant's Warehouse (Variant-Aware)
+			invQuery := tx.Model(&models.Inventory{}).
+				Where("merchant_id = ? AND product_id = ?", item.MerchantID, item.ProductID)
+			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+				invQuery = invQuery.Where("product_variant_id = ?", *item.ProductVariantID)
+			} else {
+				invQuery = invQuery.Where("product_variant_id IS NULL")
+			}
+			
+			if err := invQuery.UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
 				return err
 			}
 

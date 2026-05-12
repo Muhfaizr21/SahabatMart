@@ -624,6 +624,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 			qty                   int
 			price                 float64
 			commissionAmount      float64
+			commissionRate        float64
 			distributionAmount    float64
 			platformFeeAmount     float64
 			cogs                  float64
@@ -668,7 +669,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				Quantity:         item.Quantity,
 				UnitPrice:        unitPrice,
 			}
-			affAmt, distAmt, platAmt, cogs, _ := orderSvc.CalculateCommissions(tx, tempOI, resolvedAffiliateID, merchantID)
+			affAmt, affRate, distAmt, platAmt, cogs, _ := orderSvc.CalculateCommissions(tx, tempOI, resolvedAffiliateID, merchantID)
 
 			itemsToProcess = append(itemsToProcess, itemData{
 				product:               product,
@@ -676,6 +677,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				qty:                   item.Quantity,
 				price:                 unitPrice,
 				commissionAmount:      affAmt,
+				commissionRate:        affRate,
 				distributionAmount:    distAmt,
 				platformFeeAmount:     platAmt,
 				cogs:                  cogs,
@@ -818,6 +820,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				Quantity:             it.qty,
 				UnitPrice:            it.price,
 				Subtotal:             it.price * float64(it.qty),
+				CommissionRate:       it.commissionRate,
 				CommissionAmount:     it.commissionAmount,
 				DistributionFeeAmount: it.distributionAmount,
 				PlatformFeeAmount:    it.platformFeeAmount,

@@ -7,17 +7,24 @@ import (
 	"time"
 
 	"SahabatMart/backend/models"
+	"SahabatMart/backend/repositories"
+	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type RBACController struct {
-	DB *gorm.DB
+	DB    *gorm.DB
+	Audit *services.AuditService
 }
 
 func NewRBACController(db *gorm.DB) *RBACController {
-	return &RBACController{DB: db}
+	audit := services.NewAuditService(repositories.NewAuditRepository(db))
+	return &RBACController{
+		DB:    db,
+		Audit: audit,
+	}
 }
 
 // GET /api/admin/rbac/permissions
@@ -36,6 +43,7 @@ func (rc *RBACController) GetRoles(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/admin/rbac/roles/upsert
 func (rc *RBACController) UpsertRole(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	var input struct {
 		ID            string   `json:"id"`
 		Name          string   `json:"name"`
@@ -49,8 +57,11 @@ func (rc *RBACController) UpsertRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var role models.Role
+	oldName := ""
 	if input.ID != "" {
-		rc.DB.First(&role, "id = ?", input.ID)
+		if err := rc.DB.First(&role, "id = ?", input.ID).Error; err == nil {
+			oldName = role.Name
+		}
 	}
 
 	role.Name = input.Name
@@ -61,31 +72,53 @@ func (rc *RBACController) UpsertRole(w http.ResponseWriter, r *http.Request) {
 		rc.DB.Where("id IN ?", input.PermissionIDs).Find(&permissions)
 	}
 
-	if input.ID != "" {
-		rc.DB.Model(&role).Association("Permissions").Replace(permissions)
-	} else {
-		role.Permissions = permissions
-	}
+	if err := rc.DB.Transaction(func(tx *gorm.DB) error {
+		if input.ID != "" {
+			// Cascade Update: Jika nama role berubah, update semua user yang menggunakan role ini
+			if oldName != "" && oldName != input.Name {
+				if err := tx.Model(&models.User{}).Where("admin_role = ?", oldName).Update("admin_role", input.Name).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(&role).Association("Permissions").Replace(permissions); err != nil {
+				return err
+			}
+		} else {
+			role.Permissions = permissions
+		}
 
-	if err := rc.DB.Save(&role).Error; err != nil {
+		if err := tx.Save(&role).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan role: "+err.Error())
 		return
 	}
+
+	action := "create_role"
+	if input.ID != "" {
+		action = "update_role"
+	}
+	rc.Audit.Log(adminID, action, "rbac", role.Name, fmt.Sprintf("Permissions: %d", len(input.PermissionIDs)), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, role)
 }
 
 // DELETE /api/admin/rbac/roles/delete?id=...
 func (rc *RBACController) DeleteRole(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		utils.JSONError(w, http.StatusBadRequest, "Missing ID")
 		return
 	}
 
-	// Check if any admin uses this role
 	var role models.Role
-	rc.DB.First(&role, "id = ?", id)
+	if err := rc.DB.First(&role, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Role tidak ditemukan")
+		return
+	}
 
 	var count int64
 	rc.DB.Model(&models.User{}).Where("admin_role = ?", role.Name).Count(&count)
@@ -97,11 +130,13 @@ func (rc *RBACController) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	rc.DB.Model(&role).Association("Permissions").Clear()
 	rc.DB.Delete(&role)
 
+	rc.Audit.Log(adminID, "delete_role", "rbac", role.Name, "Role deleted successfully", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // POST /api/admin/rbac/users
 func (rc *RBACController) CreateAdminUser(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	var input struct {
 		Email      string `json:"email"`
 		Password   string `json:"password"`
@@ -121,7 +156,6 @@ func (rc *RBACController) CreateAdminUser(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check duplicate email
 	var existing models.User
 	if err := rc.DB.Where("email = ?", input.Email).First(&existing).Error; err == nil {
 		utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar")
@@ -155,6 +189,8 @@ func (rc *RBACController) CreateAdminUser(w http.ResponseWriter, r *http.Request
 	}
 	rc.DB.Create(&profile)
 
+	rc.Audit.Log(adminID, "create_admin", "rbac", user.Email, fmt.Sprintf("Role: %s, AdminRole: %s", user.Role, user.AdminRole), r.RemoteAddr)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",
 		"user_id": user.ID,
@@ -163,6 +199,7 @@ func (rc *RBACController) CreateAdminUser(w http.ResponseWriter, r *http.Request
 
 // PUT /api/admin/rbac/users/update
 func (rc *RBACController) UpdateAdminUser(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	var input struct {
 		ID         string `json:"id"`
 		AdminRole  string `json:"admin_role"`
@@ -178,6 +215,17 @@ func (rc *RBACController) UpdateAdminUser(w http.ResponseWriter, r *http.Request
 
 	if input.ID == "" {
 		utils.JSONError(w, http.StatusBadRequest, "User ID wajib diisi")
+		return
+	}
+
+	var user models.User
+	if err := rc.DB.First(&user, "id = ?", input.ID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
+	if adminID == input.ID && (input.Role != "" || input.AdminRole != "") {
+		utils.JSONError(w, http.StatusForbidden, "Anda tidak dapat mengubah role Anda sendiri demi alasan keamanan")
 		return
 	}
 
@@ -201,11 +249,14 @@ func (rc *RBACController) UpdateAdminUser(w http.ResponseWriter, r *http.Request
 		rc.DB.Model(&models.UserProfile{}).Where("user_id = ?", input.ID).Update("full_name", input.FullName)
 	}
 
+	rc.Audit.Log(adminID, "update_admin", "rbac", user.Email, fmt.Sprintf("New AdminRole: %s, New Role: %s", input.AdminRole, input.Role), r.RemoteAddr)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // POST /api/admin/rbac/users/status
 func (rc *RBACController) ToggleAdminStatus(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	var input struct {
 		ID     string `json:"id"`
 		Status string `json:"status"`
@@ -220,32 +271,60 @@ func (rc *RBACController) ToggleAdminStatus(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	var user models.User
+	if err := rc.DB.First(&user, "id = ?", input.ID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
+	// Protect SuperAdmin Utama & Self-deactivation
+	if adminID == input.ID && input.Status != "active" {
+		utils.JSONError(w, http.StatusForbidden, "Anda tidak dapat menonaktifkan akun Anda sendiri")
+		return
+	}
+
+	if (user.Email == "admin@sahabatmart.id" || user.Email == "superadmin@sahabatmart.id") && input.Status != "active" {
+		utils.JSONError(w, http.StatusForbidden, "Akun superadmin utama tidak dapat dinonaktifkan")
+		return
+	}
+
 	if err := rc.DB.Model(&models.User{}).
 		Where("id = ? AND role IN ?", input.ID, []string{"admin", "superadmin"}).
 		Update("status", input.Status).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal update status: "+err.Error())
 		return
 	}
+
+	rc.Audit.Log(adminID, "toggle_admin_status", "rbac", user.Email, fmt.Sprintf("Status changed to: %s", input.Status), r.RemoteAddr)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 // DELETE /api/admin/rbac/users/delete?id=...
 func (rc *RBACController) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		utils.JSONError(w, http.StatusBadRequest, "Missing ID")
 		return
 	}
 
-	// Protect the default superadmin
 	var user models.User
-	rc.DB.First(&user, "id = ?", id)
+	if err := rc.DB.First(&user, "id = ?", id).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
+	// Protect the default superadmin
 	if user.Email == "admin@sahabatmart.id" || user.Email == "superadmin@sahabatmart.id" {
 		utils.JSONError(w, http.StatusForbidden, "Akun superadmin utama tidak dapat dihapus")
 		return
 	}
 
 	rc.DB.Delete(&models.User{}, "id = ? AND role IN ?", id, []string{"admin", "superadmin"})
+	
+	rc.Audit.Log(adminID, "delete_admin", "rbac", user.Email, "Admin deleted permanently", r.RemoteAddr)
+	
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 

@@ -267,6 +267,15 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 			// [SYNC] Update AffiliateCommission status if applicable
 			if txn.ReferenceType == "affiliate_commission" && txn.ReferenceID != nil {
 				tx.Model(&models.AffiliateCommission{}).Where("id = ?", *txn.ReferenceID).Update("status", models.CommissionApproved)
+				
+				// [Akuglow Sync] Trigger stats recalculation for the affiliate
+				if wallet.OwnerType == models.WalletAffiliate {
+					var member models.AffiliateMember
+					if tx.Where("user_id = ?", wallet.OwnerID).First(&member).Error == nil {
+						affSvc := NewAffiliateService(tx, nil)
+						_ = affSvc.TriggerTierUpgrade(member.ID)
+					}
+				}
 			}
 			
 			count++

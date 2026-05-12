@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 	"gorm.io/gorm"
 )
@@ -22,39 +23,77 @@ func NewAffiliateService(db *gorm.DB, notif *NotificationService) *AffiliateServ
 // completedOrderStatuses adalah status pesanan yang dianggap sudah valid untuk perhitungan omset
 var completedOrderStatuses = []string{"paid", "processing", "ready_to_ship", "shipped", "delivered", "completed"}
 
-func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua string, subID1, subID2, subID3 string, linkCode string) (*models.AffiliateMember, error) {
+type TrackClickRequest struct {
+	RefCode   string
+	ProductID string
+	Referrer  string
+	IP        string
+	UA        string
+	SubID1    string
+	SubID2    string
+	SubID3    string
+	LinkCode  string
+}
+
+func (s *AffiliateService) TrackClick(req TrackClickRequest) (*models.AffiliateMember, error) {
 	var affiliate models.AffiliateMember
-	if err := s.DB.Where("ref_code = ?", refCode).First(&affiliate).Error; err != nil {
+	if err := s.DB.Where("ref_code = ?", req.RefCode).First(&affiliate).Error; err != nil {
 		return nil, err
 	}
 
-	// Fraud Shield: Cek anomali jumlah klik dari IP yang sama dalam durasi singkat
+	// Fraud Shield+: List Bot User Agents
+	botAgents := []string{"bot", "crawler", "spider", "headless", "curl", "wget", "python-requests"}
+	isBot := false
+	for _, b := range botAgents {
+		if strings.Contains(strings.ToLower(req.UA), b) {
+			isBot = true
+			break
+		}
+	}
+
+	// Fraud Shield+: Cek spam klik dalam 1 menit terakhir
 	var recentClicks int64
-	cutoff := time.Now().Add(-5 * time.Minute)
+	cutoff := time.Now().Add(-1 * time.Minute)
 	s.DB.Model(&models.AffiliateClick{}).
-		Where("ip_address = ? AND created_at > ?", ip, cutoff).
+		Where("ip_address = ? AND created_at > ?", req.IP, cutoff).
 		Count(&recentClicks)
 
-	isFraud := recentClicks > 50 // Threshold proteksi bot
+	// Proteksi agresif: Jika lebih dari 15 klik per menit dari IP yang sama
+	isFraud := recentClicks > 15 || isBot
+	
+	// Jika klik ke produk yang sama persis dalam 3 detik (Double Click/Spam)
+	var duplicateClick int64
+	s.DB.Model(&models.AffiliateClick{}).
+		Where("ip_address = ? AND product_id = ? AND created_at > ?", req.IP, req.ProductID, time.Now().Add(-3 * time.Second)).
+		Count(&duplicateClick)
+	
+	if duplicateClick > 0 {
+		isFraud = true
+	}
 
 	click := models.AffiliateClick{
 		AffiliateID: affiliate.ID,
-		ProductID:   productID,
-		Referrer:    referrer,
-		IPAddress:   ip,
-		UserAgent:   ua,
-		SubID1:      subID1,
-		SubID2:      subID2,
-		SubID3:      subID3,
+		ProductID:   req.ProductID,
+		Referrer:    req.Referrer,
+		IPAddress:   req.IP,
+		UserAgent:   req.UA,
+		SubID1:      req.SubID1,
+		SubID2:      req.SubID2,
+		SubID3:      req.SubID3,
 		IsFraud:     isFraud,
-		IsBot:       isFraud, // Anggap bot jika klik brutal
+		IsBot:       isBot,
 	}
 	s.DB.Create(&click)
 	
+	// Jika terdeteksi fraud, jangan kembalikan data affiliate (cegah atribusi)
+	if isFraud {
+		return nil, errors.New("fraud detected: activity blocked")
+	}
+
 	// Record specific custom link click if linkCode is provided
-	if linkCode != "" && !isFraud {
+	if req.LinkCode != "" {
 		s.DB.Model(&models.AffiliateLink{}).
-			Where("short_code = ?", linkCode).
+			Where("short_code = ?", req.LinkCode).
 			Update("clicks_count", gorm.Expr("clicks_count + 1"))
 		
 		// If we wanted to track AffiliateClickLog, we could do it here,
@@ -67,16 +106,19 @@ func (s *AffiliateService) TrackClick(refCode, productID, referrer, ip, ua strin
 func (s *AffiliateService) GetDashboardStats(affiliateID string) (*models.AffiliateMember, int64, error) {
 	var affiliate models.AffiliateMember
 	// First fetch the affiliate member
-	if err := s.DB.First(&affiliate, "id = ?", affiliateID).Error; err != nil {
+	if err := s.DB.Preload("Tier").First(&affiliate, "id = ?", affiliateID).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Try to preload tier separately — don't fail if tier is missing
-	if affiliate.MembershipTierID > 0 {
-		var tier models.MembershipTier
-		if err := s.DB.First(&tier, "id = ?", affiliate.MembershipTierID).Error; err == nil {
-			affiliate.Tier = &tier
-		}
+	// [Performance Fix] Use snapshot for intensive stats instead of real-time count
+	var snapshot models.AffiliateTurnoverSnapshot
+	if err := s.DB.Where("affiliate_id = ?", affiliateID).First(&snapshot).Error; err == nil {
+		// Sync current cache values to model for UI
+		affiliate.ActiveMitraCount = int(snapshot.TeamDownlines)
+		affiliate.TeamMonthlyTurnover = snapshot.MonthlyTurnover
+	} else {
+		// Fallback: If no snapshot exists, trigger one (background)
+		go s.UpdateTurnoverSnapshot(affiliateID)
 	}
 
 	var totalClicks int64
@@ -357,7 +399,9 @@ func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligi
 		log.Printf("⚠️ CheckMerchantEligibility Error: %v", err)
 	}
 
-	isEligible = qualifiedMitra >= int64(reqMitra) && monthlyTurnover >= reqTurnover
+	// [Business Policy Update] Merchant eligibility is now based on TOTAL affiliates in network
+	// instead of only 'Qualified' (directs with teams).
+	isEligible = activeMitra >= int64(reqMitra) && monthlyTurnover >= reqTurnover
 	return isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, qualifiedMitra
 }
 

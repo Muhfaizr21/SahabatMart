@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
+import TreeNode from '../../components/affiliate/TreeNode';
+import EligibilityCard from '../../components/affiliate/EligibilityCard';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
@@ -130,19 +133,19 @@ export default function TeamPerformance() {
 
   // Eligibility data
   const totalMitra = eligibility?.active_mitra || 0;
-  const qualifiedMitra = eligibility?.qualified_mitra || 0;
   const reqMitra = eligibility?.requirements?.min_mitra || 100;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
   const reqTurnover = eligibility?.requirements?.min_turnover || 10000000;
   
-  // Use qualifiedMitra for merchant progress requirement
-  const mitraProgress = Math.min((qualifiedMitra / reqMitra) * 100, 100);
+  // Use totalMitra for progress as requested (Total Affiliate instead of Qualified)
+  const mitraProgress = Math.min((totalMitra / reqMitra) * 100, 100);
   const turnoverProgress = Math.min((monthlyTurnover / reqTurnover) * 100, 100);
   const isEligible = eligibility?.is_eligible;
   const activeMitra = stats?.active_mitra || 0; // Derived from stats
 
   return (
-    <div className="space-y-8">
+    <ErrorBoundary>
+      <div className="space-y-8">
       {/* Header & Breadcrumbs */}
       <div className="space-y-4">
         <div>
@@ -219,80 +222,14 @@ export default function TeamPerformance() {
         </div>
       </div>
 
-      {/* Merchant Eligibility Progress [Sync Fix: real-time progress bar] */}
-      {eligibility && (
-        <div className="rounded-2xl p-6 space-y-5" style={{
-          ...cardStyle,
-          border: isEligible ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(183, 109, 255, 0.2)'
-        }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-white font-bold font-['Plus_Jakarta_Sans'] flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg" style={{ color: isEligible ? '#4ade80' : '#b76dff' }}>
-                  {isEligible ? 'verified' : 'storefront'}
-                </span>
-                Progress Naik ke <span className="text-purple-300 ml-1">Merchant</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {isEligible
-                  ? '🎉 Anda memenuhi syarat! Ajukan upgrade sekarang.'
-                  : 'Penuhi 2 syarat berikut untuk menjadi Merchant AkuGlow'}
-              </p>
-            </div>
-            {isEligible && (
-              <span className="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider"
-                style={{ background: '#4ade8018', color: '#4ade80', border: '1px solid #4ade8030' }}>
-                ✓ Eligible
-              </span>
-            )}
-          </div>
-
-          {/* Mitra Aktif Progress */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-300 font-semibold">Progres Mitra (Direct Berjaringan)</span>
-                <span className="text-[10px] text-slate-500">Total Tergabung: {totalMitra} Mitra</span>
-              </div>
-              <span className="text-xs font-black" style={{ color: qualifiedMitra >= reqMitra ? '#4ade80' : '#b76dff' }}>
-                {qualifiedMitra} / {reqMitra}
-              </span>
-            </div>
-            <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${mitraProgress}%`,
-                  background: qualifiedMitra >= reqMitra
-                    ? 'linear-gradient(90deg, #4ade80, #22c55e)'
-                    : 'linear-gradient(90deg, #7c3aed, #b76dff)'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Omset Tim Progress */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs text-slate-300 font-semibold">Omset Tim / Bulan</span>
-              <span className="text-xs font-black" style={{ color: monthlyTurnover >= reqTurnover ? '#4ade80' : '#fabc4e' }}>
-                {formatRp(monthlyTurnover)} / {formatRp(reqTurnover)}
-              </span>
-            </div>
-            <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${turnoverProgress}%`,
-                  background: monthlyTurnover >= reqTurnover
-                    ? 'linear-gradient(90deg, #4ade80, #22c55e)'
-                    : 'linear-gradient(90deg, #f59e0b, #fabc4e)'
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Merchant Eligibility Progress */}
+      <EligibilityCard 
+        eligibility={eligibility}
+        totalMitra={totalMitra}
+        activeMitra={activeMitra}
+        monthlyTurnover={monthlyTurnover}
+        cardStyle={cardStyle}
+      />
 
       {/* Team View Controller */}
       <div className="space-y-4">
@@ -323,6 +260,21 @@ export default function TeamPerformance() {
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* Level Filter */}
+            <select 
+              value={filterLevel}
+              onChange={(e) => setFilterLevel(e.target.value)}
+              className="bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-purple-500/50"
+            >
+              <option value="all">Semua Level</option>
+              <option value="1">Level 1 (Direct)</option>
+              <option value="2">Level 2</option>
+              <option value="3">Level 3</option>
+              <option value="4">Level 4</option>
+              <option value="5">Level 5</option>
+              <option value="2plus">Level 2+ (Jaringan)</option>
+            </select>
+
             <div className="relative flex-1 md:w-64">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
               <input
@@ -357,142 +309,148 @@ export default function TeamPerformance() {
             </div>
           </div>
         ) : (
-          <div style={cardStyle} className="rounded-3xl overflow-hidden border border-white/5">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+          <div className="rounded-3xl overflow-hidden border border-white/5 bg-white/[0.01] backdrop-blur-md shadow-2xl">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white/[0.02] border-b border-white/5">
+                  <tr className="bg-white/[0.04] border-b border-white/10">
                     {[
-                      { label: 'Nama Mitra', icon: 'person' },
-                      { label: 'Level', icon: 'layers' },
-                      { label: 'Status', icon: 'shield_check' },
-                      { label: 'Direferensikan Oleh', icon: 'link' },
-                      { label: 'Bergabung', icon: 'event' },
-                      { label: 'Omset Pribadi', icon: 'payments' },
-                      { label: 'Aksi', icon: 'settings', align: 'center' },
+                      { label: 'Siapa?', icon: 'person', width: '40%' },
+                      { label: 'Hubungan', icon: 'account_tree', width: '20%' },
+                      { label: 'Sudah Belanja?', icon: 'shopping_bag', width: '20%' },
+                      { label: 'Hasil (Omset)', icon: 'payments', width: '15%' },
+                      { label: 'Lihat Tim', icon: 'visibility', width: '5%', align: 'center' },
                     ].map((h, i) => (
-                      <th key={i} className={`px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest ${h.align === 'center' ? 'text-center' : ''}`}>
+                      <th key={i} className={`px-6 py-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] ${h.align === 'center' ? 'text-center' : ''}`} style={{ width: h.width }}>
                         <div className={`flex items-center gap-2 ${h.align === 'center' ? 'justify-center' : ''}`}>
-                          <span className="material-symbols-outlined text-[14px]">{h.icon}</span>
                           {h.label}
                         </div>
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {stats?.downlines?.filter(isMemberVisible).map((m, idx) => (
+                <tbody className="divide-y divide-white/[0.04]">
+                  {stats?.downlines?.map((m, idx) => (
                     <tr
                       key={m.affiliate_id || m.user_id || idx}
-                      className={`transition-all duration-300 ${m.level === 1 ? 'bg-purple-500/[0.03] hover:bg-purple-500/[0.06]' : 'hover:bg-white/3'}`}
-                      style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                      className="group transition-all duration-300 hover:bg-white/[0.04]"
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {m.level > 1 && (
-                            <div className="flex items-center">
-                              <div className="w-5 h-8 border-l-2 border-b-2 border-white/10 rounded-bl-xl -mt-5 mr-1" />
-                            </div>
-                          )}
-                          <div
-                            className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center text-white text-xs font-black flex-shrink-0 shadow-lg"
-                            style={{ 
-                              background: m.level === 1 
-                                ? 'linear-gradient(135deg, #7c3aed, #b76dff)' 
-                                : 'linear-gradient(135deg, #334155, #475569)',
-                              boxShadow: m.level === 1 ? '0 4px 12px rgba(124, 58, 237, 0.3)' : 'none'
-                            }}
-                          >
-                            {m.avatar_url ? (
-                              <img src={formatImage(m.avatar_url)} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-sm">{(m.full_name || 'M').charAt(0).toUpperCase()}</span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className={`text-sm font-bold ${m.level === 1 ? 'text-white' : 'text-slate-200'}`}>{m.full_name || 'Mitra'}</p>
-                              {m.level === 1 && (
-                                <span className="text-[8px] bg-purple-500 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm">Direct</span>
+                      {/* Kolom SIAPA */}
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <div
+                              className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center text-white text-sm font-black flex-shrink-0 shadow-xl border border-white/10"
+                              style={{ 
+                                background: m.level === 1 
+                                  ? 'linear-gradient(135deg, #7c3aed, #b76dff)' 
+                                  : 'linear-gradient(135deg, #1e293b, #334155)',
+                              }}
+                            >
+                              {m.avatar_url ? (
+                                <img src={formatImage(m.avatar_url)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="opacity-80">{(m.full_name || 'M').charAt(0).toUpperCase()}</span>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-500 font-mono mt-0.5">{m.user_id?.slice(0, 8)}…</p>
+                            {m.status === 'active' && (
+                              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0f172a] shadow-lg animate-pulse" />
+                            )}
+                          </div>
+
+                          <div className="flex flex-col min-w-0">
+                            <p className="text-sm font-black text-white truncate group-hover:text-purple-300 transition-colors">
+                              {m.full_name || 'Mitra Baru'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-medium mt-0.5">Gabung {new Date(m.joined_at).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span 
-                          className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
-                          style={{ 
-                            background: m.level === 1 ? '#b76dff20' : '#47556930',
-                            color: m.level === 1 ? '#b76dff' : '#94a3b8',
-                            border: m.level === 1 ? '1px solid #b76dff30' : '1px solid #47556940'
-                          }}
-                        >
-                          Lvl {m.level}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                          style={
-                            m.status === 'active'
-                              ? { color: '#4ade80', background: '#4ade8018' }
-                              : { color: '#fabc4e', background: '#fabc4e18' }
-                          }
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.status === 'active' ? '#4ade80' : '#fabc4e' }} />
-                          {m.status === 'active' ? 'Aktif' : 'Pending'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
+                      
+                      {/* Kolom HUBUNGAN */}
+                      <td className="px-6 py-5">
                         <div className="flex flex-col">
-                          <span className="text-xs text-slate-300 font-medium">{m.referrer_name || 'Sistem'}</span>
+                          {m.level === 1 ? (
+                            <span className="text-xs font-bold text-purple-400 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">star</span>
+                              Langsung (Anda)
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">
+                              Grup (Level {m.level})
+                            </span>
+                          )}
+                          <p className="text-[10px] text-slate-600 mt-0.5">Dihubungkan oleh {m.referrer_name || 'Sistem'}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-400">
-                        {new Date(m.joined_at).toLocaleDateString('id-ID', {
-                          day: '2-digit', month: 'short', year: 'numeric'
-                        })}
+
+                      {/* Kolom AKTIVITAS */}
+                      <td className="px-6 py-5">
+                        {m.status === 'active' ? (
+                          <div className="flex items-center gap-2 text-green-400 bg-green-400/5 border border-green-400/10 px-3 py-1.5 rounded-xl w-fit">
+                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                            <span className="text-[10px] font-black uppercase tracking-wider">Sudah Belanja</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-500 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl w-fit">
+                            <span className="material-symbols-outlined text-[16px]">schedule</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Belum Ada Order</span>
+                          </div>
+                        )}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-bold text-green-400">{formatRp(m.turnover)}</span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleDrillDown(m)}
-                            className="p-2 rounded-lg bg-white/5 border border-white/5 text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 transition-all"
-                            title="Masuk ke Jaringan Ini"
-                          >
-                            <span className="material-symbols-outlined text-lg">login</span>
-                          </button>
+
+                      {/* Kolom HASIL */}
+                      <td className="px-6 py-5">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-white">{formatRp(m.turnover)}</span>
+                          <p className="text-[9px] text-slate-500 uppercase font-bold tracking-tighter">Kontribusi Omset</p>
                         </div>
+                      </td>
+
+                      {/* Kolom AKSI */}
+                      <td className="px-6 py-5 text-center">
+                        <button
+                          onClick={() => handleDrillDown(m)}
+                          className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-slate-500 hover:text-white hover:bg-purple-600 transition-all duration-300 active:scale-90"
+                          title="Lihat Tim Mereka"
+                        >
+                          <span className="material-symbols-outlined text-xl">keyboard_arrow_right</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
+                  {(!stats?.downlines || stats.downlines.length === 0) && (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-24 text-center">
+                        <div className="flex flex-col items-center gap-4 opacity-20">
+                          <span className="material-symbols-outlined text-7xl">group_remove</span>
+                          <p className="text-xs font-black uppercase tracking-[0.3em]">Mitra Tidak Ditemukan</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
             
             {/* Pagination Controls */}
             {pagination.total_pages > 1 && (
-              <div className="flex items-center justify-between p-6 border-t border-white/5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  Halaman {pagination.current_page} dari {pagination.total_pages}
+              <div className="flex items-center justify-between p-6 bg-white/[0.03] border-t border-white/5">
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
+                  Hal {pagination.current_page} / {pagination.total_pages}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex gap-4">
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-10 enabled:hover:bg-purple-600 text-slate-400"
                   >
-                    Kembali
+                    Sebelumnya
                   </button>
                   <button
                     onClick={() => setPage(p => Math.min(pagination.total_pages, p + 1))}
                     disabled={page >= pagination.total_pages}
-                    className="px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-20 enabled:hover:bg-white/5 enabled:hover:text-white text-slate-400"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-10 enabled:hover:bg-purple-600 text-slate-400"
                   >
                     Selanjutnya
                   </button>
@@ -518,97 +476,7 @@ export default function TeamPerformance() {
         </div>
       </div>
     </div>
+  </ErrorBoundary>
   );
 }
 
-// Sub-component for Tree View
-const TreeNode = ({ node, onDrillDown }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const hasChildren = node?.children && node.children.length > 0;
-
-  return (
-    <div className="flex flex-col items-center">
-      <div 
-        className={`relative group p-4 rounded-2xl border transition-all duration-500 flex flex-col items-center text-center w-48 ${hasChildren ? 'cursor-pointer' : ''}`}
-        style={{
-          background: 'rgba(255, 255, 255, 0.03)',
-          borderColor: node.level === 1 ? 'rgba(168, 85, 247, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(10px)'
-        }}
-        onClick={() => hasChildren && setIsExpanded(!isExpanded)}
-      >
-        {node.level > 1 && (
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-[2px] h-12 bg-gradient-to-t from-purple-500/30 to-transparent" />
-        )}
-
-        {/* Level Indicator */}
-        <div className="absolute -top-3 -left-2 px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-[8px] font-black text-purple-400">
-          LVL {node.level}
-        </div>
-
-        <div className="relative mb-3">
-          <div 
-            className="w-14 h-14 rounded-2xl overflow-hidden border-2 p-0.5"
-            style={{ borderColor: node.level === 1 ? '#a855f7' : 'rgba(255,255,255,0.1)' }}
-          >
-            {node.avatar_url ? (
-              <img src={formatImage(node.avatar_url)} className="w-full h-full object-cover rounded-xl" alt="" />
-            ) : (
-              <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xl font-black text-white">
-                {node.full_name?.charAt(0)}
-              </div>
-            )}
-          </div>
-          {node.level === 1 && (
-            <div className="absolute -top-2 -right-2 bg-purple-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg">DIRECT</div>
-          )}
-        </div>
-
-        <h3 className="text-sm font-bold text-white truncate w-full px-2">{node.full_name}</h3>
-        <p className="text-[10px] text-slate-500 mt-0.5 font-mono">{node.user_id?.slice(0, 8)}</p>
-
-        <div className="mt-3 w-full pt-3 border-t border-white/5 flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[9px] font-bold">
-            <span className="text-slate-500 uppercase tracking-tighter">Omset</span>
-            <span className="text-green-400">{Number(node.turnover).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
-          </div>
-          <div className="flex items-center justify-between text-[9px] font-bold">
-            <span className="text-slate-500 uppercase tracking-tighter">Tim</span>
-            <span className="text-purple-400">{node?.children?.length || 0} Orang</span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="mt-4 flex gap-2 w-full opacity-0 group-hover:opacity-100 transition-all">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onDrillDown(node); }}
-            className="flex-1 py-2 rounded-xl bg-purple-500/20 border border-purple-500/30 text-[9px] font-black text-purple-400 hover:bg-purple-500 hover:text-white transition-all"
-          >
-            MASUK
-          </button>
-          {hasChildren && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-              className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all"
-            >
-              <span className="material-symbols-outlined text-sm">
-                {isExpanded ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {hasChildren && isExpanded && (
-        <div className="relative pt-12 flex gap-8">
-          {/* Connector Line to Children */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-12 bg-purple-500/20" />
-          
-          {node.children.map(child => (
-            <TreeNode key={child.affiliate_id} node={child} onDrillDown={onDrillDown} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
