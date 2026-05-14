@@ -1026,3 +1026,37 @@ func (bc *BuyerController) GetWallet(w http.ResponseWriter, r *http.Request) {
 
 	utils.JSONResponse(w, http.StatusOK, wallet)
 }
+
+// POST /api/buyer/orders/cancel
+func (bc *BuyerController) CancelOrder(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+	var req struct {
+		OrderID string `json:"order_id"`
+		Reason  string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	// Security check: Pastikan order milik buyer tersebut
+	var order models.Order
+	if err := bc.DB.Where("id = ? AND buyer_id = ?", req.OrderID, buyerID).First(&order).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan atau Anda tidak memiliki akses")
+		return
+	}
+
+	// Buyer hanya boleh membatalkan jika belum dikirim (Paid/Processing/PendingPayment)
+	// Status Shipped/Delivered sudah dicek di service layer, tapi di sini kita bisa beri pesan lebih spesifik
+	if order.Status == models.OrderShipped || order.Status == models.OrderDelivered {
+		utils.JSONError(w, http.StatusBadRequest, "Pesanan sudah dalam pengiriman dan tidak dapat dibatalkan.")
+		return
+	}
+
+	if err := bc.OrderService.CancelOrder(req.OrderID, req.Reason, "buyer"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membatalkan pesanan: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Pesanan berhasil dibatalkan"})
+}

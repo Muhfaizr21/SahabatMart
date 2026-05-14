@@ -58,9 +58,11 @@ export async function fetchJson(url, options = {}) {
     }
     
     // Pelindung Rekursif: Mengupas lapisan 'success' hanya jika itu double-wrapping murni
-    // Jangan mengupas jika ada metadata penting seperti 'total', 'page', atau 'limit'
-    while (result && result.status === 'success' && result.data !== undefined && result.total === undefined && result.page === undefined) {
+    // [BUG-H5 Fix] Tambah safety counter (maxDepth) untuk cegah infinite loop
+    let maxDepth = 3;
+    while (result && result.status === 'success' && result.data !== undefined && result.total === undefined && result.page === undefined && maxDepth > 0) {
       result = result.data;
+      maxDepth--;
     }
     
     return result;
@@ -174,9 +176,10 @@ export async function captureAffiliate() {
  * Memungkinkan Dashboard mendengarkan notifikasi secara instan
  */
 export function subscribeToNotifications(userId, onMessage) {
-  if (!userId) return null;
+  const token = localStorage.getItem('token');
+  if (!token) return null;
   
-  const eventSource = new EventSource(`${API_BASE}/api/notifications/stream?user_id=${userId}`);
+  const eventSource = new EventSource(`${API_BASE}/api/notifications/stream?t=${token}`);
   
   eventSource.onmessage = (event) => {
     try {

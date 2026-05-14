@@ -27,9 +27,16 @@ func (s *StorageService) SaveImage(file multipart.File, header *multipart.FileHe
 		return "", err
 	}
 
-	ext := filepath.Ext(header.Filename)
-	if ext == "" {
-		ext = ".webp" // Fallback
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	allowed := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".webp": true,
+		".gif":  true,
+	}
+	if !allowed[ext] {
+		return "", fmt.Errorf("ekstensi file tidak diizinkan: %s", ext)
 	}
 	filename := fmt.Sprintf("%d-%s%s", time.Now().Unix(), strings.TrimSuffix(strings.ReplaceAll(header.Filename, " ", "_"), ext), ext)
 	filePath := filepath.Join(s.UploadDir, filename)

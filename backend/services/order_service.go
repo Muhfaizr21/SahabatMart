@@ -364,8 +364,11 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 		return err
 	}
 
-	if order.Status != models.OrderPendingPayment && order.Status != models.OrderCancelled {
-		return fmt.Errorf("pesanan tidak dalam status menunggu pembayaran atau sudah dibatalkan/expired")
+	// [BUG-C3 Fix] Hanya proses order yang masih menunggu pembayaran.
+	// Order yang sudah Cancelled/Expired TIDAK boleh diproses ulang — ini security hole.
+	// Tripay webhook untuk order expired/failed cukup di-acknowledge tanpa action.
+	if order.Status != models.OrderPendingPayment {
+		return fmt.Errorf("pesanan tidak dapat diproses: status saat ini '%s', hanya 'pending_payment' yang diizinkan", order.Status)
 	}
 
 		now := time.Now()
@@ -601,7 +604,24 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 		return nil, nil
 	}
 
-	subtotal := item.UnitPrice * float64(item.Quantity)
+	// [BUG-H4 Fix] Gunakan snapshot amount dari OrderItem sebagai basis distribusi.
+	// Ini mencegah perubahan preset setelah order dibuat mempengaruhi jumlah komisi.
+	// item.CommissionAmount adalah sumber kebenaran tunggal (single source of truth).
+	snapshotTotal := item.CommissionAmount
+	subtotal := item.UnitPrice * float64(item.Quantity) // tetap dipakai sebagai pembagi untuk hitung proporsi
+	if subtotal == 0 {
+		subtotal = snapshotTotal // fallback agar tidak NaN
+	}
+
+	// Hitung total rate dari semua level preset untuk menentukan proporsi per level
+	var totalPresetRate float64
+	for _, pl := range presetLevels {
+		totalPresetRate += pl.Rate
+	}
+	if totalPresetRate == 0 {
+		totalPresetRate = 1 // safety guard
+	}
+
 	var results []PresetCommissionEntry
 
 	// Mulai dari referrer langsung (Level 1), lalu naik ke upline
@@ -616,7 +636,13 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			break // Upline tidak ditemukan, hentikan chain
 		}
 
-		commAmt := subtotal * pl.Rate
+		var commAmt float64
+		if totalPresetRate > 0 {
+			commAmt = snapshotTotal * (pl.Rate / totalPresetRate)
+		} else {
+			commAmt = 0
+		}
+		
 		if commAmt <= 0 {
 			// Lanjut ke upline meskipun rate 0
 			if aff.UplineID != nil {
@@ -690,8 +716,9 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 			return err
 		}
 
-		if order.Status == models.OrderCancelled || order.Status == models.OrderCompleted {
-			return fmt.Errorf("pesanan sudah dalam status akhir")
+		if order.Status == models.OrderCancelled || order.Status == models.OrderCompleted || 
+		   order.Status == models.OrderShipped || order.Status == models.OrderDelivered {
+			return fmt.Errorf("pesanan tidak dapat dibatalkan (Status saat ini: %s)", order.Status)
 		}
 
 		// [Sync Fix] Return Stock to BOTH Inventory and Master Product Catalog

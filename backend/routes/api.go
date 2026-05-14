@@ -153,8 +153,11 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 					}
 				}
 
+				// [BUG-H1 Fix] Inject semua identity ke context, konsisten dengan actorOnly()
 				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
 				ctx = context.WithValue(ctx, "user_role", strings.ToLower(user.Role))
+				if claims.MerchantID != "" { ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID) }
+				if claims.AffiliateID != "" { ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID) }
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
 		}
@@ -202,6 +205,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/checkout", checkoutLimit(buyerOnly(buyerCtrl.Checkout)))
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
 	mux.HandleFunc("/api/buyer/orders/detail", buyerOnly(buyerCtrl.GetOrderDetail))
+	mux.HandleFunc("/api/buyer/orders/cancel", buyerOnly(buyerCtrl.CancelOrder))
 	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
 	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
 	mux.HandleFunc("/api/buyer/profile/update", buyerOnly(buyerCtrl.UpdateProfile))

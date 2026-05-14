@@ -58,6 +58,25 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    const reason = prompt("Alasan pembatalan (opsional):");
+    if (reason === null) return; // Cancel prompt
+
+    try {
+      setLoading(true);
+      await postJson(`${BUYER_API_BASE}/orders/cancel`, {
+        order_id: id,
+        reason: reason || "Dibatalkan oleh pembeli"
+      });
+      alert("Pesanan berhasil dibatalkan");
+      loadDetail();
+    } catch (_err) {
+      alert(_err.message || "Gagal membatalkan pesanan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadDetail = async () => {
     try {
       setLoading(true);
@@ -241,7 +260,16 @@ export default function OrderDetailPage() {
                     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-2 4H8v-4h8v4z"/></svg>
                     Cetak Invoice
                   </Link>
-                </div>
+
+                  {(order.status === 'pending_payment' || order.status === 'paid' || order.status === 'processing') && (
+                    <button 
+                      onClick={handleCancelOrder}
+                      className="w-full bg-red-50 text-red-600 font-bold py-3 rounded-2xl border border-red-100 hover:bg-red-600 hover:text-white transition-all text-xs"
+                    >
+                      Batalkan Pesanan
+                    </button>
+                  )}
+                 </div>
             </div>
 
             {/* Payment Info */}

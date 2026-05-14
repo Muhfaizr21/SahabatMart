@@ -252,11 +252,16 @@ func (ac *AuthController) ForgotPassword(w http.ResponseWriter, r *http.Request)
 	fmt.Printf("✅ Reset token generated: %s\n", token)
 
 	// In production, token is sent via email. 
-	// For AkuGlow, we return it in response for debugging/demonstration if needed, 
-	// but ideally it should be hidden.
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+	// For testing, we return it in response if not in production mode.
+	resp := map[string]interface{}{
 		"message": "Instruksi reset password telah dikirim ke email Anda",
-	})
+	}
+	
+	if os.Getenv("APP_ENV") != "production" {
+		resp["debug_token"] = token
+	}
+
+	utils.JSONResponse(w, http.StatusOK, resp)
 }
 
 func (ac *AuthController) ResetPassword(w http.ResponseWriter, r *http.Request) {

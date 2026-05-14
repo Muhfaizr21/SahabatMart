@@ -25,15 +25,15 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 			return errors.New("produk tidak ditemukan")
 		}
 
-		// 2. Validate Variant
+		// 2. Validate Variant — boleh kosong untuk produk non-varian
 		var variant models.ProductVariant
 		err := tx.First(&variant, "id = ?", variantID).Error
-		if err != nil {
+		if err != nil && variantID != "" {
 			// Fallback to first variant if specific one not found
-			if err := tx.Where("product_id = ?", productID).First(&variant).Error; err != nil {
-				return errors.New("varian produk tidak tersedia")
+			if err := tx.Where("product_id = ?", productID).First(&variant).Error; err == nil {
+				variantID = variant.ID
 			}
-			variantID = variant.ID
+			// Jika produk memang tidak punya varian, biarkan variantID tetap kosong
 		}
 
 		// 3. [Akuglow Refactor] Check Stock from Inventory instead of Product model
@@ -64,7 +64,7 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 		}
 
 		var item models.CartItem
-		// We include MerchantID in the search to allow buying same product from different merchants if needed
+		// [BUG-H3 Fix] ProductVariantID sekarang *string, query tetap menggunakan string value
 		result := tx.Where("cart_id = ? AND product_variant_id = ? AND merchant_id = ? AND metadata = ?", cart.ID, variantID, merchantID, metadata).First(&item)
 		
 		if result.Error == nil {
@@ -92,11 +92,16 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 			return nil
 		}
 		
+		// [BUG-H3 Fix] ProductVariantID sekarang *string — gunakan pointer jika tidak kosong
+		var variantPtr *string
+		if variantID != "" {
+			variantPtr = &variantID
+		}
 		newItem := models.CartItem{
 			CartID:           cart.ID,
 			MerchantID:       merchantID,
 			ProductID:        productID,
-			ProductVariantID: variantID,
+			ProductVariantID: variantPtr, // nil jika produk tidak punya varian
 			Quantity:         quantity,
 			Metadata:         metadata,
 		}

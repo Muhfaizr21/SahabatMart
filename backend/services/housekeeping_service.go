@@ -3,7 +3,6 @@ package services
 import (
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"SahabatMart/backend/models"
@@ -54,7 +53,7 @@ func StartHousekeeping(db *gorm.DB) {
 		if len(recentlyActiveAffiliates) > 0 {
 			log.Printf("👥 Safety Check: Validating tier upgrades for %d recently active affiliates...", len(recentlyActiveAffiliates))
 			for _, aff := range recentlyActiveAffiliates {
-				affiliateService.TriggerTierUpgrade(aff.ID)
+				go affiliateService.TriggerTierUpgrade(aff.ID) // [BUG-M1 Fix] Run async
 			}
 		}
 
@@ -104,15 +103,23 @@ func cleanupVouchers(db *gorm.DB) error {
 
 // releaseAffiliateCommissions: pending → approved after hold_until passes
 // [Audit Fix] Only release commissions where the associated ORDER is 'completed'
+// [BUG-C2 Fix] Mencegah double-count total_earned:
+//   - Fungsi ini HANYA mengubah status AffiliateCommission dari 'pending' → 'approved'
+//   - Update total_earned TIDAK dilakukan di sini karena ProcessSettlements sudah
+//     memindahkan PendingBalance → Balance (yang merepresentasikan earning yang cair)
+//   - TriggerTierUpgrade akan re-kalkulasi total_earned dari data commission yang approved
 func releaseAffiliateCommissions(db *gorm.DB, notif *NotificationService) error {
 	now := time.Now()
 
 	// Fetch commissions yang hold_until sudah lewat DAN order sudah completed
+	// DAN WalletTransaction terkait sudah settled (ProcessSettlements sudah jalan)
 	var commissions []models.AffiliateCommission
 	db.Table("affiliate_commissions ac").
 		Joins("JOIN orders o ON o.id = ac.order_id").
+		Joins("LEFT JOIN wallet_transactions wt ON wt.reference_id = ac.id AND wt.reference_type = 'affiliate_commission'").
 		Where("ac.status = 'pending' AND ac.hold_until <= ?", now).
 		Where("o.status = ?", models.OrderCompleted).
+		Where("wt.is_settled = true OR wt.id IS NULL"). // Guard: pastikan wallet sudah settled
 		Select("ac.*").
 		Find(&commissions)
 
@@ -128,28 +135,29 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *NotificationService) error 
 		earningsByAffiliate[c.AffiliateID] += c.Amount
 	}
 
-	// Bulk update HANYA ID yang eligible (bukan semua pending)
+	// Bulk update status HANYA ID yang eligible
 	if err := db.Model(&models.AffiliateCommission{}).
 		Where("id IN ?", eligibleIDs).
 		Updates(map[string]interface{}{"status": "approved"}).Error; err != nil {
 		return err
 	}
 
-	// Update total_earned per affiliate & kirim notifikasi
+	// [BUG-C2 Fix] TIDAK update total_earned di sini. Alasannya:
+	// ProcessSettlements sudah memindahkan wallet.PendingBalance → wallet.Balance.
+	// total_earned di AffiliateMember adalah agregasi dari AffiliateCommission.status='approved'+'paid'.
+	// TriggerTierUpgrade (yang dipanggil oleh ProcessSettlements) sudah re-kalkulasi dari DB.
+	// Double-update di sini hanya menyebabkan inflasi total_earned.
+
+	// Kirim notifikasi ke masing-masing affiliate
 	configService := NewConfigService(db)
 	withdrawPct := configService.GetFloat("affiliate_withdraw_pct", 70) / 100.0
 	shoppingPct := configService.GetFloat("affiliate_shopping_pct", 30) / 100.0
 
 	for affiliateID, earned := range earningsByAffiliate {
-		// Update TotalEarned for tiering eligibility
-		if err := db.Model(&models.AffiliateMember{}).Where("id = ?", affiliateID).UpdateColumn("total_earned", gorm.Expr("total_earned + ?", earned)).Error; err != nil {
-			log.Printf("❌ Error updating TotalEarned for Affiliate %s: %v", affiliateID, err)
-		}
-
 		withdrawableAmt := earned * withdrawPct
 		shoppingAmt := earned * shoppingPct
 
-		msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair! (Rp %.0f Bisa Ditarik, Rp %.0f Saldo Belanja)", 
+		msg := fmt.Sprintf("Komisi Anda sebesar Rp %.0f telah cair! (Rp %.0f Bisa Ditarik, Rp %.0f Saldo Belanja)",
 			earned, withdrawableAmt, shoppingAmt)
 		notif.Push(affiliateID, "affiliate", "commission_released", "Komisi Siap Cair! 🎉", msg, "/affiliate/commissions")
 		log.Printf("✅ Affiliate %s: Released Rp %.0f (Notified)", affiliateID, earned)
@@ -158,19 +166,9 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *NotificationService) error 
 }
 
 func autoUpdateLogistics(db *gorm.DB, orderService *OrderService) error {
-	var groups []models.OrderMerchantGroup
-	// Find merchant groups that are SHIPPED but not yet DELIVERED
-	db.Where("status = ? AND tracking_number IS NOT NULL AND tracking_number <> ''", models.MOrderShipped).Find(&groups)
-
-	for _, group := range groups {
-		// Simulation: Every order with "99" at end of tracking number is marked as Delivered
-		if strings.HasSuffix(group.TrackingNumber, "99") {
-			log.Printf("📦 Logistics Sync: Auto-delivering group %s", group.ID)
-			if err := orderService.UpdateMerchantOrderStatus(group.ID, models.MOrderDelivered); err != nil {
-				log.Printf("❌ Logistics Sync Error: %v", err)
-			}
-		}
-	}
+	// [BUG-M3 Fix] Simulasi resi "99" dihapus karena ini production environment. 
+	// Webhook kurir yang akan mengubah status ke 'delivered'.
+	// Di sini kita bisa integrasi cek status resi tertunda via API pihak ke-3 jika diperlukan.
 	return nil
 }
 

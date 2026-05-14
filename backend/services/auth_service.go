@@ -5,6 +5,7 @@ import (
 	"SahabatMart/backend/repositories"
 	"SahabatMart/backend/utils"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ type AuthService struct {
 	Repo      *repositories.UserRepository
 	DB        *gorm.DB
 	Affiliate *AffiliateService
+	Email     *EmailService
 }
 
 func NewAuthService(db *gorm.DB) *AuthService {
@@ -23,6 +25,7 @@ func NewAuthService(db *gorm.DB) *AuthService {
 		Repo:      repositories.NewUserRepository(db),
 		DB:        db,
 		Affiliate: NewAffiliateService(db, NewNotificationService(db)),
+		Email:     NewEmailService(db),
 	}
 }
 
@@ -303,8 +306,18 @@ func (s *AuthService) RequestPasswordReset(email string) (string, error) {
 		return "", err
 	}
 
-	// In a real production app, send email here
-	// For now, we return it so the dev/user can see it or use it
+	// Kirim Email Reset Password
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.Email.getBaseFrontendURL(), token)
+	subject := "🔒 Permintaan Atur Ulang Kata Sandi - SahabatMart"
+	body := fmt.Sprintf("Halo %s,\n\nKami menerima permintaan untuk mengatur ulang kata sandi akun SahabatMart Anda.\n\nKlik link di bawah ini untuk mengatur kata sandi baru:\n%s\n\nLink ini akan kadaluarsa dalam 1 jam.\n\nJika Anda tidak merasa melakukan permintaan ini, abaikan email ini.\n\nTerima kasih,\nTim SahabatMart", user.Profile.FullName, resetLink)
+	
+	err := s.Email.SendEmail(email, subject, body)
+	if err != nil {
+		fmt.Printf("⚠️ Gagal mengirim email reset ke %s: %v. (Pastikan SMTP sudah dikonfigurasi)\n", email, err)
+	} else {
+		fmt.Printf("📧 Email reset password berhasil dikirim ke %s\n", email)
+	}
+
 	return token, nil
 }
 

@@ -312,7 +312,8 @@ function AppContent() {
           </Route>
 
           {/* Merchant Routes */}
-          <Route path="/merchant" element={<MerchantLayout />}>
+          {/* [BUG-H2 Fix] Ditambah ProtectedRoute — konsisten dengan /affiliate */}
+          <Route path="/merchant" element={<ProtectedRoute><MerchantLayout /></ProtectedRoute>}>
              <Route index element={<MerchantDashboard />} />
              <Route path="products" element={<MerchantProducts />} />
              <Route path="restock" element={<MerchantRestock />} />

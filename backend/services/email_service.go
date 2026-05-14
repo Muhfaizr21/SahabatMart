@@ -47,3 +47,8 @@ func (s *EmailService) SendEmail(to, subject, body string) error {
 
 	return nil
 }
+func (s *EmailService) getBaseFrontendURL() string {
+	configSvc := NewConfigService(s.DB)
+	url := configSvc.Get("app_frontend_url", "http://localhost:3000")
+	return url
+}

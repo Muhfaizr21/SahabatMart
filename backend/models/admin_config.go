@@ -347,7 +347,6 @@ type Notification struct {
 	Type         string    `gorm:"type:varchar(50)" json:"type"`           // order_new, payout_approved, product_approved, dispute_new
 	Title        string    `gorm:"type:varchar(100)" json:"title"`
 	Message      string    `gorm:"type:text;column:body" json:"message"` // Synced with DB 'body' column
-	Body         string    `gorm:"type:text;column:body" json:"body"`    // Alias for 'body' column to satisfy constraint
 	Link         string    `gorm:"type:varchar(255)" json:"link"`
 	IsRead       bool      `gorm:"default:false" json:"is_read"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -462,15 +461,17 @@ type CartItem struct {
 	CartID           string  `gorm:"type:uuid;not null;index" json:"cart_id"`
 	MerchantID       string  `gorm:"type:uuid;not null" json:"merchant_id"`
 	ProductID        string  `gorm:"type:uuid;not null" json:"product_id"`
-	ProductVariantID string  `gorm:"type:uuid;not null" json:"product_variant_id"`
+	// [BUG-H3 Fix] Nullable — produk tanpa varian wajib bisa masuk cart.
+	// OrderItem sudah nullable (*string), CartItem HARUS konsisten.
+	ProductVariantID *string `gorm:"type:uuid" json:"product_variant_id"` // NULL jika produk tidak punya varian
 	Quantity         int       `gorm:"not null" json:"quantity"`
 	Metadata         string    `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 
-	Product          Product        `gorm:"foreignKey:ProductID" json:"product,omitempty"`
-	ProductVariant   ProductVariant `gorm:"foreignKey:ProductVariantID" json:"product_variant,omitempty"`
-	Merchant         *Merchant      `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	Product          Product         `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	ProductVariant   *ProductVariant `gorm:"foreignKey:ProductVariantID" json:"product_variant,omitempty"`
+	Merchant         *Merchant       `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 }
 
 // Banner untuk Hero Slider Home Page

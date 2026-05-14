@@ -51,13 +51,20 @@ func (h *NotificationHub) Broadcast(userID string, payload interface{}) {
 	}
 }
 
-// SSEHandler adalah endpoint untuk client mendengarkan notifikasi
 func SSEHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		http.Error(w, "User ID required", http.StatusBadRequest)
+	token := r.URL.Query().Get("t")
+	if token == "" {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
+
+	claims, err := ParseJWT(token)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	userID := claims.UserID
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")

@@ -267,6 +267,8 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 
 func (s *FinanceService) ProcessSettlements() (int, error) {
 	count := 0
+	var affiliatesToUpgrade []string
+
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		var txs []models.WalletTransaction
 		now := time.Now()
@@ -315,12 +317,11 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 			if txn.ReferenceType == "affiliate_commission" && txn.ReferenceID != nil {
 				tx.Model(&models.AffiliateCommission{}).Where("id = ?", *txn.ReferenceID).Update("status", models.CommissionApproved)
 				
-				// [Akuglow Sync] Trigger stats recalculation for the affiliate
+				// [Akuglow Sync] Kumpulkan ID affiliate untuk trigger kalkulasi setelah TX selesai
 				if wallet.OwnerType == models.WalletAffiliate {
 					var member models.AffiliateMember
 					if tx.Where("user_id = ?", wallet.OwnerID).First(&member).Error == nil {
-						affSvc := NewAffiliateService(tx, nil)
-						_ = affSvc.TriggerTierUpgrade(member.ID)
+						affiliatesToUpgrade = append(affiliatesToUpgrade, member.ID)
 					}
 				}
 			}
@@ -331,6 +332,17 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 
 		return nil
 	})
+
+	// Run upgrades asynchronously AFTER transaction commits to prevent blocking
+	if err == nil && len(affiliatesToUpgrade) > 0 {
+		go func(ids []string) {
+			affSvc := NewAffiliateService(s.DB, nil)
+			for _, id := range ids {
+				_ = affSvc.TriggerTierUpgrade(id)
+			}
+		}(affiliatesToUpgrade)
+	}
+
 	return count, err
 }
 
@@ -423,24 +435,45 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 			return err
 		}
 
-		// [Financial Sync] Reverse Bank Balance if it was a platform inflow
-		if wallet.OwnerType == models.WalletAdmin && txn.Amount > 0 && (txn.Type == models.TxSaleRevenue || txn.Type == models.TxRestockRevenue || txn.Type == models.TxPlatformFee) {
-			var primaryLoc models.FinancialLocation
-			if err := tx.Where("is_primary = ?", true).First(&primaryLoc).Error; err == nil {
-				tx.Model(&primaryLoc).Update("balance", gorm.Expr("balance - ?", txn.Amount))
-				
-				// Record reversal mutation
-				now := time.Now()
-				tx.Create(&models.MoneyMutation{
-					ToLocationID: &primaryLoc.ID,
-					Amount:       txn.Amount,
-					Category:     "Pembalasan Pendapatan",
-					Description:  fmt.Sprintf("Auto-Reverse: %s", txn.Description),
-					Type:         "expense",
-					Status:       "processed",
-					CreatedAt:    now,
-					ProcessedAt:  &now,
-				})
+		// [BUG-C1 Fix] Balikkan saldo fisik bank (FinancialLocation) secara simetris.
+		// Saat DistributeFunds: inflow (+GrandTotal) DAN payout outflow (-MerchantPayout)
+		// keduanya mempengaruhi bank. Reversal HARUS membalikkan keduanya.
+		// Kondisi lama (txn.Amount > 0 saja) melewatkan reversal untuk payout outflow.
+		if wallet.OwnerType == models.WalletAdmin {
+			// Tentukan apakah transaksi ini pernah menyentuh saldo bank fisik saat distribusi.
+			// INFLOW: penerimaan dari customer (Amount > 0, TxSaleRevenue/TxPlatformFee)
+			wasPhysicalInflow := txn.Amount > 0 && (txn.Type == models.TxSaleRevenue || txn.Type == models.TxRestockRevenue || txn.Type == models.TxPlatformFee)
+			// OUTFLOW fisik: hanya payout yang sudah keluar nyata (withdrawal final)
+			// Catatan: PayoutOutflow dengan refType 'order' atau 'affiliate_commission' adalah
+			// transfer digital internal, BUKAN uang yang sudah keluar ke bank pihak luar.
+			// Sehingga tidak perlu di-reverse di FinancialLocation.
+			// Hanya PayoutOutflow dengan refType lain (withdrawal nyata) yang perlu di-reverse.
+			wasPhysicalOutflow := txn.Amount < 0 && txn.Type == models.TxPayoutOutflow &&
+				txn.ReferenceType != "order" && txn.ReferenceType != "affiliate_commission" && txn.ReferenceType != "order_reversal"
+
+			if wasPhysicalInflow || wasPhysicalOutflow {
+				var primaryLoc models.FinancialLocation
+				if err := tx.Where("is_primary = ?", true).First(&primaryLoc).Error; err == nil {
+					// Balikkan: kurangi inflow, tambah outflow (karena kita sedang membalik)
+					tx.Model(&primaryLoc).Update("balance", gorm.Expr("balance - ?", txn.Amount))
+
+					// Record reversal mutation untuk audit trail
+					now := time.Now()
+					mutLabel := "Pembalikan Pendapatan"
+					if wasPhysicalOutflow {
+						mutLabel = "Pembalikan Pengeluaran"
+					}
+					tx.Create(&models.MoneyMutation{
+						ToLocationID: &primaryLoc.ID,
+						Amount:       math.Abs(txn.Amount),
+						Category:     mutLabel,
+						Description:  fmt.Sprintf("Auto-Reverse: %s", txn.Description),
+						Type:         "expense",
+						Status:       "processed",
+						CreatedAt:    now,
+						ProcessedAt:  &now,
+					})
+				}
 			}
 		}
 	}
