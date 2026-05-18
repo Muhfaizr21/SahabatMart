@@ -68,6 +68,7 @@ type Order struct {
 	TotalPlatformFee    float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_platform_fee"`
 	TotalCommission     float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_commission"`
 	TotalDiscount       float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_discount"`
+	ShoppingBalanceDeduction float64   `gorm:"type:decimal(15,2);not null;default:0" json:"shopping_balance_deduction"`
 	GrandTotal          float64        `gorm:"type:decimal(15,2);not null" json:"grand_total"`
 	TotalAmount         float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_amount"` // Final amount after discount/fees
 	PaymentMethod       string         `gorm:"type:varchar(50)" json:"payment_method"` // cash, transfer, wallet, etc.

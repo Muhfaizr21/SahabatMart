@@ -116,12 +116,12 @@ func (s *AuthService) Register(email, password, fullName, phone, role, referralC
 	}
 
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
-	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID)
+	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID, false)
 	
 	return user, token, err
 }
 
-func (s *AuthService) Login(email, password, clientIP string) (*models.User, string, error) {
+func (s *AuthService) Login(email, password, clientIP string, remember bool) (*models.User, string, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	user, err := s.Repo.FindByEmail(email)
 	if err != nil {
@@ -150,7 +150,7 @@ func (s *AuthService) Login(email, password, clientIP string) (*models.User, str
 	s.PopulatePermissions(user)
 
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
-	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID)
+	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID, remember)
 
 	return user, token, err
 }
@@ -258,7 +258,7 @@ func (s *AuthService) HandleGoogleUser(email, fullName, googleID, avatar, referr
 	}
 	
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
-	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID)
+	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID, false)
 	
 	return &user, token, err
 }
@@ -375,4 +375,8 @@ func (s *AuthService) ChangePassword(userID string, oldPassword, newPassword str
 
 	hashedStr := string(hashed)
 	return s.DB.Model(&user).Update("password_hash", hashedStr).Error
+}
+
+func (s *AuthService) GetFrontendURL() string {
+	return s.Email.getBaseFrontendURL()
 }

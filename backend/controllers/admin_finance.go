@@ -3,9 +3,9 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"SahabatMart/backend/models"
@@ -43,6 +43,21 @@ func (fc *AdminFinanceController) loadConfig() ([]map[string]interface{}, []map[
 // periodWhere returns a GORM scope that filters created_at by period.
 // Supported values: "all", "today", "week", "month", "year", or "YYYY-MM".
 func periodWhere(db *gorm.DB, col, period string) *gorm.DB {
+	if strings.Contains(period, ":") {
+		parts := strings.Split(period, ":")
+		if len(parts) == 2 {
+			from := parts[0]
+			to := parts[1]
+			if from != "" && to != "" {
+				return db.Where(col+" >= ? AND "+col+" <= ?", from+" 00:00:00", to+" 23:59:59")
+			} else if from != "" {
+				return db.Where(col+" >= ?", from+" 00:00:00")
+			} else if to != "" {
+				return db.Where(col+" <= ?", to+" 23:59:59")
+			}
+		}
+	}
+
 	switch period {
 	case "all":
 		return db
@@ -137,7 +152,7 @@ func (fc *AdminFinanceController) getIncomeBreakdown(period string) (float64, ma
 	// Also count manual income mutations
 	var incomeSum float64
 	q2 := periodWhere(
-		fc.DB.Table("money_mutations").Where("type = 'income'"),
+		fc.DB.Table("money_mutations").Where("type = 'income' AND description NOT LIKE 'Auto-Sync:%'"),
 		"created_at", period,
 	)
 	q2.Select("COALESCE(SUM(amount),0)").Scan(&incomeSum)
@@ -230,73 +245,35 @@ func (fc *AdminFinanceController) ensureAllocations(period string) {
 		dsList, psList, _ := fc.loadConfig()
 		
 		if err != nil {
-			// Record NOT FOUND -> CLONING LOGIC
-			log.Printf("🆕 Period %s not found. Attempting to clone from previous period...", period)
-			
-			// Find previous period (YYYY-MM)
-			t, _ := time.Parse("2006-01", period)
-			prevPeriod := t.AddDate(0, -1, 0).Format("2006-01")
-			
-			var prevAlloc models.FinanceRevenueAllocation
-			if errPrev := tx.Where("period = ? AND source_type = 'period_summary'", prevPeriod).First(&prevAlloc).Error; errPrev == nil {
-				// Clone from previous
-				newAlloc := models.FinanceRevenueAllocation{
-					Period:      period,
-					SourceType:  "period_summary",
-					SourceID:    "auto_clone",
-					SourceHash:  "summary_" + period,
-					GrossAmount: 0, // Fresh month
-					Allocation:  prevAlloc.Allocation, // Copy the distribution map
-					CreatedAt:   time.Now(),
-				}
-				tx.Create(&newAlloc)
-			} else {
-				// No previous period? Use current config
-				newMap, _ := buildAllocMap(0, dsList, psList)
-				b, _ := json.Marshal(newMap)
-				newAlloc := models.FinanceRevenueAllocation{
-					Period:      period,
-					SourceType:  "period_summary",
-					SourceID:    "initial",
-					SourceHash:  "summary_" + period,
-					GrossAmount: 0,
-					Allocation:  string(b),
-					CreatedAt:   time.Now(),
-				}
-				tx.Create(&newAlloc)
+			// Calculate live Gross Profit
+			grossRevenue, _, capitalCost := fc.getIncomeBreakdown(period)
+			grossProfit := grossRevenue - capitalCost
+
+			newMap, _ := buildAllocMap(grossProfit, dsList, psList)
+			b, _ := json.Marshal(newMap)
+			newAlloc := models.FinanceRevenueAllocation{
+				Period:      period,
+				SourceType:  "period_summary",
+				SourceID:    "initial",
+				SourceHash:  "summary_" + period,
+				GrossAmount: grossProfit,
+				Allocation:  string(b),
+				CreatedAt:   time.Now(),
 			}
+			tx.Create(&newAlloc)
 			return nil
 		}
 
-		// Record EXISTS -> SYNC LOGIC (Update if config changed)
-		var currentMap map[string]float64
-		json.Unmarshal([]byte(alloc.Allocation), &currentMap)
+		// ALWAYS update GrossAmount and Allocation to reflect real-time data
+		grossRevenue, _, capitalCost := fc.getIncomeBreakdown(period)
+		grossProfit := grossRevenue - capitalCost
 
-		configChanged := len(currentMap) != (len(dsList) + len(psList))
-		if !configChanged {
-			for _, item := range dsList {
-				if _, ok := currentMap[item["name"].(string)]; !ok {
-					configChanged = true
-					break
-				}
-			}
-		}
-		if !configChanged {
-			for _, item := range psList {
-				if _, ok := currentMap[item["name"].(string)]; !ok {
-					configChanged = true
-					break
-				}
-			}
-		}
-
-		if configChanged {
-			log.Printf("⚙️ Config changed for period %s. Updating allocations...", period)
-			newMap, _ := buildAllocMap(alloc.GrossAmount, dsList, psList)
-			b, _ := json.Marshal(newMap)
-			alloc.Allocation = string(b)
-			tx.Save(&alloc)
-		}
+		newMap, _ := buildAllocMap(grossProfit, dsList, psList)
+		b, _ := json.Marshal(newMap)
+		
+		alloc.GrossAmount = grossProfit
+		alloc.Allocation = string(b)
+		tx.Save(&alloc)
 		
 		return nil
 	})
@@ -319,16 +296,17 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	dsList, psList, isList := fc.loadConfig()
 
 	// Build data_saving & profit_shares using current config %
+	grossProfit := gross - capitalCost
 	dataSaving := make(map[string]interface{})
 	totalSaving := 0.0
 	for _, it := range dsList {
 		pct := it["percent"].(float64)
-		val := gross * pct / 100.0
+		val := grossProfit * pct / 100.0
 		dataSaving[it["name"].(string)] = map[string]interface{}{"percent": pct, "value": val}
 		totalSaving += val
 	}
 	dataSaving["total"] = totalSaving
-	netProfit := gross - totalSaving
+	netProfit := grossProfit - totalSaving
 
 	profitShares := make(map[string]interface{})
 	totalPSPercent := 0.0
@@ -377,7 +355,7 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	// NOTE: Tidak ada filter type — semua tipe (sale, withdrawal, refund, topup, commission, dll)
 	// harus tampil agar audit trail benar-benar lengkap sesuai kebutuhan SuperAdmin
 	type WalletActivity struct {
-		ID          uint      `json:"id"`
+		ID          string    `json:"id"`
 		Type        string    `json:"type"`
 		Amount      float64   `json:"amount"`
 		Description string    `json:"description"`
@@ -431,8 +409,9 @@ func (fc *AdminFinanceController) GetDataSavingDetail(w http.ResponseWriter, r *
 
 	dsList, _, _ := fc.loadConfig()
 
-	// Aggregate allocation sums from seeded/computed records
-	sums := fc.sumAllocations(period)
+	// Calculate Real-time Values
+	gross, _, capitalCost := fc.getIncomeBreakdown(period)
+	grossProfit := gross - capitalCost
 
 	var posData []map[string]interface{}
 	var catNames []string
@@ -441,7 +420,7 @@ func (fc *AdminFinanceController) GetDataSavingDetail(w http.ResponseWriter, r *
 	for _, it := range dsList {
 		name := it["name"].(string)
 		catNames = append(catNames, name)
-		alloc := sums[name]
+		alloc := grossProfit * (it["percent"].(float64)) / 100.0
 		paid := fc.getMutSum(name, "processed", period)
 		planned := fc.getMutSum(name, "pending", period)
 		posData = append(posData, map[string]interface{}{
@@ -478,25 +457,24 @@ func (fc *AdminFinanceController) GetProfitShareDetail(w http.ResponseWriter, r 
 
 	_, psList, _ := fc.loadConfig()
 
-	sums := fc.sumAllocations(period)
+	// Calculate Real-time Values
+	gross, _, capitalCost := fc.getIncomeBreakdown(period)
+	grossProfit := gross - capitalCost
+	dsCfg, _, _ := fc.loadConfig()
+	totalSaving := 0.0
+	for _, it := range dsCfg {
+		totalSaving += grossProfit * (it["percent"].(float64)) / 100.0
+	}
+	netProfit := grossProfit - totalSaving
 
 	var posData []map[string]interface{}
 	var catNames []string
 	totalAlloc, totalPaid, totalPlanned := 0.0, 0.0, 0.0
 
-	// Also calculate gross and net profit for FinanceConfigModal
-	gross, _, _ := fc.getIncomeBreakdown(period)
-	dsCfg, _, _ := fc.loadConfig()
-	totalSaving := 0.0
-	for _, it := range dsCfg {
-		totalSaving += gross * (it["percent"].(float64)) / 100.0
-	}
-	netProfit := gross - totalSaving
-
 	for _, it := range psList {
 		name := it["name"].(string)
 		catNames = append(catNames, name)
-		alloc := sums[name]
+		alloc := netProfit * (it["percent"].(float64)) / 100.0
 		paid := fc.getMutSum(name, "processed", period)
 		planned := fc.getMutSum(name, "pending", period)
 		posData = append(posData, map[string]interface{}{
@@ -516,7 +494,8 @@ func (fc *AdminFinanceController) GetProfitShareDetail(w http.ResponseWriter, r 
 	}
 	rdName := "Laba Ditahan"
 	catNames = append(catNames, rdName)
-	rdAlloc := sums[rdName]
+	rdAlloc := netProfit - totalAlloc // Remaining after PS
+
 	rdPaid := fc.getMutSum(rdName, "processed", period)
 	rdPlanned := fc.getMutSum(rdName, "pending", period)
 	posData = append(posData, map[string]interface{}{

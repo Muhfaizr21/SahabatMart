@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"net/smtp"
+	"os"
 	"gorm.io/gorm"
 )
 
@@ -49,6 +50,12 @@ func (s *EmailService) SendEmail(to, subject, body string) error {
 }
 func (s *EmailService) getBaseFrontendURL() string {
 	configSvc := NewConfigService(s.DB)
-	url := configSvc.Get("app_frontend_url", "http://localhost:3000")
+	url := configSvc.Get("app_frontend_url", "")
+	if url == "" {
+		url = os.Getenv("FRONTEND_URL")
+	}
+	if url == "" {
+		url = "http://localhost:5173" // Vite default
+	}
 	return url
 }

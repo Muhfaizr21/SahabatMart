@@ -1222,12 +1222,14 @@ func (ac *AdminController) GetProductDetail(w http.ResponseWriter, r *http.Reque
 		BaseDistributionFeeNominal float64   `json:"base_distribution_fee_nominal"`
 		MerchantCommissionPercent  float64   `json:"merchant_commission_percent"`
 		CommissionPresetID         *string   `json:"commission_preset_id"`
+		TierCommissionPresetID     *string   `json:"tier_commission_preset_id"`
+		MerchantCommissionPresetID *string   `json:"merchant_commission_preset_id"`
 		CreatedAt                  time.Time `json:"created_at"`
 	}
 
 	var row ProductRow
 	err := ac.DB.Table("products p").
-		Select("p.id, p.name, p.description, p.sku, p.image, p.images, p.slug, p.price, p.old_price, p.wholesale_price, p.cogs, p.stock, p.status, p.weight, p.merchant_id, m.store_name, p.category, p.brand, p.attributes, p.base_affiliate_fee, p.base_affiliate_fee_nominal, p.base_distribution_fee, p.base_distribution_fee_nominal, p.merchant_commission_percent, p.commission_preset_id, p.created_at").
+		Select("p.id, p.name, p.description, p.sku, p.image, p.images, p.slug, p.price, p.old_price, p.wholesale_price, p.cogs, p.stock, p.status, p.weight, p.merchant_id, m.store_name, p.category, p.brand, p.attributes, p.base_affiliate_fee, p.base_affiliate_fee_nominal, p.base_distribution_fee, p.base_distribution_fee_nominal, p.merchant_commission_percent, p.commission_preset_id, p.tier_commission_preset_id, p.merchant_commission_preset_id, p.created_at").
 		Joins("LEFT JOIN merchants m ON m.id = p.merchant_id").
 		Where("p.id::text = ?", id).
 		Scan(&row).Error
@@ -1578,6 +1580,16 @@ func (ac *AdminController) AddProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if p.CommissionPresetID != nil && *p.CommissionPresetID == "" {
+		p.CommissionPresetID = nil
+	}
+	if p.TierCommissionPresetID != nil && *p.TierCommissionPresetID == "" {
+		p.TierCommissionPresetID = nil
+	}
+	if p.MerchantCommissionPresetID != nil && *p.MerchantCommissionPresetID == "" {
+		p.MerchantCommissionPresetID = nil
+	}
+
 	// [Akuglow Refactor] Product is now Master Product (PUSAT)
 	// Initial stock will be handled via Inventories table after creation.
 
@@ -1656,6 +1668,16 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
+	}
+
+	if req.CommissionPresetID != nil && *req.CommissionPresetID == "" {
+		req.CommissionPresetID = nil
+	}
+	if req.TierCommissionPresetID != nil && *req.TierCommissionPresetID == "" {
+		req.TierCommissionPresetID = nil
+	}
+	if req.MerchantCommissionPresetID != nil && *req.MerchantCommissionPresetID == "" {
+		req.MerchantCommissionPresetID = nil
 	}
 
 	updates := map[string]interface{}{
@@ -1915,16 +1937,15 @@ func (ac *AdminController) GetMonthlyRevenue(w http.ResponseWriter, r *http.Requ
 	// Profit formula: (subtotal - affiliate_commission - distribution_commission) - (sum of items COGS)
 	ac.DB.Raw(`
 		WITH monthly_stats AS (
-			SELECT TO_CHAR(omg.created_at, 'YYYY-MM') AS month,
-			       SUM(omg.subtotal) AS revenue,
-			       SUM(omg.platform_fee) AS fee,
-			       SUM(omg.subtotal - omg.affiliate_commission - omg.distribution_commission) AS gross_take,
-			       COUNT(DISTINCT omg.id) AS orders,
-			       SUM(oi.cogs * oi.quantity) AS total_cogs
-			FROM order_merchant_groups omg
-			LEFT JOIN order_items oi ON oi.order_merchant_group_id = omg.id
-			WHERE TO_CHAR(omg.created_at, 'YYYY') = ?
-			  AND omg.status IN ('completed', 'delivered', 'paid')
+			SELECT TO_CHAR(created_at, 'YYYY-MM') AS month,
+			       SUM(grand_total) AS revenue,
+			       0 AS fee,
+			       SUM(grand_total) AS gross_take,
+			       COUNT(DISTINCT id) AS orders,
+			       0 AS total_cogs
+			FROM orders
+			WHERE TO_CHAR(created_at, 'YYYY') = ?
+			  AND status IN ('completed', 'delivered', 'shipped', 'ready_to_ship', 'paid', 'processing')
 			GROUP BY month
 		)
 		SELECT month, revenue, COALESCE(gross_take, 0) - COALESCE(total_cogs, 0) AS profit, fee, orders
@@ -1980,9 +2001,39 @@ func (ac *AdminController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 			}
 		}
 	}
+
+	// [New Feature] Fetch Exact Financial Breakdown (Pembagian Uang)
+	type FinanceBreakdown struct {
+		ID          string    `json:"id"`
+		Type        string    `json:"type"`
+		Amount      float64   `json:"amount"`
+		Description string    `json:"description"`
+		OwnerType   string    `json:"owner_type"`
+		OwnerName   string    `json:"owner_name"`
+		CreatedAt   time.Time `json:"created_at"`
+	}
+	var breakdown []FinanceBreakdown
+
+	// We use LEFT JOIN to match wallet transactions either directly via order ID or indirectly via commission records
+	ac.DB.Raw(`
+		SELECT t.id, t.type, t.amount, t.description, w.owner_type, 
+		       COALESCE(up.full_name, m.store_name, 'Platform Admin') as owner_name, 
+		       t.created_at
+		FROM wallet_transactions t
+		JOIN wallets w ON t.wallet_id = w.id
+		LEFT JOIN users u ON w.owner_id = u.id AND w.owner_type IN ('affiliate', 'buyer', 'admin')
+		LEFT JOIN user_profiles up ON u.id = up.user_id
+		LEFT JOIN merchants m ON w.owner_id = m.id AND w.owner_type = 'merchant'
+		LEFT JOIN affiliate_commissions ac ON t.reference_id = ac.id AND t.reference_type = 'affiliate_commission'
+		WHERE t.reference_id::text = ? OR ac.order_id::text = ?
+		ORDER BY t.created_at ASC
+	`, order.ID, order.ID).Scan(&breakdown)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data":   order,
+		"finance_breakdown": breakdown,
+		"total": 1, // Prevent frontend fetchJson unwrapper from discarding finance_breakdown
 	})
 }
 
@@ -2012,15 +2063,38 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 
 	// Update Status
 	oldStatus := order.Status
-	order.Status = req.Status
-	if req.Status == models.OrderCompleted {
-		now := time.Now()
-		order.CompletedAt = &now
-	}
+	
+	if req.Status == models.OrderPaid && oldStatus == models.OrderPendingPayment {
+		// Use OrderService.CompletePayment to trigger all ledger, merchant, and affiliate payouts!
+		orderSvc := services.OrderService{
+			DB:             ac.DB,
+			FinanceService: services.NewFinanceService(ac.DB),
+			Affiliate:      services.NewAffiliateService(ac.DB, ac.Notif),
+			Notification:   ac.Notif,
+			ConfigService:  services.NewConfigService(ac.DB),
+		}
+		
+		tx := ac.DB.Begin()
+		if err := orderSvc.CompletePayment(tx, order.ID); err != nil {
+			tx.Rollback()
+			utils.JSONError(w, http.StatusInternalServerError, "Failed to complete payment: "+err.Error())
+			return
+		}
+		tx.Commit()
+		
+		// Reload order data to continue with updated status
+		ac.DB.First(&order, "id = ?", order.ID)
+	} else {
+		order.Status = req.Status
+		if req.Status == models.OrderCompleted {
+			now := time.Now()
+			order.CompletedAt = &now
+		}
 
-	if err := ac.DB.Save(&order).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Failed to update status")
-		return
+		if err := ac.DB.Save(&order).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Failed to update status")
+			return
+		}
 	}
 
 	// [FIX] Sinkronkan status ke semua Merchant Groups dengan mapping yang benar
@@ -2064,9 +2138,11 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 					newTotal := affiliate.TotalEarned + comm.Amount
 					ac.DB.Model(&affiliate).Update("total_earned", newTotal)
 
-					// 3. Trigger Tier Upgrade Tracking
-					affSvc := services.NewAffiliateService(ac.DB, ac.Notif)
-					affSvc.TriggerTierUpgrade(affiliate.ID)
+					// 3. Trigger Tier Upgrade Tracking (Run asynchronously to prevent deadlock)
+					go func(affID string) {
+						affSvc := services.NewAffiliateService(ac.DB, ac.Notif)
+						_ = affSvc.TriggerTierUpgrade(affID)
+					}(affiliate.ID)
 				}
 			}
 		}
@@ -3165,6 +3241,37 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 			Where("status = 'pending'").Count(&pendingPayouts)
 	}
 
+	var recentActivity []map[string]interface{}
+	if ac.hasTable("audit_logs") {
+		type Log struct {
+			TargetType string
+			Detail     string
+			CreatedAt  time.Time
+		}
+		var logs []Log
+		ac.DB.Table("audit_logs").Select("target_type", "detail", "created_at").Order("created_at DESC").Limit(5).Scan(&logs)
+		for _, l := range logs {
+			status := "SUCCESS"
+			logType := "system"
+			
+			// Simple mapping
+			if l.TargetType == "order" {
+				logType = "order"
+				status = "UPDATED"
+			} else if l.TargetType == "user" || l.TargetType == "merchant" {
+				logType = "user"
+				status = "SUCCESS"
+			}
+
+			recentActivity = append(recentActivity, map[string]interface{}{
+				"title":  l.Detail,
+				"type":   logType,
+				"time":   l.CreatedAt.Format(time.RFC3339),
+				"status": status,
+			})
+		}
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_users":      totalUsers,
 		"total_merchants":  totalMerchants,
@@ -3173,6 +3280,7 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 		"total_fee":        totalFee,
 		"total_orders":     totalOrders,
 		"pending_payouts":  pendingPayouts,
+		"recent_activity":  recentActivity,
 	})
 }
 
@@ -3192,13 +3300,19 @@ func (ac *AdminController) GetBlogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ac *AdminController) GetPublicBlogDetail(w http.ResponseWriter, r *http.Request) {
-	slug := r.URL.Query().Get("slug")
-	if slug == "" {
-		utils.JSONError(w, http.StatusBadRequest, "Slug is required")
+	identifier := r.URL.Query().Get("slug")
+	if identifier == "" {
+		identifier = r.URL.Query().Get("id")
+	}
+
+	if identifier == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Slug or ID is required")
 		return
 	}
+
 	var blog models.BlogPost
-	if err := ac.DB.Where("slug = ? AND status = 'published'", slug).First(&blog).Error; err != nil {
+	// Query both slug and ID (cast to text) for maximum compatibility
+	if err := ac.DB.Where("(slug = ? OR CAST(id AS TEXT) = ?) AND status = 'published'", identifier, identifier).First(&blog).Error; err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Article not found")
 		return
 	}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson, postJson, uploadFile, API_BASE } from '../lib/api';
+import { BUYER_API_BASE, fetchJson, postJson, uploadFile, API_BASE, formatImage } from '../lib/api';
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -161,11 +161,14 @@ export default function OrderDetailPage() {
                 <div className="p-8 space-y-6">
                   {group.items?.map((item, iidx) => (
                     <div key={iidx} className="flex gap-4">
-                      <div className="w-20 h-20 bg-gray-50 rounded-2xl border border-gray-100 flex-shrink-0 overflow-hidden">
-                        {/* Placeholder or actual image if available */}
-                        <div className="w-full h-full flex items-center justify-center text-gray-200">
-                          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        </div>
+                      <div className="w-20 h-20 bg-gray-50 rounded-2xl border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                        {item.product_image_url ? (
+                          <img src={formatImage(item.product_image_url)} alt={item.product_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-200">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900 text-sm leading-tight mb-1">{item.product_name}</h4>

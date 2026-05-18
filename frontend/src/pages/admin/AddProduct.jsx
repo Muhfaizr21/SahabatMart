@@ -89,7 +89,10 @@ export default function AdminAddProduct() {
     try {
       const resp = await fetch(`${API}/upload`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: formData
       });
       

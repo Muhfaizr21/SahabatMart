@@ -48,20 +48,35 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 		if err := s.DB.First(&product, "id = ?", items[i].ProductID).Error; err != nil {
 			return nil, fmt.Errorf("produk tidak ditemukan: %s", items[i].ProductID)
 		}
-
-		// Determine price based on role
+		// Determine price and image based on role and variant
 		actualPrice := product.Price
 		if (buyer.Role == "affiliate" || buyer.Role == "merchant") && product.WholesalePrice > 0 {
 			actualPrice = product.WholesalePrice
 		}
 
-		// Handle variant price override
+		items[i].ProductImageURL = product.Image
+		items[i].Weight = product.Weight
+		items[i].COGS = product.COGS
+
+		// Handle variant overrides
 		if items[i].ProductVariantID != nil && *items[i].ProductVariantID != "" {
 			var v models.ProductVariant
 			if err := s.DB.First(&v, "id = ?", *items[i].ProductVariantID).Error; err == nil {
 				actualPrice = v.Price
 				if (buyer.Role == "affiliate" || buyer.Role == "merchant") && v.WholesalePrice > 0 {
 					actualPrice = v.WholesalePrice
+				}
+				if v.Image != "" {
+					items[i].ProductImageURL = v.Image
+				}
+				if v.Weight > 0 {
+					items[i].Weight = v.Weight
+				}
+				if v.COGS > 0 {
+					items[i].COGS = v.COGS
+				}
+				if v.SKU != "" {
+					items[i].SKU = v.SKU
 				}
 			}
 		} else {
@@ -75,17 +90,9 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 		items[i].UnitPrice = actualPrice
 		items[i].Subtotal = actualPrice * float64(items[i].Quantity)
-		items[i].Weight = product.Weight
 		items[i].ProductName = product.Name
-		items[i].COGS = product.COGS // Snapshot modal saat beli untuk laporan finance
-		items[i].SKU = product.SKU
-
-		// Handle variant COGS override if exists
-		if items[i].ProductVariantID != nil && *items[i].ProductVariantID != "" {
-			var v models.ProductVariant
-			if err := s.DB.First(&v, "id = ?", *items[i].ProductVariantID).Error; err == nil && v.COGS > 0 {
-				items[i].COGS = v.COGS
-			}
+		if items[i].SKU == "" {
+			items[i].SKU = product.SKU
 		}
 
 		totalSubtotal += items[i].Subtotal
@@ -104,6 +111,15 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 	if affiliateID != nil && *affiliateID == "" {
 		affiliateID = nil
+	}
+
+	// [Auto-Cashback] Jika user adalah Affiliate dan tidak menggunakan link siapa-siapa,
+	// otomatis jadikan dia referrernya sendiri agar dapat komisi & poin, serta upline-nya juga dapat.
+	if (affiliateID == nil || *affiliateID == "") && buyer.Role == "affiliate" {
+		var myAff models.AffiliateMember
+		if err := s.DB.Where("user_id = ?", buyerID).First(&myAff).Error; err == nil {
+			affiliateID = &myAff.ID
+		}
 	}
 
 	timeout := s.ConfigService.GetInt("payment_timeout_minutes", 30)
@@ -430,7 +446,11 @@ func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 			tx.Model(&models.AffiliateMember{}).Where("id = ?", *order.AffiliateID).
 				UpdateColumn("total_conversions", gorm.Expr("total_conversions + 1"))
 
-			_ = s.Affiliate.TriggerTierUpgrade(*order.AffiliateID)
+			// Run heavy tier upgrade asynchronously outside the transaction to prevent database deadlock
+			go func(affID string) {
+				affSvc := NewAffiliateService(s.DB, s.Notification)
+				_ = affSvc.TriggerTierUpgrade(affID)
+			}(*order.AffiliateID)
 		}
 
 		return nil

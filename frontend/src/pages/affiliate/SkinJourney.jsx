@@ -324,7 +324,12 @@ export default function SkinJourney() {
         const token = localStorage.getItem('token');
         const aiRes = await fetch(`${API_BASE}/api/skin/analyze`, {
           method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: token ? { 
+            Authorization: `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true'
+          } : {
+            'ngrok-skip-browser-warning': 'true'
+          },
           body: formData
         });
         const aiJson = await aiRes.json();

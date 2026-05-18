@@ -3,26 +3,30 @@ import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2 } from 'l
 import { PUBLIC_API_BASE, fetchJson } from '../lib/api';
 import { useConfig } from '../hooks/useConfig';
 import toast from 'react-hot-toast';
+import SEO from '../components/SEO';
 
 export default function ContactPage() {
   const { config } = useConfig();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return;
     setLoading(true);
-
     try {
-      const res = await fetchJson(`${PUBLIC_API_BASE}/contact/submit`, {
+      await fetchJson(`${PUBLIC_API_BASE}/contact/submit`, {
         method: 'POST',
         body: JSON.stringify(formData)
       });
-      toast.success(res.message || 'Pesan berhasil dikirim!');
+      toast.success('Pesan Anda telah terkirim!');
       setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (_err) {
-      toast.error(_err.message || 'Gagal mengirim pesan');
+    } catch (err) {
+      toast.error('Gagal mengirim pesan: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -30,6 +34,10 @@ export default function ContactPage() {
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-16">
+      <SEO 
+        title="Hubungi Kami - SahabatMart"
+        description="Ada pertanyaan atau butuh bantuan? Hubungi SahabatMart (AkuGlow) melalui formulir kontak, WhatsApp, atau email. Tim kami siap membantu Anda."
+      />
       <div className="text-center mb-16">
         <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Hubungi <span className="text-rose-600">Kami</span></h1>
         <p className="text-gray-500 font-medium max-w-xl mx-auto">Ada pertanyaan atau butuh bantuan? Tim kami siap membantu Anda kapan saja.</p>

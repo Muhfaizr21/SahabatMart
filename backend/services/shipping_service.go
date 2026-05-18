@@ -44,7 +44,7 @@ func (s *ShippingService) SearchArea(input string) ([]map[string]interface{}, er
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	log.Printf("[Biteship] Searching area for: %s", input)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -80,7 +80,7 @@ func (s *ShippingService) FetchCouriers() ([]map[string]interface{}, error) {
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -159,36 +159,12 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 		respBody, _ := io.ReadAll(resp.Body)
 		var errBody map[string]interface{}
 		json.Unmarshal(respBody, &errBody)
-		log.Printf("⚠️ Biteship API Error (Status %d): %+v", resp.StatusCode, errBody)
-
-		// Fallback untuk mode development jika terjadi error apa pun (misal: saldo habis, belum set kurir, dll)
 		errorMessage, _ := errBody["error"].(string)
+		log.Printf("⚠️ [Biteship API Error] Status %d: %s", resp.StatusCode, errorMessage)
+
 		if os.Getenv("GO_ENV") != "production" {
-			log.Printf("💡 Development Mode: Biteship error detected ('%s'). Returning mock rates...", errorMessage)
-			return []map[string]interface{}{
-				{
-					"courier_name":            "JNE (Simulasi)",
-					"courier_code":            "jne",
-					"courier_service":         "REG",
-					"courier_service_name":    "Reguler",
-					"courier_service_code":    "reg",
-					"price":                   12000,
-					"duration":                "2-3 Hari",
-					"shipment_duration_range": "2-3",
-					"shipment_duration_unit":  "days",
-				},
-				{
-					"courier_name":            "SiCepat (Simulasi)",
-					"courier_code":            "sicepat",
-					"courier_service":         "HALU",
-					"courier_service_name":    "Halu",
-					"courier_service_code":    "halu",
-					"price":                   9000,
-					"duration":                "3-5 Hari",
-					"shipment_duration_range": "3-5",
-					"shipment_duration_unit":  "days",
-				},
-			}, nil
+			log.Printf("💡 [Dev Mode] Biteship API error — generating estimated rates from DB channels...")
+			return s.generateMockRates(items), nil
 		}
 
 		return nil, fmt.Errorf("biteship api returned status %d: %s", resp.StatusCode, errorMessage)
@@ -204,6 +180,106 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 	}
 
 	return result.Pricing, nil
+}
+
+// generateMockRates membuat estimasi ongkir berdasarkan kurir aktif di DB
+// Digunakan sebagai fallback saat Biteship API tidak tersedia (mode dev / sandbox belum setup)
+func (s *ShippingService) generateMockRates(items []models.OrderItem) []map[string]interface{} {
+	// Hitung total berat
+	totalWeight := 0
+	for _, item := range items {
+		w := item.Weight
+		if w <= 0 {
+			w = 200
+		}
+		totalWeight += w * item.Quantity
+	}
+	if totalWeight <= 0 {
+		totalWeight = 200
+	}
+
+	// Ambil kurir aktif dari DB
+	type CourierRow struct {
+		Code string
+		Name string
+	}
+	var channels []models.LogisticChannel
+	s.DB.Where("is_active = ?", true).Find(&channels)
+
+	// Tabel layanan tiap kurir: code -> [{service, duration, basePrice, pricePerKg}]
+	serviceMap := map[string][]struct {
+		service   string
+		name      string
+		duration  string
+		basePrice int
+		perKg     int
+	}{
+		"jne":          {{"REG", "Reguler", "2-3 hari", 8000, 7000}, {"YES", "Yakin Esok Sampai", "1-2 hari", 20000, 12000}},
+		"sicepat":      {{"REG", "Reguler", "2-3 hari", 7000, 6500}, {"BEST", "Best", "1-2 hari", 18000, 11000}},
+		"jnt":          {{"EZ", "Reguler", "2-3 hari", 7500, 7000}},
+		"anteraja":     {{"REG", "Reguler", "2-4 hari", 7000, 6000}},
+		"pos":          {{"Biasa", "Pos Reguler", "3-5 hari", 6000, 5500}},
+		"wahana":       {{"REG", "Reguler", "3-5 hari", 6500, 5000}},
+		"lion":         {{"REG", "Reguler", "2-4 hari", 7500, 7500}},
+		"ninja":        {{"STD", "Standard", "2-4 hari", 8000, 7000}},
+		"idexpress":    {{"STD", "Standard", "3-5 hari", 6000, 5500}},
+		"tiki":         {{"REG", "Reguler", "2-4 hari", 7000, 6500}},
+		"rpx":          {{"RGP", "Reguler", "3-5 hari", 8000, 7000}},
+		"sentralcargo": {{"REG", "Reguler", "4-7 hari", 5000, 4000}},
+	}
+
+	weightKg := float64(totalWeight) / 1000.0
+	if weightKg < 1 {
+		weightKg = 1 // minimum 1 kg
+	}
+
+	var result []map[string]interface{}
+	for _, ch := range channels {
+		services, ok := serviceMap[strings.ToLower(ch.Code)]
+		if !ok {
+			// Kurir tidak ada di tabel, generate generic
+			price := int(8000 + weightKg*7000)
+			result = append(result, map[string]interface{}{
+				"courier_name":            ch.Name,
+				"courier_code":            strings.ToLower(ch.Code),
+				"courier_service":         "REG",
+				"courier_service_name":    "Reguler",
+				"courier_service_code":    "reg",
+				"price":                   price,
+				"duration":                "2-5 hari",
+				"shipment_duration_range": "2-5",
+				"shipment_duration_unit":  "days",
+				"is_estimated":            true,
+			})
+			continue
+		}
+		for _, svc := range services {
+			price := int(float64(svc.basePrice) + weightKg*float64(svc.perKg))
+			result = append(result, map[string]interface{}{
+				"courier_name":            ch.Name,
+				"courier_code":            strings.ToLower(ch.Code),
+				"courier_service":         svc.service,
+				"courier_service_name":    svc.name,
+				"courier_service_code":    strings.ToLower(svc.service),
+				"price":                   price,
+				"duration":                svc.duration,
+				"shipment_duration_range": strings.Split(svc.duration, " ")[0],
+				"shipment_duration_unit":  "days",
+				"is_estimated":            true,
+			})
+		}
+	}
+
+	if len(result) == 0 {
+		// Absolute fallback jika DB kosong
+		result = []map[string]interface{}{
+			{"courier_name": "JNE", "courier_code": "jne", "courier_service": "REG", "courier_service_name": "Reguler", "courier_service_code": "reg", "price": int(8000 + weightKg*7000), "duration": "2-3 hari", "shipment_duration_range": "2-3", "shipment_duration_unit": "days", "is_estimated": true},
+			{"courier_name": "SiCepat", "courier_code": "sicepat", "courier_service": "REG", "courier_service_name": "Reguler", "courier_service_code": "reg", "price": int(7000 + weightKg*6500), "duration": "2-3 hari", "shipment_duration_range": "2-3", "shipment_duration_unit": "days", "is_estimated": true},
+		}
+	}
+
+	log.Printf("📦 [Dev Fallback] Generated %d estimated rates for weight %.2fkg", len(result), weightKg)
+	return result
 }
 
 // CreateOrder membuat pesanan pengiriman di Biteship
@@ -280,7 +356,7 @@ func (s *ShippingService) CreateOrder(order models.Order, group models.OrderMerc
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", err
@@ -322,7 +398,7 @@ func (s *ShippingService) GetTracking(biteshipOrderID string) (map[string]interf
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

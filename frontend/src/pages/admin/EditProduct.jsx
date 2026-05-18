@@ -146,7 +146,10 @@ export default function AdminEditProduct() {
       // Endpoint yang benar adalah /api/admin/upload, bukan /products/upload
       const resp = await fetch(`${API}/upload`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: formData
       });
       
@@ -247,6 +250,8 @@ export default function AdminEditProduct() {
       stock: parseInt(p.stock) || 0,
       merchant_commission_percent: parseFloat(p.merchant_commission_percent) || 0,
       merchant_commission_preset_id: p.merchant_commission_preset_id || null,
+      commission_preset_id: p.commission_preset_id || null,
+      tier_commission_preset_id: p.tier_commission_preset_id || null,
     };
 
     fetchJson(`${API}/products/update`, {

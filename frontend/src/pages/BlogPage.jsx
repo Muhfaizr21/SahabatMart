@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
+import SEO from '../components/SEO';
 
 export default function BlogPage() {
   const [posts, setPosts] = useState([]);
@@ -41,6 +42,10 @@ export default function BlogPage() {
 
   return (
     <main className="bg-white min-h-screen">
+      <SEO 
+        title="Blog & Edukasi - SahabatMart"
+        description="Temukan berbagai tips kecantikan, panduan perawatan kulit, dan informasi terbaru seputar dunia skincare dari para ahli SahabatMart."
+      />
       {/* Hero Section */}
       <section className="bg-gray-50 py-20 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 text-center">

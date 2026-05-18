@@ -5,6 +5,7 @@ import { isAuthenticated } from '../lib/auth';
 import { ShoppingBag } from 'lucide-react';
 import ReviewSection from '../components/ReviewSection';
 import RecommendedSection from '../components/RecommendedSection';
+import SEO from '../components/SEO';
 
 function StarRating({ rating, size = 16 }) {
   return (
@@ -19,8 +20,6 @@ function StarRating({ rating, size = 16 }) {
 }
 
 const tabs = ['Deskripsi', 'Informasi Tambahan', 'Ulasan'];
-
-
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -53,7 +52,7 @@ export default function ProductDetailPage() {
             console.log('Affiliate tracked:', res.affiliate_id);
           }
         })
-        .catch(err => console.error('Tracking failed:', _err));
+        .catch(err => console.error('Tracking failed:', err));
     }
   }, [id]);
 
@@ -187,7 +186,7 @@ export default function ProductDetailPage() {
       try {
         const d = await fetchJson(`${BUYER_API_BASE}/wishlist/check?product_id=${id}`);
         if (!cancelled) setIsWishlisted(d.is_wishlisted);
-      } catch (_e) { console.error('Wishlist check failed:', e); }
+      } catch (_e) { console.error('Wishlist check failed:', _e); }
     };
     checkWish();
     return () => { cancelled = true; };
@@ -214,6 +213,58 @@ export default function ProductDetailPage() {
     }
   };
 
+  const productSchema = product ? {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": product.name,
+    "image": formatImage(product.image),
+    "description": product.description,
+    "sku": `SM-${product.id}`,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand || "AkuGlow"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": window.location.href,
+      "priceCurrency": "IDR",
+      "price": product.price,
+      "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": product.rating || 5,
+      "reviewCount": product.reviews || 1
+    }
+  } : null;
+
+  const breadcrumbSchema = product ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Marketplace",
+        "item": `${window.location.origin}/shop`
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": product.category || "Category",
+        "item": `${window.location.origin}/shop?category=${encodeURIComponent(product.category || '')}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": product.name,
+        "item": window.location.href
+      }
+    ]
+  } : null;
+
+  const combinedSchema = [productSchema, breadcrumbSchema].filter(Boolean);
+
   if (loading) return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center bg-gray-50/50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mb-4"></div>
@@ -232,6 +283,13 @@ export default function ProductDetailPage() {
 
   return (
     <>
+    <SEO 
+      title={product.name} 
+      description={product.description?.substring(0, 160) || `Beli ${product.name} dengan harga terbaik di SahabatMart.`}
+      image={formatImage(product.image)}
+      type="article"
+      schema={combinedSchema}
+    />
     <main className="bg-gray-50/30 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:py-12 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
@@ -312,32 +370,32 @@ export default function ProductDetailPage() {
             {/* GLOBAL ATTRIBUTES SELECTOR (Dynamic from Super Admin) */}
             {(() => {
                 try {
-                  const attrs = JSON.parse(product.attributes || '{}');
-                  if (Object.keys(attrs).length === 0) return null;
-                  return (
-                    <div className="mb-8 flex flex-col gap-6">
-                      {Object.entries(attrs).map(([key, vals]) => (
-                        <div key={key}>
-                          <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">{key}</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {vals.map(v => (
-                              <button 
-                                key={v}
-                                onClick={() => setSelectedAttributes(prev => ({ ...prev, [key]: v }))}
-                                className={`px-4 py-2 rounded-xl border-2 text-xs font-black transition-all ${
-                                  selectedAttributes[key] === v 
-                                    ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md' 
-                                    : 'border-gray-100 bg-white text-gray-400 hover:border-gray-300'
-                                }`}
-                              >
-                                {v}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
+                   const attrs = JSON.parse(product.attributes || '{}');
+                   if (Object.keys(attrs).length === 0) return null;
+                   return (
+                     <div className="mb-8 flex flex-col gap-6">
+                       {Object.entries(attrs).map(([key, vals]) => (
+                         <div key={key}>
+                           <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">{key}</h4>
+                           <div className="flex flex-wrap gap-2">
+                             {vals.map(v => (
+                               <button 
+                                 key={v}
+                                 onClick={() => setSelectedAttributes(prev => ({ ...prev, [key]: v }))}
+                                 className={`px-4 py-2 rounded-xl border-2 text-xs font-black transition-all ${
+                                   selectedAttributes[key] === v 
+                                     ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-md' 
+                                     : 'border-gray-100 bg-white text-gray-400 hover:border-gray-300'
+                                 }`}
+                               >
+                                 {v}
+                               </button>
+                             ))}
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   );
                 } catch(e) { return null; }
             })()}
 

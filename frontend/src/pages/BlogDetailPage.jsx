@@ -1,60 +1,99 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
+import SEO from '../components/SEO';
 
 export default function BlogDetailPage() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const [blog, setBlog] = useState(null);
   const [latestPosts, setLatestPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch main blog detail — backend expects ?slug=... param
-    setLoading(true);
-    fetchJson(`${PUBLIC_API_BASE}/blogs/detail?slug=${id}`)
-      .then(d => {
-        // BUG-06 fix: handle both wrapped ({data: blog}) and unwrapped responses
-        const blog = d?.data || d;
-        if (blog) setBlog(blog);
-      })
-      .catch(err => console.error(_err))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    const load = async () => {
+      try {
+        // Try fetching by slug first, backend now supports both slug and id parameters
+        const d = await fetchJson(`${PUBLIC_API_BASE}/blogs/detail?slug=${slug}`);
+        if (!cancelled) {
+          setBlog(d);
+          const posts = await fetchJson(`${PUBLIC_API_BASE}/blogs`);
+          setLatestPosts(Array.isArray(posts) ? posts.slice(0, 4) : []);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [slug]);
 
-    // Fetch latest posts for sidebar
-    fetchJson(`${PUBLIC_API_BASE}/blogs`)
-      .then(d => {
-        const posts = Array.isArray(d) ? d : (d?.data || []);
-        // BUG-06 fix: filter by slug (same type as URL param id), fallback to string id
-        setLatestPosts(posts.filter(p => (p.slug || String(p.id)) !== id).slice(0, 5));
-      })
-      .catch(err => console.error(_err));
-  }, [id]);
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+    </div>
+  );
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  if (!blog) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <div className="text-7xl mb-6">🔍</div>
+        <h2 className="text-2xl font-black text-gray-900 mb-8">Artikel Tidak Ditemukan</h2>
+        <Link to="/blog" className="bg-primary text-white px-8 py-3 rounded-2xl font-bold">Kembali ke Blog</Link>
+    </div>
+  );
 
-  if (!blog) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6 text-center">
-        <div className="text-8xl mb-8">🔍</div>
-        <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">Artikel Tidak Ditemukan</h2>
-        <p className="text-gray-500 mb-10 max-w-sm font-medium leading-relaxed">
-          Maaf, artikel yang Anda cari mungkin telah dihapus atau dipindahkan ke alamat lain.
-        </p>
-        <Link to="/blog" className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform">
-          Kembali ke Blog
-        </Link>
-      </div>
-    );
-  }
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": blog.title,
+    "image": formatImage(blog.image),
+    "author": {
+      "@type": "Person",
+      "name": blog.author || "Admin"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "SahabatMart",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${window.location.origin}/logo.png`
+      }
+    },
+    "datePublished": blog.created_at,
+    "description": blog.summary
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Blog",
+        "item": `${window.location.origin}/blog`
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": blog.title,
+        "item": window.location.href
+      }
+    ]
+  };
+
+  const combinedSchema = [articleSchema, breadcrumbSchema].filter(Boolean);
 
   return (
     <main className="bg-white min-h-screen">
+      <SEO 
+        title={`${blog.title} - SahabatMart`}
+        description={blog.summary || blog.title}
+        image={formatImage(blog.image)}
+        schema={combinedSchema}
+      />
       {/* Article Header & Hero */}
       <div className="bg-gray-50 pt-16 pb-24 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
@@ -84,7 +123,7 @@ export default function BlogDetailPage() {
                 />
                 <div>
                   <div className="font-black text-gray-900 text-sm uppercase tracking-wider">{blog.author || 'Admin'}</div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Published On {new Date(blog.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Published On {new Date(blog.created_at).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
                 </div>
               </div>
             </div>
@@ -114,13 +153,7 @@ export default function BlogDetailPage() {
               
               <div 
                 className="article-content text-gray-700 leading-[1.8] text-lg md:text-xl font-medium space-y-8"
-                dangerouslySetInnerHTML={{ 
-                  __html: (blog.content || '')
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/\n/g, '<br />') 
-                }} 
+                dangerouslySetInnerHTML={{ __html: blog.content || '<p>Konten artikel tidak tersedia.</p>' }} 
               />
             </article>
 

@@ -13,6 +13,7 @@ const PERIODS = [
   { value: 'week',  label: '7 Hari Terakhir' },
   { value: 'month', label: 'Bulan Ini' },
   { value: 'year',  label: 'Tahun Ini' },
+  { value: 'custom', label: 'Kustom Tanggal' },
 ];
 
 const MUTATION_TYPES = [
@@ -32,17 +33,31 @@ export default function AdminFinance() {
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
   const [period, setPeriod]     = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [showConfig, setShowConfig] = useState(false);
   const [mutation, setMutation] = useState(emptyMut);
   const [saving, setSaving]     = useState(false);
 
-  useEffect(() => { fetchData(); }, [period]);
+  useEffect(() => { fetchData(); }, [period, dateFrom, dateTo]);
 
   const fetchData = async () => {
     setLoading(true);
+    let pParam = period;
+    if (period === 'custom') {
+      if (dateFrom && dateTo) {
+        pParam = `${dateFrom}:${dateTo}`;
+      } else {
+        setLoading(false);
+        return;
+      }
+    }
     try {
-      const r = await fetch(`${API}/finance/revenue-detail?period=${period}`, {
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+      const r = await fetch(`${API}/finance/revenue-detail?period=${pParam}`, {
+        headers: { 
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+          'ngrok-skip-browser-warning': 'true'
+        }
       });
       const res = await r.json();
       setData(res);
@@ -56,11 +71,16 @@ export default function AdminFinance() {
   const handleMutation = async (e) => {
     e.preventDefault();
     if (!mutation.category || !mutation.amount) { toast.error('Kategori & nominal wajib diisi'); return; }
+    if (!window.confirm(`Yakin ingin mencatat mutasi kas sebesar Rp${Number(mutation.amount).toLocaleString('id-ID')}?`)) return;
     setSaving(true);
     try {
       const r = await fetch(`${API}/finance/mutation`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
+        headers: { 
+          'Content-Type': 'application/json', 
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({
           ...mutation,
           amount:           Number(mutation.amount),
@@ -79,7 +99,10 @@ export default function AdminFinance() {
     try {
       const r = await fetch(`${API}/finance/mutation?id=${id}`, {
         method: 'DELETE',
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+        headers: { 
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+          'ngrok-skip-browser-warning': 'true'
+        }
       });
       if (r.ok) { toast.success('Mutasi dihapus'); fetchData(); }
       else toast.error('Gagal menghapus mutasi');
@@ -90,14 +113,15 @@ export default function AdminFinance() {
     try {
       if (action === 'delete') {
         if (!window.confirm(`Hapus kas "${loc.name}"? Pastikan tidak ada uang tersisa di dalamnya.`)) return;
-        const r = await fetch(`${API}/finance/locations?id=${loc.id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+        const r = await fetch(`${API}/finance/locations?id=${loc.id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + localStorage.getItem('token'), 'ngrok-skip-browser-warning': 'true' } });
         if (r.ok) { toast.success('Kas dihapus'); fetchData(); }
       } else if (action === 'create') {
         const name = window.prompt('Masukkan nama Lokasi Kas / Bank baru:');
         if (!name) return;
+        if (!window.confirm(`Buat Kas/Bank baru dengan nama "${name}"?`)) return;
         const r = await fetch(`${API}/finance/locations`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token'), 'ngrok-skip-browser-warning': 'true' },
           body: JSON.stringify({ name, balance: 0, is_primary: false })
         });
         if (r.ok) { toast.success('Kas berhasil ditambahkan'); fetchData(); }
@@ -106,9 +130,10 @@ export default function AdminFinance() {
         if (!name) return;
         const balanceRaw = window.prompt('Sesuaikan saldo aktual:', loc.balance);
         if (balanceRaw === null) return;
+        if (!window.confirm(`Simpan perubahan untuk "${name}" dengan saldo Rp${Number(balanceRaw).toLocaleString('id-ID')}?`)) return;
         const r = await fetch(`${API}/finance/locations/update?id=${loc.id}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token'), 'ngrok-skip-browser-warning': 'true' },
           body: JSON.stringify({ name, balance: Number(balanceRaw), is_primary: loc.is_primary })
         });
         if (r.ok) { toast.success('Kas berhasil diperbarui'); fetchData(); }
@@ -121,6 +146,8 @@ export default function AdminFinance() {
   const grossProfit = data?.gross_profit     || 0;
   const totalSaved  = data?.data_saving?.total || 0;
   const netProfit   = data?.net_profit        || 0;
+
+  const actualPeriod = period === 'custom' ? `${dateFrom}:${dateTo}` : period;
 
   if (loading && !data) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -138,6 +165,23 @@ export default function AdminFinance() {
           <p className="text-slate-500 text-sm mt-1">Pantau arus kas, pendapatan, dan alokasi dana secara real-time.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {period === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition-all"
+              />
+              <span className="text-slate-400 text-sm">—</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl px-3 py-2 outline-none focus:border-indigo-500 transition-all"
+              />
+            </div>
+          )}
           <select
             value={period}
             onChange={e => setPeriod(e.target.value)}
@@ -184,7 +228,7 @@ export default function AdminFinance() {
             <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
               <i className='bx bx-pie-chart-alt-2 text-xl'></i>
             </div>
-            <a href={`/admin/finance/data-saving?period=${period}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+            <a href={`/admin/finance/data-saving?period=${actualPeriod}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
               Detail Alokasi
             </a>
           </div>
@@ -231,7 +275,7 @@ export default function AdminFinance() {
               ))}
             </div>
             <div className="mt-6">
-               <a href={`/admin/finance/profit-share?period=${period}`} className="inline-flex items-center justify-center w-full py-2.5 px-4 text-sm font-medium bg-white text-slate-900 rounded-xl hover:bg-slate-50 transition-colors">
+               <a href={`/admin/finance/profit-share?period=${actualPeriod}`} className="inline-flex items-center justify-center w-full py-2.5 px-4 text-sm font-medium bg-white text-slate-900 rounded-xl hover:bg-slate-50 transition-colors">
                   Bagi Hasil Stakeholder
                </a>
             </div>

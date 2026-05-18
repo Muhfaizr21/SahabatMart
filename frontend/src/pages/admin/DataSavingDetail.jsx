@@ -23,7 +23,10 @@ export default function DataSavingDetail() {
     setLoading(true);
     try {
       const r = await fetch(`${API}/finance/data-saving-detail?period=${period}`, {
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+        headers: { 
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+          'ngrok-skip-browser-warning': 'true'
+        }
       });
       const res = await r.json();
       setData(res);

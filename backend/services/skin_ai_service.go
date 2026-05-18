@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -204,7 +205,7 @@ func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, ima
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("⚠️ [SkinAI] HTTP error: %v. Falling back to smart mock.", err)

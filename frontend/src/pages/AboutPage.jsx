@@ -1,10 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import aboutImg from '../assets/9bc151cb-21ca-4872-9afb-cad0c087c661.webp';
+import SEO from '../components/SEO';
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900 font-['Plus_Jakarta_Sans']">
+      <SEO 
+        title="Tentang Kami - SahabatMart"
+        description="Kenali lebih dekat SahabatMart (AkuGlow). Misi kami adalah memberdayakan individu melalui produk kecantikan premium dan peluang bisnis yang adil."
+      />
       {/* Intro Section */}
       <section className="pt-32 pb-24 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto">

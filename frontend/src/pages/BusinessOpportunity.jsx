@@ -1,68 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE } from '../lib/api';
+import SEO from '../components/SEO';
 
 const BusinessOpportunity = () => {
   const [activeSim, setActiveSim] = useState(5);
-  const [dynamicContent, setDynamicContent] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchContent = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/public/config`);
-        const result = await response.json();
-        if (result.data && result.data.business_opportunity_content) {
-          setDynamicContent(JSON.parse(result.data.business_opportunity_content));
-        }
-      } catch (error) {
-        console.error('Error fetching content:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchContent();
-  }, []);
-
-  const simulationData = dynamicContent?.simulationData || {
+  const simulationData = {
     5: {
-      title: 'Duplikasi 5 Orang',
-      desc: 'Jika Anda mengajak 5 orang, dan masing-masing mengajak 5 orang lagi dengan belanja Rp100rb/bulan.',
-      free: 'Rp 175.000',
+      title: 'Simulasi Duplikasi 5 Orang',
+      desc: 'Asumsi setiap orang mengajak 5 mitra baru dan belanja Rp 250rb/bln.',
       premium: 'Rp 5.250.000',
+      free: 'Rp 175.000',
       levels: [
-        { name: 'Level 1 (5 org × Rp100rb × 15%)', income: 'Rp 75.000' },
-        { name: 'Level 2 (25 org × Rp100rb × 5%)', income: 'Rp 125.000' },
-        { name: 'Level 3 (125 org × Rp100rb × 5%)', income: 'Rp 625.000' },
-        { name: 'Level 4 (625 org × Rp100rb × 2%)', income: 'Rp 1.250.000' },
-        { name: 'Level 5 (3.125 org × Rp100rb × 1%)', income: 'Rp 3.125.000' },
+        { name: 'Level 1 (5 org)', income: 'Rp 187.500' },
+        { name: 'Level 2 (25 org)', income: 'Rp 437.500' },
+        { name: 'Level 3 (125 org)', income: 'Rp 1.562.500' },
+        { name: 'Level 4 (625 org)', income: 'Rp 3.125.000' },
+        { name: 'Level 5 (3125 org)', income: 'Rp 7.812.500' },
       ]
     },
     10: {
-      title: 'Duplikasi 10 Orang',
-      desc: 'Jika Anda mengajak 10 orang, dan masing-masing mengajak 10 orang lagi dengan belanja Rp100rb/bulan.',
-      free: 'Rp 600.000',
-      premium: 'Rp 125.850.000',
+      title: 'Simulasi Duplikasi 10 Orang',
+      desc: 'Asumsi setiap orang mengajak 10 mitra baru dan belanja Rp 250rb/bln.',
+      premium: 'Rp 45.000.000+',
+      free: 'Rp 850.000',
       levels: [
-        { name: 'Level 1 (10 org × Rp100rb × 15%)', income: 'Rp 150.000' },
-        { name: 'Level 2 (100 org × Rp100rb × 7%)', income: 'Rp 700.000' },
-        { name: 'Level 3 (1.000 org × Rp100rb × 5%)', income: 'Rp 5.000.000' },
-        { name: 'Level 4 (10.000 org × Rp100rb × 2%)', income: 'Rp 20.000.000' },
-        { name: 'Level 5 (100.000 org × Rp100rb × 1%)', income: 'Rp 100.000.000' },
+        { name: 'Level 1 (10 org)', income: 'Rp 375.000' },
+        { name: 'Level 2 (100 org)', income: 'Rp 1.750.000' },
+        { name: 'Level 3 (1000 org)', income: 'Rp 12.500.000' },
+        { name: 'Level 4 (10000 org)', income: 'Rp 50.000.000' },
+        { name: 'Level 5 (100000 org)', income: 'Rp 250.000.000' },
       ]
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDF8F3]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-red-700" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen overflow-hidden" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <SEO 
+        title="Peluang Bisnis Skincare - SahabatMart"
+        description="Bangun bisnis skincare premium tanpa modal dan tanpa stok. Jadilah mitra SahabatMart dan nikmati komisi berkelanjutan melalui sistem afiliasi kami."
+      />
 
       {/* ===== HERO ===== */}
       <section className="bg-[#C62828] text-white pt-28 pb-20 px-6 relative overflow-hidden">
@@ -144,7 +122,6 @@ const BusinessOpportunity = () => {
               </div>
             ))}
           </div>
-
         </div>
       </section>
 
@@ -299,7 +276,7 @@ const BusinessOpportunity = () => {
 
       {/* ===== COCOK UNTUK SIAPA ===== */}
       <section className="bg-white py-16 px-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">Cocok untuk Siapa?</h2>
             <p className="text-gray-500 text-sm">Bisnis ini terbuka untuk semua kalangan</p>

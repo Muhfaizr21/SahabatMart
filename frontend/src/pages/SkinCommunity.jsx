@@ -117,7 +117,10 @@ export default function SkinCommunity() {
         formData.append('image', selectedFile);
         const uploadRes = await fetch(`${API_BASE}/api/skin/community/upload`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'ngrok-skip-browser-warning': 'true'
+          },
           body: formData
         });
         const uploadData = await uploadRes.json();

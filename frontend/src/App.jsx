@@ -114,6 +114,8 @@ import SkinCommunityAdmin from './pages/admin/SkinCommunityAdmin';
 import MembershipTiers from './pages/admin/MembershipTiers';
 import AdminReviews from './pages/admin/AdminReviews';
 import CommissionPresets from './pages/admin/CommissionPresets';
+import HomePage from './pages/HomePage';
+import { ThemeProvider } from './context/ThemeContext';
 
 
 // ── Penanganan Khusus Header/Footer ─────────
@@ -138,21 +140,7 @@ function FooterManager() {
 
 import RecommendedSection from './components/RecommendedSection';
 
-// ── Halaman Home ─────────────────────
-function HomePage() {
-  return (
-    <>
-      <HeroSlider />
-      <FeatureBar />
-      <AboutMission />
-      <ProductSection />
-      <StatsSection />
-      <Testimonials />
-      <DiagnosticCTA />
-      <PromoBanner />
-    </>
-  );
-}
+// HomePage now imported from ./pages/HomePage
 
 // Blog dan Contact kini diimpor dari component mandiri
 
@@ -211,6 +199,8 @@ function ScrollToTop() {
   return null;
 }
 
+import { HelmetProvider } from 'react-helmet-async';
+
 // ── App Root ─────────────────────
 export default function App() {
   useEffect(() => {
@@ -218,9 +208,13 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
+    <HelmetProvider>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </ThemeProvider>
+    </HelmetProvider>
   );
 }
 
@@ -243,7 +237,7 @@ function AppContent() {
            <Route path="/order-success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
            <Route path="/order/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
           <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:id" element={<BlogDetailPage />} />
+          <Route path="/blog/:slug" element={<BlogDetailPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

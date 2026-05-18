@@ -70,6 +70,7 @@ const rawMenu = [
     ]
   },
 
+
   { type: 'label', text: 'Manajemen Konten' },
   {
     type: 'item', name: 'Konten & Tampilan', icon: 'bxs-layout',

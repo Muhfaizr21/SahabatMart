@@ -28,6 +28,7 @@ const statusColors = {
 export default function AdminOrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
+  const [breakdown, setBreakdown] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [note, setNote] = useState('');
@@ -35,8 +36,11 @@ export default function AdminOrderDetail() {
   const load = () => {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/orders/${id}`)
-      .then(d => setOrder(d))
-      .catch(err => console.error(_err))
+      .then(d => {
+        setOrder(d.data || d);
+        setBreakdown(d.finance_breakdown || []);
+      })
+      .catch(err => console.error(err))
       .finally(() => setLoading(false));
   };
 
@@ -498,6 +502,31 @@ export default function AdminOrderDetail() {
                   -{idr(order.total_commission)}
                 </span>
               </div>
+
+              {/* Detailed Breakdown */}
+              {breakdown.length > 0 && (
+                <div style={{ background: '#f8fafc', borderRadius: 12, padding: '12px 16px', marginBottom: 20, border: '1px solid #eef2ff' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
+                    Rincian Alokasi Dana (Ledger)
+                  </div>
+                  {breakdown.map((b, i) => {
+                    const isOutflow = b.amount < 0;
+                    return (
+                      <div key={b.id || i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 12, borderBottom: i < breakdown.length - 1 ? '1px dashed #e2e8f0' : 'none', paddingBottom: i < breakdown.length - 1 ? 12 : 0 }}>
+                        <div style={{ flex: 1, paddingRight: 12 }}>
+                          <div style={{ fontWeight: 700, color: '#334155' }}>
+                            {b.owner_name} <span style={{fontWeight: 600, color: '#94a3b8', fontSize: 10, textTransform: 'uppercase'}}>({b.owner_type})</span>
+                          </div>
+                          <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>{b.description || b.type.replace(/_/g, ' ')}</div>
+                        </div>
+                        <div style={{ fontWeight: 800, color: isOutflow ? '#dc2626' : '#16a34a', whiteSpace: 'nowrap' }}>
+                          {isOutflow ? '-' : '+'}{idr(Math.abs(b.amount))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div style={{
                 background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
                 padding: 16,

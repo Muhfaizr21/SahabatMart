@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
+import { fetchJson, API_BASE, MERCHANT_API_BASE, formatImage } from '../../lib/api';
 import { PageHeader, A, FieldLabel, idr } from '../../lib/adminStyles.jsx';
 
 const MerchantSettings = () => {
@@ -39,16 +39,20 @@ const MerchantSettings = () => {
     };
 
     const handleSearchArea = async (input) => {
-        if (input.length < 3) return;
+        if (input.length < 3) {
+            setAreas([]);
+            return;
+        }
         setSearchingArea(true);
         try {
-            const res = await fetchJson(`/api/shipping/areas?input=${input}`);
-            setAreas(res.areas || []);
+            const res = await fetchJson(`${API_BASE}/api/shipping/areas?input=${encodeURIComponent(input)}`);
+            // Biteship returns { areas: [...] }
+            setAreas(res?.areas || (Array.isArray(res) ? res : []));
         } catch (_err) {
             console.error('Area search failed:', _err);
+            setAreas([]);
         } finally {
-            setSearchingArea(true);
-            setTimeout(() => setSearchingArea(false), 500);
+            setSearchingArea(false);
         }
     };
 
@@ -57,7 +61,9 @@ const MerchantSettings = () => {
             ...store, 
             biteship_area_id: area.id,
             area_name: area.name,
-            city: area.city_name
+            // Gunakan field name Biteship yang benar
+            city: area.administrative_division_level_2_name || area.city_name || '',
+            province: area.administrative_division_level_1_name || area.province_name || '',
         });
         setAreas([]);
     };

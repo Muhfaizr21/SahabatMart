@@ -28,8 +28,13 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateJWT(userID, role, email, merchantID, affiliateID string) (string, error) {
-	expirationTime := time.Now().Add(24 * 7 * time.Hour) // 7 Hari
+func GenerateJWT(userID, role, email, merchantID, affiliateID string, remember bool) (string, error) {
+	duration := 24 * time.Hour // Default 1 hari
+	if remember {
+		duration = 24 * 30 * time.Hour // 30 hari jika "Ingat Saya"
+	}
+	
+	expirationTime := time.Now().Add(duration)
 	claims := &Claims{
 		UserID:      userID,
 		MerchantID:  merchantID,

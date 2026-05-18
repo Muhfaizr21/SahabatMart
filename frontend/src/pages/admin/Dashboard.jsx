@@ -6,121 +6,98 @@ const API = ADMIN_API_BASE;
 
 const idr = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 
-// ─── KPI CARD ─────────────────────────────────────────
-const KpiCard = ({ icon, label, value, trend, trendUp = true, color, sub }) => (
-  <div style={{
-    background: '#fff', borderRadius: 20, padding: '24px 24px 20px',
+// ─── COMPONENTS ───────────────────────────────────────
+
+const StatCard = ({ icon, label, value, trend, trendUp, color, subText }) => (
+  <div className="stat-card" style={{
+    background: '#fff', borderRadius: '24px', padding: '24px',
     border: '1px solid #f1f5f9',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)',
-    display: 'flex', flexDirection: 'column', gap: 16,
-    transition: 'all 0.2s', cursor: 'default',
-  }}
-  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.08)'}
-  onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)'}
-  >
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: 12,
-        background: color + '14',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 4px 20px -4px rgba(0,0,0,0.05)',
+    display: 'flex', flexDirection: 'column', gap: '16px',
+    position: 'relative', overflow: 'hidden'
+  }}>
+    <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.03 }}>
+      <i className={`bx ${icon}`} style={{ fontSize: '100px', color }} />
+    </div>
+    
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+      <div style={{ 
+        width: '48px', height: '48px', borderRadius: '14px', 
+        background: color + '10', display: 'flex', alignItems: 'center', justifyContent: 'center' 
       }}>
-        <i className={`bx ${icon}`} style={{ fontSize: 20, color }} />
+        <i className={`bx ${icon}`} style={{ fontSize: '24px', color }} />
       </div>
       {trend && (
-        <span style={{
-          fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
+        <div style={{ 
+          display: 'flex', alignItems: 'center', gap: '4px',
+          padding: '4px 10px', borderRadius: '20px',
           background: trendUp ? '#f0fdf4' : '#fff1f2',
           color: trendUp ? '#16a34a' : '#dc2626',
+          fontSize: '12px', fontWeight: '700'
         }}>
-          {trendUp ? '↑' : '↓'} {trend}
-        </span>
+          <i className={`bx ${trendUp ? 'bx-trending-up' : 'bx-trending-down'}`} />
+          {trend}
+        </div>
       )}
     </div>
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      <p style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
         {label}
-      </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1 }}>
+      </p>
+      <h3 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
         {value}
-      </div>
-      {sub && <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 6, fontWeight: 500 }}>{sub}</div>}
+      </h3>
+      {subText && <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px', fontWeight: '500' }}>{subText}</p>}
     </div>
   </div>
 );
 
-// ─── SECTION TITLE ────────────────────────────────────
-const SectionTitle = ({ text }) => (
-  <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 0, letterSpacing: '-0.01em' }}>{text}</h2>
+const SectionHeader = ({ title, subtitle, action }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div>
+      <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>{title}</h2>
+      {subtitle && <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0', fontWeight: '500' }}>{subtitle}</p>}
+    </div>
+    {action}
+  </div>
 );
 
-// ─── ACTION ROW ───────────────────────────────────────
-const QuickAction = ({ to, icon, label, sub, color }) => (
-  <Link to={to} style={{
-    display: 'flex', alignItems: 'center', gap: 14,
-    padding: '14px 16px', borderRadius: 14,
-    background: '#f8fafc', border: '1px solid #f1f5f9',
-    textDecoration: 'none', transition: 'all 0.18s',
-  }}
-  onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.07)'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#f1f5f9'; }}
-  >
-    <div style={{
-      width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-      background: color + '12',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+const ActivityItem = ({ type, title, time, status, color = '#6366f1' }) => (
+  <div style={{ 
+    display: 'flex', gap: '16px', padding: '16px 0', 
+    borderBottom: '1px solid #f8fafc',
+    alignItems: 'center'
+  }}>
+    <div style={{ 
+      width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
+      background: color + '10', display: 'flex', alignItems: 'center', justifyContent: 'center'
     }}>
-      <i className={`bx ${icon}`} style={{ fontSize: 18, color }} />
+      <i className={`bx ${type === 'order' ? 'bx-shopping-bag' : type === 'user' ? 'bx-user' : 'bx-bell'}`} style={{ color, fontSize: '18px' }} />
     </div>
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{sub}</div>
+      <div style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>{title}</div>
+      <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{time}</div>
     </div>
-    <i className="bx bx-chevron-right" style={{ fontSize: 18, color: '#cbd5e1' }} />
-  </Link>
+    {status && (
+      <span style={{ 
+        fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', 
+        padding: '4px 10px', borderRadius: '20px',
+        background: '#f1f5f9', color: '#475569'
+      }}>
+        {status}
+      </span>
+    )}
+  </div>
 );
 
-// ─── CHART BAR ────────────────────────────────────────
-const BarChart = ({ data }) => {
-  const max = Math.max(...data.map(d => d.revenue), 1);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 180, padding: '0 4px' }}>
-      {data.map((d, i) => {
-        const h = (d.revenue / max) * 100;
-        const isLast = i === data.length - 1;
-        return (
-          <div key={d.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 6 }}>
-            <div title={idr(d.revenue)} style={{
-              width: '100%', height: `${Math.max(h, 8)}%`,
-              borderRadius: '8px 8px 0 0',
-              background: isLast
-                ? 'linear-gradient(180deg, #6366f1, #4f46e5)'
-                : 'linear-gradient(180deg, #e0e7ff, #c7d2fe)',
-              transition: 'all 0.3s',
-              boxShadow: isLast ? '0 8px 24px rgba(99,102,241,0.3)' : 'none',
-              position: 'relative'
-            }}
-            onMouseEnter={e => !isLast && (e.currentTarget.style.background = 'linear-gradient(180deg, #a5b4fc, #818cf8)')}
-            onMouseLeave={e => !isLast && (e.currentTarget.style.background = 'linear-gradient(180deg, #e0e7ff, #c7d2fe)')}
-            />
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase' }}>
-              {d.month.slice(5)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+// ─── MAIN COMPONENT ───────────────────────────────────
 
-// ─── MAIN DASHBOARD ───────────────────────────────────
 export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear().toString());
-
-  const currentYear = new Date().getFullYear();
-  const availableYears = Array.from({length: 5}, (_, i) => (currentYear - i).toString());
 
   const loadData = () => {
     setLoading(true);
@@ -129,215 +106,241 @@ export default function AdminDashboard() {
       fetchJson(`${API}/finance/monthly?year=${year}`),
     ]).then(([ov, mo]) => {
       setOverview(ov);
-      const data = Array.isArray(mo) ? mo : (mo?.data || []);
-      setMonthly(data);
+      setMonthly(Array.isArray(mo) ? mo : (mo?.data || []));
     }).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadData(); }, [year]);
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: '50%',
-        border: '3px solid #e0e7ff', borderTopColor: '#6366f1',
-        animation: 'spin 0.8s linear infinite'
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh', flexDirection: 'column', gap: '20px' }}>
+      <div className="premium-spinner" style={{
+        width: '50px', height: '50px', borderRadius: '50%',
+        border: '4px solid #f1f5f9', borderTopColor: '#6366f1',
+        animation: 'spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite'
       }} />
-      <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>Loading analytics...</span>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+      <p style={{ fontSize: '14px', color: '#64748b', fontWeight: '600', letterSpacing: '0.05em' }}>PREPARING INSIGHTS...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 
-  const kpis = [
-    { icon: 'bxs-group', label: 'Total Users', value: (overview?.total_users || 0).toLocaleString('id-ID'), trend: '12.5%', color: '#6366f1', sub: 'Platform-wide registrations' },
-    { icon: 'bxs-store-alt', label: 'Active Merchants', value: (overview?.total_merchants || 0).toLocaleString('id-ID'), trend: '2.3%', color: '#8b5cf6', sub: `${overview?.pending_payouts || 0} payout pending` },
-    { icon: 'bxs-link-alt', label: 'Affiliates', value: (overview?.total_affiliates || 0).toLocaleString('id-ID'), trend: '5.8%', color: '#06b6d4', sub: 'Active referral network' },
-    { icon: 'bxs-shopping-bag', label: 'Total Orders', value: (overview?.total_orders || 0).toLocaleString('id-ID'), trend: '8.1%', color: '#f59e0b', sub: 'All-time transactions' },
-    { icon: 'bxs-dollar-circle', label: 'Gross Revenue', value: idr(overview?.total_revenue), trend: '18%', color: '#10b981', sub: 'Platform GMV' },
-    { icon: 'bx-line-chart', label: 'Platform Fee', value: idr(overview?.total_fee), trend: '14%', color: '#ef4444', sub: 'Net earnings' },
-  ];
-
   return (
-    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-
-      {/* ─── PAGE HEADER ─── */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+    <div className="admin-dashboard-root" style={{ padding: '4px 0 40px' }}>
+      {/* ─── TOP BAR ─── */}
+      <div style={{ 
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+        marginBottom: '40px', flexWrap: 'wrap', gap: '20px'
+      }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 800, color: '#6366f1',
-              textTransform: 'uppercase', letterSpacing: '0.1em',
-              background: '#eef2ff', padding: '4px 10px', borderRadius: 20,
-            }}>Live Analytics</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{ 
+              fontSize: '10px', fontWeight: '900', color: '#fff', background: '#6366f1', 
+              padding: '4px 12px', borderRadius: '20px', letterSpacing: '0.1em' 
+            }}>SUPER ADMIN</span>
+            <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Dashboard Overview</span>
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', marginBottom: 4 }}>
-            Command Center
+          <h1 style={{ fontSize: '32px', fontWeight: '900', color: '#0f172a', margin: 0, letterSpacing: '-0.04em' }}>
+            AkuGlow Command <span style={{ color: '#6366f1' }}>Center</span>
           </h1>
-          <p style={{ fontSize: 14, color: '#64748b', fontWeight: 500, marginBottom: 0 }}>
-            Monitor and manage your entire AkuGlow ecosystem in real-time.
-          </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={loadData} style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
-            borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff',
-            fontSize: 13, fontWeight: 700, color: '#475569', cursor: 'pointer',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={loadData} className="btn-secondary" style={{
+            display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px',
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px',
+            fontSize: '14px', fontWeight: '700', color: '#475569', cursor: 'pointer',
+            transition: 'all 0.2s'
           }}>
-            <i className="bx bx-refresh" style={{ fontSize: 17 }} /> Refresh
+            <i className="bx bx-refresh" style={{ fontSize: '20px' }} />
+            Sync Data
           </button>
-          <button style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
-            borderRadius: 12, border: 'none',
-            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(99,102,241,0.3)',
+          <button className="btn-primary" style={{
+            display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px',
+            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+            border: 'none', borderRadius: '14px',
+            fontSize: '14px', fontWeight: '700', color: '#fff', cursor: 'pointer',
+            boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.4)',
+            transition: 'all 0.2s'
           }}>
-            <i className="bx bx-cloud-download" style={{ fontSize: 17 }} /> Export
+            <i className="bx bx-cloud-download" style={{ fontSize: '20px' }} />
+            Export Report
           </button>
         </div>
       </div>
 
       {/* ─── KPI GRID ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-        {kpis.map(k => <KpiCard key={k.label} {...k} />)}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+        gap: '24px',
+        marginBottom: '40px'
+      }}>
+        <StatCard 
+          icon="bx-dollar-circle" color="#6366f1" label="Platform Revenue" 
+          value={idr(overview?.total_revenue)} trend="24.5%" trendUp={true}
+          subText="Gross Merchandise Value"
+        />
+        <StatCard 
+          icon="bx-user-voice" color="#06b6d4" label="Active Affiliates" 
+          value={(overview?.total_affiliates || 0).toLocaleString()} trend="12%" trendUp={true}
+          subText="Growth from referral network"
+        />
+        <StatCard 
+          icon="bx-store-alt" color="#8b5cf6" label="Total Merchants" 
+          value={(overview?.total_merchants || 0).toLocaleString()} trend="5.2%" trendUp={true}
+          subText="Verified ecosystem partners"
+        />
+        <StatCard 
+          icon="bx-package" color="#f59e0b" label="Pending Payouts" 
+          value={(overview?.pending_payouts || 0).toLocaleString()} 
+          trend={overview?.pending_payouts > 10 ? "Warning" : null} trendUp={false}
+          subText="Awaiting admin approval"
+        />
       </div>
 
-      {/* ─── MAIN GRID ─── */}
-      <div style={{ 
-        display: 'flex', 
-        flexWrap: 'wrap',
-        gap: 20 
-      }}>
+      {/* ─── MAIN CONTENT AREA ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px', alignItems: 'start' }}>
+        
+        {/* Left Column: Analytics & Charts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          
+          {/* Revenue Chart Section */}
+          <div style={{ 
+            background: '#fff', borderRadius: '24px', padding: '32px',
+            border: '1px solid #f1f5f9', boxShadow: '0 4px 20px -4px rgba(0,0,0,0.03)'
+          }}>
+            <SectionHeader 
+              title="Revenue Performance" 
+              subtitle="Monthly revenue breakdown and trends"
+              action={
+                <select 
+                  value={year} onChange={(e) => setYear(e.target.value)}
+                  style={{ 
+                    padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0',
+                    fontSize: '13px', fontWeight: '700', color: '#475569', outline: 'none'
+                  }}
+                >
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                </select>
+              }
+            />
+            
+            <div style={{ height: '300px', width: '100%', marginTop: '20px', position: 'relative' }}>
+              {monthly.length > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'flex-end', height: '240px', gap: '12px' }}>
+                  {monthly.map((m, idx) => {
+                    const max = Math.max(...monthly.map(x => x.revenue), 1);
+                    const height = (m.revenue / max) * 100;
+                    return (
+                      <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', height: '100%', justifyContent: 'flex-end' }}>
+                        <div style={{ 
+                          width: '100%', height: `${height}%`, minHeight: '4px',
+                          background: m.month.includes('-05') ? 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)' : '#e2e8f0',
+                          borderRadius: '8px 8px 4px 4px',
+                          transition: 'all 0.5s ease',
+                          position: 'relative'
+                        }} title={idr(m.revenue)}>
+                          {height > 15 && <div style={{ 
+                            position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)',
+                            fontSize: '10px', fontWeight: '800', color: '#6366f1'
+                          }}>{(m.revenue / 1000000).toFixed(1)}M</div>}
+                        </div>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8' }}>
+                          {m.month.split('-')[1]}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: '14px' }}>
+                  No transaction data found for this period.
+                </div>
+              )}
+            </div>
+          </div>
 
-        {/* Chart */}
-        <div style={{
-          flex: '1 1 500px',
-          background: '#fff', borderRadius: 20, padding: 28,
-          border: '1px solid #f1f5f9',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          minWidth: 0 // Prevent overflow in flex
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
-            <div>
-              <SectionTitle text="Revenue Growth" />
-              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4, marginBottom: 0, fontWeight: 500 }}>
-                Monthly GMV & platform fee breakdown
+          {/* System Performance & Status */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', 
+              borderRadius: '24px', padding: '24px', color: '#fff'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 10px #22c55e' }} />
+                <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.1em' }}>HEALTHY</span>
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: '900', margin: '0 0 8px' }}>API & Database</h3>
+              <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: '1.6' }}>
+                All core services are responding normally. Latency: <span style={{ color: '#22c55e' }}>24ms</span>
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: '4px 8px', borderRadius: 10, border: '1px solid #f1f5f9' }}>
-              <select 
-                value={year} 
-                onChange={(e) => setYear(e.target.value)}
-                style={{
-                  border: 'none', background: 'transparent', fontSize: 13, fontWeight: 700,
-                  color: '#6366f1', outline: 'none', cursor: 'pointer'
+            
+            <div style={{ 
+              background: '#fff', borderRadius: '24px', padding: '24px',
+              border: '1px solid #f1f5f9', boxShadow: '0 4px 20px -4px rgba(0,0,0,0.03)'
+            }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 12px', color: '#0f172a' }}>Moderation Queue</h3>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#f59e0b' }}>12</div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Products</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#ef4444' }}>5</div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase' }}>Merchants</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Quick Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          
+
+          {/* Quick Shortcuts */}
+          <div style={{ 
+            background: '#fff', borderRadius: '24px', padding: '32px',
+            border: '1px solid #f1f5f9', boxShadow: '0 4px 20px -4px rgba(0,0,0,0.03)'
+          }}>
+            <SectionHeader title="Quick Shortcuts" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {[
+                { label: 'Orders', icon: 'bx-shopping-bag', path: '/admin/orders', color: '#6366f1' },
+                { label: 'Merchants', icon: 'bx-store', path: '/admin/merchants', color: '#8b5cf6' },
+                { label: 'Users', icon: 'bx-user', path: '/admin/users', color: '#06b6d4' },
+                { label: 'Finance', icon: 'bx-wallet', path: '/admin/finance', color: '#10b981' },
+                { label: 'Settings', icon: 'bx-cog', path: '/admin/settings', color: '#64748b' },
+                { label: 'Security', icon: 'bx-shield-quarter', path: '/admin/security', color: '#ef4444' },
+              ].map(item => (
+                <Link key={item.label} to={item.path} style={{ 
+                  textDecoration: 'none', display: 'flex', flexDirection: 'column', 
+                  alignItems: 'center', padding: '16px', borderRadius: '16px', 
+                  background: '#f8fafc', gap: '8px', border: '1px solid #f1f5f9',
+                  transition: 'transform 0.2s, background 0.2s'
+                }} 
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#fff';
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.05)';
                 }}
-              >
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {monthly.length > 0 ? (
-            <>
-              <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-                <div style={{ minWidth: 400 }}>
-                  <BarChart data={monthly} />
-                </div>
-              </div>
-              <div style={{ 
-                borderTop: '1px solid #f1f5f9', 
-                marginTop: 24, 
-                paddingTop: 20, 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: 20
-              }}>
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  {[
-                    { label: 'Total GMV', value: idr(overview?.total_revenue), color: '#6366f1' },
-                    { label: 'Platform Fee', value: idr(overview?.total_fee), color: '#10b981' },
-                    { label: 'Orders', value: (overview?.total_orders || 0).toLocaleString('id-ID'), color: '#f59e0b' },
-                  ].map(s => (
-                    <div key={s.label} style={{ minWidth: 100 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{s.label}</div>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: s.color, letterSpacing: '-0.03em' }}>{s.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <Link to="/admin/finance" style={{
-                  fontSize: 12, fontWeight: 700, color: '#6366f1',
-                  textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '8px 12px', background: '#f5f7ff', borderRadius: 8
-                }}>
-                  View Ledger <i className="bx bx-right-arrow-alt" style={{ fontSize: 18 }} />
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                >
+                  <i className={`bx ${item.icon}`} style={{ fontSize: '24px', color: item.color }} />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>{item.label}</span>
                 </Link>
-              </div>
-            </>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-              <i className="bx bx-bar-chart-alt-2" style={{ fontSize: 48, color: '#e2e8f0', marginBottom: 12 }} />
-              <p style={{ fontSize: 14, color: '#cbd5e1', fontWeight: 600, marginBottom: 0 }}>No transaction data yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column */}
-        <div style={{ flex: '1 1 340px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* System Status */}
-          <div style={{
-            background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)',
-            borderRadius: 20, padding: 24, position: 'relative', overflow: 'hidden',
-          }}>
-            <div style={{ position: 'absolute', top: -20, right: -20, fontSize: 100, color: 'rgba(255,255,255,0.02)' }}>
-              <i className="bx bxs-shield-alt-2" />
-            </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.1em' }}>All Systems Operational</span>
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.03em', marginBottom: 8 }}>
-                99.9% Uptime
-              </div>
-              <p style={{ fontSize: 12, color: '#475569', fontWeight: 500, marginBottom: 20 }}>
-                Database, API & worker services are running without issues.
-              </p>
-              <Link to="/admin/audit" style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: '#94a3b8', fontSize: 11, fontWeight: 700,
-                textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
-                <i className="bx bxs-file-find" style={{ fontSize: 14 }} /> Audit Logs
-              </Link>
+              ))}
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div style={{
-            background: '#fff', borderRadius: 20, padding: 24,
-            border: '1px solid #f1f5f9',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex', flexDirection: 'column', gap: 0,
-          }}>
-            <div style={{ marginBottom: 16 }}>
-              <SectionTitle text="Quick Actions" />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <QuickAction to="/admin/merchants" icon="bxs-store-alt" label="Merchant Audit" sub="Review & verify partners" color="#8b5cf6" />
-              <QuickAction to="/admin/payouts" icon="bxs-wallet" label="Payout Queue" sub={`${overview?.pending_payouts || 0} request pending`} color="#10b981" />
-              <QuickAction to="/admin/products" icon="bxs-package" label="Product Catalog" sub="Manage inventory" color="#f59e0b" />
-              <QuickAction to="/admin/finance" icon="bx-line-chart" label="Financial Ledger" sub="Revenue & fee breakdown" color="#6366f1" />
-            </div>
-          </div>
         </div>
+
       </div>
     </div>
   );

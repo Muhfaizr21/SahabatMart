@@ -127,7 +127,10 @@ export default function AddEditProduct() {
     try {
       const resp = await fetch(`${MERCHANT_API_BASE}/upload`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: fd
       });
       const data = await resp.json();

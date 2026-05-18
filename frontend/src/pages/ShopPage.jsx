@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { PUBLIC_API_BASE, BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
+import SEO from '../components/SEO';
 
 const badgeColors = { hot: 'bg-red-500', trending: 'bg-blue-500', offer: 'bg-green-500', sale: 'bg-orange-500' };
 
@@ -59,7 +60,6 @@ export default function ShopPage() {
       fetchJson(`${PUBLIC_API_BASE}/products`),
       fetchJson(`${PUBLIC_API_BASE}/categories`),
     ]).then(([p, c]) => {
-      // fetchJson automatically unwraps {status: 'success', data: [...]}, so p and c are likely arrays
       const productListData = Array.isArray(p) ? p : (p.data || []);
       const categoryListData = Array.isArray(c) ? c : (c.data || []);
       
@@ -76,7 +76,7 @@ export default function ShopPage() {
   useEffect(() => {
     const fetchWishlist = async () => {
       const token = localStorage.getItem('token');
-      if (!token) return; // Jangan panggil jika tidak login agar tidak diarahkan ke /login
+      if (!token) return;
 
       try {
         const d = await fetchJson(`${BUYER_API_BASE}/wishlist`);
@@ -117,7 +117,6 @@ export default function ShopPage() {
     }
 
     try {
-      // Find default variant or fallback
       const variantId = product.variants && product.variants.length > 0 ? product.variants[0].id : product.id;
       
       await fetchJson(`${BUYER_API_BASE}/cart/add`, {
@@ -129,7 +128,6 @@ export default function ShopPage() {
           quantity: 1
         })
       });
-      // Global sync for Navbar & others
       window.dispatchEvent(new Event('cartUpdate'));
       window.dispatchEvent(new Event('openCart'));
     } catch (_err) {
@@ -140,7 +138,6 @@ export default function ShopPage() {
   let filtered = allProducts.filter(p => {
     if (activeCategory !== 'Semua' && p.category !== activeCategory) return false;
     
-    // Global Search Sync (Live per word)
     if (searchTerm) {
       const words = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length > 0);
       const productName = p.name.toLowerCase();
@@ -152,10 +149,8 @@ export default function ShopPage() {
     const range = priceRanges[priceRange];
     if (price < range.min || price > range.max) return false;
 
-    // Rating Filter Sync
     if (minRating > 0 && (p.rating || 0) < minRating) return false;
 
-    // Brand Filter Sync
     if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand)) return false;
 
     return true;
@@ -167,13 +162,11 @@ export default function ShopPage() {
   else if (sortBy === 'Harga Tertinggi') filtered = [...filtered].sort((a, b) => b.price - a.price);
   else if (sortBy === 'Rating Tertinggi') filtered = [...filtered].sort((a, b) => b.rating - a.rating);
 
-  // Pagination Logic
   const totalPages = Math.ceil(filtered.length / productsPerPage);
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
   const currentProducts = filtered.slice(indexOfFirstProduct, indexOfLastProduct);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [activeCategory, sortBy, priceRange, searchParam, selectedBrands, minRating]);
@@ -191,6 +184,11 @@ export default function ShopPage() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
+      <SEO 
+        title={activeCategory === 'Semua' ? "Semua Produk - SahabatMart" : `${activeCategory} - SahabatMart`}
+        description={`Jelajahi koleksi ${activeCategory === 'Semua' ? 'produk kecantikan dan kesehatan' : activeCategory} terbaik di SahabatMart. Belanja sekarang dengan promo menarik.`}
+        type="website"
+      />
       {/* Mobile Sticky Filter & Search Bar */}
       <div className="lg:hidden sticky top-[104px] z-40 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
         <div className="flex flex-col">
@@ -400,8 +398,6 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {/* Mobile Local Search Bar - Now Integrated in Sticky Header above */}
-
             {/* Search Indicator */}
             {searchParam && (
               <div className="mb-8 flex items-center gap-3 animate-in fade-in slide-in-from-left duration-500">
@@ -439,7 +435,6 @@ export default function ShopPage() {
                   Maaf, kami tidak menemukan produk yang cocok dengan pencarian Anda.
                 </p>
 
-                {/* Smart Suggestion for Non-Product Searches */}
                 {(searchParam?.toLowerCase().includes('kontak') || searchParam?.toLowerCase().includes('hubungi') || searchParam?.toLowerCase().includes('bantuan')) && (
                   <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
                     <p className="text-rose-600 font-black text-sm mb-3">Mencari bantuan atau kontak kami?</p>
@@ -481,11 +476,8 @@ export default function ShopPage() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
                 {currentProducts.map(product => (
                   <div key={product.id} className="group bg-white rounded-[32px] border border-gray-100/80 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] transition-all duration-700 overflow-hidden hover:-translate-y-3 flex flex-col relative">
-                    {/* Image Container */}
                     <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-[1/1.1]">
                       <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" />
-                      
-                      {/* Glass Badge Overlay */}
                       {product.badge && (
                         <div className="absolute top-4 left-4 z-10">
                             <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-xl backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
@@ -493,8 +485,6 @@ export default function ShopPage() {
                             </span>
                         </div>
                       )}
-
-                      {/* Floating Wishlist - Only if Logged In */}
                       {isLoggedIn && (
                         <button
                           onClick={e => { e.preventDefault(); handleToggleWishlist(product.id); }}
@@ -507,7 +497,6 @@ export default function ShopPage() {
                       )}
                     </Link>
 
-                    {/* Content */}
                     <div className="p-5 sm:p-7 flex-1 flex flex-col">
                       <div className="flex items-center gap-2 mb-3">
                         <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-black uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-lg">
@@ -519,20 +508,15 @@ export default function ShopPage() {
                           <span className="text-[9px] text-gray-400 font-bold">({product.reviews || 0})</span>
                         </div>
                       </div>
-                      
                       <Link to={`/product/${product.id}`} className="text-[14px] sm:text-[16px] font-black text-gray-900 hover:text-blue-700 transition-colors leading-snug mb-4 block line-clamp-2 min-h-[2.8em]">
                         {product.name}
                       </Link>
-
-                      {/* Store Info */}
                       <div className="flex items-center gap-2 mb-6 group/store">
                         <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] text-blue-600 font-black">
                              {product.store_name?.charAt(0) || "A"}
                         </div>
                         <span className="text-[11px] font-bold text-gray-400 group-hover/store:text-blue-600 transition-colors truncate">{product.store_name || "AkuGlow Official"}</span>
                       </div>
-
-                      {/* Price & Buy Section */}
                       <div className="mt-auto pt-5 border-t border-gray-50">
                         <div className="flex items-center justify-between mb-3">
                            <div>
@@ -548,7 +532,6 @@ export default function ShopPage() {
                              </button>
                            )}
                         </div>
-                        
                         {!isLoggedIn && (
                            <Link to="/login" className="block w-full py-2.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all text-center">
                              Login untuk beli
@@ -573,7 +556,6 @@ export default function ShopPage() {
                         </div>
                       )}
                     </Link>
-                    
                     <div className="flex-1 flex flex-col py-2">
                       <div className="flex items-center gap-3 mb-3">
                         <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-black uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-lg hover:bg-blue-100 transition-colors">
@@ -585,24 +567,20 @@ export default function ShopPage() {
                           <span className="text-[10px] text-gray-400 font-bold">({product.reviews || 0} Ulasan)</span>
                         </div>
                       </div>
-
                       <Link to={`/product/${product.id}`} className="text-xl sm:text-2xl font-black text-gray-900 hover:text-blue-700 transition-colors leading-tight mb-4 line-clamp-2">
                         {product.name}
                       </Link>
-
                       <div className="flex items-center gap-3 mb-6">
                         <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 font-black">
                           {product.store_name?.charAt(0) || "A"}
                         </div>
                         <span className="text-xs font-bold text-gray-400">{product.store_name || "AkuGlow Official"}</span>
                       </div>
-
                       <div className="mt-auto flex items-center justify-between pt-6 border-t border-gray-50">
                         <div className="flex flex-col">
                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</span>
                            <h4 className="font-black text-gray-900 text-2xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
                         </div>
-                        
                          {isLoggedIn ? (
                            <div className="flex items-center gap-3">
                              <button
@@ -630,8 +608,6 @@ export default function ShopPage() {
                 ))}
               </div>
             )}
-
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-16">
                 <button 
@@ -641,7 +617,6 @@ export default function ShopPage() {
                 >
                   <span className="material-symbols-outlined font-black">chevron_left</span>
                 </button>
-                
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
                   <button 
                     key={n} 
@@ -651,7 +626,6 @@ export default function ShopPage() {
                     {n}
                   </button>
                 ))}
-                
                 <button 
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
@@ -664,13 +638,9 @@ export default function ShopPage() {
           </div>
         </div>
       </div>
-      {/* Mobile Filter Modal */}
       {isMobileFilterOpen && (
         <div className="fixed inset-0 z-[100] lg:hidden">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileFilterOpen(false)}></div>
-          
-          {/* Modal Content */}
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
             <div className="p-8">
               <div className="flex items-center justify-between mb-8">
@@ -679,9 +649,7 @@ export default function ShopPage() {
                   <span className="material-symbols-outlined font-black">close</span>
                 </button>
               </div>
-
               <div className="space-y-10 pb-10">
-                {/* Sort Section */}
                 <div>
                   <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Urutkan Produk</h3>
                   <div className="grid grid-cols-2 gap-3">
@@ -698,8 +666,6 @@ export default function ShopPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* Price Section */}
                 <div>
                   <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rentang Harga</h3>
                   <div className="space-y-3">
@@ -716,8 +682,6 @@ export default function ShopPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* Rating Section */}
                 <div>
                   <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rating Minimal</h3>
                   <div className="flex flex-wrap gap-3">
@@ -735,8 +699,6 @@ export default function ShopPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* Brand Section */}
                 <div>
                   <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Pilih Brand</h3>
                   <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 no-scrollbar">
@@ -757,8 +719,6 @@ export default function ShopPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Action Button */}
               <div className="pt-6 border-t border-gray-100 mt-4">
                 <button 
                   onClick={() => setIsMobileFilterOpen(false)}

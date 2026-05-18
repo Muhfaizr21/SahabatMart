@@ -145,40 +145,40 @@ export function ProductCard({ product }) {
   );
 }
 
-export default function ProductSection() {
+export default function ProductSection({ title = "Koleksi Terpopuler AkuGlow ✨", subtitle = "Pilihan produk skincare terbaik yang paling dicintai oleh komunitas kami.", limit = 3 }) {
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch top 3 products sorted by popular (sales)
-    fetchJson(`${PUBLIC_API_BASE}/products?sort=popular&limit=3`)
+    fetchJson(`${PUBLIC_API_BASE}/products?sort=popular&limit=${limit}`)
       .then(d => {
         const data = Array.isArray(d) ? d : (d.data || []);
         setTrending(data);
       })
       .catch(() => setTrending([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [limit]);
 
   return (
-    <section className="py-14 bg-white">
+    <section className="py-14">
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-10 text-center md:text-left">
-          <h2 className="text-2xl md:text-3xl font-black text-gray-900">Koleksi Terpopuler AkuGlow ✨</h2>
-          <p className="text-gray-500 text-sm mt-1">Pilihan produk skincare terbaik yang paling dicintai oleh komunitas kami.</p>
+          <h2 className="text-2xl md:text-3xl font-black text-gray-900">{title}</h2>
+          <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
         </div>
         
         {loading ? (
              <div className="text-center py-20"><div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div></div>
         ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-8">
                 {trending.map(p => <ProductCard key={p.id} product={p} />)}
             </div>
         )}
         
         <div className="mt-12 text-center">
-          <Link to="/shop" className="inline-flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all">
-            Lihat Semua Produk <i className='bx bx-right-arrow-alt'></i>
+          <Link to="/shop" className="inline-flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all group">
+            Lihat Semua Produk 
+            <i className='bx bx-right-arrow-alt text-xl group-hover:translate-x-1 transition-transform'></i>
           </Link>
         </div>
       </div>

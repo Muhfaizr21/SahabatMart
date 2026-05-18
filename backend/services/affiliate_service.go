@@ -576,12 +576,15 @@ func (s *AffiliateService) UpdateUplineSnapshotsRecursive(affiliateID string) {
 func (s *AffiliateService) updateUplineRecursive(affiliateID string, depth int) {
 	const maxDepth = 15
 	if depth > maxDepth {
-		log.Printf("⚠️ UpdateUplineSnapshots: max depth %d reached at affiliate %s", maxDepth, affiliateID)
+		log.Printf("⚠️ [AFFILIATE-SYNC] Max depth %d reached at affiliate %s. Stopping recursion.", maxDepth, affiliateID)
 		return
 	}
 
 	// Update diri sendiri
-	s.UpdateTurnoverSnapshot(affiliateID)
+	if err := s.UpdateTurnoverSnapshot(affiliateID); err != nil {
+		log.Printf("❌ [AFFILIATE-SYNC] Error updating snapshot for %s: %v", affiliateID, err)
+		// Kita lanjutkan saja ke upline, mungkin hanya user ini yang bermasalah
+	}
 
 	// Cari upline dan lanjut ke atas
 	var member models.AffiliateMember
@@ -589,6 +592,8 @@ func (s *AffiliateService) updateUplineRecursive(affiliateID string, depth int) 
 		if member.UplineID != nil && *member.UplineID != "" {
 			s.updateUplineRecursive(*member.UplineID, depth+1)
 		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Printf("❌ [AFFILIATE-SYNC] Error fetching upline for %s: %v", affiliateID, err)
 	}
 }
 

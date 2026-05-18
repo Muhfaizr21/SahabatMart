@@ -34,6 +34,21 @@ export default function OrderSuccessPage() {
             sedang kami proses.
           </p>
 
+          {!payment && order.shopping_balance_deduction > 0 && (
+            <div className="bg-green-50 rounded-2xl p-6 text-left border border-green-100 mb-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Metode Pembayaran</p>
+                  <p className="font-bold text-gray-900">Saldo Bonus Belanja (Lunas)</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Total Pembayaran</p>
+                  <p className="font-black text-green-700 text-lg">Rp{order.shopping_balance_deduction?.toLocaleString('id')}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {payment && (
             <div className="bg-blue-50 rounded-2xl p-6 text-left border border-blue-100">
               <div className="flex justify-between items-start mb-4">

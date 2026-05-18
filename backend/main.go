@@ -71,6 +71,11 @@ func ConnectDB() {
 	// [Migration Fixes] Migrasi manual/one-time dipindahkan ke seeder jika diperlukan.
 	// Menjalankan ALTER TABLE setiap restart menyebabkan lock database.
 
+	// Patch existing order items to populate product_image_url from products table
+	if err := DB.Exec("UPDATE order_items SET product_image_url = (SELECT image FROM products WHERE products.id = order_items.product_id) WHERE product_image_url = '' OR product_image_url IS NULL").Error; err != nil {
+		log.Printf("⚠️ Failed to patch product_image_url: %v", err)
+	}
+
 	// Seed Sample Education for testing
 	var count int64
 	DB.Model(&models.SkinEducation{}).Count(&count)

@@ -42,6 +42,7 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Remember bool   `json:"remember"`
 }
 
 func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +87,7 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientIP := ac.getClientIP(r)
-	user, token, err := ac.Service.Login(req.Email, req.Password, clientIP)
+	user, token, err := ac.Service.Login(req.Email, req.Password, clientIP, req.Remember)
 	if err != nil {
 		utils.JSONError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -138,7 +139,7 @@ func (ac *AuthController) Impersonate(w http.ResponseWriter, r *http.Request) {
 		affiliateID = user.Affiliate.ID
 	}
 
-	token, _ := utils.GenerateJWT(user.ID, user.Role, user.Email, merchantID, affiliateID)
+	token, _ := utils.GenerateJWT(user.ID, user.Role, user.Email, merchantID, affiliateID, true)
 	
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Ghost login berhasil",
@@ -218,16 +219,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		// [Deploy Rule] FRONTEND_URL harus diset di .env / server config!
-		// Untuk dev local: FRONTEND_URL=http://localhost:5173
-		// Untuk production: FRONTEND_URL=https://yourdomain.com
-		frontendURL = os.Getenv("APP_URL")
-	}
-	if frontendURL == "" {
-		frontendURL = "http://localhost:5173" // last-resort dev fallback only
-	}
+	frontendURL := ac.Service.GetFrontendURL()
 	
 	// Redirect balik ke frontend dengan token di URL
 	http.Redirect(w, r, fmt.Sprintf("%s/login?token=%s&user_id=%s", frontendURL, jwtToken, user.ID), http.StatusTemporaryRedirect)

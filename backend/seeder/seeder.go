@@ -267,6 +267,9 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 		Status: "active", 
 		IsVerified: true,
 		JoinedAt: time.Now(),
+		// Biteship Area ID untuk Gudang Pusat (Jakarta Pusat - Gambir)
+		// Dapatkan ID valid dari: GET https://api.biteship.com/v1/maps/areas?countries=ID&input=gambir+jakarta
+		BiteshipAreaID: "IDNP6IDNC147IDND829", // Jakarta Pusat - Gambir (verified)
 	}
 	db.Create(&pusatMerch)
 
@@ -711,6 +714,17 @@ func SeedConfigs(db *gorm.DB) {
 			{"name": "Komisi Platform", "type": "sale_revenue"},
 			{"name": "Lain-lain", "type": "manual_income"}
 		]`, Description: "Daftar Sumber Pendapatan Platform (JSON)"},
+		// --- THEME & BRANDING ---
+		{Key: "theme_primary", Value: "#E11D48", Description: "Primary Brand Color (AkuGlow Crimson)"},
+		{Key: "theme_primary_dark", Value: "#BE123C", Description: "Primary Dark Color"},
+		{Key: "theme_primary_light", Value: "#FB7185", Description: "Primary Light Color"},
+		{Key: "theme_secondary", Value: "#06d6a0", Description: "Secondary/Success Color"},
+		{Key: "theme_accent", Value: "#EAB308", Description: "Accent/Gold Color"},
+		{Key: "theme_radius", Value: "1.25rem", Description: "Global Border Radius"},
+		{Key: "theme_font_heading", Value: "'Plus Jakarta Sans', sans-serif", Description: "Heading Font Family"},
+		{Key: "theme_font_body", Value: "'Inter', sans-serif", Description: "Body Font Family"},
+		// --- BITESHIP / SHIPPING ---
+		{Key: "default_biteship_area_id", Value: "IDNP6IDNC147IDND829", Description: "Default Origin Biteship Area ID (Gudang Pusat - Gambir Jakarta Pusat). Update via Admin > Merchant Settings."},
 	}
 
 	for _, c := range configs {

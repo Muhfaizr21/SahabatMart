@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -152,7 +153,8 @@ func (s *TripayService) doGet(path string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Add("Authorization", "Bearer "+s.ApiKey)
-	resp, err := (&http.Client{}).Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +179,8 @@ func (s *TripayService) doPost(path string, payload interface{}) ([]byte, error)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", "Bearer "+s.ApiKey)
-	resp, err := (&http.Client{}).Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

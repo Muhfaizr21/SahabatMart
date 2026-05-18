@@ -32,8 +32,9 @@ export default function AdminPromo() {
     try {
       const resp = await fetch(`${ADMIN_API_BASE}/upload`, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'ngrok-skip-browser-warning': 'true'
         },
         body: fd
       });

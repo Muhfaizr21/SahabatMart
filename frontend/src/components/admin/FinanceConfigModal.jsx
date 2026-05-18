@@ -29,7 +29,10 @@ export default function FinanceConfigModal({ isOpen, onClose, onRefresh }) {
     setLoading(true);
     try {
       const r = await fetch(`${API}/finance/revenue-detail`, {
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+        headers: { 
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+          'ngrok-skip-browser-warning': 'true'
+        }
       });
       const res = await r.json();
       setDsList(res.config?.data_saving_list || []);
@@ -55,7 +58,8 @@ export default function FinanceConfigModal({ isOpen, onClose, onRefresh }) {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + localStorage.getItem('token')
+          Authorization: 'Bearer ' + localStorage.getItem('token'),
+          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify({
           finance_data_saving_list: dsList,

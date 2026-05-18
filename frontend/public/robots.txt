@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /merchant/
+Disallow: /affiliate/
+Disallow: /checkout/
+Disallow: /cart/
+Disallow: /api/
+
+Sitemap: https://akuglow.com/api/sitemap.xml

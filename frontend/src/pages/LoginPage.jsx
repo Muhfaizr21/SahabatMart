@@ -15,6 +15,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +30,9 @@ export default function LoginPage() {
     const token = params.get('token');
     
     if (token) {
+      // CLEANUP: Hapus token dari URL segera setelah dibaca untuk keamanan
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
       setLoading(true);
       localStorage.setItem('token', token);
       
@@ -58,7 +62,7 @@ export default function LoginPage() {
       const data = await fetchJson(`${AUTH_API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, remember })
       });
 
       localStorage.setItem('token', data.token);
@@ -164,7 +168,13 @@ export default function LoginPage() {
             </div>
             
             <div className="flex items-center gap-3 mt-1">
-              <input type="checkbox" id="remember" className="w-5 h-5 rounded-lg border-gray-200 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600" />
+              <input 
+                type="checkbox" 
+                id="remember" 
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-5 h-5 rounded-lg border-gray-200 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600" 
+              />
               <label htmlFor="remember" className="text-xs text-gray-500 font-bold cursor-pointer select-none">Ingat saya di perangkat ini</label>
             </div>
             

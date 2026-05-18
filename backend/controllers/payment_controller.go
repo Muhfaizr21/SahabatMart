@@ -208,11 +208,14 @@ func respondCallback(w http.ResponseWriter, success bool, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	if success {
 		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+		})
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": msg,
+		})
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": success,
-		"message": msg,
-	})
 }

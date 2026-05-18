@@ -31,6 +31,7 @@ export default function CheckoutPage() {
   const [openGroups, setOpenGroups] = useState({ "Virtual Account": true, "Internal": true });
   const [user, setUser] = useState(null);
   const [wallet, setWallet] = useState(null);
+  const [useShoppingBalance, setUseShoppingBalance] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -82,18 +83,6 @@ export default function CheckoutPage() {
             min_amount: c.minimum_amount || 0,
             max_amount: c.maximum_amount || 0,
           }));
-
-          // Add Shopping Balance if available
-          if (walletData?.shopping_balance > 0) {
-            mapped.unshift({
-              id: 'shopping_balance',
-              label: 'Saldo Bonus Belanja',
-              icon: 'https://cdn-icons-png.flaticon.com/512/2331/2331716.png',
-              desc: 'Internal',
-              type: 'direct',
-              balance: walletData.shopping_balance
-            });
-          }
 
           setPaymentMethods(mapped);
           if (mapped.length > 0) setPaymentMethod(mapped[0].id);
@@ -164,6 +153,8 @@ export default function CheckoutPage() {
   }
 
   const total = subtotal + (shippingType === 'expedition' ? shippingCost : 0) - discount;
+  const shoppingBalanceDeduction = useShoppingBalance ? Math.min(wallet?.shopping_balance || 0, total) : 0;
+  const remainingTotal = total - shoppingBalanceDeduction;
 
   const handleApplyVoucher = async () => {
     if (!voucherCode) return;
@@ -204,13 +195,19 @@ export default function CheckoutPage() {
   };
 
   const handleSearchArea = async (input) => {
-    if (input.length < 3) return;
+    if (input.length < 3) {
+      setAreas([]);
+      return;
+    }
     setSearchingArea(true);
     try {
-      const res = await fetchJson(`${API_BASE}/api/shipping/areas?input=${input}`);
-      setAreas(res || []);
+      const res = await fetchJson(`${API_BASE}/api/shipping/areas?input=${encodeURIComponent(input)}`);
+      // Backend returns { areas: [...] } — extract the array
+      const areaList = res?.areas || (Array.isArray(res) ? res : []);
+      setAreas(areaList);
     } catch (_err) {
       console.error('Area search failed:', _err);
+      setAreas([]);
     } finally {
       setSearchingArea(false);
     }
@@ -248,32 +245,35 @@ export default function CheckoutPage() {
         weight: i.product_variant?.weight || i.product?.weight || 200,
         merchant_id: i.merchant_id || '00000000-0000-0000-0000-000000000000'
       }));
+
+      // Kirim sebagai POST — fetchJson sudah handle Content-Type & ngrok header
       const res = await fetchJson(`${API_BASE}/api/shipping/rates`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ destination_area_id: areaId, items })
       });
       
-      const rates = res.rates || {};
+      // fetchJson sudah unwrap { status: 'success', data: {...} } jika ada
+      // Backend mengembalikan { rates: {...}, warning: '...' } langsung
+      const rates = res?.rates || {};
       setShippingRates(rates);
-      setShippingWarning(res.warning || "");
+      setShippingWarning(res?.warning || '');
 
-      // Auto-select first rate for each merchant if not yet selected
+      // Auto-select kurir pertama untuk tiap merchant jika belum dipilih
       const initialSelected = { ...selectedShippings };
       Object.keys(rates).forEach(mID => {
-        if (!initialSelected[mID] && rates[mID].length > 0) {
+        if (!initialSelected[mID] && rates[mID]?.length > 0) {
           initialSelected[mID] = rates[mID][0];
         }
       });
       setSelectedShippings(initialSelected);
 
-      // Total shipping cost update
       const totalCost = Object.values(initialSelected).reduce((sum, r) => sum + (r?.price || 0), 0);
       setShippingCost(totalCost);
 
     } catch (_err) {
       console.error('Fetch rates failed:', _err);
       setShippingRates({});
+      setShippingWarning('Gagal mengambil ongkir. Pastikan koneksi stabil.');
     } finally {
       setLoadingRates(false);
     }
@@ -347,6 +347,7 @@ export default function CheckoutPage() {
           upline_id: uplineRef,
           voucher_code: appliedVoucher?.code || '',
           payment_method: paymentMethod,
+          use_shopping_balance: useShoppingBalance,
           total_weight: cart.items?.reduce((w, i) => w + ((i.product_variant?.weight || i.product?.weight || 200) * i.quantity), 0) || 0,
         };
 
@@ -649,10 +650,15 @@ export default function CheckoutPage() {
                                     className="accent-blue-600 w-4 h-4" 
                                   />
                                   <div className="flex-1">
-                                    <div className="font-bold text-gray-900 text-sm uppercase tracking-tight">
+                                    <div className="font-bold text-gray-900 text-sm uppercase tracking-tight flex items-center gap-2">
                                       {method.courier_name} <span className="text-blue-600">{method.courier_service}</span>
+                                      {method.is_estimated && (
+                                        <span className="text-[8px] font-black bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">EST</span>
+                                      )}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 font-medium mt-0.5">Estimasi {method.duration}</div>
+                                    <div className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                      {method.is_estimated ? 'Perkiraan waktu' : 'Estimasi'} {method.duration}
+                                    </div>
                                   </div>
                                   <div className="text-sm font-black text-gray-900">Rp{method.price.toLocaleString('id-ID')}</div>
                                 </label>
@@ -740,9 +746,44 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              {/* Saldo Bonus Belanja Toggle */}
+              {wallet && wallet.shopping_balance > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="material-symbols-outlined text-purple-600 text-2xl">account_balance_wallet</span>
+                      <div>
+                        <h2 className="font-bold text-gray-900 text-sm">Gunakan Saldo Bonus Belanja</h2>
+                        <p className="text-gray-400 text-[10px] mt-0.5">Potong total tagihan menggunakan saldo bonus Anda</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={useShoppingBalance} 
+                        onChange={(e) => setUseShoppingBalance(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                  </div>
+                  <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-100 flex items-center justify-between text-xs font-semibold">
+                    <span className="text-purple-700">Saldo Tersedia:</span>
+                    <span className="text-purple-900 font-bold">Rp{wallet.shopping_balance.toLocaleString('id-ID')}</span>
+                  </div>
+                  {useShoppingBalance && (
+                    <div className="mt-3 p-3 bg-green-50 rounded-xl border border-green-100 flex items-center justify-between text-xs font-semibold text-green-700 animate-in fade-in slide-in-from-top-1">
+                      <span>Deduction Applied:</span>
+                      <span>-Rp{Math.min(wallet.shopping_balance, total).toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Payment Method */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 text-lg mb-5">Metode Pembayaran</h2>
+              {remainingTotal > 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                  <h2 className="font-bold text-gray-900 text-lg mb-5">Metode Pembayaran</h2>
                 
                 {loadingChannels ? (
                    <div className="py-6 text-center">
@@ -833,6 +874,15 @@ export default function CheckoutPage() {
                    </div>
                 )}
               </div>
+              ) : (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100 shadow-sm p-6 flex flex-col items-center justify-center text-center py-8">
+                  <span className="material-symbols-outlined text-4xl text-green-600 mb-2">verified</span>
+                  <h3 className="font-bold text-green-900 text-sm">Pesanan Sepenuhnya Terbayar</h3>
+                  <p className="text-green-700 text-xs mt-1 max-w-sm">
+                    Saldo Bonus Belanja Anda mencukupi untuk membayar seluruh pesanan ini. Tidak diperlukan metode pembayaran eksternal!
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Right: Summary */}
@@ -927,11 +977,18 @@ export default function CheckoutPage() {
                       <span className="font-medium">-Rp{discount.toLocaleString('id-ID')}</span>
                     </div>
                   )}
+                  {shoppingBalanceDeduction > 0 && (
+                    <div className="flex justify-between text-purple-600">
+                      <span>Potongan Saldo Belanja</span>
+                      <span className="font-medium font-bold">-Rp{shoppingBalanceDeduction.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   {(() => {
+                    if (remainingTotal === 0) return null;
                     const selectedMethod = paymentMethods.find(m => m.id === paymentMethod);
                     const feeFlat = selectedMethod?.fee_customer || 0;
                     const feePercent = selectedMethod?.fee_customer_pct || 0;
-                    const totalPaymentFee = Math.round((total * (feePercent / 100)) + feeFlat);
+                    const totalPaymentFee = Math.round((remainingTotal * (feePercent / 100)) + feeFlat);
                     
                     if (totalPaymentFee > 0) {
                       return (
@@ -946,11 +1003,12 @@ export default function CheckoutPage() {
                   <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
                     <span>Total Tagihan</span>
                     <span>Rp{(() => {
+                      if (remainingTotal === 0) return '0';
                       const selectedMethod = paymentMethods.find(m => m.id === paymentMethod);
                       const feeFlat = selectedMethod?.fee_customer || 0;
                       const feePercent = selectedMethod?.fee_customer_pct || 0;
-                      const totalPaymentFee = Math.round((total * (feePercent / 100)) + feeFlat);
-                      return (total + totalPaymentFee).toLocaleString('id-ID');
+                      const totalPaymentFee = Math.round((remainingTotal * (feePercent / 100)) + feeFlat);
+                      return (remainingTotal + totalPaymentFee).toLocaleString('id-ID');
                     })()}</span>
                   </div>
                 </div>

@@ -234,11 +234,12 @@ func (bc *BuyerController) MoveToCart(w http.ResponseWriter, r *http.Request) {
 func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 	var req struct {
-		Items         []models.OrderItem `json:"items"`
-		ShippingInfo  models.Order       `json:"shipping_info"`
-		VoucherCode   string             `json:"voucher_code"`
-		AffiliateID   *string            `json:"affiliate_id"`
-		PaymentMethod string             `json:"payment_method"`
+		Items               []models.OrderItem `json:"items"`
+		ShippingInfo        models.Order       `json:"shipping_info"`
+		VoucherCode         string             `json:"voucher_code"`
+		AffiliateID         *string            `json:"affiliate_id"`
+		PaymentMethod       string             `json:"payment_method"`
+		UseShoppingBalance  bool               `json:"use_shopping_balance"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -269,10 +270,81 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Apply Shopping Balance Deduction if requested
+	var deduction float64
+	if req.UseShoppingBalance {
+		err = bc.DB.Transaction(func(tx *gorm.DB) error {
+			var user models.User
+			if err := tx.First(&user, "id = ?", buyerID).Error; err != nil {
+				return err
+			}
+			ownerType := models.WalletAffiliate
+			if user.Role == "merchant" {
+				ownerType = models.WalletMerchant
+			} else if user.Role == "buyer" {
+				ownerType = models.WalletBuyer
+			}
+
+			financeSvc := services.NewFinanceService(tx)
+			wallet, err := financeSvc.GetWallet(buyerID, ownerType)
+			if err != nil {
+				return nil // No wallet, no deduction
+			}
+
+			if wallet.ShoppingBalance > 0 {
+				deduction = wallet.ShoppingBalance
+				if deduction > order.GrandTotal {
+					deduction = order.GrandTotal
+				}
+				
+				if deduction > 0 {
+					// Deduct from ShoppingBalance
+					desc := fmt.Sprintf("Potongan Saldo Belanja untuk Pesanan #%s", order.OrderNumber)
+					if err := financeSvc.ProcessTransaction(tx, buyerID, ownerType, models.TxShoppingPayment, -deduction, order.ID, "order", desc, nil); err != nil {
+						return err
+					}
+
+					// Update order in tx
+					order.ShoppingBalanceDeduction = deduction
+					order.GrandTotal = order.GrandTotal - deduction
+					if err := tx.Model(order).Updates(map[string]interface{}{
+						"shopping_balance_deduction": deduction,
+						"grand_total":                order.GrandTotal,
+					}).Error; err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			utils.JSONError(w, http.StatusBadRequest, "Gagal memotong saldo belanja: "+err.Error())
+			return
+		}
+	}
+
 	// Integrasi TriPay: Jika metode pembayaran dipilih, buat transaksi di TriPay
 	var paymentData map[string]interface{}
 
-	if req.PaymentMethod == "shopping_balance" {
+	if order.GrandTotal == 0 {
+		// Fully paid with Shopping Balance
+		err = bc.DB.Transaction(func(tx *gorm.DB) error {
+			orderSvc := services.NewOrderService(tx)
+			return orderSvc.CompletePayment(tx, order.ID)
+		})
+		if err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal menyelesaikan pembayaran: "+err.Error())
+			return
+		}
+
+		bc.DB.First(order, "id = ?", order.ID)
+		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+			"order":   order,
+			"payment": nil,
+		})
+		return
+	} else if req.PaymentMethod == "shopping_balance" {
+		// Fallback/Legacy direct shopping balance method (requires full balance coverage)
 		err := bc.DB.Transaction(func(tx *gorm.DB) error {
 			var user models.User
 			if err := tx.First(&user, "id = ?", buyerID).Error; err != nil {
@@ -293,13 +365,15 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 				return fmt.Errorf("dompet tidak ditemukan")
 			}
 
-			if wallet.ShoppingBalance < order.GrandTotal {
-				return fmt.Errorf("saldo bonus belanja tidak mencukupi (Tersedia: Rp %.0f, Dibutuhkan: Rp %.0f)", wallet.ShoppingBalance, order.GrandTotal)
+			// Adjust requirement based on already deducted amount (if any)
+			needed := order.GrandTotal
+			if wallet.ShoppingBalance < needed {
+				return fmt.Errorf("saldo bonus belanja tidak mencukupi (Tersedia: Rp %.0f, Dibutuhkan: Rp %.0f)", wallet.ShoppingBalance, needed)
 			}
 
 			// Deduct from ShoppingBalance
 			desc := fmt.Sprintf("Pembayaran Pesanan #%s menggunakan Bonus Belanja", order.OrderNumber)
-			if err := financeSvc.ProcessTransaction(tx, buyerID, ownerType, models.TxShoppingPayment, -order.GrandTotal, order.ID, "order", desc, nil); err != nil {
+			if err := financeSvc.ProcessTransaction(tx, buyerID, ownerType, models.TxShoppingPayment, -needed, order.ID, "order", desc, nil); err != nil {
 				return err
 			}
 

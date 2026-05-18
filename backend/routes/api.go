@@ -595,6 +595,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/products/track", productCtrl.TrackInteraction)
 	mux.HandleFunc("/api/public/products/recommended", productCtrl.GetRecommendations)
 	mux.HandleFunc("/api/public/membership-tiers", tierCtrl.GetPublicTiers)
+	mux.HandleFunc("/api/public/sitemap.xml", adminCtrl.GenerateSitemap)
 	
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)
@@ -633,7 +634,9 @@ func CorsMiddleware(next http.Handler) http.Handler {
 		log.Printf("🌐 [%s] %s", r.Method, r.URL.Path)
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning")
+		// Bypass ngrok interstitial warning page for all API responses
+		w.Header().Set("ngrok-skip-browser-warning", "true")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
