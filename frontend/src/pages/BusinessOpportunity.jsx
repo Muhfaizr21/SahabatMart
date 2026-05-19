@@ -1,10 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { API_BASE } from '../lib/api';
+import { API_BASE, PUBLIC_API_BASE, fetchJson } from '../lib/api';
 import SEO from '../components/SEO';
 
 const BusinessOpportunity = () => {
   const [activeSim, setActiveSim] = useState(5);
+  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/embed/N7VoHAG1QE4");
+
+  useEffect(() => {
+    fetchJson(`${PUBLIC_API_BASE}/configs`)
+      .then(configs => {
+        if (configs && configs.business_opportunity_video_url) {
+          setVideoUrl(configs.business_opportunity_video_url);
+        }
+      })
+      .catch(err => {
+        console.warn("Failed to fetch public configs:", err);
+      });
+  }, []);
+
+  const getYoutubeEmbedUrl = (url) => {
+    if (!url) return '';
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+    return url;
+  };
 
   const simulationData = {
     5: {
@@ -71,6 +94,33 @@ const BusinessOpportunity = () => {
             >
               Lihat Simulasi Komisi
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== VIDEO PRESENTATION ===== */}
+      <section className="bg-white pt-24 pb-16 px-6 relative">
+        {/* Triangle Divider from Red Hero */}
+        <div className="absolute top-0 left-0 right-0 w-full overflow-hidden leading-none z-10">
+          <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[40px] text-[#C62828] fill-current">
+            <path d="M0,0 L600,120 L1200,0 Z"></path>
+          </svg>
+        </div>
+
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-black text-center text-gray-900 tracking-wider mb-10 uppercase">
+            VIDEO PRESENTASI BISNIS AKUGLOW !
+          </h2>
+          
+          <div className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border-8 border-white bg-gray-100">
+            <iframe
+              className="absolute top-0 left-0 w-full h-full"
+              src={getYoutubeEmbedUrl(videoUrl)}
+              title="Video Presentasi Bisnis AkuGlow"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            ></iframe>
           </div>
         </div>
       </section>
@@ -276,7 +326,7 @@ const BusinessOpportunity = () => {
 
       {/* ===== COCOK UNTUK SIAPA ===== */}
       <section className="bg-white py-16 px-6">
-        <div className="max-w-4xl auto">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">Cocok untuk Siapa?</h2>
             <p className="text-gray-500 text-sm">Bisnis ini terbuka untuk semua kalangan</p>

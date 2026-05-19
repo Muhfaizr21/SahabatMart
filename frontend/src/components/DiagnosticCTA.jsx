@@ -35,7 +35,7 @@ export default function DiagnosticCTA() {
             <div className="flex-1 relative hidden lg:block">
               <div className="relative z-10 rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/20">
                 <img 
-                  src="https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600&h=600&fit=crop" 
+                  src="/skincare_diagnostic.png" 
                   alt="Skin Care Diagnostic" 
                   className="w-full h-auto"
                 />

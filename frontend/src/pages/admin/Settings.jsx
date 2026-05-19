@@ -15,6 +15,7 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
   { key: 'merchant_min_active_mitra',  value: '100',          description: 'Min. Mitra Aktif (Merchant)', group: 'platform',  type: 'number' },
   { key: 'merchant_min_team_turnover', value: '10000000',     description: 'Min. Omset Tim (Merchant)',  group: 'platform',  type: 'number' },
+  { key: 'business_opportunity_video_url', value: 'https://www.youtube.com/watch?v=N7VoHAG1QE4', description: 'URL Video Peluang Bisnis (YouTube)', group: 'platform', type: 'text' },
   { key: 'payout_min_amount',       value: '50000',            description: 'Minimum Payout (Rp)',        group: 'payout',    type: 'number' },
   { key: 'payout_schedule',         value: 'weekly',           description: 'Jadwal Payout',              group: 'payout',    type: 'select', options: ['daily', 'weekly', 'monthly'] },
   { key: 'payout_day',              value: 'friday',           description: 'Hari Payout (jika weekly)',  group: 'payout',    type: 'select', options: ['monday','tuesday','wednesday','thursday','friday'] },
@@ -173,7 +174,7 @@ export default function AdminSettings() {
 
   const renderSecurity = () => {
     return (
-      <div className="animate-fade-in" style={{ padding: 24 }}>
+      <div className="settings-panel-content animate-fade-in">
         <div style={{ maxWidth: 400 }}>
           <h4 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Ganti Password Admin</h4>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>Ubah password akun Super Admin Anda untuk keamanan maksimal.</p>
@@ -235,6 +236,59 @@ export default function AdminSettings() {
 
   return (
     <div style={S.page} className="fade-in">
+      <style>{`
+        .settings-grid {
+          display: grid;
+          grid-template-columns: 220px 1fr;
+          gap: 24px;
+          align-items: start;
+        }
+        .settings-sidebar {
+          position: sticky;
+          top: 20px;
+          background: #fff;
+          border-radius: 16px;
+          border: 1px solid #f0f0f5;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+          overflow: hidden;
+        }
+        .settings-sidebar-list {
+          display: flex;
+          flex-direction: column;
+          padding: 8px;
+        }
+        .settings-panel-content {
+          padding: 24px;
+        }
+        @media (max-width: 768px) {
+          .settings-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          .settings-sidebar {
+            position: static;
+          }
+          .settings-sidebar-list {
+            flex-direction: row;
+            overflow-x: auto;
+            white-space: nowrap;
+            gap: 8px;
+            -webkit-overflow-scrolling: touch;
+          }
+          .settings-sidebar-list::-webkit-scrollbar {
+            display: none;
+          }
+          .settings-sidebar-item {
+            flex-shrink: 0;
+            width: auto !important;
+            margin-bottom: 0 !important;
+          }
+          .settings-panel-content {
+            padding: 16px;
+          }
+        }
+      `}</style>
+
       {/* Breadcrumb */}
       <div className="d-none d-sm-flex align-items-center gap-2 mb-4">
         <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>Konfigurasi</span>
@@ -250,21 +304,21 @@ export default function AdminSettings() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, alignItems: 'start' }}>
+      <div className="settings-grid">
         {/* Sidebar Nav */}
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f0f0f5', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', overflow: 'hidden', position: 'sticky', top: 20 }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9' }}>
+        <div className="settings-sidebar">
+          <div className="d-none d-md-block" style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9' }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Grup Konfigurasi</div>
           </div>
-          <div style={{ padding: 8 }}>
+          <div className="settings-sidebar-list">
             {groups.map(g => {
               const m = GROUP_META[g];
               const active = activeGroup === g;
               return (
-                <button key={g} onClick={() => setActiveGroup(g)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 2, background: active ? m.color + '15' : 'transparent', transition: 'all 0.15s' }}>
+                <button key={g} onClick={() => setActiveGroup(g)} className="settings-sidebar-item" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 2, background: active ? m.color + '15' : 'transparent', transition: 'all 0.15s' }}>
                   <i className={`bx ${m.icon}`} style={{ fontSize: 20, color: active ? m.color : '#94a3b8' }} />
                   <span style={{ fontSize: 14, fontWeight: 600, color: active ? m.color : '#475569' }}>{m.label}</span>
-                  {active && <i className="bx bx-chevron-right" style={{ fontSize: 18, color: m.color, marginLeft: 'auto' }} />}
+                  {active && <i className="bx bx-chevron-right d-none d-md-inline" style={{ fontSize: 18, color: m.color, marginLeft: 'auto' }} />}
                 </button>
               );
             })}
@@ -288,7 +342,7 @@ export default function AdminSettings() {
 
           {/* Config Fields */}
           {activeGroup === 'security' ? renderSecurity() : (
-            <div style={{ padding: 24 }}>
+            <div className="settings-panel-content">
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px 0' }}>
                 <div className="spinner-border" style={{ color: '#4361ee', width: 32, height: 32, borderWidth: 3 }} />

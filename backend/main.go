@@ -76,6 +76,23 @@ func ConnectDB() {
 		log.Printf("⚠️ Failed to patch product_image_url: %v", err)
 	}
 
+	// Patch standard Biteship Area IDs to fully-qualified ones (with IDZ suffix)
+	// 1. Update Gudang Pusat/Gambir in merchants table
+	if err := DB.Exec("UPDATE merchants SET biteship_area_id = 'IDNP6IDNC147IDND829IDZ10110' WHERE biteship_area_id = 'IDNP6IDNC147IDND829'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch merchant area id: %v", err)
+	}
+	// 2. Update default_biteship_area_id in platform_configs
+	if err := DB.Exec("UPDATE platform_configs SET value = 'IDNP6IDNC147IDND829IDZ10110' WHERE key = 'default_biteship_area_id' AND value = 'IDNP6IDNC147IDND829'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch default platform config area id: %v", err)
+	}
+	// 3. Update existing user profiles having standard Gambir or Cirebon Area IDs
+	if err := DB.Exec("UPDATE user_profiles SET area_id = 'IDNP6IDNC147IDND829IDZ10110' WHERE area_id = 'IDNP6IDNC147IDND829'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch user profile Gambir area id: %v", err)
+	}
+	if err := DB.Exec("UPDATE user_profiles SET area_id = 'IDNP9IDNC105IDND171IDZ45171' WHERE area_id = 'IDNP9IDNC105IDND171'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch user profile Cirebon area id: %v", err)
+	}
+
 	// Seed Sample Education for testing
 	var count int64
 	DB.Model(&models.SkinEducation{}).Count(&count)

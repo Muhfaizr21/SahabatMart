@@ -4,6 +4,73 @@ import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate 
 
 const steps = ['Detail Pengiriman', 'Konfirmasi'];
 
+const CourierLogo = ({ code, name }) => {
+  const [imgError, setImgError] = useState(false);
+  
+  const brandConfigs = {
+    jne: { bg: 'bg-blue-900', text: 'text-white font-extrabold italic', label: 'JNE' },
+    sicepat: { bg: 'bg-red-700', text: 'text-white font-black', label: 'SICEPAT' },
+    jnt: { bg: 'bg-red-600', text: 'text-white font-black italic', label: 'J&T' },
+    anteraja: { bg: 'bg-gradient-to-r from-pink-500 to-orange-500', text: 'text-white font-bold', label: 'anteraja' },
+    pos: { bg: 'bg-orange-600', text: 'text-white font-extrabold', label: 'POS' },
+    tiki: { bg: 'bg-blue-600 border-yellow-400 border', text: 'text-white font-bold italic', label: 'TIKI' },
+    lion: { bg: 'bg-red-500', text: 'text-white font-bold', label: 'LION' },
+    sap: { bg: 'bg-blue-800', text: 'text-amber-500 font-extrabold', label: 'SAP' },
+    rpx: { bg: 'bg-emerald-700', text: 'text-white font-bold', label: 'RPX' },
+    idexpress: { bg: 'bg-red-800', text: 'text-white font-black', label: 'IDE' },
+    sentral: { bg: 'bg-blue-900', text: 'text-white font-semibold tracking-widest', label: 'SENTRAL' },
+    pickup: { bg: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-700 font-bold', label: 'PICKUP', isIcon: true },
+  };
+
+  const codeLower = code?.toLowerCase() || '';
+  const config = brandConfigs[codeLower] || { bg: 'bg-gray-100', text: 'text-gray-700 font-bold', label: name?.substring(0, 3).toUpperCase() };
+
+  const logoUrls = {
+    jne: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254395932-EPH35E5BOM3KKP4T5JEX/JNE.png',
+    sicepat: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255745749-V7618DUMF5V4QZ754F8E/Sicepat.png',
+    jnt: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254580340-VCPW4U4JURCOQ416S4L3/J%26T.png',
+    anteraja: 'https://seeklogo.com/images/A/anteraja-logo-E9D58E2E10-seeklogo.com.png',
+    pos: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256334547-0639I72O4A81X941V8W8/Pos+Indonesia.png',
+    tiki: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256247348-QO1O633519Y2K9G67LCH/Tiki.png',
+    lion: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255956749-C14Y4J3L9X29N9P1T8W8/Lion+Parcel.png',
+    sap: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256087547-4W2N3639O4169P1T8W8/SAP+Express.png',
+    idexpress: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256447547-4W2N3639O4169P1T8W8/ID+Express.png',
+    sentral: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256157547-4W2N3639O4169P1T8W8/Sentral+Cargo.png',
+    rpx: 'https://seeklogo.com/images/R/rpx-holding-logo-2CC70A5E04-seeklogo.com.png',
+  };
+
+  const imageUrl = logoUrls[codeLower];
+
+  if (config.isIcon) {
+    return (
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-inner ${config.bg}`}>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615 3.001 3.001 0 0 0 3.75.615m-7.5 0H18m-7.5 0a3.001 3.001 0 0 0 3.75-.615 3.001 3.001 0 0 0 3.75.615m0 0V5.25m0 0a2.25 2.25 0 0 0-2.25-2.25h-1.5a2.25 2.25 0 0 0-2.25 2.25m6.75 0v-.901m0 0a2.25 2.25 0 0 0-2.25-2.25h-1.5a2.25 2.25 0 0 0-2.25 2.25m0 0v.901m-6.75 0v-.901m0 0A2.25 2.25 0 0 1 7.5 3h1.5a2.25 2.25 0 0 1 2.25 2.25v.901" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (imageUrl && !imgError) {
+    return (
+      <div className="w-12 h-9 bg-white rounded-lg flex items-center justify-center p-0.5 border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
+        <img 
+          src={imageUrl} 
+          alt={name} 
+          className="w-full h-full object-contain"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`w-12 h-9 rounded-lg flex items-center justify-center px-1 text-[8px] font-black tracking-tight text-center shadow-sm select-none flex-shrink-0 ${config.bg} ${config.text}`}>
+      {config.label}
+    </div>
+  );
+};
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -631,11 +698,11 @@ export default function CheckoutPage() {
                                 {mID === '00000000-0000-0000-0000-000000000000' ? 'Kirim Langsung Dari: OFFICIAL PUSAT' : `Kirim dari: ${mName}`}
                               </span>
                             </div>
-                            <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {rates.map((method, idx) => (
-                                <label key={idx} className={`flex items-center gap-4 border-2 rounded-2xl p-4 cursor-pointer transition-all ${
+                                <label key={idx} className={`flex items-center gap-3 border-2 rounded-xl p-3.5 cursor-pointer transition-all relative overflow-hidden ${
                                   selectedShippings[mID]?.courier_code === method.courier_code && selectedShippings[mID]?.courier_service === method.courier_service
-                                  ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100' : 'border-gray-100 hover:border-gray-200 bg-white'
+                                  ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-50/50' : 'border-gray-100 hover:border-gray-300 bg-white'
                                 }`}>
                                   <input 
                                     type="radio" 
@@ -647,20 +714,22 @@ export default function CheckoutPage() {
                                       const totalCost = Object.values(newSelected).reduce((sum, r) => sum + (r?.price || 0), 0);
                                       setShippingCost(totalCost);
                                     }}
-                                    className="accent-blue-600 w-4 h-4" 
+                                    className="accent-blue-600 w-4 h-4 flex-shrink-0" 
                                   />
-                                  <div className="flex-1">
-                                    <div className="font-bold text-gray-900 text-sm uppercase tracking-tight flex items-center gap-2">
-                                      {method.courier_name} <span className="text-blue-600">{method.courier_service}</span>
+                                  <CourierLogo code={method.courier_code} name={method.courier_name} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-gray-900 text-xs uppercase tracking-tight flex items-center gap-1.5 flex-wrap">
+                                      <span>{method.courier_name}</span> 
+                                      <span className="text-blue-600 font-extrabold">{method.courier_service_name || method.courier_service}</span>
                                       {method.is_estimated && (
-                                        <span className="text-[8px] font-black bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">EST</span>
+                                        <span className="text-[8px] font-black bg-amber-100 text-amber-700 border border-amber-200 px-1 py-0.2 rounded-full">EST</span>
                                       )}
                                     </div>
                                     <div className="text-[10px] text-gray-400 font-medium mt-0.5">
-                                      {method.is_estimated ? 'Perkiraan waktu' : 'Estimasi'} {method.duration}
+                                      {method.is_estimated ? 'Perkiraan' : 'Estimasi'} {method.duration}
                                     </div>
                                   </div>
-                                  <div className="text-sm font-black text-gray-900">Rp{method.price.toLocaleString('id-ID')}</div>
+                                  <div className="text-sm font-black text-gray-900 ml-auto whitespace-nowrap">Rp{method.price.toLocaleString('id-ID')}</div>
                                 </label>
                               ))}
                             </div>

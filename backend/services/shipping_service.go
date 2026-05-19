@@ -69,6 +69,21 @@ func (s *ShippingService) SearchArea(input string) ([]map[string]interface{}, er
 		return nil, err
 	}
 
+	// Auto-append IDZ suffix with postal code from area.name
+	for _, area := range result.Areas {
+		if id, ok := area["id"].(string); ok && !strings.Contains(id, "IDZ") {
+			if name, ok := area["name"].(string); ok {
+				parts := strings.Split(name, ".")
+				if len(parts) > 0 {
+					postalCode := strings.TrimSpace(parts[len(parts)-1])
+					if postalCode != "" {
+						area["id"] = id + "IDZ" + postalCode
+					}
+				}
+			}
+		}
+	}
+
 	log.Printf("[Biteship] Found %d areas for '%s'", len(result.Areas), input)
 	return result.Areas, nil
 }
@@ -134,6 +149,14 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 		})
 	}
 
+	// Sanitize Area IDs by automatically appending IDZ suffix for Gambir/origin if missing
+	if originAreaID == "IDNP6IDNC147IDND829" {
+		originAreaID = "IDNP6IDNC147IDND829IDZ10110"
+	}
+	if destinationAreaID == "IDNP6IDNC147IDND829" {
+		destinationAreaID = "IDNP6IDNC147IDND829IDZ10110"
+	}
+
 	payload := map[string]interface{}{
 		"origin_area_id":      originAreaID,
 		"destination_area_id": destinationAreaID,
@@ -177,6 +200,17 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
+	}
+
+	// Enforce courier_service is populated with courier_service_code for frontend selection compatibility
+	for _, p := range result.Pricing {
+		if p["courier_service"] == nil || p["courier_service"] == "" {
+			if sCode, ok := p["courier_service_code"].(string); ok && sCode != "" {
+				p["courier_service"] = sCode
+			} else if sType, ok := p["type"].(string); ok && sType != "" {
+				p["courier_service"] = sType
+			}
+		}
 	}
 
 	return result.Pricing, nil
@@ -329,6 +363,18 @@ func (s *ShippingService) CreateOrder(order models.Order, group models.OrderMerc
 		shipperPhone = "08123456789" // Fallback
 	}
 
+	originArea := merchant.BiteshipAreaID
+	if originArea == "IDNP6IDNC147IDND829" {
+		originArea = "IDNP6IDNC147IDND829IDZ10110"
+	} else if originArea != "" && !strings.Contains(originArea, "IDZ") {
+		originArea = originArea + "IDZ10110" // default Gambir postcode fallback
+	}
+
+	destArea := order.DestinationAreaID
+	if destArea != "" && !strings.Contains(destArea, "IDZ") && order.ShippingPostalCode != "" {
+		destArea = destArea + "IDZ" + order.ShippingPostalCode
+	}
+
 	payload := map[string]interface{}{
 		"order_note":      fmt.Sprintf("Order #%s", order.OrderNumber),
 		"callback_url":    os.Getenv("BITESHIP_CALLBACK_URL"),
@@ -337,13 +383,13 @@ func (s *ShippingService) CreateOrder(order models.Order, group models.OrderMerc
 		"origin_contact_name":  merchant.StoreName,
 		"origin_contact_phone": shipperPhone,
 		"origin_address":       user.Profile.Address + ", " + user.Profile.City,
-		"origin_area_id":       merchant.BiteshipAreaID,
+		"origin_area_id":       originArea,
 		
 		// Destination (Recipient) Details
 		"destination_contact_name":  order.ShippingName,
 		"destination_contact_phone": order.ShippingPhone,
 		"destination_address":       order.ShippingAddress,
-		"destination_area_id":       order.DestinationAreaID,
+		"destination_area_id":       destArea,
 		
 		"courier_company": group.CourierCode,
 		"courier_type":    group.ServiceCode,

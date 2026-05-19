@@ -22,7 +22,7 @@ func SeedAll(db *gorm.DB) {
 
 	// [IMPORTANT] Ensure the extensions and tables are ready
 	db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
-	
+
 	// Re-run migration to ensure all tables exist with new schema
 	db.AutoMigrate(
 		&models.User{}, &models.UserProfile{},
@@ -38,13 +38,13 @@ func SeedAll(db *gorm.DB) {
 
 	// DROP TRIGGER if exists
 	db.Exec("DROP TRIGGER IF EXISTS update_average_rating ON reviews")
-	
+
 	tables := []string{
 		"reviews", "cart_items", "carts", "wishlists",
 		"order_items", "order_merchant_groups", "orders",
 		"wallet_transactions", "wallets", "payout_requests",
 		"affiliate_commissions", "affiliate_withdrawals", "affiliate_click_logs",
-		"skin_pre_tests", "skin_progress", "skin_journals", 
+		"skin_pre_tests", "skin_progress", "skin_journals",
 		"skin_community_posts", "skin_community_comments", "skin_community_likes",
 		"skin_community_groups", "skin_educations",
 		"skin_journey_programs", "skin_journey_steps", "skin_journey_routines",
@@ -106,14 +106,14 @@ func SeedAll(db *gorm.DB) {
 
 func seedSuppliers(db *gorm.DB) []models.Supplier {
 	fmt.Println("  -> Seeding Suppliers (Mata Elang)...")
-	
+
 	suppliers := []models.Supplier{
 		{ID: uuid.New().String(), Name: "PT. Kimia Farma (Skincare Div)", Contact: "Bp. Ahmad", Phone: "08123456789", Email: "supply@kimiafarma.co.id", Address: "Jakarta Industrial Estate"},
 		{ID: uuid.New().String(), Name: "Cosmax Indonesia (Global Supply)", Contact: "Ms. Kim", Phone: "08998877665", Email: "production@cosmax.id", Address: "Jababeka Cikarang"},
 		{ID: uuid.New().String(), Name: "Herbalindo Utama", Contact: "Bp. Slamet", Phone: "087712344321", Email: "slamet@herbalindo.com", Address: "Solo, Jawa Tengah"},
 	}
-	for i := range suppliers { 
-		db.FirstOrCreate(&suppliers[i], models.Supplier{Name: suppliers[i].Name}) 
+	for i := range suppliers {
+		db.FirstOrCreate(&suppliers[i], models.Supplier{Name: suppliers[i].Name})
 	}
 	return suppliers
 }
@@ -129,7 +129,7 @@ func finalizeWarehouse(db *gorm.DB, suppliers []models.Supplier) {
 			"is_master":       true,
 			"wholesale_price": p.Price * 0.75, // Harga merchant diskon 25%
 		}
-		
+
 		// Only set default COGS if it's still 0 (to avoid overwriting specific values from Akuglow seeder)
 		if p.COGS == 0 {
 			updates["cogs"] = p.Price * 0.50 // Default 50%
@@ -157,7 +157,7 @@ func finalizeWarehouse(db *gorm.DB, suppliers []models.Supplier) {
 			// Update Pusat Inventory (Handle Variants)
 			var variants []models.ProductVariant
 			db.Where("product_id = ?", p.ID).Find(&variants)
-			
+
 			if len(variants) > 0 {
 				for _, v := range variants {
 					idCopy := v.ID
@@ -257,16 +257,16 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	}
 	db.Create(&admin)
 	db.Create(&models.UserProfile{UserID: admin.ID, FullName: "Super Admin (Pusat)"})
-	
+
 	// Create Pusat Merchant record owned by Super Admin
 	pusatMerch := models.Merchant{
-		ID: PusatID, 
-		UserID: admin.ID, 
-		StoreName: "Gudang Pusat AkuGlow", 
-		Slug: "pusat", 
-		Status: "active", 
+		ID:         PusatID,
+		UserID:     admin.ID,
+		StoreName:  "Gudang Pusat AkuGlow",
+		Slug:       "pusat",
+		Status:     "active",
 		IsVerified: true,
-		JoinedAt: time.Now(),
+		JoinedAt:   time.Now(),
 		// Biteship Area ID untuk Gudang Pusat (Jakarta Pusat - Gambir)
 		// Dapatkan ID valid dari: GET https://api.biteship.com/v1/maps/areas?countries=ID&input=gambir+jakarta
 		BiteshipAreaID: "IDNP6IDNC147IDND829", // Jakarta Pusat - Gambir (verified)
@@ -280,7 +280,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 		MembershipTierID: 4, // Platinum
 		Status:           "active",
 	})
-	
+
 	// Buyers (Test Location Tracking)
 	buyerSby := models.User{Email: "buyer@akuglow.com", PasswordHash: &pwHash, Role: "affiliate", Status: "active"}
 	db.Create(&buyerSby)
@@ -305,7 +305,7 @@ func seedUsers(db *gorm.DB) []models.Merchant {
 	pusatUser := models.User{ID: uuid.New().String(), Email: "pusat@akuglow.com", PasswordHash: &pwHash, Role: "merchant", Status: "active"}
 	db.Create(&pusatUser)
 	db.Create(&models.UserProfile{UserID: pusatUser.ID, FullName: "Staf Gudang Pusat"})
-	
+
 	// Note: We don't create a new merchant for pusatUser because they share the PusatID logic
 
 	// Merchants (Distributors)
@@ -345,12 +345,12 @@ func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Me
 	fmt.Println("  -> Seeding 40 Premium Products...")
 
 	productTemplates := []struct {
-		name     string
-		cat      string
-		brand    string
-		price    float64
-		desc     string
-		img      string
+		name  string
+		cat   string
+		brand string
+		price float64
+		desc  string
+		img   string
 	}{
 		{"Brightening Vitamin C Serum", "Serum & Essence", "GlowLab", 185000, "Serum untuk mencerahkan wajah dalam 7 hari.", "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800"},
 		{"Hyaluronic Acid Booster", "Serum & Essence", "AquaSkin", 210000, "Menghidrasi kulit hingga lapisan terdalam.", "https://images.unsplash.com/photo-1617897903246-719242758050?w=800"},
@@ -409,7 +409,7 @@ func seedProducts(db *gorm.DB, categories map[string]uint, merchants []models.Me
 			IsMaster:    true,    // SEMUA produk yang dibuat di pusat adalah Master Product
 			MerchantID:  PusatID, // Set Pusat as the official owner of Master Products
 			SupplierID:  suppliers[i%len(suppliers)].ID,
-			Stock:       100,     // Initial master stock
+			Stock:       100, // Initial master stock
 			Rating:      0,
 			Reviews:     0,
 		}
@@ -463,7 +463,7 @@ func seedMarketing(db *gorm.DB) {
 
 	// [Akuglow] Seed Affiliate Materials
 	fmt.Println("  -> Seeding Affiliate Resources (Edu, Events, Promo)...")
-	
+
 	edus := []models.AffiliateEducation{
 		{Title: "Cara Mencapai 100 Mitra Pertama", Slug: "sukses-100-mitra", Category: "Marketing", Content: "Panduan...", VideoURL: "https://www.youtube.com/embed/dQw4w9WgXcQ", IsActive: true},
 		{Title: "Strategi Duplicate Leader", Slug: "duplicate-leader", Category: "Leadership", Content: "Panduan...", VideoURL: "https://www.youtube.com/embed/dQw4w9WgXcQ", IsActive: true},
@@ -477,115 +477,119 @@ func seedMarketing(db *gorm.DB) {
 		{Title: "Webinar: Rahasia Omset 10 JT/Bulan", Description: "Live coaching bersama CEO AkuGlow.", Type: "online", Location: "Zoom Meeting", StartTime: time.Now().Add(48 * time.Hour), EndTime: time.Now().Add(50 * time.Hour), Status: "upcoming", IsActive: true},
 		{Title: "Kopdar Akbar Jakarta", Description: "Temu kangen dan sharing session offline.", Type: "offline", Location: "Kuningan City, Jakarta", StartTime: time.Now().Add(168 * time.Hour), EndTime: time.Now().Add(172 * time.Hour), Status: "upcoming", IsActive: true},
 	}
-	for _, ev := range events { db.Create(&ev) }
+	for _, ev := range events {
+		db.Create(&ev)
+	}
 
 	promos := []models.PromoMaterial{
 		{Title: "Story Instagram: Brightening Series", Type: "image", Category: "Instagram", FileURL: "https://images.unsplash.com/photo-1590156221122-c746e753e50b?w=800", Caption: "Glow up bareng AkuGlow! 💎", IsActive: true},
 		{Title: "Banner Facebook: Open Mitra", Type: "image", Category: "Facebook", FileURL: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800", Caption: "Join komunitas kecantikan terbesar!", IsActive: true},
 	}
-	for _, p := range promos { db.Create(&p) }
+	for _, p := range promos {
+		db.Create(&p)
+	}
 }
 
 func seedRBAC(db *gorm.DB) {
 	fmt.Println("  -> Seeding RBAC Configuration (Granular)...")
 	perms := []models.Permission{
 		// ─────────── GENERAL / DASHBOARD ───────────
-		{Code: "view_dashboard",         Name: "Lihat Dashboard",              Group: "Dashboard", Description: "Akses halaman ringkasan dashboard"},
-		{Code: "view_analytics",         Name: "Lihat Analitik & Statistik",   Group: "Dashboard", Description: "Melihat grafik & laporan kinerja platform"},
-		{Code: "view_notifications",     Name: "Lihat Notifikasi Sistem",      Group: "Dashboard", Description: "Membaca notifikasi & alert sistem"},
+		{Code: "view_dashboard", Name: "Lihat Dashboard", Group: "Dashboard", Description: "Akses halaman ringkasan dashboard"},
+		{Code: "view_analytics", Name: "Lihat Analitik & Statistik", Group: "Dashboard", Description: "Melihat grafik & laporan kinerja platform"},
+		{Code: "view_notifications", Name: "Lihat Notifikasi Sistem", Group: "Dashboard", Description: "Membaca notifikasi & alert sistem"},
 
 		// ─────────── CATALOG: PRODUCTS ───────────
-		{Code: "product_view",           Name: "Lihat Produk",                 Group: "Catalog",   Description: "Melihat daftar dan detail produk"},
-		{Code: "product_create",         Name: "Tambah Produk Baru",           Group: "Catalog",   Description: "Membuat produk master baru"},
-		{Code: "product_update",         Name: "Edit Produk",                  Group: "Catalog",   Description: "Mengubah detail, harga, dan stok produk"},
-		{Code: "product_delete",         Name: "Hapus Produk",                 Group: "Catalog",   Description: "Menghapus atau menonaktifkan produk"},
-		{Code: "product_bulk_action",    Name: "Aksi Massal Produk",           Group: "Catalog",   Description: "Aktifkan/nonaktifkan banyak produk sekaligus"},
-		{Code: "product_manage_variant", Name: "Kelola Varian Produk",         Group: "Catalog",   Description: "Tambah, edit, hapus varian & SKU produk"},
-		{Code: "product_import_export",  Name: "Import / Export Produk",       Group: "Catalog",   Description: "Upload file CSV/Excel untuk produk massal"},
-		{Code: "product_manage_pricing", Name: "Atur Harga & Komisi",          Group: "Catalog",   Description: "Mengatur harga jual, harga grosir, dan tier komisi"},
+		{Code: "product_view", Name: "Lihat Produk", Group: "Catalog", Description: "Melihat daftar dan detail produk"},
+		{Code: "product_create", Name: "Tambah Produk Baru", Group: "Catalog", Description: "Membuat produk master baru"},
+		{Code: "product_update", Name: "Edit Produk", Group: "Catalog", Description: "Mengubah detail, harga, dan stok produk"},
+		{Code: "product_delete", Name: "Hapus Produk", Group: "Catalog", Description: "Menghapus atau menonaktifkan produk"},
+		{Code: "product_bulk_action", Name: "Aksi Massal Produk", Group: "Catalog", Description: "Aktifkan/nonaktifkan banyak produk sekaligus"},
+		{Code: "product_manage_variant", Name: "Kelola Varian Produk", Group: "Catalog", Description: "Tambah, edit, hapus varian & SKU produk"},
+		{Code: "product_import_export", Name: "Import / Export Produk", Group: "Catalog", Description: "Upload file CSV/Excel untuk produk massal"},
+		{Code: "product_manage_pricing", Name: "Atur Harga & Komisi", Group: "Catalog", Description: "Mengatur harga jual, harga grosir, dan tier komisi"},
 
 		// ─────────── CATALOG: CATEGORIES ───────────
-		{Code: "category_view",          Name: "Lihat Kategori",               Group: "Catalog",   Description: "Melihat daftar kategori produk"},
-		{Code: "category_create",        Name: "Tambah Kategori",              Group: "Catalog",   Description: "Membuat kategori atau subkategori baru"},
-		{Code: "category_update",        Name: "Edit Kategori",                Group: "Catalog",   Description: "Mengubah nama, slug, dan urutan kategori"},
-		{Code: "category_delete",        Name: "Hapus Kategori",               Group: "Catalog",   Description: "Menghapus kategori yang tidak digunakan"},
+		{Code: "category_view", Name: "Lihat Kategori", Group: "Catalog", Description: "Melihat daftar kategori produk"},
+		{Code: "category_create", Name: "Tambah Kategori", Group: "Catalog", Description: "Membuat kategori atau subkategori baru"},
+		{Code: "category_update", Name: "Edit Kategori", Group: "Catalog", Description: "Mengubah nama, slug, dan urutan kategori"},
+		{Code: "category_delete", Name: "Hapus Kategori", Group: "Catalog", Description: "Menghapus kategori yang tidak digunakan"},
 
 		// ─────────── ORDERS / SALES ───────────
-		{Code: "order_view",             Name: "Lihat Semua Pesanan",          Group: "Sales",     Description: "Melihat daftar & detail seluruh pesanan"},
-		{Code: "order_update_status",    Name: "Update Status Pesanan",        Group: "Sales",     Description: "Mengubah status pesanan (proses, kirim, selesai)"},
-		{Code: "order_cancel",           Name: "Batalkan Pesanan",             Group: "Sales",     Description: "Membatalkan pesanan yang bermasalah"},
-		{Code: "order_refund",           Name: "Proses Refund & Pengembalian", Group: "Sales",     Description: "Memproses permintaan pengembalian dana"},
-		{Code: "order_export",           Name: "Export Data Pesanan",          Group: "Sales",     Description: "Download laporan pesanan ke format Excel/CSV"},
-		{Code: "order_view_financial",   Name: "Lihat Rincian Keuangan Order", Group: "Sales",     Description: "Melihat nominal pembayaran, fee, dan payout per pesanan"},
+		{Code: "order_view", Name: "Lihat Semua Pesanan", Group: "Sales", Description: "Melihat daftar & detail seluruh pesanan"},
+		{Code: "order_update_status", Name: "Update Status Pesanan", Group: "Sales", Description: "Mengubah status pesanan (proses, kirim, selesai)"},
+		{Code: "order_cancel", Name: "Batalkan Pesanan", Group: "Sales", Description: "Membatalkan pesanan yang bermasalah"},
+		{Code: "order_refund", Name: "Proses Refund & Pengembalian", Group: "Sales", Description: "Memproses permintaan pengembalian dana"},
+		{Code: "order_export", Name: "Export Data Pesanan", Group: "Sales", Description: "Download laporan pesanan ke format Excel/CSV"},
+		{Code: "order_view_financial", Name: "Lihat Rincian Keuangan Order", Group: "Sales", Description: "Melihat nominal pembayaran, fee, dan payout per pesanan"},
 
 		// ─────────── INVENTORY / WAREHOUSE ───────────
-		{Code: "inventory_view",         Name: "Lihat Stok Gudang",            Group: "Inventory", Description: "Melihat stok di semua gudang & merchant"},
-		{Code: "inventory_update",       Name: "Update Stok Manual",           Group: "Inventory", Description: "Mengubah jumlah stok secara manual"},
-		{Code: "inventory_restock",      Name: "Kelola Permintaan Restock",    Group: "Inventory", Description: "Approve/reject permintaan restock dari merchant"},
-		{Code: "inventory_inbound",      Name: "Input Barang Masuk (Inbound)", Group: "Inventory", Description: "Mencatat penerimaan barang dari supplier"},
-		{Code: "inventory_mutation",     Name: "Lihat Mutasi Stok",            Group: "Inventory", Description: "Melihat riwayat perubahan stok (log mutasi)"},
-		{Code: "inventory_report",       Name: "Export Laporan Inventaris",    Group: "Inventory", Description: "Download laporan stok ke Excel/PDF"},
+		{Code: "inventory_view", Name: "Lihat Stok Gudang", Group: "Inventory", Description: "Melihat stok di semua gudang & merchant"},
+		{Code: "inventory_update", Name: "Update Stok Manual", Group: "Inventory", Description: "Mengubah jumlah stok secara manual"},
+		{Code: "inventory_restock", Name: "Kelola Permintaan Restock", Group: "Inventory", Description: "Approve/reject permintaan restock dari merchant"},
+		{Code: "inventory_inbound", Name: "Input Barang Masuk (Inbound)", Group: "Inventory", Description: "Mencatat penerimaan barang dari supplier"},
+		{Code: "inventory_mutation", Name: "Lihat Mutasi Stok", Group: "Inventory", Description: "Melihat riwayat perubahan stok (log mutasi)"},
+		{Code: "inventory_report", Name: "Export Laporan Inventaris", Group: "Inventory", Description: "Download laporan stok ke Excel/PDF"},
 
 		// ─────────── USERS / BUYERS ───────────
-		{Code: "user_view",              Name: "Lihat Data Pengguna",          Group: "Users",     Description: "Melihat daftar dan profil pembeli"},
-		{Code: "user_create",            Name: "Tambah Pengguna Baru",         Group: "Users",     Description: "Membuat akun pengguna secara manual"},
-		{Code: "user_update",            Name: "Edit Data Pengguna",           Group: "Users",     Description: "Mengubah profil atau data akun pengguna"},
-		{Code: "user_suspend",           Name: "Suspend / Aktifkan Pengguna",  Group: "Users",     Description: "Menonaktifkan atau mengaktifkan akun pengguna"},
-		{Code: "user_delete",            Name: "Hapus Pengguna",               Group: "Users",     Description: "Menghapus permanen akun pengguna"},
-		{Code: "user_view_wallet",       Name: "Lihat Saldo & Wallet",         Group: "Users",     Description: "Melihat saldo dompet dan riwayat transaksi pengguna"},
+		{Code: "user_view", Name: "Lihat Data Pengguna", Group: "Users", Description: "Melihat daftar dan profil pembeli"},
+		{Code: "user_create", Name: "Tambah Pengguna Baru", Group: "Users", Description: "Membuat akun pengguna secara manual"},
+		{Code: "user_update", Name: "Edit Data Pengguna", Group: "Users", Description: "Mengubah profil atau data akun pengguna"},
+		{Code: "user_suspend", Name: "Suspend / Aktifkan Pengguna", Group: "Users", Description: "Menonaktifkan atau mengaktifkan akun pengguna"},
+		{Code: "user_delete", Name: "Hapus Pengguna", Group: "Users", Description: "Menghapus permanen akun pengguna"},
+		{Code: "user_view_wallet", Name: "Lihat Saldo & Wallet", Group: "Users", Description: "Melihat saldo dompet dan riwayat transaksi pengguna"},
 
 		// ─────────── MERCHANTS ───────────
-		{Code: "merchant_view",          Name: "Lihat Data Merchant",          Group: "Merchants", Description: "Melihat daftar dan profil semua merchant"},
-		{Code: "merchant_create",        Name: "Daftarkan Merchant Baru",      Group: "Merchants", Description: "Membuat akun merchant baru"},
-		{Code: "merchant_update",        Name: "Edit Profil Merchant",         Group: "Merchants", Description: "Mengubah data toko, kota, dan pengaturan merchant"},
-		{Code: "merchant_verify",        Name: "Verifikasi / Setujui Merchant",Group: "Merchants", Description: "Approve atau reject pengajuan merchant baru"},
-		{Code: "merchant_suspend",       Name: "Suspend Merchant",             Group: "Merchants", Description: "Menonaktifkan atau mensuspensi akun merchant"},
-		{Code: "merchant_view_payout",   Name: "Lihat Payout Merchant",        Group: "Merchants", Description: "Melihat riwayat payout yang diterima merchant"},
+		{Code: "merchant_view", Name: "Lihat Data Merchant", Group: "Merchants", Description: "Melihat daftar dan profil semua merchant"},
+		{Code: "merchant_create", Name: "Daftarkan Merchant Baru", Group: "Merchants", Description: "Membuat akun merchant baru"},
+		{Code: "merchant_update", Name: "Edit Profil Merchant", Group: "Merchants", Description: "Mengubah data toko, kota, dan pengaturan merchant"},
+		{Code: "merchant_verify", Name: "Verifikasi / Setujui Merchant", Group: "Merchants", Description: "Approve atau reject pengajuan merchant baru"},
+		{Code: "merchant_suspend", Name: "Suspend Merchant", Group: "Merchants", Description: "Menonaktifkan atau mensuspensi akun merchant"},
+		{Code: "merchant_view_payout", Name: "Lihat Payout Merchant", Group: "Merchants", Description: "Melihat riwayat payout yang diterima merchant"},
 
 		// ─────────── AFFILIATE ───────────
-		{Code: "affiliate_view",         Name: "Lihat Data Mitra Affiliate",   Group: "Affiliate", Description: "Melihat daftar dan kinerja semua affiliate"},
-		{Code: "affiliate_update_tier",  Name: "Update Tier Affiliate",        Group: "Affiliate", Description: "Mengubah tier keanggotaan affiliate"},
-		{Code: "affiliate_manage_tiers", Name: "Kelola Tier Keanggotaan",      Group: "Affiliate", Description: "CRUD tier membership & syaratnya"},
-		{Code: "affiliate_view_commission", Name: "Lihat Komisi Affiliate",    Group: "Affiliate", Description: "Melihat riwayat komisi affiliate"},
+		{Code: "affiliate_view", Name: "Lihat Data Mitra Affiliate", Group: "Affiliate", Description: "Melihat daftar dan kinerja semua affiliate"},
+		{Code: "affiliate_update_tier", Name: "Update Tier Affiliate", Group: "Affiliate", Description: "Mengubah tier keanggotaan affiliate"},
+		{Code: "affiliate_manage_tiers", Name: "Kelola Tier Keanggotaan", Group: "Affiliate", Description: "CRUD tier membership & syaratnya"},
+		{Code: "affiliate_view_commission", Name: "Lihat Komisi Affiliate", Group: "Affiliate", Description: "Melihat riwayat komisi affiliate"},
 		{Code: "affiliate_approve_withdrawal", Name: "Setujui Penarikan Dana", Group: "Affiliate", Description: "Approve atau tolak permintaan withdraw affiliate"},
-		{Code: "affiliate_manage_materials",  Name: "Kelola Materi Promosi",   Group: "Affiliate", Description: "Tambah/edit/hapus materi promo untuk affiliate"},
+		{Code: "affiliate_manage_materials", Name: "Kelola Materi Promosi", Group: "Affiliate", Description: "Tambah/edit/hapus materi promo untuk affiliate"},
 
 		// ─────────── FINANCE ───────────
-		{Code: "finance_view_summary",   Name: "Lihat Ringkasan Keuangan",     Group: "Finance",   Description: "Melihat pendapatan, fee platform, dan pengeluaran"},
-		{Code: "finance_view_transactions", Name: "Lihat Semua Transaksi",     Group: "Finance",   Description: "Melihat riwayat transaksi lengkap platform"},
-		{Code: "finance_process_payout", Name: "Proses Payout",                Group: "Finance",   Description: "Menjalankan proses payout ke merchant & affiliate"},
-		{Code: "finance_view_reports",   Name: "Lihat Laporan Keuangan",       Group: "Finance",   Description: "Melihat laporan P&L, arus kas, dan rekonsiliasi"},
-		{Code: "finance_export_reports", Name: "Export Laporan Keuangan",      Group: "Finance",   Description: "Download laporan keuangan ke Excel/PDF"},
+		{Code: "finance_view_summary", Name: "Lihat Ringkasan Keuangan", Group: "Finance", Description: "Melihat pendapatan, fee platform, dan pengeluaran"},
+		{Code: "finance_view_transactions", Name: "Lihat Semua Transaksi", Group: "Finance", Description: "Melihat riwayat transaksi lengkap platform"},
+		{Code: "finance_process_payout", Name: "Proses Payout", Group: "Finance", Description: "Menjalankan proses payout ke merchant & affiliate"},
+		{Code: "finance_view_reports", Name: "Lihat Laporan Keuangan", Group: "Finance", Description: "Melihat laporan P&L, arus kas, dan rekonsiliasi"},
+		{Code: "finance_export_reports", Name: "Export Laporan Keuangan", Group: "Finance", Description: "Download laporan keuangan ke Excel/PDF"},
 
 		// ─────────── MARKETING & CONTENT ───────────
-		{Code: "marketing_view_banner",  Name: "Lihat Banner & Promo",         Group: "Marketing", Description: "Melihat daftar banner aktif di toko"},
-		{Code: "marketing_manage_banner",Name: "Kelola Banner Promosi",        Group: "Marketing", Description: "Upload, edit, dan hapus banner homepage"},
-		{Code: "marketing_view_voucher", Name: "Lihat Voucher",                Group: "Marketing", Description: "Melihat daftar voucher diskon aktif"},
-		{Code: "marketing_create_voucher", Name: "Buat Voucher Baru",          Group: "Marketing", Description: "Membuat kode voucher diskon baru"},
+		{Code: "marketing_view_banner", Name: "Lihat Banner & Promo", Group: "Marketing", Description: "Melihat daftar banner aktif di toko"},
+		{Code: "marketing_manage_banner", Name: "Kelola Banner Promosi", Group: "Marketing", Description: "Upload, edit, dan hapus banner homepage"},
+		{Code: "marketing_view_voucher", Name: "Lihat Voucher", Group: "Marketing", Description: "Melihat daftar voucher diskon aktif"},
+		{Code: "marketing_create_voucher", Name: "Buat Voucher Baru", Group: "Marketing", Description: "Membuat kode voucher diskon baru"},
 		{Code: "marketing_update_voucher", Name: "Edit / Nonaktifkan Voucher", Group: "Marketing", Description: "Mengubah nilai, kuota, atau menonaktifkan voucher"},
-		{Code: "marketing_delete_voucher", Name: "Hapus Voucher",              Group: "Marketing", Description: "Menghapus voucher yang sudah tidak dipakai"},
-		{Code: "content_blog",             Name: "Kelola Artikel Blog",        Group: "Marketing", Description: "Tambah, edit, dan hapus artikel blog"},
-		{Code: "content_education",        Name: "Kelola Edukasi",             Group: "Marketing", Description: "Kelola materi edukasi afiliasi"},
-		{Code: "content_event",            Name: "Kelola Event",               Group: "Marketing", Description: "Kelola event online & offline"},
-		{Code: "content_promo_material",   Name: "Kelola Bahan Promosi",       Group: "Marketing", Description: "Kelola aset promosi (gambar/video)"},
+		{Code: "marketing_delete_voucher", Name: "Hapus Voucher", Group: "Marketing", Description: "Menghapus voucher yang sudah tidak dipakai"},
+		{Code: "content_blog", Name: "Kelola Artikel Blog", Group: "Marketing", Description: "Tambah, edit, dan hapus artikel blog"},
+		{Code: "content_education", Name: "Kelola Edukasi", Group: "Marketing", Description: "Kelola materi edukasi afiliasi"},
+		{Code: "content_event", Name: "Kelola Event", Group: "Marketing", Description: "Kelola event online & offline"},
+		{Code: "content_promo_material", Name: "Kelola Bahan Promosi", Group: "Marketing", Description: "Kelola aset promosi (gambar/video)"},
 
 		// ─────────── PLATFORM SETTINGS ───────────
-		{Code: "settings_view",          Name: "Lihat Pengaturan Platform",    Group: "Settings",  Description: "Melihat konfigurasi platform (payment, fee, dll)"},
-		{Code: "settings_update",        Name: "Edit Pengaturan Platform",     Group: "Settings",  Description: "Mengubah konfigurasi platform secara global"},
-		{Code: "settings_manage_payment",Name: "Konfigurasi Payment Gateway",  Group: "Settings",  Description: "Mengatur API key Tripay/Midtrans & mode sandbox"},
-		{Code: "settings_manage_smtp",   Name: "Konfigurasi Email / SMTP",     Group: "Settings",  Description: "Mengatur server email untuk notifikasi otomatis"},
+		{Code: "settings_view", Name: "Lihat Pengaturan Platform", Group: "Settings", Description: "Melihat konfigurasi platform (payment, fee, dll)"},
+		{Code: "settings_update", Name: "Edit Pengaturan Platform", Group: "Settings", Description: "Mengubah konfigurasi platform secara global"},
+		{Code: "settings_manage_payment", Name: "Konfigurasi Payment Gateway", Group: "Settings", Description: "Mengatur API key Tripay/Midtrans & mode sandbox"},
+		{Code: "settings_manage_smtp", Name: "Konfigurasi Email / SMTP", Group: "Settings", Description: "Mengatur server email untuk notifikasi otomatis"},
 
 		// ─────────── RBAC / IAM ───────────
-		{Code: "rbac_view",              Name: "Lihat Modul IAM / RBAC",       Group: "IAM",       Description: "Melihat daftar staf, role, dan permission"},
-		{Code: "rbac_manage_staff",      Name: "Kelola Staf Admin",            Group: "IAM",       Description: "Tambah, edit, suspend, hapus akun staf admin"},
-		{Code: "rbac_manage_roles",      Name: "Kelola Security Profile",      Group: "IAM",       Description: "Buat dan edit role beserta permission-nya"},
-		{Code: "rbac_assign_role",       Name: "Assign Role ke Staf",          Group: "IAM",       Description: "Menugaskan security profile ke akun staf"},
+		{Code: "rbac_view", Name: "Lihat Modul IAM / RBAC", Group: "IAM", Description: "Melihat daftar staf, role, dan permission"},
+		{Code: "rbac_manage_staff", Name: "Kelola Staf Admin", Group: "IAM", Description: "Tambah, edit, suspend, hapus akun staf admin"},
+		{Code: "rbac_manage_roles", Name: "Kelola Security Profile", Group: "IAM", Description: "Buat dan edit role beserta permission-nya"},
+		{Code: "rbac_assign_role", Name: "Assign Role ke Staf", Group: "IAM", Description: "Menugaskan security profile ke akun staf"},
 
 		// ─────────── REPORTS / AUDIT ───────────
-		{Code: "report_sales",           Name: "Laporan Penjualan",            Group: "Reports",   Description: "Akses laporan penjualan harian/bulanan/tahunan"},
-		{Code: "report_inventory",       Name: "Laporan Inventaris",           Group: "Reports",   Description: "Akses laporan mutasi stok dan restock"},
-		{Code: "report_users",           Name: "Laporan Pengguna & Affiliate", Group: "Reports",   Description: "Akses data pertumbuhan pengguna dan mitra"},
-		{Code: "report_export_all",      Name: "Export Semua Laporan",         Group: "Reports",   Description: "Hak akses download seluruh laporan platform"},
+		{Code: "report_sales", Name: "Laporan Penjualan", Group: "Reports", Description: "Akses laporan penjualan harian/bulanan/tahunan"},
+		{Code: "report_inventory", Name: "Laporan Inventaris", Group: "Reports", Description: "Akses laporan mutasi stok dan restock"},
+		{Code: "report_users", Name: "Laporan Pengguna & Affiliate", Group: "Reports", Description: "Akses data pertumbuhan pengguna dan mitra"},
+		{Code: "report_export_all", Name: "Export Semua Laporan", Group: "Reports", Description: "Hak akses download seluruh laporan platform"},
 	}
 	for _, p := range perms {
 		db.FirstOrCreate(&p, models.Permission{Code: p.Code})
@@ -860,5 +864,3 @@ func seedBanners(db *gorm.DB) {
 		}
 	}
 }
-
-

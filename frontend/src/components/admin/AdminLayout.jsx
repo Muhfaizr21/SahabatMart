@@ -263,7 +263,7 @@ const AdminLayout = () => {
         transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
         position: 'fixed', top: 0, 
         left: isMobile && collapsed ? -C.sideW : 0, 
-        bottom: 0, zIndex: 10,
+        bottom: 0, zIndex: 100,
         overflow: 'hidden',
         borderRight: `1px solid ${C.border}`,
         boxShadow: isMobile && !collapsed ? '20px 0 50px rgba(0,0,0,0.3)' : 'none',
