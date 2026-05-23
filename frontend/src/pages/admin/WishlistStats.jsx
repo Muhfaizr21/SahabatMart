@@ -38,8 +38,8 @@ export default function WishlistStats() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader 
-        title="Market Insight: Wishlist" 
+      <PageHeader
+        title="Market Insight: Wishlist"
         subtitle="Analisis produk yang paling banyak diinginkan oleh pelanggan untuk strategi stok."
       >
         <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
@@ -74,8 +74,8 @@ export default function WishlistStats() {
                 onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
               >
                 <td style={{ ...A.td, paddingLeft: 24, textAlign: 'center' }}>
-                  <div style={{ 
-                    width: 32, height: 32, borderRadius: '50%', 
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%',
                     background: idx === 0 ? '#fbbf24' : idx === 1 ? '#cbd5e1' : idx === 2 ? '#d97706' : '#f1f5f9',
                     color: idx < 3 ? '#fff' : '#64748b',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -86,14 +86,14 @@ export default function WishlistStats() {
                 </td>
                 <td style={A.td}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img 
-                      src={formatImage(s.image)} 
+                    <img
+                      src={formatImage(s.image)}
                       alt={s.product_name}
                       style={{ width: 44, height: 44, borderRadius: 10, objectCover: 'cover', background: '#f8fafc' }}
                     />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, lineHeight: '1.2' }}>{s.product_name}</div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>ID: {s.product_id?.slice(0,8)}</div>
+                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>ID: {s.product_id?.slice(0, 8)}</div>
                     </div>
                   </div>
                 </td>
@@ -124,9 +124,9 @@ export default function WishlistStats() {
                       <span style={{ color: '#0f172a' }}>{Math.min(100, (s.count / (stats[0].count || 1)) * 100).toFixed(0)}%</span>
                     </div>
                     <div style={{ width: '100%', height: 6, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
-                      <div style={{ 
-                        width: `${(s.count / (stats[0].count || 1)) * 100}%`, 
-                        height: '100%', 
+                      <div style={{
+                        width: `${(s.count / (stats[0].count || 1)) * 100}%`,
+                        height: '100%',
                         background: 'linear-gradient(90deg, #ec4899, #f43f5e)',
                         borderRadius: 3
                       }} />

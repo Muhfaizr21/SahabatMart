@@ -8,9 +8,9 @@ const badgeColors = { hot: 'bg-red-500', trending: 'bg-blue-500', offer: 'bg-gre
 function StarRating({ rating }) {
   return (
     <div className="flex items-center gap-0.5">
-      {[1,2,3,4,5].map(s => (
+      {[1, 2, 3, 4, 5].map(s => (
         <svg key={s} width="12" height="12" viewBox="0 0 24 24" fill={s <= Math.floor(rating) ? '#facc15' : '#e5e7eb'}>
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
       ))}
     </div>
@@ -31,7 +31,7 @@ export default function ShopPage() {
   const navigate = useNavigate();
   const catParam = searchParams.get('cat');
   const searchParam = searchParams.get('search');
-  
+
   const [activeCategory, setActiveCategory] = useState(catParam || 'Semua');
   const [sortBy, setSortBy] = useState('Default');
   const [priceRange, setPriceRange] = useState(0);
@@ -43,7 +43,7 @@ export default function ShopPage() {
   const [allCategories, setAllCategories] = useState(['Semua']);
   const [loading, setLoading] = useState(true);
   const isLoggedIn = !!localStorage.getItem('token');
-  
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 12;
@@ -62,7 +62,7 @@ export default function ShopPage() {
     ]).then(([p, c]) => {
       const productListData = Array.isArray(p) ? p : (p.data || []);
       const categoryListData = Array.isArray(c) ? c : (c.data || []);
-      
+
       setAllProducts(productListData);
       const categoriesFromProducts = Array.from(new Set(productListData.map(p => p.category).filter(Boolean)));
       const uniqueCats = Array.from(new Set([...categoryListData.map(cat => cat.name), ...categoriesFromProducts])).sort();
@@ -118,7 +118,7 @@ export default function ShopPage() {
 
     try {
       const variantId = product.variants && product.variants.length > 0 ? product.variants[0].id : product.id;
-      
+
       await fetchJson(`${BUYER_API_BASE}/cart/add`, {
         method: 'POST',
         body: JSON.stringify({
@@ -137,7 +137,7 @@ export default function ShopPage() {
 
   let filtered = allProducts.filter(p => {
     if (activeCategory !== 'Semua' && p.category !== activeCategory) return false;
-    
+
     if (searchTerm) {
       const words = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length > 0);
       const productName = p.name.toLowerCase();
@@ -173,10 +173,10 @@ export default function ShopPage() {
 
   const handleLocalSearch = (val) => {
     setSearchParams(prev => {
-        const newParams = new URLSearchParams(prev);
-        if (val) newParams.set('search', val);
-        else newParams.delete('search');
-        return newParams;
+      const newParams = new URLSearchParams(prev);
+      if (val) newParams.set('search', val);
+      else newParams.delete('search');
+      return newParams;
     }, { replace: true });
   };
 
@@ -184,7 +184,7 @@ export default function ShopPage() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
-      <SEO 
+      <SEO
         title={activeCategory === 'Semua' ? "Semua Produk - SahabatMart" : `${activeCategory} - SahabatMart`}
         description={`Jelajahi koleksi ${activeCategory === 'Semua' ? 'produk kecantikan dan kesehatan' : activeCategory} terbaik di SahabatMart. Belanja sekarang dengan promo menarik.`}
         type="website"
@@ -198,38 +198,37 @@ export default function ShopPage() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-5 py-2 rounded-full text-[11px] font-black whitespace-nowrap transition-all border ${
-                  activeCategory === cat
+                className={`px-5 py-2 rounded-full text-[11px] font-black whitespace-nowrap transition-all border ${activeCategory === cat
                     ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-100'
                     : 'bg-white border-gray-200 text-gray-500 hover:border-rose-300'
-                }`}
+                  }`}
               >
                 {cat}
               </button>
             ))}
           </div>
-          
+
           {/* Search & Filter Controls */}
           <div className="flex items-center gap-3 px-4 py-3">
-             <div className="relative flex-1 group">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black group-focus-within:text-rose-500 transition-colors">search</span>
-                <input 
-                  type="text"
-                  placeholder="Cari produk..."
-                  className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:bg-white focus:border-rose-500 transition-all text-xs font-bold"
-                  value={searchTerm}
-                  onChange={(e) => handleLocalSearch(e.target.value)}
-                />
-                {searchTerm && (
-                  <button 
-                    onClick={() => handleLocalSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 p-1"
-                  >
-                    <span className="material-symbols-outlined text-sm font-black">close</span>
-                  </button>
-                )}
-             </div>
-             <button 
+            <div className="relative flex-1 group">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black group-focus-within:text-rose-500 transition-colors">search</span>
+              <input
+                type="text"
+                placeholder="Cari produk..."
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:bg-white focus:border-rose-500 transition-all text-xs font-bold"
+                value={searchTerm}
+                onChange={(e) => handleLocalSearch(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => handleLocalSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 p-1"
+                >
+                  <span className="material-symbols-outlined text-sm font-black">close</span>
+                </button>
+              )}
+            </div>
+            <button
               onClick={() => setIsMobileFilterOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-xs font-black text-gray-700 shadow-sm active:scale-95 transition-all"
             >
@@ -254,16 +253,14 @@ export default function ShopPage() {
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`group w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all ${
-                      activeCategory === cat
+                    className={`group w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all ${activeCategory === cat
                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
                         : 'text-gray-600 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <span className={activeCategory === cat ? 'font-bold' : 'font-medium'}>{cat}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md transition-colors ${
-                      activeCategory === cat ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
-                    }`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md transition-colors ${activeCategory === cat ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
+                      }`}>
                       {cat === 'Semua' ? allProducts.length : allProducts.filter(p => p.category === cat).length}
                     </span>
                   </button>
@@ -300,11 +297,11 @@ export default function ShopPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
               <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Rating</h3>
               <div className="space-y-3">
-                {[5,4,3,2,1].map(r => (
+                {[5, 4, 3, 2, 1].map(r => (
                   <label key={r} className="flex items-center gap-3 cursor-pointer group">
                     <div className="relative flex items-center justify-center">
-                      <input 
-                        type="radio" 
+                      <input
+                        type="radio"
                         name="rating_filter"
                         checked={minRating === r}
                         onChange={() => setMinRating(prev => prev === r ? 0 : r)}
@@ -328,9 +325,9 @@ export default function ShopPage() {
               <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                 {allBrands.map(brand => (
                   <label key={brand} className="flex items-center gap-3 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      className="accent-blue-600 w-4 h-4 rounded" 
+                    <input
+                      type="checkbox"
+                      className="accent-blue-600 w-4 h-4 rounded"
                       checked={selectedBrands.includes(brand)}
                       onChange={(e) => {
                         if (e.target.checked) setSelectedBrands(prev => [...prev, brand]);
@@ -351,50 +348,50 @@ export default function ShopPage() {
             {/* Desktop Toolbar (Hidden on Mobile) */}
             <div className="hidden lg:flex items-center justify-between gap-6 mb-10 bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-sm">
               <div className="flex items-center gap-6">
-                 <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-100">
-                    <button 
-                      onClick={() => setViewMode('grid')}
-                      className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
+                <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-100">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <span className="material-symbols-outlined font-black text-xl">grid_view</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <span className="material-symbols-outlined font-black text-xl">view_list</span>
+                  </button>
+                </div>
+
+                <div className="relative flex-1 min-w-[300px] group">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black pointer-events-none group-focus-within:text-rose-500 transition-colors">search</span>
+                  <input
+                    type="text"
+                    placeholder="Cari di toko ini..."
+                    className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-rose-500 transition-all text-sm font-bold"
+                    value={searchTerm}
+                    onChange={(e) => handleLocalSearch(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => handleLocalSearch('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 transition-colors"
                     >
-                      <span className="material-symbols-outlined font-black text-xl">grid_view</span>
+                      <span className="material-symbols-outlined text-lg font-black">close</span>
                     </button>
-                    <button 
-                      onClick={() => setViewMode('list')}
-                      className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      <span className="material-symbols-outlined font-black text-xl">view_list</span>
-                    </button>
-                 </div>
-                 
-                 <div className="relative flex-1 min-w-[300px] group">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black pointer-events-none group-focus-within:text-rose-500 transition-colors">search</span>
-                    <input 
-                      type="text"
-                      placeholder="Cari di toko ini..."
-                      className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-rose-500 transition-all text-sm font-bold"
-                      value={searchTerm}
-                      onChange={(e) => handleLocalSearch(e.target.value)}
-                    />
-                    {searchTerm && (
-                      <button 
-                        onClick={() => handleLocalSearch('')}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg font-black">close</span>
-                      </button>
-                    )}
-                 </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-4">
-                 <p className="text-sm font-bold text-gray-400">Urutkan:</p>
-                 <select 
-                   value={sortBy}
-                   onChange={(e) => setSortBy(e.target.value)}
-                   className="bg-gray-50 border border-gray-100 text-gray-800 text-sm font-black px-6 py-3 rounded-2xl outline-none focus:border-rose-500 transition-all cursor-pointer"
-                 >
-                   {sortOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                 </select>
+                <p className="text-sm font-bold text-gray-400">Urutkan:</p>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-gray-50 border border-gray-100 text-gray-800 text-sm font-black px-6 py-3 rounded-2xl outline-none focus:border-rose-500 transition-all cursor-pointer"
+                >
+                  {sortOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
               </div>
             </div>
 
@@ -404,7 +401,7 @@ export default function ShopPage() {
                 <div className="bg-blue-50 px-4 py-2 rounded-2xl border border-blue-100 flex items-center gap-3">
                   <span className="text-sm text-blue-600 font-bold">Hasil pencarian:</span>
                   <span className="text-sm text-blue-900 font-black italic">"{searchParam}"</span>
-                  <button 
+                  <button
                     onClick={() => setSearchParams(prev => {
                       const newParams = new URLSearchParams(prev);
                       newParams.delete('search');
@@ -420,15 +417,15 @@ export default function ShopPage() {
             )}
 
             {loading ? (
-                <div className="bg-white rounded-2xl border border-gray-100 p-20 text-center">
-                    <div className="spinner-border text-blue-600"></div>
-                    <p className="text-gray-500 mt-3">Memuat produk...</p>
-                </div>
+              <div className="bg-white rounded-2xl border border-gray-100 p-20 text-center">
+                <div className="spinner-border text-blue-600"></div>
+                <p className="text-gray-500 mt-3">Memuat produk...</p>
+              </div>
             ) : filtered.length === 0 ? (
               <div className="py-20 text-center animate-in fade-in zoom-in duration-500">
                 <div className="relative inline-block mb-6">
-                   <div className="absolute inset-0 bg-rose-100 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                   <span className="relative material-symbols-outlined text-7xl text-gray-200">inventory_2</span>
+                  <div className="absolute inset-0 bg-rose-100 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+                  <span className="relative material-symbols-outlined text-7xl text-gray-200">inventory_2</span>
                 </div>
                 <h3 className="text-2xl font-black text-gray-800 mb-2">Produk Tidak Ditemukan</h3>
                 <p className="text-gray-500 font-bold mb-8 max-w-xs mx-auto">
@@ -444,7 +441,7 @@ export default function ShopPage() {
                     </Link>
                   </div>
                 )}
-                
+
                 {(searchParam?.toLowerCase().includes('tentang') || searchParam?.toLowerCase().includes('profil')) && (
                   <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
                     <p className="text-rose-600 font-black text-sm mb-3">Ingin tahu lebih banyak tentang kami?</p>
@@ -465,7 +462,7 @@ export default function ShopPage() {
                   </div>
                 )}
 
-                <button 
+                <button
                   onClick={() => setSearchParams({})}
                   className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-sm hover:bg-black transition-all shadow-xl shadow-gray-200"
                 >
@@ -480,9 +477,9 @@ export default function ShopPage() {
                       <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" />
                       {product.badge && (
                         <div className="absolute top-4 left-4 z-10">
-                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-xl backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
-                                {product.badge}
-                            </span>
+                          <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-xl backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
+                            {product.badge}
+                          </span>
                         </div>
                       )}
                       {isLoggedIn && (
@@ -491,7 +488,7 @@ export default function ShopPage() {
                           className={`absolute top-4 right-4 z-10 w-10 h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 ${liked[product.id] ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur-md text-gray-400 hover:bg-white hover:text-red-500'}`}
                         >
                           <svg width="18" height="18" fill={liked[product.id] ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                           </svg>
                         </button>
                       )}
@@ -500,10 +497,10 @@ export default function ShopPage() {
                     <div className="p-5 sm:p-7 flex-1 flex flex-col">
                       <div className="flex items-center gap-2 mb-3">
                         <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-black uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-lg">
-                           {product.category}
+                          {product.category}
                         </Link>
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-50">
-                          <svg width="12" height="12" fill="#facc15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          <svg width="12" height="12" fill="#facc15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                           <span className="text-[10px] font-black text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
                           <span className="text-[9px] text-gray-400 font-bold">({product.reviews || 0})</span>
                         </div>
@@ -513,29 +510,29 @@ export default function ShopPage() {
                       </Link>
                       <div className="flex items-center gap-2 mb-6 group/store">
                         <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] text-blue-600 font-black">
-                             {product.store_name?.charAt(0) || "A"}
+                          {product.store_name?.charAt(0) || "A"}
                         </div>
                         <span className="text-[11px] font-bold text-gray-400 group-hover/store:text-blue-600 transition-colors truncate">{product.store_name || "AkuGlow Official"}</span>
                       </div>
                       <div className="mt-auto pt-5 border-t border-gray-50">
                         <div className="flex items-center justify-between mb-3">
-                           <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</p>
-                              <h4 className="font-black text-gray-900 text-base sm:text-xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
-                           </div>
-                           {isLoggedIn && (
-                             <button 
-                               onClick={() => handleAddToCart(product)}
-                               className="w-9 h-9 rounded-xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
-                             >
-                               <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
-                             </button>
-                           )}
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</p>
+                            <h4 className="font-black text-gray-900 text-base sm:text-xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                          </div>
+                          {isLoggedIn && (
+                            <button
+                              onClick={() => handleAddToCart(product)}
+                              className="w-9 h-9 rounded-xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
+                            >
+                              <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
+                            </button>
+                          )}
                         </div>
                         {!isLoggedIn && (
-                           <Link to="/login" className="block w-full py-2.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all text-center">
-                             Login untuk beli
-                           </Link>
+                          <Link to="/login" className="block w-full py-2.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all text-center">
+                            Login untuk beli
+                          </Link>
                         )}
                       </div>
                     </div>
@@ -578,30 +575,30 @@ export default function ShopPage() {
                       </div>
                       <div className="mt-auto flex items-center justify-between pt-6 border-t border-gray-50">
                         <div className="flex flex-col">
-                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</span>
-                           <h4 className="font-black text-gray-900 text-2xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</span>
+                          <h4 className="font-black text-gray-900 text-2xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
                         </div>
-                         {isLoggedIn ? (
-                           <div className="flex items-center gap-3">
-                             <button
-                               onClick={() => handleToggleWishlist(product.id)}
-                               className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${liked[product.id] ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500'}`}
-                             >
-                               <span className="material-symbols-outlined font-black">{liked[product.id] ? 'favorite' : 'favorite_border'}</span>
-                             </button>
-                             <button 
-                               onClick={() => handleAddToCart(product)}
-                               className="bg-[#0A0A0B] hover:bg-blue-600 text-white font-black px-8 py-3.5 rounded-2xl shadow-xl shadow-gray-200 transition-all flex items-center gap-3 active:scale-95"
-                             >
-                               <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
-                               <span>Beli Sekarang</span>
-                             </button>
-                           </div>
-                         ) : (
-                           <Link to="/login" className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl text-xs font-black hover:bg-blue-100 transition-all">
-                             Login untuk Berbelanja
-                           </Link>
-                         )}
+                        {isLoggedIn ? (
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleToggleWishlist(product.id)}
+                              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${liked[product.id] ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500'}`}
+                            >
+                              <span className="material-symbols-outlined font-black">{liked[product.id] ? 'favorite' : 'favorite_border'}</span>
+                            </button>
+                            <button
+                              onClick={() => handleAddToCart(product)}
+                              className="bg-[#0A0A0B] hover:bg-blue-600 text-white font-black px-8 py-3.5 rounded-2xl shadow-xl shadow-gray-200 transition-all flex items-center gap-3 active:scale-95"
+                            >
+                              <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
+                              <span>Beli Sekarang</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <Link to="/login" className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl text-xs font-black hover:bg-blue-100 transition-all">
+                            Login untuk Berbelanja
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -610,7 +607,7 @@ export default function ShopPage() {
             )}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-16">
-                <button 
+                <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                   className={`w-12 h-12 rounded-2xl border border-gray-200 flex items-center justify-center transition-all ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600 hover:text-white hover:border-blue-600 text-gray-600'}`}
@@ -618,15 +615,15 @@ export default function ShopPage() {
                   <span className="material-symbols-outlined font-black">chevron_left</span>
                 </button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                  <button 
-                    key={n} 
+                  <button
+                    key={n}
                     onClick={() => setCurrentPage(n)}
                     className={`w-12 h-12 rounded-2xl text-sm font-black transition-all ${n === currentPage ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                   >
                     {n}
                   </button>
                 ))}
-                <button 
+                <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                   className={`w-12 h-12 rounded-2xl border border-gray-200 flex items-center justify-center transition-all ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600 hover:text-white hover:border-blue-600 text-gray-600'}`}
@@ -657,9 +654,8 @@ export default function ShopPage() {
                       <button
                         key={opt}
                         onClick={() => setSortBy(opt)}
-                        className={`py-3 px-4 rounded-2xl text-xs font-bold transition-all border ${
-                          sortBy === opt ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
-                        }`}
+                        className={`py-3 px-4 rounded-2xl text-xs font-bold transition-all border ${sortBy === opt ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
+                          }`}
                       >
                         {opt}
                       </button>
@@ -673,9 +669,8 @@ export default function ShopPage() {
                       <button
                         key={i}
                         onClick={() => setPriceRange(i)}
-                        className={`w-full text-left py-4 px-5 rounded-2xl text-sm font-bold transition-all border ${
-                          priceRange === i ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-100 text-gray-500'
-                        }`}
+                        className={`w-full text-left py-4 px-5 rounded-2xl text-sm font-bold transition-all border ${priceRange === i ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-100 text-gray-500'
+                          }`}
                       >
                         {range.label}
                       </button>
@@ -685,13 +680,12 @@ export default function ShopPage() {
                 <div>
                   <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rating Minimal</h3>
                   <div className="flex flex-wrap gap-3">
-                    {[5,4,3,2,1].map(r => (
+                    {[5, 4, 3, 2, 1].map(r => (
                       <button
                         key={r}
                         onClick={() => setMinRating(prev => prev === r ? 0 : r)}
-                        className={`py-3 px-5 rounded-2xl flex items-center gap-2 transition-all border ${
-                          minRating === r ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
-                        }`}
+                        className={`py-3 px-5 rounded-2xl flex items-center gap-2 transition-all border ${minRating === r ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
+                          }`}
                       >
                         <span className="text-xs font-black">{r}</span>
                         <StarRating rating={r} />
@@ -709,9 +703,8 @@ export default function ShopPage() {
                           if (selectedBrands.includes(brand)) setSelectedBrands(prev => prev.filter(b => b !== brand));
                           else setSelectedBrands(prev => [...prev, brand]);
                         }}
-                        className={`py-3 px-4 rounded-2xl text-[11px] font-bold transition-all border text-center ${
-                          selectedBrands.includes(brand) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500'
-                        }`}
+                        className={`py-3 px-4 rounded-2xl text-[11px] font-bold transition-all border text-center ${selectedBrands.includes(brand) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500'
+                          }`}
                       >
                         {brand}
                       </button>
@@ -720,7 +713,7 @@ export default function ShopPage() {
                 </div>
               </div>
               <div className="pt-6 border-t border-gray-100 mt-4">
-                <button 
+                <button
                   onClick={() => setIsMobileFilterOpen(false)}
                   className="w-full bg-[#0A0A0B] text-white py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
                 >

@@ -49,7 +49,7 @@ export default function AdminEducation() {
       setShowModal(false);
       loadData();
     }).catch(err => toast.error(_err.message))
-    .finally(() => setSaving(false));
+      .finally(() => setSaving(false));
   };
 
   const deleteItem = (id) => {
@@ -64,11 +64,11 @@ export default function AdminEducation() {
 
   return (
     <div style={A.page}>
-      <PageHeader 
-        title="Affiliate Education" 
+      <PageHeader
+        title="Affiliate Education"
         subtitle="Manage learning materials for your partners"
       >
-        <button 
+        <button
           onClick={() => { setFormData({ id: 0, title: '', content: '', video_url: '', category: 'Marketing', image_url: '', is_featured: false, is_active: true }); setShowModal(true); }}
           style={A.btnPrimary}
         >
@@ -104,13 +104,13 @@ export default function AdminEducation() {
                 <td style={A.td}>{e.category}</td>
                 <td style={A.td}>{e.is_featured ? '⭐ Yes' : 'No'}</td>
                 <td style={A.td}>
-                   <span style={statusBadge(e.is_active ? 'active' : 'inactive')}>{e.is_active ? 'Active' : 'Hidden'}</span>
+                  <span style={statusBadge(e.is_active ? 'active' : 'inactive')}>{e.is_active ? 'Active' : 'Hidden'}</span>
                 </td>
                 <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
-                   <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
-                      <button onClick={() => { setFormData(e); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
-                      <button onClick={() => deleteItem(e.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
-                   </div>
+                  <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
+                    <button onClick={() => { setFormData(e); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
+                    <button onClick={() => deleteItem(e.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -120,54 +120,54 @@ export default function AdminEducation() {
 
       {showModal && (
         <Modal title={formData.id ? 'Edit Materi' : 'Tambah Materi Baru'} onClose={() => setShowModal(false)} wide>
-           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 <div className="lg:col-span-2 space-y-6">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Judul Materi</FieldLabel>
-                       <input style={A.input} value={formData.title} onChange={ev => setFormData({ ...formData, title: ev.target.value })} required />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Deskripsi / Konten</FieldLabel>
-                       <textarea style={{ ...A.textarea, height: 200 }} value={formData.content} onChange={ev => setFormData({ ...formData, content: ev.target.value })} required />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Video URL (Embed)</FieldLabel>
-                       <input style={A.input} value={formData.video_url} onChange={ev => setFormData({ ...formData, video_url: ev.target.value })} placeholder="https://www.youtube.com/embed/..." />
-                    </div>
-                 </div>
-
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                       <FieldLabel>Thumbnail</FieldLabel>
-                       <div style={{ height: 160, borderRadius: 16, border: '2px dashed #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                          {formData.image_url ? <img src={formatImage(formData.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <i className="bx bx-image-add" style={{ fontSize: 32, color: '#cbd5e1' }} />}
-                          <input type="file" onChange={handleUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept="image/*" />
-                          {uploading && <div className="spinner-border text-primary" />}
-                       </div>
-                    </div>
-                    <div>
-                       <FieldLabel>Kategori</FieldLabel>
-                       <select style={A.select} value={formData.category} onChange={ev => setFormData({ ...formData, category: ev.target.value })}>
-                          <option value="Marketing">📢 Marketing</option>
-                          <option value="Product">📦 Product Knowledge</option>
-                          <option value="Sales">💰 Sales Strategy</option>
-                       </select>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                       <input type="checkbox" checked={formData.is_featured} onChange={ev => setFormData({ ...formData, is_featured: ev.target.checked })} />
-                       <span style={{ fontSize: 13, fontWeight: 600 }}>Tampilkan di Unggulan</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                       <input type="checkbox" checked={formData.is_active} onChange={ev => setFormData({ ...formData, is_active: ev.target.checked })} />
-                       <span style={{ fontSize: 13, fontWeight: 600 }}>Aktif (Tampil ke Mitra)</span>
-                    </div>
-                    <button type="submit" disabled={saving} style={{ ...A.btnPrimary, marginTop: 20 }}>
-                       {saving ? 'Saving...' : 'Simpan Materi'}
-                    </button>
-                 </div>
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <FieldLabel>Judul Materi</FieldLabel>
+                  <input style={A.input} value={formData.title} onChange={ev => setFormData({ ...formData, title: ev.target.value })} required />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <FieldLabel>Deskripsi / Konten</FieldLabel>
+                  <textarea style={{ ...A.textarea, height: 200 }} value={formData.content} onChange={ev => setFormData({ ...formData, content: ev.target.value })} required />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <FieldLabel>Video URL (Embed)</FieldLabel>
+                  <input style={A.input} value={formData.video_url} onChange={ev => setFormData({ ...formData, video_url: ev.target.value })} placeholder="https://www.youtube.com/embed/..." />
+                </div>
               </div>
-           </form>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div>
+                  <FieldLabel>Thumbnail</FieldLabel>
+                  <div style={{ height: 160, borderRadius: 16, border: '2px dashed #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                    {formData.image_url ? <img src={formatImage(formData.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <i className="bx bx-image-add" style={{ fontSize: 32, color: '#cbd5e1' }} />}
+                    <input type="file" onChange={handleUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept="image/*" />
+                    {uploading && <div className="spinner-border text-primary" />}
+                  </div>
+                </div>
+                <div>
+                  <FieldLabel>Kategori</FieldLabel>
+                  <select style={A.select} value={formData.category} onChange={ev => setFormData({ ...formData, category: ev.target.value })}>
+                    <option value="Marketing">📢 Marketing</option>
+                    <option value="Product">📦 Product Knowledge</option>
+                    <option value="Sales">💰 Sales Strategy</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input type="checkbox" checked={formData.is_featured} onChange={ev => setFormData({ ...formData, is_featured: ev.target.checked })} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Tampilkan di Unggulan</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input type="checkbox" checked={formData.is_active} onChange={ev => setFormData({ ...formData, is_active: ev.target.checked })} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Aktif (Tampil ke Mitra)</span>
+                </div>
+                <button type="submit" disabled={saving} style={{ ...A.btnPrimary, marginTop: 20 }}>
+                  {saving ? 'Saving...' : 'Simpan Materi'}
+                </button>
+              </div>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

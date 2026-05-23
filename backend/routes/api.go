@@ -5,6 +5,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"SahabatMart/backend/middleware"
@@ -12,6 +13,7 @@ import (
 	"SahabatMart/backend/services"
 	"SahabatMart/backend/utils"
 	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -98,8 +100,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
 				ctx = context.WithValue(ctx, "user_role", role) // BUG-10 fix: expose role to controllers
-				if claims.MerchantID != "" { ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID) }
-				if claims.AffiliateID != "" { ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID) }
+				if claims.MerchantID != "" {
+					ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID)
+				}
+				if claims.AffiliateID != "" {
+					ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID)
+				}
 
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
@@ -156,8 +162,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 				// [BUG-H1 Fix] Inject semua identity ke context, konsisten dengan actorOnly()
 				ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
 				ctx = context.WithValue(ctx, "user_role", strings.ToLower(user.Role))
-				if claims.MerchantID != "" { ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID) }
-				if claims.AffiliateID != "" { ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID) }
+				if claims.MerchantID != "" {
+					ctx = context.WithValue(ctx, "merchant_id", claims.MerchantID)
+				}
+				if claims.AffiliateID != "" {
+					ctx = context.WithValue(ctx, "affiliate_id", claims.AffiliateID)
+				}
 				next.ServeHTTP(w, r.WithContext(ctx))
 			}
 		}
@@ -182,7 +192,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/auth/forgot-password", authLimit(authCtrl.ForgotPassword))
 	mux.HandleFunc("/api/auth/reset-password", authLimit(authCtrl.ResetPassword))
 	mux.HandleFunc("/api/auth/impersonate", actorOnly("superadmin")(authCtrl.Impersonate))
-	
+
 	// Middleware actor check
 	anyUser := actorOnly("merchant", "affiliate", "admin", "superadmin")
 	adminOnly := actorOnly("admin", "superadmin")
@@ -194,7 +204,6 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/callback/tripay", paymentCtrl.TriPayCallback)
 	mux.HandleFunc("/api/payment/channels", paymentCtrl.GetChannels)
 	mux.HandleFunc("/api/payment/fee", paymentCtrl.GetFee)
-
 
 	// --- Buyer Routes (Now mapped to all authenticated users) ---
 	buyerOnly := actorOnly("affiliate", "merchant", "admin", "superadmin")
@@ -231,33 +240,33 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/restock", merchantOnly(merchantCtrl.GetRestockRequests))
 	mux.HandleFunc("/api/merchant/restock/request", merchantOnly(merchantCtrl.RequestRestock))
 	mux.HandleFunc("/api/merchant/restock/receive", merchantOnly(merchantCtrl.ReceiveRestock))
-	
+
 	// Orders
 	mux.HandleFunc("/api/merchant/orders", merchantOnly(merchantCtrl.GetOrders))
 	mux.HandleFunc("/api/merchant/orders/status", merchantOnly(merchantCtrl.UpdateOrderStatus))
 	mux.HandleFunc("/api/merchant/pos/products", merchantOnly(merchantCtrl.POSGetProducts))
 	mux.HandleFunc("/api/merchant/pos/checkout", merchantOnly(checkoutLimit(merchantCtrl.POSCheckout)))
 	mux.HandleFunc("/api/merchant/pos/member/", merchantOnly(lookupLimit(merchantCtrl.GetMemberByCode)))
-	
+
 	// Finance
 	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
 	mux.HandleFunc("/api/merchant/wallet/withdraw", merchantOnly(merchantCtrl.RequestPayout))
 	mux.HandleFunc("/api/merchant/wallet/history", merchantOnly(merchantCtrl.GetPayoutHistory))
 	mux.HandleFunc("/api/merchant/wallet/transactions", merchantOnly(merchantCtrl.GetWalletTransactions))
-	
+
 	// Vouchers (Disabled: Managed by Admin Only)
 	// mux.HandleFunc("/api/merchant/vouchers", merchantOnly(merchantCtrl.GetVouchers))
 	// mux.HandleFunc("/api/merchant/vouchers/upsert", merchantOnly(merchantCtrl.UpsertVoucher))
 	// mux.HandleFunc("/api/merchant/vouchers/delete", merchantOnly(merchantCtrl.DeleteVoucher))
-	
+
 	// Disputes
 	mux.HandleFunc("/api/merchant/disputes", merchantOnly(merchantCtrl.GetDisputes))
 	mux.HandleFunc("/api/merchant/disputes/respond", merchantOnly(merchantCtrl.RespondDispute))
-	
+
 	// Store Profile
 	mux.HandleFunc("/api/merchant/store", merchantOnly(merchantCtrl.GetStoreProfile))
 	mux.HandleFunc("/api/merchant/store/update", merchantOnly(merchantCtrl.UpdateStoreProfile))
-	
+
 	mux.HandleFunc("/api/merchant/notifications", merchantOnly(merchantCtrl.GetNotifications))
 	mux.HandleFunc("/api/merchant/notifications/read", merchantOnly(merchantCtrl.MarkNotificationRead))
 	mux.HandleFunc("/api/merchant/notifications/read-all", merchantOnly(merchantCtrl.MarkAllNotificationsRead))
@@ -296,7 +305,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	// --- Admin Routes ---
 	adminOnly = actorOnly("admin", "superadmin")
 	superAdminOnly = actorOnly("superadmin")
-	
+
 	// Skin Journey (Akuglow)
 	mux.HandleFunc("/api/skin/pretest", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.SubmitPreTest))
 	mux.HandleFunc("/api/skin/programs", actorOnly("affiliate", "merchant", "admin", "superadmin")(skinCtrl.GetPrograms))
@@ -323,7 +332,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// Admin Community Management
 	mux.HandleFunc("/api/admin/skin/community/group", actorOnly("admin", "superadmin")(skinCtrl.AdminCreateGroup))
-	
+
 	// Admin Skin Journey Monitoring
 	mux.HandleFunc("/api/admin/skin/pretests", adminOnly(skinCtrl.AdminGetAllPreTests))
 	mux.HandleFunc("/api/admin/skin/journals", adminOnly(skinCtrl.AdminGetAllJournals))
@@ -457,7 +466,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/commissions/merchant", adminOnly(adminCtrl.ManageMerchantCommissions))
 	mux.HandleFunc("/api/admin/commissions/product", adminOnly(adminCtrl.ManageProductCommissions))
 	mux.HandleFunc("/api/admin/commissions/presets", adminOnly(adminCtrl.ManageCommissionPresets))
-	
+
 	// Product Variants
 	mux.HandleFunc("/api/admin/products/variants", adminOnly(adminCtrl.GetProductVariants))
 	mux.HandleFunc("/api/admin/products/variants/add", adminOnly(adminCtrl.AddProductVariant))
@@ -596,7 +605,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/products/recommended", productCtrl.GetRecommendations)
 	mux.HandleFunc("/api/public/membership-tiers", tierCtrl.GetPublicTiers)
 	mux.HandleFunc("/api/public/sitemap.xml", adminCtrl.GenerateSitemap)
-	
+
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)
 
@@ -630,12 +639,33 @@ func recoverMiddleware(next http.Handler) http.Handler {
 }
 
 func CorsMiddleware(next http.Handler) http.Handler {
+	// Build allowed origins from environment (supports comma-separated list)
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+	allowedOrigins := map[string]bool{
+		"http://localhost:5173": true,
+		"http://localhost:3000": true,
+	}
+	for _, origin := range strings.Split(frontendURL, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			allowedOrigins[origin] = true
+		}
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("🌐 [%s] %s", r.Method, r.URL.Path)
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		// Allow any localhost port dynamically (e.g. 5173, 5174, 3000) or any specifically allowed origin
+		isLocalhost := strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:")
+		if allowedOrigins[origin] || isLocalhost {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning")
-		// Bypass ngrok interstitial warning page for all API responses
+		// Bypass ngrok interstitial for API responses
 		w.Header().Set("ngrok-skip-browser-warning", "true")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)

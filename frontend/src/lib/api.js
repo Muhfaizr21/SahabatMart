@@ -1,8 +1,26 @@
-// [DEPLOY RULE #1]: Set VITE_API_BASE di .env.production → JANGAN biarkan localhost di server!
-// Dev local: VITE_API_BASE=http://localhost:8080
-// Production: VITE_API_BASE=https://api.yourdomain.com
-const RAW_API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-export const API_BASE = (RAW_API_BASE && RAW_API_BASE !== '/') ? RAW_API_BASE.replace(/\/+$/, '') : 'http://localhost:8080';
+/**
+ * Priority chain for API base URL:
+ * 1. window.APP_CONFIG.API_BASE  ← dari /public/config.js (bisa diedit di server tanpa rebuild!)
+ * 2. import.meta.env.VITE_API_BASE ← dari .env / .env.production (baked saat build)
+ * 3. 'http://localhost:8080'     ← fallback development
+ *
+ * Untuk ganti URL di server: edit file /config.js di folder dist, TIDAK perlu rebuild!
+ */
+function resolveApiBase() {
+  // Runtime config — highest priority (editable on server without rebuild)
+  if (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.API_BASE) {
+    const url = window.APP_CONFIG.API_BASE.replace(/\/+$/, '');
+    if (url && url !== '/') return url;
+  }
+  // Build-time Vite env — second priority
+  const viteBase = import.meta.env.VITE_API_BASE;
+  if (viteBase && viteBase !== '/') return viteBase.replace(/\/+$/, '');
+  // Final fallback
+  return 'http://localhost:8080';
+}
+
+const RAW_API_BASE = resolveApiBase();
+export const API_BASE = RAW_API_BASE;
 export const AUTH_API_BASE = `${API_BASE}/api/auth`;
 export const PUBLIC_API_BASE = `${API_BASE}/api/public`;
 export const ADMIN_API_BASE = `${API_BASE}/api/admin`;

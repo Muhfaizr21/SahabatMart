@@ -2359,7 +2359,7 @@ func (ac *AdminController) ManageCommissionPresets(w http.ResponseWriter, r *htt
 		json.NewDecoder(r.Body).Decode(&preset)
 		ac.DB.Save(&preset)
 		ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_commission_preset", "commission_preset",
-			fmt.Sprintf("%d", preset.ID), preset.Name, r.RemoteAddr)
+			preset.ID, preset.Name, r.RemoteAddr)
 		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 			"status": "success",
 			"data":   preset,

@@ -3,8 +3,11 @@ package tests
 import (
 	"SahabatMart/backend/models"
 	"SahabatMart/backend/utils"
+	"fmt"
+	"os"
 	"testing"
 
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -12,8 +15,38 @@ import (
 
 // SetupTestDB in-memory or separate DB for tests
 func SetupTestDB() *gorm.DB {
-	dsn := "host=localhost user=postgres password= dbname=sahabatmart_test port=5432 sslmode=disable"
+	_ = godotenv.Load("../.env")
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "muhfaiizr"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "admin"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "sahabatmart"
+	}
+	dbName = dbName + "_test"
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "5432"
+	}
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbName, port)
 	db, _ := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	
+	if db != nil {
+		// Enable uuid-ossp extension
+		db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
+		// Auto migrate required tables for testing
+		_ = db.AutoMigrate(&models.PaymentWebhook{})
+	}
 	return db
 }
 

@@ -317,7 +317,7 @@ export default function SkinJourney() {
           return;
         }
 
-        toast.loading('Menganalisis dengan AI SahabatMart...', { id: 'ai-analyze' });
+        toast.loading('Menganalisis dengan AI AkuGlow...', { id: 'ai-analyze' });
         const formData = new FormData();
         formData.append('photo', processedBlob, 'processed_selfie.jpg');
         
@@ -1696,7 +1696,7 @@ export default function SkinJourney() {
             <div className="flex items-center justify-center gap-12">
                <div className="text-center">
                   <div className="w-32 h-[1px] bg-white/10 mb-2" />
-                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">SahabatMart AI System</div>
+                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">AkuGlow AI System</div>
                </div>
             </div>
           </div>

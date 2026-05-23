@@ -711,7 +711,7 @@ export default function ProfilePage() {
                            <h5 className="font-black text-sm tracking-wide uppercase">Cara Penggunaan</h5>
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          Tunjukkan kode QR di atas saat melakukan pembayaran di kasir outlet <span className="text-white font-bold underline decoration-rose-500 underline-offset-4">SahabatMart</span> mana saja agar transaksi Anda tercatat otomatis di dashboard.
+                          Tunjukkan kode QR di atas saat melakukan pembayaran di kasir outlet <span className="text-white font-bold underline decoration-rose-500 underline-offset-4">AkuGlow</span> mana saja agar transaksi Anda tercatat otomatis di dashboard.
                         </p>
                       </div>
                     </div>

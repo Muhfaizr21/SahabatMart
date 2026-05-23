@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"SahabatMart/backend/utils"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,6 +18,29 @@ var (
 	mu      sync.Mutex
 	clients = make(map[string]*client)
 )
+
+// getRealIP extracts the actual client IP, correctly handling reverse proxies
+// (Nginx, Cloudflare, etc.) that set X-Forwarded-For or X-Real-IP headers.
+func getRealIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For may contain multiple IPs: "client, proxy1, proxy2"
+		// The leftmost IP is the original client
+		parts := strings.Split(xff, ",")
+		ip := strings.TrimSpace(parts[0])
+		if ip != "" {
+			return ip
+		}
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	// Fallback to RemoteAddr for direct connections
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
 
 func RateLimitMiddleware(limit int, window time.Duration) func(http.Handler) http.Handler {
 	// Cleanup old entries periodically
@@ -34,7 +59,7 @@ func RateLimitMiddleware(limit int, window time.Duration) func(http.Handler) htt
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
+			ip := getRealIP(r)
 
 			mu.Lock()
 			if _, found := clients[ip]; !found {

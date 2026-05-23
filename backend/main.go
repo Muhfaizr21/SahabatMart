@@ -115,12 +115,17 @@ func ConnectDB() {
 }
 
 func buildDSN() string {
-	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+	sslMode := "disable"
+	if os.Getenv("APP_ENV") == "production" && os.Getenv("DB_HOST") != "localhost" && os.Getenv("DB_HOST") != "127.0.0.1" {
+		sslMode = "require"
+	}
+	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		getEnv("DB_HOST", "localhost"),
 		getEnv("DB_USER", "postgres"),
 		getEnv("DB_PASSWORD", ""),
 		getEnv("DB_NAME", "sahabatmart"),
 		getEnv("DB_PORT", "5432"),
+		sslMode,
 	)
 }
 
