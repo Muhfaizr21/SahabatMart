@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/smtp"
 	"regexp"
 	"strconv"
 	"strings"
@@ -76,6 +78,22 @@ func (ac *AdminController) UploadImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan file")
 		return
+	}
+
+	// [Media Library Sync] Automatically register newly uploaded admin image into Media Library
+	adminID, _ := r.Context().Value("user_id").(string)
+	userRole, _ := r.Context().Value("user_role").(string)
+	if adminID != "" && (userRole == "admin" || userRole == "superadmin") {
+		media := models.Media{
+			Filename:   header.Filename,
+			URL:        url,
+			Size:       header.Size,
+			MimeType:   header.Header.Get("Content-Type"),
+			UploadedBy: adminID,
+			CreatedAt:  time.Now(),
+		}
+		ac.DB.Create(&media)
+		ac.Audit.Log(adminID, "upload_media_auto", "media", media.ID, media.Filename, r.RemoteAddr)
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{
@@ -168,7 +186,7 @@ func (ac *AdminController) GetUserDownlines(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Recursive fetch downlines
-	tree := ac.fetchDownlineTree(aff.ID, 1, 10) // Max 10 levels
+	tree := ac.fetchDownlineTree(aff.ID, 1, 100) // Max 100 levels
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -244,6 +262,7 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		UserID           string `json:"user_id"`
 		Status           string `json:"status"` // active, suspended, banned
 		Role             string `json:"role"`
+		Phone            string `json:"phone"`
 		AdminRole        string `json:"admin_role"`
 		AdminPermissions string `json:"admin_permissions"`
 	}
@@ -255,6 +274,13 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Role != "" {
 		updates["role"] = req.Role
+	}
+	if req.Phone != "" {
+		updates["phone"] = &req.Phone
+	} else if req.Phone == "" {
+		// If phone is explicitly passed as empty, update to nil/null to prevent empty strings unique index issues
+		var nilStr *string
+		updates["phone"] = nilStr
 	}
 	if req.AdminRole != "" {
 		updates["admin_role"] = req.AdminRole
@@ -483,6 +509,9 @@ func (ac *AdminController) UpdateMerchant(w http.ResponseWriter, r *http.Request
 		MerchantID      string `json:"merchant_id"`
 		StoreName       string `json:"store_name"`
 		BiteshipAreaID  string `json:"biteship_area_id"`
+		AreaName        string `json:"area_name"`
+		City            string `json:"city"`
+		Province        string `json:"province"`
 		EnabledCouriers string `json:"enabled_couriers"`
 		Status          string `json:"status"`
 		IsVerified      bool   `json:"is_verified"`
@@ -498,6 +527,15 @@ func (ac *AdminController) UpdateMerchant(w http.ResponseWriter, r *http.Request
 	}
 	if req.BiteshipAreaID != "" {
 		updates["biteship_area_id"] = req.BiteshipAreaID
+	}
+	if req.AreaName != "" {
+		updates["area_name"] = req.AreaName
+	}
+	if req.City != "" {
+		updates["city"] = req.City
+	}
+	if req.Province != "" {
+		updates["province"] = req.Province
 	}
 	if req.EnabledCouriers != "" {
 		updates["enabled_couriers"] = req.EnabledCouriers
@@ -640,6 +678,44 @@ func (ac *AdminController) DeleteCategory(w http.ResponseWriter, r *http.Request
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+func (ac *AdminController) BulkDeleteCategories(w http.ResponseWriter, r *http.Request) {
+	adminID, _ := r.Context().Value("user_id").(string)
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada kategori yang dipilih")
+		return
+	}
+
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		for _, id := range req.IDs {
+			if err := tx.Where("id = ?", id).Delete(&models.Category{}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus beberapa kategori: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(adminID, "bulk_delete_categories", "category", fmt.Sprintf("%d items", len(req.IDs)), "bulk purged", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ORDERS MANAGEMENT (GLOBAL)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -775,7 +851,9 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 		TotalWithdrawn   float64   `json:"total_withdrawn"`
 		TotalClicks      int64     `json:"total_clicks"`
 		TotalConversions int       `json:"total_conversions"`
-		BankName         string    `json:"bank_name"`
+		BankName          string    `gorm:"column:bank_name" json:"bank_name"`
+		BankAccountNumber string    `gorm:"column:bank_account_number" json:"bank_account_number"`
+		BankAccountName   string    `gorm:"column:bank_account_name" json:"bank_account_name"`
 		AffStatus        string    `json:"affiliate_status"`
 		JoinedAt         time.Time `json:"joined_at"`
 		Balance          float64   `json:"balance"`
@@ -810,14 +888,14 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 		       am.ref_code, mt.name AS tier_name, mt.color AS tier_color, mt.level AS tier_level,
 		       mt.base_commission_rate AS comm_rate, mt.id AS membership_tier_id,
 		       w.total_earned, w.total_withdrawn, am.total_clicks, am.total_conversions,
-		       am.bank_name, am.status AS aff_status, am.created_at AS joined_at,
+		am.bank_name, am.bank_account_number, am.bank_account_name, am.status AS aff_status, am.created_at AS joined_at,
 		       w.balance,
 		       COALESCE(ats.team_turnover, 0) AS team_turnover,
 		       COALESCE(ats.monthly_turnover, 0) AS monthly_turnover,
 		       COALESCE(ats.team_downlines, 0) AS team_downlines
 		FROM users u
 		LEFT JOIN user_profiles up ON up.user_id = u.id
-		INNER JOIN affiliate_members am ON am.user_id = u.id
+		LEFT JOIN affiliate_members am ON am.user_id = u.id
 		LEFT JOIN wallets w ON w.owner_id = u.id AND w.owner_type = 'affiliate'
 		LEFT JOIN membership_tiers mt ON mt.id = am.membership_tier_id
 		LEFT JOIN affiliate_turnover_snapshots ats ON ats.affiliate_id = am.id
@@ -850,9 +928,14 @@ func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req struct {
-		UserID           string `json:"user_id"`
-		MembershipTierID uint   `json:"membership_tier_id"`
-		Status           string `json:"status"`
+		UserID             string `json:"user_id"`
+		Email              string `json:"email"`
+		FullName           string `json:"full_name"`
+		MembershipTierID   uint   `json:"membership_tier_id"`
+		Status             string `json:"status"`
+		BankName           string `json:"bank_name"`
+		BankAccountNumber  string `json:"bank_account_number"`
+		BankAccountName    string `json:"bank_account_name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
@@ -864,6 +947,32 @@ func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Update email in users table if provided and changed
+	if req.Email != "" {
+		var u models.User
+		if err := ac.DB.First(&u, "id = ?", req.UserID).Error; err == nil {
+			if u.Email != req.Email {
+				var existingUser models.User
+				if err := ac.DB.Where("email = ? AND id != ?", req.Email, req.UserID).First(&existingUser).Error; err == nil {
+					utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar")
+					return
+				}
+				if err := ac.DB.Model(&u).Update("email", req.Email).Error; err != nil {
+					utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui email")
+					return
+				}
+			}
+		}
+	}
+
+	// Update full_name in user_profiles if provided
+	if req.FullName != "" {
+		if err := ac.DB.Table("user_profiles").Where("user_id = ?", req.UserID).Update("full_name", req.FullName).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui nama lengkap: "+err.Error())
+			return
+		}
+	}
+
 	updates := map[string]interface{}{}
 	if req.MembershipTierID > 0 {
 		updates["membership_tier_id"] = req.MembershipTierID
@@ -871,23 +980,45 @@ func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Reque
 	if req.Status != "" {
 		updates["status"] = req.Status
 	}
-
-	if len(updates) == 0 {
-		utils.JSONError(w, http.StatusBadRequest, "Tidak ada data yang diupdate")
-		return
+	if req.BankName != "" {
+		updates["bank_name"] = req.BankName
+	}
+	if req.BankAccountNumber != "" {
+		updates["bank_account_number"] = req.BankAccountNumber
+	}
+	if req.BankAccountName != "" {
+		updates["bank_account_name"] = req.BankAccountName
 	}
 
-	// Update the AffiliateMember record associated with this user
-	if err := ac.DB.Model(&models.AffiliateMember{}).
-		Where("user_id = ?", req.UserID).
-		Updates(updates).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate data member: "+err.Error())
-		return
+	if len(updates) > 0 {
+		// Update the AffiliateMember record associated with this user
+		if err := ac.DB.Model(&models.AffiliateMember{}).
+			Where("user_id = ?", req.UserID).
+			Updates(updates).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal mengupdate data member: "+err.Error())
+			return
+		}
+
+		// [Sync to Merchant] If merchant exists, update merchant bank info as well!
+		var merchant models.Merchant
+		if err := ac.DB.Where("user_id = ?", req.UserID).First(&merchant).Error; err == nil {
+			merchantUpdates := map[string]interface{}{}
+			if req.BankName != "" {
+				merchantUpdates["bank_name"] = req.BankName
+			}
+			if req.BankAccountNumber != "" {
+				merchantUpdates["bank_account_number"] = req.BankAccountNumber
+			}
+			if req.BankAccountName != "" {
+				merchantUpdates["bank_account_name"] = req.BankAccountName
+			}
+			ac.DB.Model(&merchant).Updates(merchantUpdates)
+		}
 	}
 
 	// Log audit
 	ac.Audit.Log(adminID, "update_member_info", "affiliate_member", req.UserID,
-		fmt.Sprintf("UserID: %s, Updates: %v", req.UserID, updates), r.RemoteAddr)
+		fmt.Sprintf("UserID: %s, Email: %s, FullName: %s, Updates: %v", req.UserID, req.Email, req.FullName, updates), r.RemoteAddr)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "message": "Data member berhasil diperbarui"})
 }
@@ -929,9 +1060,7 @@ func (ac *AdminController) UpsertAffiliateConfig(w http.ResponseWriter, r *http.
 		utils.JSONError(w, http.StatusBadRequest, "Nama tier wajib diisi")
 		return
 	}
-	if req.CommissionHoldDays == 0 {
-		req.CommissionHoldDays = 7
-	}
+	req.CommissionHoldDays = 0
 	tier := models.MembershipTier{
 		ID:                 req.ID,
 		Name:               req.Name,
@@ -2862,8 +2991,8 @@ func (ac *AdminController) UpsertVoucher(w http.ResponseWriter, r *http.Request)
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (ac *AdminController) GetAffiliateClicks(w http.ResponseWriter, r *http.Request) {
-	var clicks []models.AffiliateClick
-	ac.DB.Order("created_at DESC").Limit(1000).Find(&clicks)
+	var clicks []models.AffiliateClickLog
+	ac.DB.Order("clicked_at DESC").Limit(1000).Find(&clicks)
 	ac.Audit.Log(r.Context().Value("user_id").(string), "get_affiliate_clicks", "security", "", "viewed clicks", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": clicks})
 }
@@ -2956,6 +3085,50 @@ func (ac *AdminController) PayoutSettings(w http.ResponseWriter, r *http.Request
 		}
 		utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 	}
+}
+
+// POST /api/admin/configs/test-email
+func (ac *AdminController) TestEmailSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var req struct {
+		To string `json:"to"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.To == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload. 'to' email is required.")
+		return
+	}
+
+	configSvc := services.NewConfigService(ac.DB)
+	host := configSvc.Get("notif_smtp_host", "")
+	user := configSvc.Get("notif_smtp_user", "")
+	pass := configSvc.Get("notif_smtp_pass", "")
+	port := configSvc.Get("notif_smtp_port", "587")
+
+	if host == "" || user == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Konfigurasi SMTP tidak lengkap di database. Pastikan Host dan Username telah disimpan.")
+		return
+	}
+
+	auth := smtp.PlainAuth("", user, pass, host)
+	msg := []byte("To: " + req.To + "\r\n" +
+		"Subject: Test Koneksi SMTP SahabatMart\r\n" +
+		"\r\n" +
+		"Halo! Ini adalah email uji coba untuk memverifikasi bahwa konfigurasi SMTP Anda di SahabatMart sudah berjalan dengan sukses.\r\n")
+
+	addr := host + ":" + port
+	err := smtp.SendMail(addr, auth, user, []string{req.To}, msg)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Gagal mengirim email: %v", err))
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{
+		"status":  "success",
+		"message": "Email uji coba sukses dikirim ke " + req.To,
+	})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3284,6 +3457,154 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /api/admin/export-report → export financial overview & dashboard report to CSV
+func (ac *AdminController) ExportReport(w http.ResponseWriter, r *http.Request) {
+	var totalUsers, totalMerchants, totalAffiliates int64
+	var totalRevenue, totalFee float64
+	var totalOrders, pendingPayouts int64
+
+	ac.DB.Model(&models.User{}).Count(&totalUsers)
+	ac.DB.Model(&models.Merchant{}).Where("status = 'active'").Count(&totalMerchants)
+	ac.DB.Model(&models.User{}).Where("role = 'affiliate'").Count(&totalAffiliates)
+
+	if ac.hasTable("orders") {
+		activeStats := []string{
+			string(models.OrderCompleted), string(models.OrderDelivered), 
+			string(models.OrderShipped), string(models.OrderReadyToShip), 
+			string(models.OrderPaid), string(models.OrderProcessing),
+		}
+		ac.DB.Model(&models.Order{}).Where("status != ?", models.OrderCancelled).Count(&totalOrders)
+		ac.DB.Model(&models.Order{}).
+			Where("status IN ?", activeStats).
+			Select("COALESCE(SUM(grand_total), 0)").Scan(&totalRevenue)
+	}
+
+	if ac.hasTable("wallet_transactions") {
+		ac.DB.Table("wallet_transactions").
+			Where("type = ? AND amount > 0", string(models.TxPlatformFee)).
+			Select("COALESCE(SUM(amount), 0)").Scan(&totalFee)
+	}
+
+	if ac.hasTable("payout_requests") {
+		ac.DB.Table("payout_requests").
+			Where("status = 'pending'").Count(&pendingPayouts)
+	}
+
+	// Fetch Monthly Stats for current year
+	yearStr := time.Now().Format("2006")
+	type MonthRow struct {
+		Month   string  `json:"month"`
+		Revenue float64 `json:"revenue"`
+		Profit  float64 `json:"profit"`
+		Fee     float64 `json:"fee"`
+		Orders  int     `json:"orders"`
+	}
+	var monthlyRows []MonthRow
+	if ac.hasTable("order_merchant_groups") {
+		ac.DB.Raw(`
+			WITH monthly_stats AS (
+				SELECT TO_CHAR(created_at, 'YYYY-MM') AS month,
+				       SUM(grand_total) AS revenue,
+				       0 AS fee,
+				       SUM(grand_total) AS gross_take,
+				       COUNT(DISTINCT id) AS orders,
+				       0 AS total_cogs
+				FROM orders
+				WHERE TO_CHAR(created_at, 'YYYY') = ?
+				  AND status IN ('completed', 'delivered', 'shipped', 'ready_to_ship', 'paid', 'processing')
+				GROUP BY month
+			)
+			SELECT month, revenue, COALESCE(gross_take, 0) - COALESCE(total_cogs, 0) AS profit, fee, orders
+			FROM monthly_stats
+			ORDER BY month ASC
+		`, yearStr).Scan(&monthlyRows)
+	}
+
+	// Fetch Pending Payouts
+	var payouts []models.PayoutRequest
+	if ac.hasTable("payout_requests") {
+		ac.DB.Where("status = 'pending'").Limit(50).Find(&payouts)
+	}
+
+	// Fetch Recent Orders
+	type OrderInfo struct {
+		ID         string
+		GrandTotal float64
+		Status     string
+		CreatedAt  time.Time
+	}
+	var recentOrders []OrderInfo
+	if ac.hasTable("orders") {
+		ac.DB.Table("orders").Select("id", "grand_total", "status", "created_at").Order("created_at DESC").Limit(50).Scan(&recentOrders)
+	}
+
+	// Write CSV response
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=sahabatmart_report_%s.csv", time.Now().Format("20060102_150405")))
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	// Title / Metadata
+	writer.Write([]string{"SAHABATMART - PLATFORM FINANCIAL & DASHBOARD REPORT"})
+	writer.Write([]string{"Exported At", time.Now().Format(time.RFC1123)})
+	writer.Write([]string{"Target Year", yearStr})
+	writer.Write([]string{""})
+
+	// Section 1: Dashboard Overview Summary
+	writer.Write([]string{"SECTION 1: DASHBOARD OVERVIEW SUMMARY"})
+	writer.Write([]string{"Metric", "Value"})
+	writer.Write([]string{"Platform Revenue (GMV)", fmt.Sprintf("Rp %.2f", totalRevenue)})
+	writer.Write([]string{"Total Platform Fees", fmt.Sprintf("Rp %.2f", totalFee)})
+	writer.Write([]string{"Active Affiliates", fmt.Sprintf("%d", totalAffiliates)})
+	writer.Write([]string{"Total Merchants", fmt.Sprintf("%d", totalMerchants)})
+	writer.Write([]string{"Total Orders", fmt.Sprintf("%d", totalOrders)})
+	writer.Write([]string{"Pending Payout Requests", fmt.Sprintf("%d", pendingPayouts)})
+	writer.Write([]string{""})
+
+	// Section 2: Monthly Revenue Performance
+	writer.Write([]string{"SECTION 2: MONTHLY REVENUE PERFORMANCE (" + yearStr + ")"})
+	writer.Write([]string{"Month", "Revenue (GMV)", "Est. Profit", "Orders Count"})
+	for _, row := range monthlyRows {
+		writer.Write([]string{row.Month, fmt.Sprintf("Rp %.2f", row.Revenue), fmt.Sprintf("Rp %.2f", row.Profit), fmt.Sprintf("%d", row.Orders)})
+	}
+	writer.Write([]string{""})
+
+	// Section 3: Pending Payout Requests Details
+	writer.Write([]string{"SECTION 3: PENDING PAYOUT REQUESTS"})
+	writer.Write([]string{"Payout ID", "Merchant ID", "Amount", "Bank Name", "Account Number", "Account Name", "Requested At"})
+	for _, p := range payouts {
+		writer.Write([]string{
+			p.ID,
+			p.MerchantID,
+			fmt.Sprintf("Rp %.2f", p.Amount),
+			p.BankName,
+			p.BankAccountNumber,
+			p.BankAccountName,
+			p.RequestedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	if len(payouts) == 0 {
+		writer.Write([]string{"No pending payout requests."})
+	}
+	writer.Write([]string{""})
+
+	// Section 4: Recent 50 Orders
+	writer.Write([]string{"SECTION 4: RECENT 50 ORDERS"})
+	writer.Write([]string{"Order ID", "Grand Total", "Status", "Created At"})
+	for _, o := range recentOrders {
+		writer.Write([]string{
+			o.ID,
+			fmt.Sprintf("Rp %.2f", o.GrandTotal),
+			o.Status,
+			o.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	if len(recentOrders) == 0 {
+		writer.Write([]string{"No orders found."})
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOG CMS MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3351,6 +3672,43 @@ func (ac *AdminController) DeleteBlog(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	ac.DB.Delete(&models.BlogPost{}, id)
 	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_blog", "blog", id, "deleted", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (ac *AdminController) BulkDeleteBlogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada artikel yang dipilih")
+		return
+	}
+
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		for _, id := range req.IDs {
+			if err := tx.Delete(&models.BlogPost{}, id).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus beberapa artikel: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(r.Context().Value("user_id").(string), "bulk_delete_blogs", "blog", fmt.Sprintf("%d items", len(req.IDs)), "bulk purged", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -3885,6 +4243,43 @@ func (ac *AdminController) DeleteEducation(w http.ResponseWriter, r *http.Reques
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+func (ac *AdminController) BulkDeleteEducation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada materi yang dipilih")
+		return
+	}
+
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		for _, id := range req.IDs {
+			if err := tx.Delete(&models.AffiliateEducation{}, "id = ?", id).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus beberapa materi: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(r.Context().Value("user_id").(string), "bulk_delete_education", "education", fmt.Sprintf("%d items", len(req.IDs)), "bulk purged", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
 // GET /api/admin/events
 func (ac *AdminController) GetEvents(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -3897,11 +4292,32 @@ func (ac *AdminController) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * limit
 
+	query := ac.DB.Model(&models.AffiliateEvent{})
+
+	// Filter by search
+	search := r.URL.Query().Get("search")
+	if search != "" {
+		s := "%" + strings.ToLower(search) + "%"
+		query = query.Where("LOWER(title) LIKE ? OR LOWER(location) LIKE ? OR LOWER(description) LIKE ?", s, s, s)
+	}
+
+	// Filter by type
+	evType := r.URL.Query().Get("type")
+	if evType != "" && evType != "all" {
+		query = query.Where("type = ?", evType)
+	}
+
+	// Filter by status
+	status := r.URL.Query().Get("status")
+	if status != "" && status != "all" {
+		query = query.Where("status = ?", status)
+	}
+
 	var total int64
-	ac.DB.Model(&models.AffiliateEvent{}).Count(&total)
+	query.Count(&total)
 
 	var events []models.AffiliateEvent
-	ac.DB.Order("start_time DESC").Limit(limit).Offset(offset).Find(&events)
+	query.Order("start_time DESC").Limit(limit).Offset(offset).Find(&events)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
@@ -3988,12 +4404,50 @@ func (ac *AdminController) DeletePromoMaterial(w http.ResponseWriter, r *http.Re
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+func (ac *AdminController) BulkDeletePromoMaterials(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada materi promo yang dipilih")
+		return
+	}
+
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		for _, id := range req.IDs {
+			if err := tx.Delete(&models.PromoMaterial{}, "id = ?", id).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus beberapa materi promo: "+err.Error())
+		return
+	}
+
+	ac.Audit.Log(r.Context().Value("user_id").(string), "bulk_delete_promo_materials", "promo", fmt.Sprintf("%d items", len(req.IDs)), "bulk purged", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
 // POST /api/admin/users/create
 func (ac *AdminController) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 		FullName string `json:"full_name"`
+		Phone    string `json:"phone"`
 		Role     string `json:"role"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -4027,6 +4481,9 @@ func (ac *AdminController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: &hashStr,
 		Role:         req.Role,
 		Status:       "active",
+	}
+	if req.Phone != "" {
+		user.Phone = &req.Phone
 	}
 
 	if user.Role == "" {

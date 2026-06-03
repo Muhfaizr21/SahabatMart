@@ -2,13 +2,13 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
 /**
- * Komponen SEO Utama SahabatMart (AkuGlow)
+ * Komponen SEO Utama AkuGlow
  * Mengelola metadata, social tags, canonical URL, dan schema data terstruktur.
  */
 const SEO = ({ 
   title, 
   description, 
-  name = "SahabatMart", 
+  name = "AkuGlow", 
   type = "website", 
   image = "/akuglow.jpg", 
   url = window.location.href,

@@ -19,7 +19,14 @@ const C = {
 const rawMenu = [
   { type: 'item', name: 'Dashboard', icon: 'bxs-dashboard', path: '/admin', end: true, perm: 'view_dashboard' },
 
-  { type: 'label', text: 'Anggota & Pengguna' },
+  { type: 'label', text: 'PESANAN' },
+  { type: 'item', name: 'Semua Pesanan', icon: 'bxs-receipt', path: '/admin/orders', perm: 'order_view' },
+  { type: 'item', name: 'Komplain & Sengketa', icon: 'bx-error-circle', path: '/admin/disputes', perm: 'order_update_status' },
+
+  { type: 'label', text: 'KASIR' },
+  { type: 'item', name: 'Kasir / POS', icon: 'bxs-calculator', path: '/admin/pos', perm: 'order_view' },
+
+  { type: 'label', text: 'ANGGOTA & PENGGUNA' },
   {
     type: 'item', name: 'Manajemen User', icon: 'bxs-user-account',
     children: [
@@ -28,78 +35,90 @@ const rawMenu = [
       { name: 'Level Keanggotaan', path: '/admin/membership-tiers', perm: 'affiliate_manage_tiers' },
     ]
   },
+
+  { type: 'label', text: 'MERCHANT' },
   {
-    type: 'item', name: 'Toko (Merchant)', icon: 'bxs-store-alt',
+    type: 'item', name: 'Toko / Merchant', icon: 'bxs-store-alt',
     children: [
       { name: 'Semua Toko', path: '/admin/merchants', perm: 'merchant_view' },
       { name: 'Permintaan Stok', path: '/admin/merchants/restock', perm: 'inventory_restock' },
     ]
   },
 
-  { type: 'label', text: 'Penjualan & Katalog' },
-  { type: 'item', name: 'Kasir (POS)', icon: 'bxs-calculator', path: '/admin/pos', perm: 'order_view' },
+  { type: 'label', text: 'KATALOG PRODUK' },
+  { type: 'item', name: 'Gudang Pusat / Stok', icon: 'bxs-cube', path: '/admin/inventory/pusat', perm: 'inventory_view' },
+  { type: 'item', name: 'Semua Produk', icon: 'bxs-shopping-bag-alt', path: '/admin/products', perm: 'product_view' },
+  { type: 'item', name: 'Kategori Produk', icon: 'bxs-grid-alt', path: '/admin/categories', perm: 'category_view' },
+  { type: 'item', name: 'Brand / Merek', icon: 'bxs-purchase-tag', path: '/admin/brands', perm: 'product_view' },
+  { type: 'item', name: 'Ulasan Produk', icon: 'bxs-star', path: '/admin/reviews', perm: 'product_view' },
+  { type: 'item', name: 'Moderasi Produk', icon: 'bxs-checkbox-checked', path: '/admin/moderation', perm: 'product_update' },
+
+  { type: 'label', text: 'PROMOSI & MARKETING' },
   { type: 'item', name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist', perm: 'view_analytics' },
-  {
-    type: 'item', name: 'Katalog Produk', icon: 'bxs-package',
-    children: [
-      { name: 'Gudang Pusat (Stok)', path: '/admin/inventory/pusat', perm: 'inventory_view' },
-      { name: 'Semua Produk', path: '/admin/products', perm: 'product_view' },
-      { name: 'Kategori Produk', path: '/admin/categories', perm: 'category_view' },
-      { name: 'Brand / Merek', path: '/admin/brands', perm: 'product_view' },
-      { name: 'Ulasan Produk', path: '/admin/reviews', perm: 'product_view' },
-      { name: 'Moderasi Konten', path: '/admin/moderation', perm: 'product_update' },
-    ]
-  },
-  {
-    type: 'item', name: 'Pesanan', icon: 'bxs-receipt',
-    children: [
-      { name: 'Semua Pesanan', path: '/admin/orders', perm: 'order_view' },
-      { name: 'Komplain & Sengketa', path: '/admin/disputes', perm: 'order_update_status' },
-    ]
-  },
   { type: 'item', name: 'Voucher & Promo', icon: 'bxs-coupon', path: '/admin/vouchers', perm: 'marketing_view_voucher' },
 
-  { type: 'label', text: 'Laporan Keuangan' },
-  {
-    type: 'item', name: 'Keuangan', icon: 'bxs-wallet',
-    children: [
-      { name: 'Buku Besar (Ledger)', path: '/admin/finance', perm: 'finance_view_summary' },
-      { name: 'Aturan Komisi', path: '/admin/commissions', perm: 'finance_view_summary' },
-      { name: 'Preset Komisi', path: '/admin/commission-presets', perm: 'finance_view_summary' },
-      { name: 'Pencairan Dana', path: '/admin/payouts', perm: 'finance_process_payout' },
-    ]
-  },
+  { type: 'label', text: 'KEUANGAN' },
+  { type: 'item', name: 'Buku Besar / Ledger', icon: 'bxs-bank', path: '/admin/finance', perm: 'finance_view_summary' },
+  { type: 'item', name: 'Preset Komisi', icon: 'bxs-badge-dollar', path: '/admin/commission-presets', perm: 'finance_view_summary' },
+  { type: 'item', name: 'Pencairan Dana', icon: 'bxs-credit-card-front', path: '/admin/payouts', perm: 'finance_process_payout' },
 
+  { type: 'label', text: 'KONTEN & TAMPILAN' },
+  { type: 'item', name: 'Pustaka Media', icon: 'bxs-photo-album', path: '/admin/media', perm: 'content_blog' },
+  { type: 'item', name: 'Artikel Blog', icon: 'bxs-edit', path: '/admin/blogs', perm: 'content_blog' },
+  { type: 'item', name: 'Banner Promo', icon: 'bxs-image', path: '/admin/banners', perm: 'marketing_manage_banner' },
+  { type: 'item', name: 'Edukasi Afiliasi', icon: 'bxs-graduation', path: '/admin/education', perm: 'content_education' },
+  { type: 'item', name: 'Event Afiliasi', icon: 'bxs-calendar', path: '/admin/events', perm: 'content_event' },
+  { type: 'item', name: 'Bahan Promosi', icon: 'bxs-megaphone', path: '/admin/promo', perm: 'content_promo_material' },
+  { type: 'item', name: 'Komunitas Skin', icon: 'bxs-group', path: '/admin/skin-community', perm: 'content_education' },
 
-  { type: 'label', text: 'Manajemen Konten' },
-  {
-    type: 'item', name: 'Konten & Tampilan', icon: 'bxs-layout',
-    children: [
-      { name: 'Artikel Blog', path: '/admin/blogs', perm: 'content_blog' },
-      { name: 'Banner Promo', path: '/admin/banners', perm: 'marketing_manage_banner' },
-      { name: 'Edukasi Afiliasi', path: '/admin/education', perm: 'content_education' },
-      { name: 'Event Afiliasi', path: '/admin/events', perm: 'content_event' },
-      { name: 'Bahan Promosi', path: '/admin/promo', perm: 'content_promo_material' },
-      { name: 'Komunitas Skin', path: '/admin/skin-community', perm: 'content_education' },
-    ]
-  },
-
-  { type: 'label', text: 'Sistem & Keamanan' },
-  { type: 'item', name: 'Skin Journey', icon: 'bx-leaf', path: '/admin/skin-journey', perm: 'view_analytics' },
-  { type: 'item', name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit', perm: 'settings_view' },
-  { type: 'item', name: 'Logistik & Kurir', icon: 'bxs-truck', path: '/admin/logistics', perm: 'settings_view' },
-  { type: 'item', name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security', perm: 'settings_view' },
+  { type: 'label', text: 'OPERASIONAL' },
+  { type: 'item', name: 'Logistic & Kurir', icon: 'bxs-truck', path: '/admin/logistics', perm: 'settings_view' },
   { type: 'item', name: 'Pesan Masuk', icon: 'bxs-inbox', path: '/admin/inbox', perm: 'user_view' },
-  { type: 'item', name: 'Hak Akses (RBAC)', icon: 'bxs-key', path: '/admin/rbac', perm: 'rbac_view' },
+
+  { type: 'label', text: 'CUSTOMER EXPERIENCE' },
+  { type: 'item', name: 'Skin Journey', icon: 'bx-leaf', path: '/admin/skin-journey', perm: 'view_analytics' },
+
+  { type: 'label', text: 'SISTEM & KEAMANAN' },
+  { type: 'item', name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security', perm: 'settings_view' },
+  { type: 'item', name: 'Hak Akses / RBAC', icon: 'bxs-key', path: '/admin/rbac', perm: 'rbac_view' },
+  { type: 'item', name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit', perm: 'settings_view' },
   { type: 'item', name: 'Pengaturan Sistem', icon: 'bxs-cog', path: '/admin/settings', perm: 'settings_view' },
+
+  { type: 'label', text: 'AKUN' },
+  { type: 'item', name: 'Keluar / Logout', icon: 'bx-log-out', path: '/logout', perm: 'view_dashboard' },
 ];
 
 // ─── SIDEBAR ITEM ──────────────────────────────────────
 const NavItem = ({ item }) => {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const hasChildren = item.children?.length > 0;
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
   if (!hasChildren) {
+    if (item.path === '/logout') {
+      return (
+        <button
+          onClick={handleLogout}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 14px', borderRadius: 10, marginBottom: 2, border: 'none',
+            background: 'transparent', cursor: 'pointer', transition: 'all 0.18s',
+            color: '#ef4444',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          <i className={`bx ${item.icon}`} style={{ fontSize: 18, color: '#ef4444', flexShrink: 0 }} />
+          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{item.name}</span>
+        </button>
+      );
+    }
     return (
       <NavLink
         to={item.path}
@@ -331,6 +350,25 @@ const AdminLayout = () => {
                 return !collapsed ? <Label key={`lbl-${idx}`} text={m.text} /> : null;
               }
               if (collapsed) {
+                if (m.path === '/logout') {
+                  return (
+                    <button
+                      key={m.name}
+                      onClick={handleLogout}
+                      title={m.name}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '10px', borderRadius: 10, marginBottom: 4, border: 'none',
+                        background: 'transparent', color: '#ef4444', cursor: 'pointer',
+                        width: '100%'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <i className={`bx ${m.icon}`} style={{ fontSize: 20 }} />
+                    </button>
+                  );
+                }
                 return (
                   <NavLink
                     key={m.name}
@@ -352,25 +390,6 @@ const AdminLayout = () => {
           })()}
         </nav>
 
-        {/* Bottom: User */}
-        {!collapsed && (
-          <div style={{ padding: '12px 10px', borderTop: `1px solid ${C.border}` }}>
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px', borderRadius: 10, border: 'none',
-                background: 'transparent', cursor: 'pointer', color: C.muted,
-                fontSize: 13, fontWeight: 500,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#f87171'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.muted; }}
-            >
-              <i className="bx bx-log-out" style={{ fontSize: 18 }} />
-              Keluar (Logout)
-            </button>
-          </div>
-        )}
       </aside>
 
       {/* ─── MAIN CONTENT ─── */}
@@ -432,21 +451,22 @@ const AdminLayout = () => {
                 style={{
                   width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0',
                   background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', position: 'relative'
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer'
                 }}
               >
                 <i className="bx bx-bell" style={{ fontSize: 18, color: '#64748b' }} />
-                {unreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
-                    background: '#ef4444', borderRadius: 9,
-                    border: '2px solid #f8fafc', color: 'white', fontSize: 10, fontWeight: 900,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px'
-                  }}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
               </button>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
+                  background: '#ef4444', borderRadius: 9,
+                  border: '2px solid #f8fafc', color: 'white', fontSize: 10, fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+                  pointerEvents: 'none', zIndex: 10
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
 
               {openNotif && (
                 <div style={{

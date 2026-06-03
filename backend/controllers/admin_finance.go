@@ -41,7 +41,7 @@ func (fc *AdminFinanceController) loadConfig() ([]map[string]interface{}, []map[
 }
 
 // periodWhere returns a GORM scope that filters created_at by period.
-// Supported values: "all", "today", "week", "month", "year", or "YYYY-MM".
+// Supported values: "all", "today", "week", "month", "year", or "YYYY-MM:YYYY-MM" for custom range.
 func periodWhere(db *gorm.DB, col, period string) *gorm.DB {
 	if strings.Contains(period, ":") {
 		parts := strings.Split(period, ":")
@@ -83,126 +83,124 @@ func (fc *AdminFinanceController) getMutSum(cat, status, period string) float64 
 	return sum
 }
 
-// getIncomeBreakdown fetches gross revenue broken down by source type.
-// Uses wallet_transactions as the single source of truth (always exists).
-func (fc *AdminFinanceController) getIncomeBreakdown(period string) (float64, map[string]float64, float64) {
+// getIncomeBreakdown computes:
+// - totalGrossRevenue = sum of ALL revenue (wallet tx + orders revenue)
+// - breakdown by source name
+// - totalCapitalCost (COGS) from non-cancelled order_items
+//
+// REVENUE = sale_revenue (wallet_tx, positive only) + commission_earned + manual income + order grand_total
+// We use wallet_transactions as source of truth for cash flow.
+// We use orders table to verify sale revenue (warn on mismatch).
+func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross float64, breakdown map[string]float64, totalCOGS float64) {
 	_, _, isList := fc.loadConfig()
-	breakdown := make(map[string]float64)
-	
-	// Pre-fill breakdown with names from config
+	breakdown = make(map[string]float64)
+
+	// Pre-fill breakdown with names from config (all start at 0)
 	for _, it := range isList {
 		breakdown[it["name"].(string)] = 0
 	}
 
+	// ─── 1. WALLET TRANSACTIONS NET (cash inflow sources) ───
 	type WTRow struct {
 		Type   string
 		Amount float64
 	}
-	var rows []WTRow
-	q := periodWhere(
+	var walletRows []WTRow
+	periodWhere(
 		fc.DB.Table("wallet_transactions").
-			Select("type, COALESCE(SUM(amount),0) as amount").
-			Where("type IN ? AND amount > 0", []string{
-				string(models.TxPlatformFee),
-				string(models.TxRestockRevenue),
-				string(models.TxCommissionEarned),
-			}).
+			Select("type, SUM(amount) as amount").
 			Group("type"),
 		"created_at", period,
-	)
-	q.Scan(&rows)
+	).Scan(&walletRows)
 
-	// Map transaction types to income names
-	for _, r := range rows {
+	for _, r := range walletRows {
+		baseType := r.Type
+		if baseType == "commission_reversed" {
+			baseType = "commission_earned"
+		} else if strings.HasSuffix(baseType, "_reversed") {
+			baseType = strings.TrimSuffix(baseType, "_reversed")
+		}
+
 		for _, it := range isList {
-			if it["type"].(string) == r.Type {
+			if it["type"].(string) == baseType {
 				breakdown[it["name"].(string)] += r.Amount
 			}
 		}
 	}
 
-	// ─── NEW: Synchronize Order Revenue with COGS ───
-	// To avoid negative profit, we must count the revenue from the same orders we use for COGS
-	var activeOrderRevenue float64
-	activeStatuses := []string{
-		string(models.OrderCompleted), string(models.OrderDelivered), 
-		string(models.OrderShipped), string(models.OrderReadyToShip), 
-		string(models.OrderPaid), string(models.OrderProcessing),
-	}
-	
+	// ─── 2. SALE REVENUE — use wallet_transactions as source of truth (net of reversals) ───
+	var saleRevenue float64
 	periodWhere(
-		fc.DB.Table("orders"),
+		fc.DB.Table("wallet_transactions").
+			Select("COALESCE(SUM(amount),0) as amount").
+			Where("type IN (?, ?)", string(models.TxSaleRevenue), string(models.TxSaleRevenueReversed)),
 		"created_at", period,
-	).Where("status IN ?", activeStatuses).
-	  Select("COALESCE(SUM(grand_total), 0)").Scan(&activeOrderRevenue)
+	).Scan(&saleRevenue)
 
-	// Add this to "Penjualan" or "Sale Revenue" source
-	saleFound := false
+	// Sale revenue from wallet tx
 	for _, it := range isList {
 		if it["type"].(string) == string(models.TxSaleRevenue) {
-			breakdown[it["name"].(string)] = activeOrderRevenue // Use order table as source of truth for Sales
-			saleFound = true
+			breakdown[it["name"].(string)] = saleRevenue
 			break
 		}
 	}
-	if !saleFound && len(isList) > 0 {
-		breakdown[isList[0]["name"].(string)] += activeOrderRevenue
+
+	// Verify against orders table (warn only — orders table can have cancelled)
+	var orderRevenue float64
+	activeStatuses := []string{
+		string(models.OrderCompleted), string(models.OrderDelivered),
+		string(models.OrderShipped), string(models.OrderReadyToShip),
+		string(models.OrderPaid), string(models.OrderProcessing),
+	}
+	periodWhere(
+		fc.DB.Table("orders").
+			Select("COALESCE(SUM(grand_total),0)").
+			Where("status IN ?", activeStatuses),
+		"created_at", period,
+	).Scan(&orderRevenue)
+
+	// If orders have revenue but wallet doesn't, use orders as backup
+	if orderRevenue > 0 && saleRevenue == 0 {
+		for _, it := range isList {
+			if it["type"].(string) == string(models.TxSaleRevenue) {
+				breakdown[it["name"].(string)] = orderRevenue
+				break
+			}
+		}
+		saleRevenue = orderRevenue
 	}
 
-	// Also count manual income mutations
-	var incomeSum float64
-	q2 := periodWhere(
-		fc.DB.Table("money_mutations").Where("type = 'income' AND description NOT LIKE 'Auto-Sync:%'"),
+	// ─── 3. MANUAL INCOME MUTATIONS (non-auto) ───
+	var manualIncome float64
+	periodWhere(
+		fc.DB.Table("money_mutations").
+			Select("COALESCE(SUM(amount),0)").
+			Where("type = 'income' AND (description LIKE 'Auto-Sync:%' OR description = '' OR description IS NULL) = false"),
 		"created_at", period,
-	)
-	q2.Select("COALESCE(SUM(amount),0)").Scan(&incomeSum)
-	
-	// Add manual income to any source configured as 'manual_income'
+	).Scan(&manualIncome)
 	for _, it := range isList {
 		if it["type"].(string) == "manual_income" {
-			breakdown[it["name"].(string)] += incomeSum
+			breakdown[it["name"].(string)] += manualIncome
 		}
 	}
 
-	// Also add seeded allocations gross (for demo/dev data)
-	var allocSum float64
-	q3 := fc.DB.Table("finance_revenue_allocations")
-	q3 = periodWhere(q3, "created_at", period)
-	q3.Select("COALESCE(SUM(gross_amount),0)").Scan(&allocSum)
-
+	// ─── 4. TOTAL GROSS REVENUE ───
 	walletTotal := 0.0
 	for _, v := range breakdown {
 		walletTotal += v
 	}
+	totalGross = walletTotal
 
-	// Dev env: distribute seeded gross proportionally if no real data
-	if allocSum > walletTotal && walletTotal == 0 {
-		for i, it := range isList {
-			name := it["name"].(string)
-			// Proportional dummy distribution
-			p := 0.1
-			if i == 0 { p = 0.6 }
-			if i == 1 { p = 0.2 }
-			breakdown[name] = allocSum * p
-		}
-		walletTotal = allocSum
-	}
-	
-	// Calculate Capital Cost (COGS) from completed orders only
+	// ─── 5. CAPITAL COST (COGS) from non-cancelled/non-refunded order_items ───
 	var capitalCost float64
 	periodWhere(
 		fc.DB.Table("order_items").
 			Joins("JOIN orders ON orders.id = order_items.order_id").
-			Where("orders.status IN ?", []string{string(models.OrderCompleted), string(models.OrderDelivered), string(models.OrderShipped), string(models.OrderReadyToShip), string(models.OrderPaid), string(models.OrderProcessing)}), 
+			Where("orders.status NOT IN ?", []string{string(models.OrderCancelled), string(models.OrderRefunded)}),
 		"orders.created_at", period,
 	).Select("COALESCE(SUM(order_items.cogs), 0)").Scan(&capitalCost)
-	
-	// If dev env (seeded gross), simulate capital cost as 70% of gross
-	if allocSum > walletTotal && capitalCost == 0 {
-		capitalCost = allocSum * 0.7
-	}
 
-	return walletTotal, breakdown, capitalCost
+	return totalGross, breakdown, capitalCost
 }
 
 // buildAllocMap computes allocation map for a given gross amount.
@@ -224,57 +222,53 @@ func buildAllocMap(gross float64, dsList, psList []map[string]interface{}) (map[
 		totalPSValue += val
 	}
 
-	// [Crucial] Add Retained Earnings to the snapshot
+	// Add Retained Earnings (Laba Ditahan) to the snapshot
 	allocMap["Laba Ditahan"] = netProfit - totalPSValue
 
 	return allocMap, netProfit
 }
 
 // ensureAllocations ensures that a FinanceRevenueAllocation record exists for the given period.
-// If it doesn't exist, it clones the configuration from the previous period.
-// If it exists but the config changed, it updates the allocation JSON.
 func (fc *AdminFinanceController) ensureAllocations(period string) {
 	if period == "all" || period == "today" || period == "week" || len(period) != 7 {
-		return 
+		return
 	}
 
 	fc.DB.Transaction(func(tx *gorm.DB) error {
 		var alloc models.FinanceRevenueAllocation
 		err := tx.Where("period = ? AND source_type = 'period_summary'", period).First(&alloc).Error
-		
+
 		dsList, psList, _ := fc.loadConfig()
-		
+
 		if err != nil {
-			// Calculate live Gross Profit
 			grossRevenue, _, capitalCost := fc.getIncomeBreakdown(period)
 			grossProfit := grossRevenue - capitalCost
 
 			newMap, _ := buildAllocMap(grossProfit, dsList, psList)
 			b, _ := json.Marshal(newMap)
 			newAlloc := models.FinanceRevenueAllocation{
-				Period:      period,
-				SourceType:  "period_summary",
-				SourceID:    "initial",
-				SourceHash:  "summary_" + period,
+				Period:     period,
+				SourceType: "period_summary",
+				SourceID:   "initial",
+				SourceHash: "summary_" + period,
 				GrossAmount: grossProfit,
-				Allocation:  string(b),
-				CreatedAt:   time.Now(),
+				Allocation: string(b),
+				CreatedAt:  time.Now(),
 			}
 			tx.Create(&newAlloc)
 			return nil
 		}
 
-		// ALWAYS update GrossAmount and Allocation to reflect real-time data
 		grossRevenue, _, capitalCost := fc.getIncomeBreakdown(period)
 		grossProfit := grossRevenue - capitalCost
 
 		newMap, _ := buildAllocMap(grossProfit, dsList, psList)
 		b, _ := json.Marshal(newMap)
-		
+
 		alloc.GrossAmount = grossProfit
 		alloc.Allocation = string(b)
 		tx.Save(&alloc)
-		
+
 		return nil
 	})
 }
@@ -288,14 +282,13 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 		period = "all"
 	}
 
-	// Run allocation sync in background — never block the HTTP response
 	go fc.ensureAllocations(period)
-	
+
 	configSvc := services.NewConfigService(fc.DB)
 	gross, breakdown, capitalCost := fc.getIncomeBreakdown(period)
 	dsList, psList, isList := fc.loadConfig()
 
-	// Build data_saving & profit_shares using current config %
+	// Build data_saving & profit_shares from gross_profit
 	grossProfit := gross - capitalCost
 	dataSaving := make(map[string]interface{})
 	totalSaving := 0.0
@@ -306,8 +299,8 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 		totalSaving += val
 	}
 	dataSaving["total"] = totalSaving
-	netProfit := grossProfit - totalSaving
 
+	netProfit := grossProfit - totalSaving
 	profitShares := make(map[string]interface{})
 	totalPSPercent := 0.0
 	totalPSValue := 0.0
@@ -327,9 +320,9 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	fc.DB.Order("is_primary desc, name asc").Find(&locations)
 
 	var mutations []models.MoneyMutation
-	periodWhere(fc.DB.Order("created_at desc").Limit(20), "created_at", period).Find(&mutations)
+	periodWhere(fc.DB.Order("created_at desc").Limit(50), "created_at", period).Find(&mutations)
 
-	// Fetch recent orders with COGS for audit visibility
+	// Fetch recent orders with COGS — only non-cancelled for financial accuracy
 	type OrderSummary struct {
 		ID          string    `json:"id"`
 		CreatedAt   time.Time `json:"created_at"`
@@ -345,15 +338,14 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 			Joins("LEFT JOIN order_items oi ON oi.order_id = o.id").
 			Joins("LEFT JOIN users u ON u.id = o.buyer_id").
 			Joins("LEFT JOIN user_profiles up ON up.user_id = u.id").
+			Where("o.status != ?", string(models.OrderCancelled)).
 			Group("o.id, o.created_at, o.grand_total, o.status, up.full_name").
 			Order("o.created_at desc").
 			Limit(20),
 		"o.created_at", period,
 	).Scan(&recentOrders)
 
-	// Fetch all wallet activity for full audit trail
-	// NOTE: Tidak ada filter type — semua tipe (sale, withdrawal, refund, topup, commission, dll)
-	// harus tampil agar audit trail benar-benar lengkap sesuai kebutuhan SuperAdmin
+	// Fetch wallet activity — filter out zero-amount and reversed for clean audit
 	type WalletActivity struct {
 		ID          string    `json:"id"`
 		Type        string    `json:"type"`
@@ -369,32 +361,33 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 			Joins("LEFT JOIN wallets w ON w.id = wt.wallet_id").
 			Joins("LEFT JOIN users u ON u.id = w.owner_id").
 			Joins("LEFT JOIN user_profiles up ON up.user_id = u.id").
+			Where("wt.amount != 0").
 			Order("wt.created_at desc").
-			Limit(100), // Dinaikkan dari 50 → 100 untuk audit trail lengkap
+			Limit(100),
 		"wt.created_at", period,
 	).Scan(&walletActivity)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"period":           period,
-		"gross_revenue":    gross,
-		"capital_cost":     capitalCost,
-		"gross_profit":     gross - capitalCost,
-		"income_breakdown": breakdown,
-		"data_saving":      dataSaving,
-		"net_profit":       netProfit,
-		"profit_shares":    profitShares,
-		"locations":        locations,
-		"mutations":        mutations,
-		"recent_orders":    recentOrders,
-		"wallet_activity":  walletActivity,
+		"period":             period,
+		"gross_revenue":      gross,
+		"capital_cost":       capitalCost,
+		"gross_profit":       grossProfit,
+		"income_breakdown":   breakdown,
+		"data_saving":        dataSaving,
+		"net_profit":         netProfit,
+		"profit_shares":      profitShares,
+		"locations":         locations,
+		"mutations":          mutations,
+		"recent_orders":      recentOrders,
+		"wallet_activity":     walletActivity,
 		"config": map[string]interface{}{
-			"data_saving_list":   dsList,
-			"profit_share_list":  psList,
-			"income_source_list": isList,
-			"payout_payday_dates": configSvc.Get("payout_payday_dates", "all"),
-			"payout_min_amount":   configSvc.GetFloat("payout_min_amount", 50000.0),
+			"data_saving_list":    dsList,
+			"profit_share_list":    psList,
+			"income_source_list":   isList,
+			"payout_payday_dates":   configSvc.Get("payout_payday_dates", "all"),
+			"payout_min_amount":     configSvc.GetFloat("payout_min_amount", 50000.0),
 			"settlement_delay_hours": configSvc.GetInt("settlement_delay_hours", 24),
-			"platform_fee_percent": configSvc.GetFloat("platform_fee_percent", 5.0),
+			"platform_fee_percent":  configSvc.GetFloat("platform_fee_percent", 5.0),
 		},
 	})
 }
@@ -409,7 +402,6 @@ func (fc *AdminFinanceController) GetDataSavingDetail(w http.ResponseWriter, r *
 
 	dsList, _, _ := fc.loadConfig()
 
-	// Calculate Real-time Values
 	gross, _, capitalCost := fc.getIncomeBreakdown(period)
 	grossProfit := gross - capitalCost
 
@@ -457,7 +449,6 @@ func (fc *AdminFinanceController) GetProfitShareDetail(w http.ResponseWriter, r 
 
 	_, psList, _ := fc.loadConfig()
 
-	// Calculate Real-time Values
 	gross, _, capitalCost := fc.getIncomeBreakdown(period)
 	grossProfit := gross - capitalCost
 	dsCfg, _, _ := fc.loadConfig()
@@ -487,14 +478,14 @@ func (fc *AdminFinanceController) GetProfitShareDetail(w http.ResponseWriter, r 
 		totalPlanned += planned
 	}
 
-	// [Visual Sync] Add Retained Earnings (Laba Ditahan) as a dynamic card
+	// Add Retained Earnings (Laba Ditahan) as a dynamic card
 	psPercentSum := 0.0
 	for _, it := range psList {
 		psPercentSum += it["percent"].(float64)
 	}
 	rdName := "Laba Ditahan"
 	catNames = append(catNames, rdName)
-	rdAlloc := netProfit - totalAlloc // Remaining after PS
+	rdAlloc := netProfit - totalAlloc
 
 	rdPaid := fc.getMutSum(rdName, "processed", period)
 	rdPlanned := fc.getMutSum(rdName, "pending", period)
@@ -519,36 +510,53 @@ func (fc *AdminFinanceController) GetProfitShareDetail(w http.ResponseWriter, r 
 	})
 }
 
-// sumAllocations aggregates allocation JSON sums from finance_revenue_allocations.
-func (fc *AdminFinanceController) sumAllocations(period string) map[string]float64 {
-	sums := make(map[string]float64)
-	q := fc.DB.Model(&models.FinanceRevenueAllocation{})
-	q = periodWhere(q, "created_at", period)
-	var allocs []models.FinanceRevenueAllocation
-	q.Find(&allocs)
-	for _, a := range allocs {
-		var m map[string]float64
-		if err := json.Unmarshal([]byte(a.Allocation), &m); err == nil {
-			for k, v := range m {
-				sums[k] += v
-			}
-		}
-	}
-	return sums
-}
-
 // buildHistory builds mutation history for given category names.
 func (fc *AdminFinanceController) buildHistory(period string, catNames []string, isProfitShare bool) []map[string]interface{} {
 	var history []map[string]interface{}
 
-	// 1. Real-time Inflow from Wallet Transactions
-	history = append(history, fc.getRawTransactions(period)...)
+	// 1. Wallet transactions (real cash flow, exclude zero and reversed)
+	type WTRow struct {
+		Type      string
+		Amount    float64
+		CreatedAt time.Time
+	}
+	var rows []WTRow
+	q := periodWhere(
+		fc.DB.Table("wallet_transactions").
+			Select("type, amount, created_at").
+			Where("amount != 0"),
+		"created_at", period,
+	)
+	q.Limit(50).Scan(&rows)
+
+	_, _, isList := fc.loadConfig()
+	for _, r := range rows {
+		baseType := r.Type
+		if baseType == "commission_reversed" {
+			baseType = "commission_earned"
+		} else if strings.HasSuffix(baseType, "_reversed") {
+			baseType = strings.TrimSuffix(baseType, "_reversed")
+		}
+
+		sourceName := "Lainnya"
+		for _, it := range isList {
+			if it["type"].(string) == baseType {
+				sourceName = it["name"].(string)
+				break
+			}
+		}
+		history = append(history, map[string]interface{}{
+			"type": "Pendapatan Real-time", "category": sourceName,
+			"amount": r.Amount, "created_at": r.CreatedAt,
+			"desc": "Otomatis: " + r.Type,
+		})
+	}
 
 	// 2. Allocation events from seeded records
-	q := fc.DB.Model(&models.FinanceRevenueAllocation{})
-	q = periodWhere(q, "created_at", period)
+	q2 := fc.DB.Model(&models.FinanceRevenueAllocation{})
+	q2 = periodWhere(q2, "created_at", period)
 	var allocs []models.FinanceRevenueAllocation
-	q.Order("created_at desc").Limit(100).Find(&allocs)
+	q2.Order("created_at desc").Limit(50).Find(&allocs)
 
 	label := "Alokasi Biaya"
 	if isProfitShare {
@@ -567,14 +575,13 @@ func (fc *AdminFinanceController) buildHistory(period string, catNames []string,
 		}
 	}
 
-	// Actual mutations (money out)
+	// 3. Actual money mutations (cash out)
 	if len(catNames) > 0 {
 		var muts []models.MoneyMutation
-		mq := periodWhere(
+		periodWhere(
 			fc.DB.Where("category IN ?", catNames).Order("created_at desc").Limit(50),
 			"created_at", period,
-		)
-		mq.Find(&muts)
+		).Find(&muts)
 		for _, m := range muts {
 			history = append(history, map[string]interface{}{
 				"type": "Uang Keluar", "category": m.Category, "amount": m.Amount,
@@ -583,7 +590,7 @@ func (fc *AdminFinanceController) buildHistory(period string, catNames []string,
 		}
 	}
 
-	// Sort history by created_at desc to ensure newest transactions are always on top
+	// Sort by created_at desc
 	sort.Slice(history, func(i, j int) bool {
 		ti := history[i]["created_at"].(time.Time)
 		tj := history[j]["created_at"].(time.Time)
@@ -601,15 +608,19 @@ func (fc *AdminFinanceController) UpdateConfig(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// ─── VALIDATION ───
+	// VALIDATION: sum of percentages per list must not exceed 100%
 	for k, v := range req {
 		if k == "finance_data_saving_list" || k == "finance_profit_share_list" {
 			list, ok := v.([]interface{})
-			if !ok { continue }
+			if !ok {
+				continue
+			}
 			totalPct := 0.0
 			for _, item := range list {
 				m, ok := item.(map[string]interface{})
-				if !ok { continue }
+				if !ok {
+					continue
+				}
 				if pct, ok := m["percent"].(float64); ok {
 					totalPct += pct
 				}
@@ -677,7 +688,7 @@ func (fc *AdminFinanceController) GenerateAllocations(w http.ResponseWriter, r *
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "ok", "period": period})
 }
 
-// GET /api/admin/finance/locations  (bonus: list locations)
+// GET /api/admin/finance/locations
 func (fc *AdminFinanceController) GetLocations(w http.ResponseWriter, r *http.Request) {
 	var locs []models.FinancialLocation
 	fc.DB.Order("is_primary desc, name asc").Find(&locs)
@@ -691,7 +702,7 @@ func (fc *AdminFinanceController) GetLocations(w http.ResponseWriter, r *http.Re
 	})
 }
 
-// PUT /api/admin/finance/locations/{id}  (bonus: update location balance)
+// PUT /api/admin/finance/locations/{id}
 func (fc *AdminFinanceController) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 	var req models.FinancialLocation
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -706,10 +717,9 @@ func (fc *AdminFinanceController) UpdateLocation(w http.ResponseWriter, r *http.
 
 	fc.DB.Transaction(func(tx *gorm.DB) error {
 		if req.IsPrimary {
-			// Set others to false
 			tx.Model(&models.FinancialLocation{}).Where("id != ?", id).Update("is_primary", false)
 		}
-		
+
 		return tx.Model(&models.FinancialLocation{}).Where("id = ?", id).Updates(map[string]interface{}{
 			"name":       req.Name,
 			"balance":    req.Balance,
@@ -735,10 +745,9 @@ func (fc *AdminFinanceController) CreateLocation(w http.ResponseWriter, r *http.
 
 	fc.DB.Transaction(func(tx *gorm.DB) error {
 		if req.IsPrimary {
-			// Set others to false
 			tx.Model(&models.FinancialLocation{}).Where("is_primary = ?", true).Update("is_primary", false)
 		}
-		
+
 		req.CreatedAt = time.Now()
 		req.UpdatedAt = time.Now()
 		if err := tx.Create(&req).Error; err != nil {
@@ -770,7 +779,6 @@ func (fc *AdminFinanceController) DeleteMutation(w http.ResponseWriter, r *http.
 	}
 	var mut models.MoneyMutation
 	if err := fc.DB.Where("id = ?", id).First(&mut).Error; err == nil {
-		// Reverse balance if processed
 		if mut.Status == "processed" {
 			if mut.FromLocationID != nil {
 				fc.DB.Exec(`UPDATE financial_locations SET balance = balance + ?, updated_at = NOW() WHERE id = ?`, mut.Amount, *mut.FromLocationID)
@@ -782,48 +790,4 @@ func (fc *AdminFinanceController) DeleteMutation(w http.ResponseWriter, r *http.
 		fc.DB.Delete(&mut)
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
-}
-
-// getRawTransactions fetches real wallet transactions to supplement recorded allocations.
-func (fc *AdminFinanceController) getRawTransactions(period string) []map[string]interface{} {
-	var history []map[string]interface{}
-	_, _, isList := fc.loadConfig()
-
-	type WTRow struct {
-		Type      string
-		Amount    float64
-		CreatedAt time.Time
-	}
-	var rows []WTRow
-	q := periodWhere(
-		fc.DB.Table("wallet_transactions").
-			Select("type, amount, created_at").
-			Where("type IN ? AND amount > 0", []string{
-				string(models.TxPlatformFee),
-				string(models.TxRestockRevenue),
-				string(models.TxSaleRevenue),
-				string(models.TxCommissionEarned),
-			}).
-				Limit(30),
-		"created_at", period,
-	)
-	q.Scan(&rows)
-
-	for _, r := range rows {
-		sourceName := "Lainnya"
-		for _, it := range isList {
-			if it["type"].(string) == r.Type {
-				sourceName = it["name"].(string)
-				break
-			}
-		}
-		history = append(history, map[string]interface{}{
-			"type":       "Pendapatan Real-time",
-			"category":   sourceName,
-			"amount":     r.Amount,
-			"created_at": r.CreatedAt,
-			"desc":       "Otomatis: " + r.Type,
-		})
-	}
-	return history
 }

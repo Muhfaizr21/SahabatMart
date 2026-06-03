@@ -857,6 +857,7 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	buyerID := r.Context().Value("user_id").(string)
 
 	var req struct {
+		Email       string `json:"email"`
 		FullName    string `json:"full_name"`
 		Gender      string `json:"gender"`
 		DateOfBirth string `json:"date_of_birth"`
@@ -876,6 +877,22 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	err := bc.DB.Transaction(func(tx *gorm.DB) error {
+		// Update email in users table if provided and changed
+		if req.Email != "" {
+			var u models.User
+			if err := tx.First(&u, "id = ?", buyerID).Error; err == nil {
+				if u.Email != req.Email {
+					var existingUser models.User
+					if err := tx.Where("email = ? AND id != ?", req.Email, buyerID).First(&existingUser).Error; err == nil {
+						return fmt.Errorf("email %s sudah terdaftar untuk akun lain", req.Email)
+					}
+					if err := tx.Model(&u).Update("email", req.Email).Error; err != nil {
+						return err
+					}
+				}
+			}
+		}
+
 		// Update User Phone (Handle empty as NULL to avoid unique constraint issues)
 		if req.Phone != "" {
 			var existing models.User

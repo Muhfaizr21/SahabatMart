@@ -38,7 +38,7 @@ export default function MerchantOrders() {
         });
       }
     } catch (_err) {
-      console.error('Failed to load orders:', _err);
+      // silent — order load failure
     } finally {
       setLoading(false);
     }

@@ -19,6 +19,11 @@ function resolveApiBase() {
   return 'http://localhost:8080';
 }
 
+// [BUG-M9 Fix] Lazy resolve — panggil resolveApiBase() setiap kali export diakses,
+// bukan saat module load. Ini memastikan window.APP_CONFIG sudah ter-set.
+export function getApiBase() {
+  return resolveApiBase();
+}
 const RAW_API_BASE = resolveApiBase();
 export const API_BASE = RAW_API_BASE;
 export const AUTH_API_BASE = `${API_BASE}/api/auth`;
@@ -72,7 +77,6 @@ export async function fetchJson(url, options = {}) {
     try {
       result = JSON.parse(text);
     } catch (_e) {
-      console.error("Server returned non-JSON response:", text);
       throw new Error("Format respons server tidak valid");
     }
     
@@ -182,10 +186,9 @@ export async function captureAffiliate() {
       // Simpan di localStorage agar tetap ADA saat checkout
       if (res.affiliate_id) {
         localStorage.setItem('affiliate_id', res.affiliate_id);
-        console.log('✅ Affiliate Tracked:', res.affiliate_id);
       }
     } catch (_err) {
-      console.warn('⚠️ Affiliate tracking failed:', _err);
+      // Silent — affiliate tracking failure tidak boleh mengganggu UX
     }
   }
 }
@@ -205,7 +208,7 @@ export function subscribeToNotifications(userId, onMessage) {
       const data = JSON.parse(event.data);
       onMessage(data);
     } catch (_err) {
-      console.error('SSE Error:', _err);
+      // silent — SSE parse error tidak perlu log ke console
     }
   };
 

@@ -20,12 +20,11 @@ const DEFAULT_CONFIGS = [
   { key: 'payout_schedule',         value: 'weekly',           description: 'Jadwal Payout',              group: 'payout',    type: 'select', options: ['daily', 'weekly', 'monthly'] },
   { key: 'payout_day',              value: 'friday',           description: 'Hari Payout (jika weekly)',  group: 'payout',    type: 'select', options: ['monday','tuesday','wednesday','thursday','friday'] },
   { key: 'payout_bank_code',        value: '',                 description: 'Kode Bank Default',          group: 'payout',    type: 'text' },
-  { key: 'payment_gateway',         value: 'tripay',           description: 'Payment Gateway Aktif',      group: 'payment',   type: 'select', options: ['tripay', 'midtrans', 'xendit'] },
+  { key: 'payment_gateway',         value: 'tripay',           description: 'Payment Gateway Aktif',      group: 'payment',   type: 'select', options: ['tripay', 'xendit'] },
   { key: 'payment_tripay_merchant', value: '',                 description: 'Tripay Merchant Code',       group: 'payment',   type: 'text' },
   { key: 'payment_tripay_key',      value: '',                 description: 'Tripay API Key',              group: 'payment',   type: 'secret' },
   { key: 'payment_tripay_private',  value: '',                 description: 'Tripay Private Key',          group: 'payment',   type: 'secret' },
   { key: 'payment_tripay_url',      value: 'https://tripay.co.id/api-sandbox', description: 'Tripay Base URL', group: 'payment',   type: 'text' },
-  { key: 'payment_midtrans_key',    value: '',                 description: 'Midtrans Server Key',        group: 'payment',   type: 'secret' },
   { key: 'payment_sandbox_mode',    value: 'true',             description: 'Mode Sandbox',               group: 'payment',   type: 'bool' },
   { key: 'payment_timeout_minutes', value: '60',               description: 'Timeout Pembayaran (menit)', group: 'payment',   type: 'number' },
   { key: 'notif_email_enabled',     value: 'true',             description: 'Email Notifikasi',           group: 'notification', type: 'bool' },
@@ -80,6 +79,24 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [activeGroup, setActiveGroup] = useState('platform');
+  const [testEmail, setTestEmail] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
+
+  const handleTestEmail = () => {
+    if (!testEmail) return;
+    setTestingEmail(true);
+    fetchJson(API + '/configs/test-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: testEmail }),
+    }).then(res => {
+      setToast({ type: 'success', msg: res.message || 'Email uji coba berhasil dikirim!' });
+      setTimeout(() => setToast(null), 5000);
+    }).catch(err => {
+      setToast({ type: 'error', msg: err.message || 'Gagal mengirim email uji coba.' });
+      setTimeout(() => setToast(null), 5000);
+    }).finally(() => setTestingEmail(false));
+  };
 
   useEffect(() => {
     fetchJson(API + '/configs')
@@ -369,6 +386,50 @@ export default function AdminSettings() {
                     </div>
                   ))}
                 </div>
+                {activeGroup === 'notification' && (
+                  <div style={{ marginTop: 24, padding: '20px 24px', borderRadius: 14, background: '#f8fafc', border: '1.5px dashed #cbd5e1', marginBottom: 24 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: '#475569', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="bx bx-paper-plane" style={{ fontSize: 18, color: '#8b5cf6' }} />
+                      <span>Tes Pengiriman Email SMTP</span>
+                    </div>
+                    <p style={{ fontSize: 12.5, color: '#64748b', marginBottom: 16 }}>Kirim email uji coba untuk memverifikasi bahwa konfigurasi SMTP Anda sudah berjalan dengan sukses. <strong style={{ color: '#ef4444' }}>Catatan:</strong> Pastikan Anda telah mengklik <strong>"Simpan Konfigurasi"</strong> terlebih dahulu agar pengaturan terbaru Anda diterapkan.</p>
+                    <div style={{ display: 'flex', gap: 10, maxWidth: 450 }}>
+                      <input
+                        type="email"
+                        placeholder="Masukkan email tujuan..."
+                        value={testEmail}
+                        onChange={e => setTestEmail(e.target.value)}
+                        style={{ ...S.input, flex: 1, background: '#fff' }}
+                      />
+                      <button
+                        onClick={handleTestEmail}
+                        disabled={testingEmail || !testEmail}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '10px 20px',
+                          borderRadius: 10,
+                          border: 'none',
+                          background: '#8b5cf6',
+                          color: '#fff',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          opacity: (testingEmail || !testEmail) ? 0.6 : 1,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {testingEmail ? (
+                          <div className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                        ) : (
+                          <i className="bx bx-send" />
+                        )}
+                        {testingEmail ? 'Mengirim...' : 'Tes Kirim'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                   <button onClick={handleSave} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, border: 'none', background: '#4361ee', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                     {saving ? <div className="spinner-border spinner-border-sm" style={{ width: 16, height: 16 }} /> : <i className="bx bx-save" style={{ fontSize: 18 }} />}

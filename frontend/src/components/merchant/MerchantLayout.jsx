@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
-import { getStoredUser } from '../../lib/auth';
+import { getStoredUser, logout } from '../../lib/auth';
 import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
+import toast from 'react-hot-toast';
 
 const SidebarLink = ({ item }) => (
   <NavLink
@@ -50,7 +51,7 @@ const MerchantLayout = () => {
         setNotifications(res);
       }
     } catch (_err) {
-      console.error("Failed to fetch merchant notifs", _err);
+      // silent — notif fetch failure
     }
   };
 
@@ -65,7 +66,7 @@ const MerchantLayout = () => {
       await fetchJson(`${MERCHANT_API_BASE}/notifications/read-all`, { method: 'POST' });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch (_err) {
-      console.error("Failed to clear notifs", _err);
+      toast.error("Gagal menandai notifikasi");
     }
   };
 
@@ -75,7 +76,7 @@ const MerchantLayout = () => {
       await fetchJson(`${MERCHANT_API_BASE}/notifications/all`, { method: 'DELETE' });
       setNotifications([]);
     } catch (_err) {
-      console.error("Failed to delete all notifs", _err);
+      toast.error("Gagal hapus notifikasi");
     }
   };
 
@@ -87,7 +88,7 @@ const MerchantLayout = () => {
       });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     } catch (_err) {
-      console.error("Failed to read notif", _err);
+      // silent
     }
   };
 
@@ -97,7 +98,7 @@ const MerchantLayout = () => {
       await fetchJson(`${MERCHANT_API_BASE}/notifications/delete?id=${id}`, { method: 'DELETE' });
       setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (_err) {
-      console.error("Failed to delete notif", _err);
+      toast.error("Gagal hapus notifikasi");
     }
   };
 
@@ -107,9 +108,7 @@ const MerchantLayout = () => {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
+    logout(); // [BUG-M7 Fix] panggil centralized logout — bersihin affiliate_id dll
   };
 
   const menuItems = [
@@ -163,7 +162,27 @@ const MerchantLayout = () => {
       <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? 'ml-72' : 'ml-0'}`}>
         
         {/* Top Header Bar */}
-        <header className="sticky top-0 right-0 w-full z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/60 flex justify-between items-center px-8 h-20">
+        <header 
+          style={{
+            position: 'sticky',
+            top: 0,
+            right: 0,
+            width: '100%',
+            zIndex: 40,
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(12px)',
+            borderBottom: '1px solid rgba(226, 232, 240, 0.6)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingLeft: '32px',
+            paddingRight: '32px',
+            paddingTop: '28px',
+            paddingBottom: '28px',
+            minHeight: '100px',
+            boxSizing: 'border-box'
+          }}
+        >
             <div className="flex items-center gap-6">
                 <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-sm">
                     <span className="material-symbols-outlined text-slate-600">{isSidebarOpen ? 'menu_open' : 'menu'}</span>
@@ -186,13 +205,16 @@ const MerchantLayout = () => {
                        className={`w-11 h-11 flex items-center justify-center rounded-xl transition-all border ${showNotifMenu ? 'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-inner' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300 shadow-sm'}`}
                     >
                         <span className="material-symbols-outlined">notifications</span>
-                        {/* Dot indicator */}
-                        {notifications.filter(n => !n.is_read).length > 0 && (
-                          <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center">
-                              {notifications.filter(n => !n.is_read).length}
-                          </span>
-                        )}
                     </button>
+                    {/* Dot indicator - Safe inset position to completely prevent clipping */}
+                    {notifications.filter(n => !n.is_read).length > 0 && (
+                      <span 
+                        className="absolute w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center pointer-events-none"
+                        style={{ top: '1px', right: '1px', zIndex: 10 }}
+                      >
+                          {notifications.filter(n => !n.is_read).length}
+                      </span>
+                    )}
 
                     {showNotifMenu && (
                         <div className="absolute top-14 right-0 w-[350px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[9999]">

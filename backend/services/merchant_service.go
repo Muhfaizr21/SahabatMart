@@ -314,6 +314,25 @@ func (s *MerchantService) RequestPayout(merchantID string, amount float64, note 
 		return nil, fmt.Errorf("minimum penarikan adalah Rp %.0f", minWithdrawal)
 	}
 
+	// Fetch bank details from affiliate_members if they are empty
+	if bankName == "" || accNo == "" || accName == "" {
+		var merchant models.Merchant
+		if err := s.DB.First(&merchant, "id = ?", merchantID).Error; err == nil {
+			var aff models.AffiliateMember
+			if err2 := s.DB.Where("user_id = ?", merchant.UserID).First(&aff).Error; err2 == nil {
+				if bankName == "" {
+					bankName = aff.BankName
+				}
+				if accNo == "" {
+					accNo = aff.BankAccountNumber
+				}
+				if accName == "" {
+					accName = aff.BankAccountName
+				}
+			}
+		}
+	}
+
 	payout := &models.PayoutRequest{
 		ID:                uuid.New().String(),
 		MerchantID:        merchantID,
@@ -458,11 +477,15 @@ func (s *MerchantService) UpdateStoreProfile(merchantID string, updates map[stri
 		return nil, err
 	}
 
-	// Proteksi field finansial agar tidak bisa diubah via update profil
-	delete(updates, "balance")
-	delete(updates, "total_sales")
-	delete(updates, "user_id")
-	delete(updates, "id")
+	// Proteksi field sensitif agar tidak bisa diubah via update profil
+	protectedFields := []string{"balance", "total_sales", "user_id", "id", "status", "verified_at",
+		"verified_by", "is_verified", "suspended_at", "suspended_reason",
+		"commission_rate_override", "custom_commission_rate", "deleted_at",
+		"created_at", "updated_at", "total_products", "total_orders",
+		"total_revenue", "average_rating"}
+	for _, f := range protectedFields {
+		delete(updates, f)
+	}
 
 	err := s.DB.Model(&m).Updates(updates).Error
 	return &m, err

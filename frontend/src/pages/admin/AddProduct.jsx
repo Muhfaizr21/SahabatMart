@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { A, PageHeader, FieldLabel } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
+import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
 const API = ADMIN_API_BASE;
 
@@ -16,6 +17,10 @@ export default function AdminAddProduct() {
   const [merchantPresets, setMerchantPresets] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Media Library Modal states
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mediaModalType, setMediaModalType] = useState('main'); // 'main' or 'gallery'
 
   const [p, setP] = useState({
     name: '', sku: '', description: '', price: 0, old_price: 0, cogs: 0, weight: 0,
@@ -334,9 +339,19 @@ export default function AdminAddProduct() {
               )}
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input style={{ ...A.input, flex: 1 }} type="text" placeholder="https:// atau Upload..." value={p.image}
+                  <input style={{ ...A.input, flex: 1 }} type="text" placeholder="https:// atau Pilih Media..." value={p.image}
                     onChange={e => setP(prev => ({ ...prev, image: e.target.value }))} />
-                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#4361ee', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='#eef2ff'} onMouseLeave={e => e.currentTarget.style.background='#f8fafc'}>
+                  <button 
+                    type="button"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#6366f1', transition: 'all 0.2s' }} 
+                    onMouseEnter={e => e.currentTarget.style.background='#eef2ff'} 
+                    onMouseLeave={e => e.currentTarget.style.background='#f8fafc'}
+                    onClick={() => { setMediaModalType('main'); setMediaModalOpen(true); }}
+                    title="Pilih dari Media Library"
+                  >
+                    <i className="bx bx-images" style={{ fontSize: 20 }} />
+                  </button>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 10, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer', flexShrink: 0, color: '#4361ee', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='#eef2ff'} onMouseLeave={e => e.currentTarget.style.background='#f8fafc'} title="Unggah Foto Baru">
                     {uploading ? <i className="bx bx-loader-alt bx-spin" style={{ fontSize: 20 }} /> : <i className="bx bx-upload" style={{ fontSize: 20 }} />}
                     <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'main')} />
                   </label>
@@ -357,9 +372,19 @@ export default function AdminAddProduct() {
                   </button>
                 </div>
               ))}
+              <button 
+                type="button"
+                style={{ width: 80, height: 80, borderRadius: 10, border: '2px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6366f1', background: '#f8fafc', transition: 'all 0.2s' }} 
+                onMouseEnter={e => {e.currentTarget.style.borderColor='#6366f1'; e.currentTarget.style.background='#eef2ff';}} 
+                onMouseLeave={e => {e.currentTarget.style.borderColor='#cbd5e1'; e.currentTarget.style.background='#f8fafc';}}
+                onClick={() => { setMediaModalType('gallery'); setMediaModalOpen(true); }}
+              >
+                <i className="bx bx-images" style={{ fontSize: 26 }} />
+                <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Media Lib</span>
+              </button>
               <label style={{ width: 80, height: 80, borderRadius: 10, border: '2px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', background: '#f8fafc', transition: 'all 0.2s' }} onMouseEnter={e => {e.currentTarget.style.borderColor='#4361ee'; e.currentTarget.style.color='#4361ee';}} onMouseLeave={e => {e.currentTarget.style.borderColor='#cbd5e1'; e.currentTarget.style.color='#64748b';}}>
                 {uploading ? <i className="bx bx-loader-alt bx-spin" style={{ fontSize: 24 }} /> : <i className="bx bx-image-add" style={{ fontSize: 26 }} />}
-                <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Tambah</span>
+                <span style={{ fontSize: 10, fontWeight: 600, marginTop: 4 }}>Unggah</span>
                 <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'gallery')} />
               </label>
             </div>
@@ -372,79 +397,22 @@ export default function AdminAddProduct() {
           <div style={{ background: '#f0f9ff', padding: 24, borderRadius: 16, border: '1.5px solid #bae6fd' }}>
              <div style={{ display: 'flex', gap: 10, marginBottom: 20, padding: '12px 16px', background: '#e0f2fe', borderRadius: 10, color: '#0369a1', fontWeight: 600, fontSize: 13, alignItems: 'center' }}>
                 <i className="bx bx-info-circle" style={{ fontSize: 18 }} /> 
-                Isi form ini untuk memberikan komisi khusus pada produk ini (mengabaikan aturan global).
+                Isi form ini untuk menetapkan preset komisi berjenjang (MLM) produk ini.
              </div>
              
-             <div className="form-grid">
-                <div>
-                  <FieldLabel>Komisi Mitra Reguler (%)</FieldLabel>
-                  <input style={A.input} type="number" step="0.01" placeholder="Misal: 10" 
-                    value={p.base_affiliate_fee} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div>
-                  <FieldLabel>Atau Nominal Rupiah (Rp)</FieldLabel>
-                  <input style={A.input} type="number" placeholder="Misal: 25000" 
-                    value={p.base_affiliate_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_affiliate_fee_nominal: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div>
-                  <FieldLabel>Fee Distribusi Agen (%)</FieldLabel>
-                  <input style={A.input} type="number" step="0.01" placeholder="Misal: 5" 
-                    value={p.base_distribution_fee} onChange={e => setP(prev => ({ ...prev, base_distribution_fee: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div>
-                  <FieldLabel>Atau Nominal Rupiah (Rp)</FieldLabel>
-                  <input style={A.input} type="number" placeholder="Misal: 15000" 
-                    value={p.base_distribution_fee_nominal} onChange={e => setP(prev => ({ ...prev, base_distribution_fee_nominal: parseFloat(e.target.value) || 0 }))} />
-                </div>
-             </div>
-
-             <div className="divider" style={{ background: '#bae6fd' }} />
-
-             <div className="form-grid">
-                <div>
-                  <FieldLabel>Preset Komisi Upline (MLM)</FieldLabel>
-                  <select
-                    value={p.commission_preset_id || ''}
-                    onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
-                    style={{ ...A.select, borderColor: '#7c3aed', background: '#fff' }}
-                  >
-                    <option value="">-- Gunakan Hierarki Default --</option>
-                    {presets.filter(pr => pr.is_active).map(pr => (
-                      <option key={pr.id} value={pr.id}>{pr.name}</option>
-                    ))}
-                  </select>
-                  <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Distribusi komisi berjenjang ke upline mitra.</div>
-                </div>
-
-                <div>
-                  <FieldLabel>Preset Membership Tier (Matrix)</FieldLabel>
-                  <select
-                    value={p.tier_commission_preset_id || ''}
-                    onChange={e => setP(prev => ({ ...prev, tier_commission_preset_id: e.target.value || null }))}
-                    style={{ ...A.select, borderColor: '#10b981', background: '#fff' }}
-                  >
-                    <option value="">-- Gunakan Rate Produk Default --</option>
-                    {tierPresets.filter(pr => pr.is_active).map(pr => (
-                      <option key={pr.id} value={pr.id}>{pr.name}</option>
-                    ))}
-                  </select>
-                  <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Atur rate komisi berbeda untuk Reseller / Agen / VIP.</div>
-                </div>
-
-                <div>
-                  <FieldLabel>Merchant Commission Preset</FieldLabel>
-                  <select
-                    value={p.merchant_commission_preset_id || ''}
-                    onChange={e => setP(prev => ({ ...prev, merchant_commission_preset_id: e.target.value || null }))}
-                    style={{ ...A.select, borderColor: '#3b82f6', background: '#fff' }}
-                  >
-                    <option value="">-- Tanpa Preset (Manual %) --</option>
-                    {merchantPresets.filter(pr => pr.is_active).map(pr => (
-                      <option key={pr.id} value={pr.id}>{pr.name} ({(pr.merchant_commission_rate * 100).toFixed(1)}%)</option>
-                    ))}
-                  </select>
-                  <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Gunakan preset untuk standarisasi komisi merchant.</div>
-                </div>
+             <div>
+                <FieldLabel>Preset Komisi Upline (MLM)</FieldLabel>
+                <select
+                  value={p.commission_preset_id || ''}
+                  onChange={e => setP(prev => ({ ...prev, commission_preset_id: e.target.value || null }))}
+                  style={{ ...A.select, borderColor: '#7c3aed', background: '#fff', maxWidth: '500px' }}
+                >
+                  <option value="">-- Gunakan Hierarki Default --</option>
+                  {presets.filter(pr => pr.is_active).map(pr => (
+                    <option key={pr.id} value={pr.id}>{pr.name}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>Distribusi komisi berjenjang ke upline mitra.</div>
              </div>
           </div>
 
@@ -484,6 +452,21 @@ export default function AdminAddProduct() {
           </div>
         </form>
       </div>
+
+      <MediaLibraryModal 
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        multiple={mediaModalType === 'gallery'}
+        currentSelection={mediaModalType === 'gallery' ? gallery : p.image}
+        onSelect={(selected) => {
+          if (mediaModalType === 'main') {
+            setP(prev => ({ ...prev, image: selected }));
+          } else {
+            setGallery(selected);
+            setP(prev => ({ ...prev, images: JSON.stringify(selected) }));
+          }
+        }}
+      />
     </div>
   );
 }

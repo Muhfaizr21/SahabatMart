@@ -285,7 +285,7 @@ export default function ProductDetailPage() {
     <>
     <SEO 
       title={product.name} 
-      description={product.description?.substring(0, 160) || `Beli ${product.name} dengan harga terbaik di SahabatMart.`}
+      description={product.description?.substring(0, 160) || `Beli ${product.name} dengan harga terbaik di AkuGlow.`}
       image={formatImage(product.image)}
       type="article"
       schema={combinedSchema}

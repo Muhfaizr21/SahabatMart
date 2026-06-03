@@ -77,7 +77,7 @@ func (s *SkinAIService) buildSystemRole(templateRole string) string {
 // These are TEMPLATES only. Product knowledge is injected dynamically from DB.
 // Do NOT hardcode product details here. Use {{product_knowledge}} placeholder.
 
-const systemRoleTemplate = `Anda adalah "Sahabat Glow", AI Skincare Expert untuk platform Akuglow (SahabatMart).
+const systemRoleTemplate = `Anda adalah "Sahabat Glow", AI Skincare Expert untuk platform AkuGlow.
 Analisis foto kulit wajah secara mendalam, teknis, dan empatis.
 Bahasa: Bahasa Indonesia yang hangat dan memotivasi.
 

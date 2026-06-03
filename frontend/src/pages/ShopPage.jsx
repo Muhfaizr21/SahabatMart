@@ -185,8 +185,8 @@ export default function ShopPage() {
   return (
     <main className="bg-gray-50 min-h-screen">
       <SEO
-        title={activeCategory === 'Semua' ? "Semua Produk - SahabatMart" : `${activeCategory} - SahabatMart`}
-        description={`Jelajahi koleksi ${activeCategory === 'Semua' ? 'produk kecantikan dan kesehatan' : activeCategory} terbaik di SahabatMart. Belanja sekarang dengan promo menarik.`}
+        title={activeCategory === 'Semua' ? "Semua Produk - AkuGlow" : `${activeCategory} - AkuGlow`}
+        description={`Jelajahi koleksi ${activeCategory === 'Semua' ? 'produk kecantikan dan kesehatan' : activeCategory} terbaik di AkuGlow. Belanja sekarang dengan promo menarik.`}
         type="website"
       />
       {/* Mobile Sticky Filter & Search Bar */}

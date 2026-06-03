@@ -9,7 +9,7 @@ export const getStoredUser = () => {
     if (!user) return null;
     return JSON.parse(user);
   } catch (_err) {
-    console.error('Failed to parse stored user', _err);
+    localStorage.removeItem('user');
     return null;
   }
 };
@@ -33,16 +33,33 @@ export const isAdminUser = (user) => {
 export const logout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  // [BUG-H7 Fix] Hapus affiliate_id saat logout — cegah misattribution lintas sesi
+  localStorage.removeItem('affiliate_id');
+  localStorage.removeItem('pending_ref');
   // Gunakan reload agar state global bersih total
   window.location.href = '/login';
 };
 
 /**
  * setupAuthFetchInterceptor
- * Dibutuhkan oleh main.jsx untuk konfigurasi awal fetch.
- * Kita buat sesederhana mungkin agar tidak crash saat boot.
+ * Mengatur interceptor fetch global untuk auto-attach token.
  */
+let _originalFetch = null;
+
 export const setupAuthFetchInterceptor = () => {
-  console.log('Auth Interceptor initialized');
+  if (_originalFetch) return true; // sudah di-set
+  
+  _originalFetch = window.fetch;
+  window.fetch = function(input, init = {}) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      init.headers = {
+        ...init.headers,
+        'Authorization': `Bearer ${token}`,
+      };
+    }
+    return _originalFetch(input, init);
+  };
+  
   return true;
 };

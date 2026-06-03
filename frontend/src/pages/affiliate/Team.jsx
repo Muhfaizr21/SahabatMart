@@ -136,6 +136,9 @@ export default function TeamPerformance() {
   const reqMitra = eligibility?.requirements?.min_mitra || 100;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
   const reqTurnover = eligibility?.requirements?.min_turnover || 10000000;
+  const directMitra = eligibility?.direct_mitra || 0;
+  const totalTransactions = eligibility?.total_transactions || 0;
+  const performancePoints = eligibility?.performance_points || 0;
   
   // Use totalMitra for progress as requested (Total Affiliate instead of Qualified)
   const mitraProgress = Math.min((totalMitra / reqMitra) * 100, 100);
@@ -229,6 +232,9 @@ export default function TeamPerformance() {
         activeMitra={activeMitra}
         monthlyTurnover={monthlyTurnover}
         cardStyle={cardStyle}
+        directMitra={directMitra}
+        totalTransactions={totalTransactions}
+        performancePoints={performancePoints}
       />
 
       {/* Team View Controller */}

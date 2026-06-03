@@ -35,7 +35,7 @@ export default function AdminModeration() {
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Product Guard & Moderation" subtitle="Pintu gerbang kualitas. Tinjau setiap aset yang didaftarkan merchant sebelum publikasi.">
+      <PageHeader title="Moderasi Produk" subtitle="Pintu gerbang kualitas. Tinjau setiap produk yang didaftarkan merchant sebelum publikasi.">
         <div style={A.searchWrap}>
           <i className="bx bx-search" style={A.searchIcon} />
           <input 

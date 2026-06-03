@@ -43,8 +43,8 @@ export default function BlogPage() {
   return (
     <main className="bg-white min-h-screen">
       <SEO 
-        title="Blog & Edukasi - SahabatMart"
-        description="Temukan berbagai tips kecantikan, panduan perawatan kulit, dan informasi terbaru seputar dunia skincare dari para ahli SahabatMart."
+        title="Blog & Edukasi - AkuGlow"
+        description="Temukan berbagai tips kecantikan, panduan perawatan kulit, dan informasi terbaru seputar dunia skincare dari para ahli AkuGlow."
       />
       {/* Hero Section */}
       <section className="bg-gray-50 py-20 border-b border-gray-100">

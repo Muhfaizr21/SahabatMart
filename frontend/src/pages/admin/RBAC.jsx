@@ -28,9 +28,17 @@ const AdminRBAC = () => {
     const [previewUser, setPreviewUser] = useState(null);
     const [selectedRole, setSelectedRole] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [expandedGroups, setExpandedGroups] = useState({});
     
     const initialUserState = { email: '', password: '', full_name: '', role: 'admin', admin_role: '', department: '' };
     const [newUser, setNewUser] = useState(initialUserState);
+
+    const toggleGroupExpand = (groupName) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [groupName]: !prev[groupName]
+        }));
+    };
 
     const loadData = () => {
         setLoading(true);
@@ -80,7 +88,7 @@ const AdminRBAC = () => {
             toast.success('Security Profile berhasil disinkronisasi');
             setShowRoleModal(false);
             loadData();
-        }).catch(err => toast.error(_err.message));
+        }).catch(err => toast.error(err.message));
     };
 
     const handleDeleteRole = (id) => {
@@ -89,7 +97,7 @@ const AdminRBAC = () => {
             .then(() => {
                 toast.success("Role berhasil dihapus");
                 loadData();
-            }).catch(err => toast.error(_err.message));
+            }).catch(err => toast.error(err.message));
     };
 
     const handleCloneRole = (role) => {
@@ -124,7 +132,7 @@ const AdminRBAC = () => {
             setNewUser(initialUserState);
             setSelectedUser(null);
             loadData();
-        }).catch(err => toast.error(_err.message));
+        }).catch(err => toast.error(err.message));
     };
 
     const handleEditUser = (user) => {
@@ -148,7 +156,7 @@ const AdminRBAC = () => {
         }).then(() => {
             toast.success(`Status admin diubah menjadi ${newStatus}`);
             loadData();
-        }).catch(err => toast.error(_err.message));
+        }).catch(err => toast.error(err.message));
     };
 
     const handleDeleteUser = (id) => {
@@ -157,7 +165,7 @@ const AdminRBAC = () => {
             .then(() => {
                 toast.success("Admin berhasil dihapus");
                 loadData();
-            }).catch(err => toast.error(_err.message));
+            }).catch(err => toast.error(err.message));
     };
 
     const toggleGroup = (groupName, select) => {
@@ -193,7 +201,7 @@ const AdminRBAC = () => {
                 .rbac-grid-main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
                 .rbac-perm-cols { column-count: 2; column-gap: 24px; }
                 .rbac-role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
-                .rbac-modal-grid { display: grid; grid-template-columns: 350px 1fr; gap: 32px; }
+                .rbac-modal-grid { display: grid; grid-template-columns: 280px 1fr; gap: 32px; }
                 .rbac-user-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; }
                 .rbac-hero-content { display: flex; justify-content: space-between; align-items: center; }
                 .rbac-toolbar { display: flex; gap: 12px; align-items: center; width: 100%; }
@@ -221,6 +229,10 @@ const AdminRBAC = () => {
                 @media (max-width: 640px) {
                     .rbac-role-grid { grid-template-columns: 1fr; }
                     .admin-header-stack { flex-direction: column; align-items: flex-start !important; gap: 20px !important; }
+                }
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateY(-8px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
             `}</style>
 
@@ -264,7 +276,7 @@ const AdminRBAC = () => {
                                 </div>
                                 <h1 style={{ margin: 0, fontSize: 32, fontWeight: 900, letterSpacing: '-1px' }}>RBAC Command Center</h1>
                                 <p style={{ margin: '8px 0 0 0', fontSize: 15, color: '#a5b4fc', maxWidth: 500, lineHeight: 1.6 }}>
-                                    Pusat kendali otoritas sistem SahabatMart. Pantau, kelola, dan audit seluruh akses personel secara real-time.
+                                    Pusat kendali otoritas sistem AkuGlow. Pantau, kelola, dan audit seluruh akses personel secara real-time.
                                 </p>
                             </div>
                             <div style={{ textAlign: 'right' }}>
@@ -623,7 +635,7 @@ const AdminRBAC = () => {
                                 </div>
                                 <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>Capability Registry</h2>
                                 <p style={{ margin: '12px 0 0 0', fontSize: 15, color: '#94a3b8', maxWidth: 600, lineHeight: 1.6 }}>
-                                    Daftar lengkap seluruh kapabilitas atomik dalam ekosistem SahabatMart. 
+                                    Daftar lengkap seluruh kapabilitas atomik dalam ekosistem AkuGlow. 
                                     Gunakan registry ini untuk memetakan fungsi teknis ke dalam kebijakan akses bisnis.
                                 </p>
                             </div>
@@ -646,13 +658,18 @@ const AdminRBAC = () => {
                                 .reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})
                         ).map(([group, perms]) => {
                             const groupIcons = {
+                                'Dashboard': 'bx-grid-alt',
+                                'Catalog': 'bx-layer',
+                                'Sales': 'bx-cart',
                                 'Inventory': 'bx-package',
-                                'Orders': 'bx-cart',
                                 'Users': 'bx-user',
-                                'Admin': 'bx-shield-quarter',
+                                'Merchants': 'bx-store-alt',
+                                'Affiliate': 'bx-group',
                                 'Finance': 'bx-wallet',
                                 'Marketing': 'bx-megaphone',
-                                'Education': 'bx-book-open'
+                                'Settings': 'bx-cog',
+                                'IAM': 'bx-shield-quarter',
+                                'Reports': 'bx-bar-chart-alt-2'
                             };
                             const icon = groupIcons[group] || 'bx-cube';
 
@@ -764,83 +781,149 @@ const AdminRBAC = () => {
                 <Modal title={selectedRole.id ? "UPDATE SECURITY PROFILE" : "CREATE NEW SECURITY PROFILE"} onClose={() => setShowRoleModal(false)} wide>
                     <form onSubmit={handleSaveRole}>
                         <div className="rbac-modal-grid">
-                            <div>
-                                <div style={{ background: '#f8fafc', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-                                    <h4 style={{ margin: '0 0 20px 0', fontSize: 14, fontWeight: 800, color: '#1e293b' }}>Detail Profile</h4>
-                                    <FieldLabel>Profile Name</FieldLabel>
-                                    <input style={{...A.input, marginBottom: 16, background: '#fff'}} placeholder="e.g. Senior CS Analyst" value={selectedRole.name} onChange={e=>setSelectedRole({...selectedRole, name: e.target.value})} required />
-                                    
-                                    <FieldLabel>Operational Context / Description</FieldLabel>
-                                    <textarea style={{...A.input, height: 120, background: '#fff'}} placeholder="Jelaskan ruang lingkup dan tanggung jawab dari profile ini..." value={selectedRole.description} onChange={e=>setSelectedRole({...selectedRole, description: e.target.value})} />
-                                    
-                                    <div style={{ marginTop: 24, padding: 16, background: '#e0e7ff', borderRadius: 12, border: '1px dashed #a5b4fc' }}>
-                                        <div style={{ fontSize: 12, fontWeight: 800, color: '#4338ca', marginBottom: 8 }}>Status Sinkronisasi</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <span style={{ fontSize: 11, color: '#4f46e5' }}>Total Izin Terpilih:</span>
-                                            <span style={{ fontSize: 18, fontWeight: 900, color: '#312e81' }}>{(selectedRole.permission_ids || []).length}</span>
+                            <div className="rbac-modal-left">
+                                <div style={{ background: '#f8fafc', padding: 24, borderRadius: 16, border: '1px solid #e2e8f0', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 20px 0', fontSize: 14, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.3px' }}>DETAIL PROFILE</h4>
+                                        
+                                        <div style={{ marginBottom: 16 }}>
+                                            <FieldLabel>Profile Name</FieldLabel>
+                                            <input style={{...A.input, background: '#fff', border: '1.5px solid #e2e8f0', fontWeight: 600}} placeholder="e.g. Senior CS Analyst" value={selectedRole.name} onChange={e=>setSelectedRole({...selectedRole, name: e.target.value})} required />
+                                        </div>
+                                        
+                                        <div style={{ marginBottom: 16 }}>
+                                            <FieldLabel>Operational Context / Description</FieldLabel>
+                                            <textarea style={{...A.input, height: 140, background: '#fff', border: '1.5px solid #e2e8f0', resize: 'none', lineHeight: 1.5}} placeholder="Jelaskan ruang lingkup dan tanggung jawab dari profile ini..." value={selectedRole.description} onChange={e=>setSelectedRole({...selectedRole, description: e.target.value})} />
                                         </div>
                                     </div>
-                                </div>
-                                <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-                                    <button style={{...A.btnPrimary, flex: 1, height: 48, fontSize: 13}} type="submit">
-                                        <i className="bx bx-save" style={{ marginRight: 8, fontSize: 18 }} /> SAVE PROFILE
-                                    </button>
+                                    
+                                    <div>
+                                        <div style={{ padding: 18, background: 'linear-gradient(135deg, #f5f7ff 0%, #e0e7ff 100%)', borderRadius: 16, border: '1px solid #c7d2fe' }}>
+                                            <div style={{ fontSize: 11, fontWeight: 900, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Status Sinkronisasi</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>Total Izin Terpilih:</span>
+                                                <span style={{ fontSize: 20, fontWeight: 900, color: '#4f46e5', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <i className="bx bx-key" /> {(selectedRole.permission_ids || []).length}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <button style={{...A.btnPrimary, width: '100%', height: 48, fontSize: 13.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20}} type="submit">
+                                            <i className="bx bx-save" style={{ fontSize: 18 }} /> SAVE PROFILE
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div>
-                               <div className="rbac-tab-header">
-                                    <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Matrix Kapabilitas</h4>
-                                    <div style={{ fontSize: 12, color: '#64748b', background: '#f1f5f9', padding: '6px 12px', borderRadius: 20 }}>
-                                        Pilih fungsi yang diizinkan untuk role ini
+                            <div className="rbac-modal-right">
+                                <div className="rbac-tab-header" style={{ marginBottom: 16 }}>
+                                    <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.3px' }}>Matrix Kapabilitas</h4>
+                                    <div style={{ fontSize: 11.5, color: '#4f46e5', background: '#eef2ff', padding: '6px 14px', borderRadius: 20, fontWeight: 800 }}>
+                                        Batasi kapabilitas operasional profil
                                     </div>
                                 </div>
                                 
-                                <div style={{ background: '#f8fafc', padding: 24, borderRadius: 24, border: '1px solid #e2e8f0', maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                                    {Object.entries(permissions.reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})).map(([g, ps]) => (
-                                        <div key={g} style={{ background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                                <div style={{ fontSize: 13, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                    <div style={{ width: 30, height: 30, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <i className="bx bx-folder" style={{ color: '#6366f1' }}/>
+                                <div style={{ background: '#f8fafc', padding: '20px', borderRadius: 24, border: '1px solid #e2e8f0', maxHeight: '52vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                    {Object.entries(permissions.reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})).map(([g, ps]) => {
+                                        const groupIcons = {
+                                            'Dashboard': 'bx-grid-alt',
+                                            'Catalog': 'bx-layer',
+                                            'Sales': 'bx-cart',
+                                            'Inventory': 'bx-package',
+                                            'Users': 'bx-user',
+                                            'Merchants': 'bx-store-alt',
+                                            'Affiliate': 'bx-group',
+                                            'Finance': 'bx-wallet',
+                                            'Marketing': 'bx-megaphone',
+                                            'Settings': 'bx-cog',
+                                            'IAM': 'bx-shield-quarter',
+                                            'Reports': 'bx-bar-chart-alt-2'
+                                        };
+                                        const icon = groupIcons[g] || 'bx-cube';
+                                        const isExpanded = !!expandedGroups[g];
+                                        const selectedCount = ps.filter(p => (selectedRole.permission_ids || []).includes(p.id)).length;
+                                        
+                                        return (
+                                            <div key={g} style={{ flexShrink: 0, background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)', transition: 'all 0.3s ease' }}>
+                                                {/* Header Trigger */}
+                                                <div 
+                                                    style={{ 
+                                                        display: 'flex', 
+                                                        justifyContent: 'space-between', 
+                                                        alignItems: 'center', 
+                                                        padding: '14px 20px', 
+                                                        background: 'linear-gradient(90deg, #f8fafc 0%, #fff 100%)', 
+                                                        borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none',
+                                                        cursor: 'pointer',
+                                                        userSelect: 'none'
+                                                    }}
+                                                    onClick={() => toggleGroupExpand(g)}
+                                                >
+                                                    <div style={{ fontSize: 12, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '0.05em' }}>
+                                                        <div style={{ width: 28, height: 28, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <i className={`bx ${icon}`} style={{ color: '#6366f1', fontSize: 16 }}/>
+                                                        </div>
+                                                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                                                            {g.toUpperCase()} MODULE
+                                                            {selectedCount > 0 && (
+                                                                <span style={{ fontSize: 10, background: '#e0e7ff', color: '#4f46e5', padding: '2px 8px', borderRadius: 8, fontWeight: 800, marginLeft: 8 }}>
+                                                                    {selectedCount} / {ps.length} SELECTED
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                     </div>
-                                                    {g.toUpperCase()} MODULE
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }} onClick={e => e.stopPropagation()}>
+                                                        <div style={{ display: 'flex', gap: 8 }}>
+                                                            <button type="button" style={{ border: 'none', background: '#eef2ff', borderRadius: 20, padding: '6px 14px', fontSize: 10, fontWeight: 800, color: '#4f46e5', cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.background='#c7d2fe'} onMouseLeave={e=>e.currentTarget.style.background='#eef2ff'} onClick={() => toggleGroup(g, true)}>SELECT ALL</button>
+                                                            <button type="button" style={{ border: 'none', background: '#f1f5f9', borderRadius: 20, padding: '6px 14px', fontSize: 10, fontWeight: 800, color: '#64748b', cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.background='#cbd5e1'} onMouseLeave={e=>e.currentTarget.style.background='#f1f5f9'} onClick={() => toggleGroup(g, false)}>CLEAR</button>
+                                                        </div>
+                                                        <div 
+                                                            onClick={() => toggleGroupExpand(g)}
+                                                            style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isExpanded ? '#f1f5f9' : 'transparent', cursor: 'pointer', transition: '0.2s' }}
+                                                        >
+                                                            <i className="bx bx-chevron-down" style={{ fontSize: 18, color: '#64748b', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }} />
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: 8 }}>
-                                                    <button type="button" style={{ border: 'none', background: '#eef2ff', borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#4f46e5', cursor: 'pointer' }} onClick={() => toggleGroup(g, true)}>SELECT ALL</button>
-                                                    <button type="button" style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#64748b', cursor: 'pointer' }} onClick={() => toggleGroup(g, false)}>CLEAR</button>
-                                                </div>
+                                                
+                                                {/* Content Dropdown */}
+                                                {isExpanded && (
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, padding: 20, background: '#fff', animation: 'slideDown 0.25s ease-out' }}>
+                                                        {ps.map(p => {
+                                                            const isChecked = (selectedRole.permission_ids || []).includes(p.id);
+                                                            return (
+                                                                <div key={p.id} style={{ 
+                                                                    display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px', 
+                                                                    background: isChecked ? '#f5f7ff' : '#fff', 
+                                                                    border: `2.5px solid ${isChecked ? '#6366f1' : '#f1f5f9'}`, 
+                                                                    borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s',
+                                                                    boxShadow: isChecked ? '0 4px 12px rgba(99,102,241,0.08)' : 'none'
+                                                                }}
+                                                                onClick={() => togglePermission(p.id)}
+                                                                onMouseEnter={e => { if(!isChecked) e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                                                onMouseLeave={e => { if(!isChecked) e.currentTarget.style.borderColor = '#f1f5f9'; }}
+                                                                >
+                                                                    <div style={{ 
+                                                                        width: 18, height: 18, borderRadius: 6, 
+                                                                        border: `2px solid ${isChecked ? '#6366f1' : '#cbd5e1'}`, 
+                                                                        background: isChecked ? '#6366f1' : '#fff', 
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                        flexShrink: 0, marginTop: 2, transition: 'all 0.2s'
+                                                                    }}>
+                                                                        {isChecked && <i className="bx bx-check" style={{ color: '#fff', fontSize: 14 }} />}
+                                                                    </div>
+                                                                    <div style={{ minWidth: 0 }}>
+                                                                        <div style={{ fontSize: 12.5, fontWeight: 800, color: isChecked ? '#1e1b4b' : '#334155' }}>{p.name}</div>
+                                                                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, fontFamily: 'monospace' }}>{p.code}</div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, padding: 20 }}>
-                                                {ps.map(p => {
-                                                    const isChecked = (selectedRole.permission_ids || []).includes(p.id);
-                                                    return (
-                                                        <label key={p.id} style={{ 
-                                                            display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px', 
-                                                            background: isChecked ? '#f5f7ff' : '#fff', 
-                                                            border: `2px solid ${isChecked ? '#6366f1' : '#f1f5f9'}`, 
-                                                            borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s'
-                                                        }}>
-                                                            <div style={{ 
-                                                                width: 20, height: 20, borderRadius: 6, 
-                                                                border: `2px solid ${isChecked ? '#6366f1' : '#cbd5e1'}`, 
-                                                                background: isChecked ? '#6366f1' : '#fff', 
-                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                flexShrink: 0, marginTop: 2
-                                                            }}>
-                                                                {isChecked && <i className="bx bx-check" style={{ color: '#fff', fontSize: 16 }} />}
-                                                                <input type="checkbox" style={{ display: 'none' }} checked={isChecked} onChange={() => togglePermission(p.id)} />
-                                                            </div>
-                                                            <div style={{ minWidth: 0 }}>
-                                                                <div style={{ fontSize: 12.5, fontWeight: 800, color: isChecked ? '#1e1b4b' : '#334155' }}>{p.name}</div>
-                                                                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, fontFamily: 'monospace' }}>{p.code}</div>
-                                                            </div>
-                                                        </label>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>

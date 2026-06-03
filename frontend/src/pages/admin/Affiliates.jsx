@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
+import toast from 'react-hot-toast';
 
 const API = ADMIN_API_BASE;
 
@@ -66,15 +67,20 @@ export default function AdminAffiliates() {
   const saveMemberTier = () => {
     if (!editMemberTier) return;
     setSaving(true);
-    fetchJson(`${API}/affiliates/member/update-tier`, {
-      method: 'POST',
-      body: JSON.stringify({
-        user_id: editMemberTier.id,
-        membership_tier_id: parseInt(editMemberTier.new_tier_id),
-        status: editMemberTier.new_status
-      }),
-    }).then(() => { load(); setEditMemberTier(null); })
-      .catch(err => alert(_err.message || 'Gagal mengubah data member'))
+      fetchJson(`${API}/affiliates/member/update-info`, {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: editMemberTier.id,
+          email: editMemberTier.new_email || '',
+          full_name: editMemberTier.new_full_name || '',
+          membership_tier_id: parseInt(editMemberTier.new_tier_id),
+          status: editMemberTier.new_status,
+          bank_name: editMemberTier.new_bank_name || '',
+          bank_account_number: editMemberTier.new_bank_account_number || '',
+          bank_account_name: editMemberTier.new_bank_account_name || '',
+        }),
+      }).then(() => { load(); setEditMemberTier(null); })
+      .catch(err => alert(err.message || 'Gagal mengubah data member'))
       .finally(() => setSaving(false));
   };
 
@@ -132,7 +138,7 @@ export default function AdminAffiliates() {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
                 <thead>
                   <tr>
-                    {['Member', 'Ref Code', 'Tier', 'Komisi', 'Saldo', 'Omzet Tim', 'Omzet Bulan', 'Aksi'].map((h, i) => (
+                    {['Member', 'Ref Code', 'Tier', 'Info Bank', 'Komisi', 'Saldo', 'Omzet Tim', 'Aksi'].map((h, i) => (
                       <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 7 ? 24 : 14 }}>{h}</th>
                     ))}
                   </tr>
@@ -170,13 +176,17 @@ export default function AdminAffiliates() {
                           {a.tier_name || 'Mitra Dasar'}
                         </span>
                       </td>
+                      <td style={A.td}>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: '#0f172a' }}>{a.bank_name || '—'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{a.bank_account_number || ''}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8' }}>{a.bank_account_name || ''}</div>
+                      </td>
                       <td style={A.td}><span style={{ fontWeight: 700, color: '#10b981' }}>{idr(a.total_earned || 0)}</span></td>
                       <td style={A.td}><span style={{ fontWeight: 700, color: '#6366f1' }}>{idr(a.balance || 0)}</span></td>
                       <td style={A.td}>
                         <div style={{ fontWeight: 700, color: '#0f172a' }}>{idr(a.team_turnover || 0)}</div>
                         <div style={{ fontSize: 10, color: '#94a3b8' }}>{a.team_downlines || 0} downlines</div>
                       </td>
-                      <td style={A.td}><span style={{ fontWeight: 700, color: '#f59e0b' }}>{idr(a.monthly_turnover || 0)}</span></td>
                       <td style={{ ...A.td, paddingRight: 24 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, ...(STATUS_BADGE[a.affiliate_status] || STATUS_BADGE['pending_verification']) }}>
@@ -184,8 +194,8 @@ export default function AdminAffiliates() {
                           </span>
                           <button 
                             style={A.iconBtn('#6366f1', '#eef2ff')} 
-                            title="Ubah Status/Tier"
-                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '', new_status: a.affiliate_status || '' })}
+                            title="Ubah Status/Tier/Bank"
+                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '', new_status: a.affiliate_status || '', new_bank_name: a.bank_name || '', new_bank_account_number: a.bank_account_number || '', new_bank_account_name: a.bank_account_name || '' })}
                           >
                             <i className="bx bx-edit-alt" />
                           </button>
@@ -320,9 +330,42 @@ export default function AdminAffiliates() {
         <Modal title="Ubah Level Member" onClose={() => setEditMemberTier(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: '#f8fafc', borderRadius: 14, padding: '16px 20px', border: '1px solid #f1f5f9' }}>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Member</div>
-              <div style={{ fontWeight: 700, color: '#0f172a' }}>{editMemberTier.full_name || editMemberTier.email}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>Biodata Diri Member</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                <div>
+                  <FieldLabel>Nama Lengkap</FieldLabel>
+                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_full_name || ''}
+                    onChange={e => setEditMemberTier(p => ({ ...p, new_full_name: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>Email</FieldLabel>
+                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_email || ''}
+                    onChange={e => setEditMemberTier(p => ({ ...p, new_email: e.target.value }))} />
+                </div>
+              </div>
               <div style={{ fontSize: 12, color: '#94a3b8' }}>Tier Saat Ini: <span style={{ color: '#6366f1', fontWeight: 700 }}>{editMemberTier.tier_name || 'Mitra Dasar'}</span></div>
+            </div>
+
+            {/* Bank Info */}
+            <div style={{ background: '#f8fafc', borderRadius: 14, padding: '16px 20px', border: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>Info Rekening Bank</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <FieldLabel>Nama Bank</FieldLabel>
+                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_bank_name || ''}
+                    onChange={e => setEditMemberTier(p => ({ ...p, new_bank_name: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>No Rekening</FieldLabel>
+                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_bank_account_number || ''}
+                    onChange={e => setEditMemberTier(p => ({ ...p, new_bank_account_number: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <FieldLabel>Nama Pemilik Rekening</FieldLabel>
+                <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_bank_account_name || ''}
+                  onChange={e => setEditMemberTier(p => ({ ...p, new_bank_account_name: e.target.value }))} />
+              </div>
             </div>
 
             <div>

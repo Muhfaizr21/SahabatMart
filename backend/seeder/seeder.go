@@ -236,10 +236,10 @@ func seedCategories(db *gorm.DB) map[string]uint {
 func seedTiers(db *gorm.DB) {
 	fmt.Println("  -> Seeding Membership Tiers...")
 	tiers := []models.MembershipTier{
-		{Name: "Mitra Dasar", Level: 1, BaseCommissionRate: 0.05, MinWithdrawalAmount: 50000, CommissionHoldDays: 14, IsActive: true, MinCommissionDepth: 1, MaxCommissionDepth: 1},
-		{Name: "Mitra Silver", Level: 2, BaseCommissionRate: 0.10, MinWithdrawalAmount: 100000, CommissionHoldDays: 10, IsActive: true, MinEarningsUpgrade: 5000000, MinCommissionDepth: 1, MaxCommissionDepth: 2},
-		{Name: "Mitra Gold", Level: 3, BaseCommissionRate: 0.15, MinWithdrawalAmount: 250000, CommissionHoldDays: 7, IsActive: true, MinEarningsUpgrade: 25000000, MinCommissionDepth: 1, MaxCommissionDepth: 3},
-		{Name: "Mitra Platinum", Level: 4, BaseCommissionRate: 0.20, MinWithdrawalAmount: 500000, CommissionHoldDays: 3, IsActive: true, MinEarningsUpgrade: 100000000, MinCommissionDepth: 1, MaxCommissionDepth: 10},
+		{Name: "Mitra Dasar", Level: 1, BaseCommissionRate: 0.05, MinWithdrawalAmount: 50000, CommissionHoldDays: 0, IsActive: true, MinCommissionDepth: 1, MaxCommissionDepth: 1},
+		{Name: "Mitra Silver", Level: 2, BaseCommissionRate: 0.10, MinWithdrawalAmount: 100000, CommissionHoldDays: 0, IsActive: true, MinEarningsUpgrade: 5000000, MinCommissionDepth: 1, MaxCommissionDepth: 2},
+		{Name: "Mitra Gold", Level: 3, BaseCommissionRate: 0.15, MinWithdrawalAmount: 250000, CommissionHoldDays: 0, IsActive: true, MinEarningsUpgrade: 25000000, MinCommissionDepth: 1, MaxCommissionDepth: 3},
+		{Name: "Mitra Platinum", Level: 4, BaseCommissionRate: 0.20, MinWithdrawalAmount: 500000, CommissionHoldDays: 0, IsActive: true, MinEarningsUpgrade: 100000000, MinCommissionDepth: 1, MaxCommissionDepth: 100},
 	}
 	for _, t := range tiers {
 		db.Create(&t)
@@ -576,7 +576,7 @@ func seedRBAC(db *gorm.DB) {
 		// ─────────── PLATFORM SETTINGS ───────────
 		{Code: "settings_view", Name: "Lihat Pengaturan Platform", Group: "Settings", Description: "Melihat konfigurasi platform (payment, fee, dll)"},
 		{Code: "settings_update", Name: "Edit Pengaturan Platform", Group: "Settings", Description: "Mengubah konfigurasi platform secara global"},
-		{Code: "settings_manage_payment", Name: "Konfigurasi Payment Gateway", Group: "Settings", Description: "Mengatur API key Tripay/Midtrans & mode sandbox"},
+		{Code: "settings_manage_payment", Name: "Konfigurasi Payment Gateway", Group: "Settings", Description: "Mengatur API key Tripay & mode sandbox"},
 		{Code: "settings_manage_smtp", Name: "Konfigurasi Email / SMTP", Group: "Settings", Description: "Mengatur server email untuk notifikasi otomatis"},
 
 		// ─────────── RBAC / IAM ───────────
@@ -613,7 +613,7 @@ func SeedConfigs(db *gorm.DB) {
 		{Key: "payout_day", Value: "friday", Description: "Hari Payout (jika weekly)"},
 		{Key: "payout_payday_dates", Value: "25,30", Description: "Tanggal Gajian (pisahkan dengan koma, misal: 25,30)"},
 		{Key: "settlement_delay_hours", Value: "24", Description: "Delay Settlement Saldo (Jam)"},
-		{Key: "payment_gateway", Value: "tripay", Description: "Payment Gateway Aktif (tripay/midtrans)"},
+		{Key: "payment_gateway", Value: "tripay", Description: "Payment Gateway Aktif (tripay)"},
 		{Key: "payment_tripay_merchant", Value: "", Description: "Tripay Merchant Code"},
 		{Key: "payment_tripay_key", Value: "", Description: "Tripay API Key"},
 		{Key: "payment_tripay_private", Value: "", Description: "Tripay Private Key"},

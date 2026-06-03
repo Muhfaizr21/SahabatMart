@@ -10,9 +10,11 @@ export default function AdminEducation() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const loadData = () => {
     setLoading(true);
+    setSelectedIds([]);
     fetchJson(`${ADMIN_API_BASE}/education`)
       .then(d => setEdu(d || []))
       .catch(err => toast.error('Gagal memuat materi edukasi'))
@@ -20,6 +22,32 @@ export default function AdminEducation() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === edu.length) setSelectedIds([]);
+    else setSelectedIds(edu.map(e => e.id));
+  };
+
+  const bulkDelete = () => {
+    if (!window.confirm(`Hapus ${selectedIds.length} materi terpilih secara permanen?`)) return;
+    setLoading(true);
+    fetchJson(`${ADMIN_API_BASE}/education/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids: selectedIds })
+    })
+      .then(() => {
+        toast.success('Materi terpilih dihapus');
+        loadData();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Gagal menghapus materi');
+        setLoading(false);
+      });
+  };
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
@@ -48,7 +76,7 @@ export default function AdminEducation() {
       toast.success(formData.id ? 'Materi diperbarui' : 'Materi ditambahkan');
       setShowModal(false);
       loadData();
-    }).catch(err => toast.error(_err.message))
+    }).catch(err => toast.error(err.message))
       .finally(() => setSaving(false));
   };
 
@@ -59,7 +87,7 @@ export default function AdminEducation() {
         toast.success('Materi dihapus');
         loadData();
       })
-      .catch(err => toast.error(_err.message));
+      .catch(err => toast.error(err.message));
   };
 
   return (
@@ -76,11 +104,39 @@ export default function AdminEducation() {
         </button>
       </PageHeader>
 
-      <TablePanel loading={loading}>
+      <TablePanel 
+        loading={loading}
+        toolbar={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {selectedIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 12px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fee2e2' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
+                <button 
+                  onClick={bulkDelete}
+                  style={{ ...A.btnPrimary, background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
+                >
+                  <i className="bx bx-trash" /> Hapus Terpilih
+                </button>
+              </div>
+            )}
+            <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
+              {loading ? 'Memuat...' : `${edu.length} materi`}
+            </span>
+          </div>
+        }
+      >
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ ...A.th, paddingLeft: 24 }}>Materi</th>
+              <th style={{ ...A.th, width: 40, paddingLeft: 24 }}>
+                <input 
+                  type="checkbox" 
+                  checked={edu.length > 0 && selectedIds.length === edu.length} 
+                  onChange={toggleSelectAll}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                />
+              </th>
+              <th style={A.th}>Materi</th>
               <th style={A.th}>Kategori</th>
               <th style={A.th}>Featured</th>
               <th style={A.th}>Status</th>
@@ -88,32 +144,59 @@ export default function AdminEducation() {
             </tr>
           </thead>
           <tbody>
-            {edu.map(e => (
-              <tr key={e.id}>
-                <td style={{ ...A.td, paddingLeft: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 64, height: 44, borderRadius: 10, overflow: 'hidden', border: '1px solid #f1f5f9', background: '#f8fafc', flexShrink: 0 }}>
-                      <img src={formatImage(e.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+            {edu.map((e, idx) => {
+              const isSelected = selectedIds.includes(e.id);
+              const isLast = idx === edu.length - 1;
+              return (
+                <tr 
+                  key={e.id}
+                  style={{ 
+                    background: isSelected ? '#f5f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa'),
+                    borderBottom: isLast ? 'none' : '1px solid #f8fafc'
+                  }}
+                  onMouseEnter={e => !isSelected && (e.currentTarget.style.background = '#f8fafc')}
+                  onMouseLeave={e => !isSelected && (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
+                >
+                  <td style={{ ...A.td, paddingLeft: 24, width: 40 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected} 
+                      onChange={() => toggleSelect(e.id)}
+                      style={{ width: 17, height: 17, cursor: 'pointer' }}
+                    />
+                  </td>
+                  <td style={A.td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 64, height: 44, borderRadius: 10, overflow: 'hidden', border: '1px solid #f1f5f9', background: '#f8fafc', flexShrink: 0 }}>
+                        <img src={formatImage(e.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{e.title}</div>
+                        <div style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 700 }}>{e.category}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 800, color: '#0f172a' }}>{e.title}</div>
-                      <div style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 700 }}>{e.category}</div>
+                  </td>
+                  <td style={A.td}>{e.category}</td>
+                  <td style={A.td}>{e.is_featured ? '⭐ Yes' : 'No'}</td>
+                  <td style={A.td}>
+                    <span style={statusBadge(e.is_active ? 'active' : 'inactive')}>{e.is_active ? 'Active' : 'Hidden'}</span>
+                  </td>
+                  <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
+                      <button onClick={() => { setFormData(e); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
+                      <button onClick={() => deleteItem(e.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
                     </div>
-                  </div>
-                </td>
-                <td style={A.td}>{e.category}</td>
-                <td style={A.td}>{e.is_featured ? '⭐ Yes' : 'No'}</td>
-                <td style={A.td}>
-                  <span style={statusBadge(e.is_active ? 'active' : 'inactive')}>{e.is_active ? 'Active' : 'Hidden'}</span>
-                </td>
-                <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
-                  <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
-                    <button onClick={() => { setFormData(e); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
-                    <button onClick={() => deleteItem(e.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
-                  </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {edu.length === 0 && !loading && (
+              <tr>
+                <td colSpan="6" style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
+                   Belum ada materi edukasi yang dipublikasikan.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </TablePanel>

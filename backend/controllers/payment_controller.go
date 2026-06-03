@@ -96,7 +96,6 @@ func (c *PaymentController) TriPayCallback(w http.ResponseWriter, r *http.Reques
 	// 6. Proses dengan idempotency guard (HandleWebhook = DB Transaction + lock)
 	err = utils.HandleWebhook(c.DB, "tripay", payload.Reference, string(body), func(tx *gorm.DB) error {
 		// Hanya proses status PAID
-		// EXPIRED & FAILED → acknowledge tapi tidak ubah order (sudah dihandle housekeeping)
 		if payload.Status != "PAID" {
 			return nil
 		}
@@ -112,6 +111,13 @@ func (c *PaymentController) TriPayCallback(w http.ResponseWriter, r *http.Reques
 
 		// Idempotency: skip jika sudah dibayar
 		if order.Status == models.OrderPaid {
+			return nil
+		}
+
+		// [BUG-C4 Fix] Jika order sudah expired/cancelled, acknowledge saja.
+		// Tripay akan infinite retry jika kita return error.
+		// Untuk expired order, return nil (success) agar Tripay stop retry.
+		if order.Status != models.OrderPendingPayment {
 			return nil
 		}
 
@@ -148,6 +154,8 @@ func (c *PaymentController) TriPayCallback(w http.ResponseWriter, r *http.Reques
 	// 7. Docs: response WAJIB {"success": true} agar Tripay tidak retry
 	respondCallback(w, true, "OK")
 }
+
+// respondCallback: format response sesuai docs Tripay → {"success": true/false}
 
 // ─── Get Active Payment Channels ─────────────────────────────────────────────
 // GET /api/payment/channels → dipakai CheckoutPage.jsx

@@ -83,6 +83,27 @@ export default function StatusMitra() {
         </div>
       )}
 
+      {/* If already a merchant */}
+      {eligibility?.is_merchant && (
+        <div
+          className="flex items-start gap-4 p-5 rounded-2xl text-sm font-medium fade-in"
+          style={{
+            background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.04))',
+            border: '1px solid rgba(234, 179, 8, 0.35)',
+            color: '#fbbf24',
+            boxShadow: '0 8px 32px rgba(234,179,8,0.05)'
+          }}
+        >
+          <span className="material-symbols-outlined text-2xl flex-shrink-0" style={{ color: '#fbbf24' }}>workspace_premium</span>
+          <div>
+            <p className="font-black text-amber-300 text-xs uppercase tracking-widest mb-1">Status Puncak Tercapai 🏆</p>
+            <p className="text-slate-300 text-xs leading-relaxed">
+              Selamat! Anda saat ini telah aktif sebagai <strong className="text-white">Merchant Resmi AkuGlow</strong>. Anda memiliki akses penuh ke Pusat Distribusi, Komisi Distribusi, dan pengelolaan stok gudang mitra Anda secara langsung.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Progress Cards */}
       <div
         className="rounded-2xl p-6 space-y-6"
@@ -99,7 +120,12 @@ export default function StatusMitra() {
               Penuhi kedua syarat di bawah untuk mengajukan upgrade.
             </p>
           </div>
-          {isEligible && !applyResult?.success && (
+          {eligibility?.is_merchant ? (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 whitespace-nowrap shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+              <span className="material-symbols-outlined text-sm">verified_user</span>
+              VERIFIED MERCHANT
+            </div>
+          ) : isEligible && !applyResult?.success && (
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black text-white transition-all hover:opacity-90 whitespace-nowrap"

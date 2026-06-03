@@ -128,15 +128,26 @@ export default function AdminMerchants() {
 
   const updateMerchantArea = (area) => {
     if (!modal) return;
+    const cityName = area.administrative_division_level_2_name || area.city_name || '';
+    const provName = area.administrative_division_level_1_name || area.province_name || '';
     fetchJson(`${API}/merchants/update`, {
       method: 'PUT',
       body: JSON.stringify({ 
         merchant_id: modal.id, 
         biteship_area_id: area.id,
+        area_name: area.name,
+        city: cityName,
+        province: provName,
         is_verified: modal.is_verified 
       }),
     }).then(() => {
-      setModal({ ...modal, biteship_area_id: area.id });
+      setModal({ 
+        ...modal, 
+        biteship_area_id: area.id,
+        area_name: area.name,
+        city: cityName,
+        province: provName
+      });
       setAreas([]);
       setSearchInput('');
       load();
@@ -453,15 +464,27 @@ export default function AdminMerchants() {
                       {areas.map(a => (
                         <div key={a.id} onClick={() => updateMerchantArea(a)} style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 11 }}>
                           <div style={{ fontWeight: 800 }}>{a.name}</div>
-                          <div style={{ color: '#64748b' }}>{a.city_name}, {a.province_name}</div>
+                          <div style={{ color: '#64748b' }}>
+                            {a.administrative_division_level_2_name || a.city_name || ''}, {a.administrative_division_level_1_name || a.province_name || ''} ({a.postal_code || '-'})
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
                 {modal.biteship_area_id ? (
-                  <div style={{ marginTop: 10, fontSize: 11, fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <i className="bx bxs-map-pin" /> AREA-ID: {modal.biteship_area_id}
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="bx bxs-map-pin" /> AREA-ID: {modal.biteship_area_id}
+                    </div>
+                    {modal.area_name && (
+                      <div style={{ marginTop: 8, fontSize: 11, background: '#f0fdf4', padding: '8px 12px', borderRadius: 8, border: '1px solid #dcfce7', color: '#14532d' }}>
+                        <div style={{ fontWeight: 800 }}>{modal.area_name}</div>
+                        <div style={{ fontSize: 10, color: '#166534', marginTop: 2 }}>
+                          {modal.city}, {modal.province}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>

@@ -31,3 +31,10 @@ merchant.html
 shofy/
 template-admin/
 scratch/
+
+# Temporary / Binary Files
+*.zip
+*.sql
+*.bak
+backend/sahabatmart
+backend/sahabatmart_binary

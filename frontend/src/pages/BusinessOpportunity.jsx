@@ -61,8 +61,8 @@ const BusinessOpportunity = () => {
   return (
     <div className="min-h-screen overflow-hidden" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <SEO 
-        title="Peluang Bisnis Skincare - SahabatMart"
-        description="Bangun bisnis skincare premium tanpa modal dan tanpa stok. Jadilah mitra SahabatMart dan nikmati komisi berkelanjutan melalui sistem afiliasi kami."
+        title="Peluang Bisnis Skincare - AkuGlow"
+        description="Bangun bisnis skincare premium tanpa modal dan tanpa stok. Jadilah mitra AkuGlow dan nikmati komisi berkelanjutan melalui sistem afiliasi kami."
       />
 
       {/* ===== HERO ===== */}
@@ -158,7 +158,7 @@ const BusinessOpportunity = () => {
           </div>
           <div className="grid md:grid-cols-2 gap-5">
             {[
-              { num: '01', title: 'Daftar Mitra Gratis', desc: 'Daftar sebagai mitra di SahabatMart.com tanpa biaya apapun. Tidak ada minimum pembelian.' },
+              { num: '01', title: 'Daftar Mitra Gratis', desc: 'Daftar sebagai mitra di AkuGlow.com tanpa biaya apapun. Tidak ada minimum pembelian.' },
               { num: '02', title: 'Ambil Link Unikmu', desc: 'Gunakan link produk atau link pendaftaran unik dari Dashboard Member Anda.' },
               { num: '03', title: 'Bagikan Konten', desc: 'Share ke WhatsApp, TikTok, atau Instagram. Foto & video promosi sudah kami siapkan.' },
               { num: '04', title: 'Komisi Masuk Otomatis', desc: 'Dapatkan komisi otomatis dari setiap transaksi yang terjadi melalui link Anda.' },

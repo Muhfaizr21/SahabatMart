@@ -9,6 +9,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const cardRef = useRef(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
 
   const downloadCard = async () => {
     if (cardRef.current === null || !userData) return;
@@ -44,6 +45,7 @@ export default function ProfilePage() {
   }, [tabParam]);
 
   const [formData, setFormData] = useState({
+    email: '',
     full_name: '',
     phone: '',
     gender: '',
@@ -89,6 +91,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (userData?.profile) {
       setFormData({
+        email: userData.email || '',
         full_name: userData.profile.full_name || '',
         phone: userData.phone || '',
         gender: userData.profile.gender || '',
@@ -245,8 +248,12 @@ export default function ProfilePage() {
             width: 100% !important;
           }
           /* Ensure the card prints with its background colors */
-          .perspective-1000 {
-            transform: scale(1.4) !important;
+          .print-card {
+            transform: scale(1.3) !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+          .print-card * {
             print-color-adjust: exact !important;
             -webkit-print-color-adjust: exact !important;
           }
@@ -337,10 +344,15 @@ export default function ProfilePage() {
                          className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
                        />
                     </div>
-                    <div>
-                       <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Alamat Email</label>
-                       <input type="email" defaultValue={userData.email} readOnly className="w-full border border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed rounded-xl px-4 py-3.5 text-sm font-medium outline-none" />
-                    </div>
+                     <div>
+                        <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Alamat Email</label>
+                        <input 
+                          type="email" 
+                          value={formData.email} 
+                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          className="w-full border-2 border-gray-100 rounded-xl px-4 py-3.5 text-sm font-semibold text-gray-900 focus:border-blue-500 outline-none transition-colors" 
+                        />
+                     </div>
                     <div>
                        <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block mb-2">Nomor Telepon</label>
                        <input 
@@ -678,8 +690,17 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div ref={cardRef}>
-                    <MemberCard user={userData} profile={profile} />
+                  <div 
+                    ref={cardRef} 
+                    onClick={() => setShowCardModal(true)}
+                    className="cursor-pointer relative group/card flex flex-col justify-between w-full print-card"
+                  >
+                    <MemberCard user={userData} profile={profile} size="small" />
+                    <div className="text-center mt-3 opacity-40 group-hover/card:opacity-90 transition-opacity duration-300">
+                      <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase flex items-center justify-center gap-1.5">
+                        <span className="material-symbols-outlined text-xs">zoom_in</span> Klik kartu untuk memperbesar
+                      </span>
+                    </div>
                   </div>
 
                   {/* INFO SECTION */}
@@ -740,9 +761,33 @@ export default function ProfilePage() {
 
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* Premium Fullscreen Member Card Modal */}
+      {showCardModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/95 backdrop-blur-2xl animate-in fade-in duration-300 no-print"
+          onClick={() => setShowCardModal(false)}
+        >
+          {/* Close trigger button */}
+          <div className="absolute top-6 right-6 z-50">
+            <button 
+              onClick={() => setShowCardModal(false)} 
+              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/10 transition-all active:scale-95 flex items-center justify-center shadow-lg"
+            >
+              <span className="material-symbols-outlined text-2xl">close</span>
+            </button>
+          </div>
+
+          <div 
+            className="w-full max-w-[1063px] transform scale-95 md:scale-100 transition-all duration-500 ease-out animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MemberCard user={userData} profile={profile} size="large" />
+          </div>
+        </div>
+      )}
     </main>
   );
 }

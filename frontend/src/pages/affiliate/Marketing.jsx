@@ -32,7 +32,7 @@ export default function MarketingMaterials() {
     // Load affiliate profile for ref_code
     fetchJson(`${AFFILIATE_API_BASE}/profile`)
       .then(res => setAffiliate(res))
-      .catch(err => console.error("Gagal memuat profile affiliate", _err));
+      .catch(_err => console.error("Gagal memuat profile affiliate", _err));
   }, [fetchMaterials]);
 
   const handlePageChange = (p) => {

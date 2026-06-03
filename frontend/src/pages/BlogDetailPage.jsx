@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 import SEO from '../components/SEO';
+import DOMPurify from 'dompurify';
 
 export default function BlogDetailPage() {
   const { slug } = useParams();
@@ -55,10 +56,10 @@ export default function BlogDetailPage() {
     },
     "publisher": {
       "@type": "Organization",
-      "name": "SahabatMart",
+      "name": "AkuGlow",
       "logo": {
         "@type": "ImageObject",
-        "url": `${window.location.origin}/logo.png`
+        "url": `${window.location.origin}/akuglow.jpg`
       }
     },
     "datePublished": blog.created_at,
@@ -89,7 +90,7 @@ export default function BlogDetailPage() {
   return (
     <main className="bg-white min-h-screen">
       <SEO 
-        title={`${blog.title} - SahabatMart`}
+        title={`${blog.title} - AkuGlow`}
         description={blog.summary || blog.title}
         image={formatImage(blog.image)}
         schema={combinedSchema}
@@ -153,7 +154,7 @@ export default function BlogDetailPage() {
               
               <div 
                 className="article-content text-gray-700 leading-[1.8] text-lg md:text-xl font-medium space-y-8"
-                dangerouslySetInnerHTML={{ __html: blog.content || '<p>Konten artikel tidak tersedia.</p>' }} 
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(blog.content || '<p>Konten artikel tidak tersedia.</p>') }} 
               />
             </article>
 

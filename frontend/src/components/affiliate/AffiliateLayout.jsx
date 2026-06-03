@@ -9,35 +9,54 @@ import { fetchJson, AFFILIATE_API_BASE, API_BASE, formatImage } from '../../lib/
 // Event Terdekat, Materi Promo, Voucher, Belanja Yuk
 // (* Merchant Area muncul dinamis hanya jika role = merchant)
 const menuItems = [
-  { name: 'Dashboard', icon: 'dashboard', path: '/affiliate', end: true },
-  { name: 'Skin Journey', icon: 'face', path: '/affiliate/skin/journey' },
-  { name: 'Dompet & Penarikan', icon: 'account_balance_wallet', path: '/affiliate/withdrawals' },
-  { name: 'Riwayat Komisi', icon: 'payments', path: '/affiliate/commissions' },
-  { name: 'Profil Saya', icon: 'person_outline', path: '/affiliate/settings' },
-  { name: 'Omset Tim', icon: 'monitoring', path: '/affiliate/stats' },
-  { name: 'Pesanan Saya', icon: 'receipt_long', path: '/profile' }, 
-  { name: 'Status Mitra', icon: 'workspace_premium', path: '/affiliate/status' },
-  { name: 'Team', icon: 'groups', path: '/affiliate/team' },
-  { name: 'Edukasi Bisnis', icon: 'school', path: '/affiliate/education' },
-  { name: 'Leaderboard', icon: 'emoji_events', path: '/affiliate/leaderboard' },
-  { name: 'Link Affiliate', icon: 'link', path: '/affiliate/links' },
-  { name: 'Event Terdekat', icon: 'event', path: '/affiliate/events' },
-  { name: 'Materi Promo', icon: 'campaign', path: '/affiliate/marketing' },
-  { name: 'Voucher', icon: 'local_offer', path: '/affiliate/vouchers' },
-  { name: 'Komunitas', icon: 'forum', path: '/affiliate/community' },
-  { name: 'Kembali Ke Toko', icon: 'shopping_basket', path: '/', end: true },
+  { type: 'item', name: 'Dashboard', icon: 'dashboard', path: '/affiliate', end: true },
+  { type: 'item', name: 'Pesanan Saya', icon: 'receipt_long', path: '/profile' },
+  { type: 'item', name: 'Profil Saya', icon: 'person_outline', path: '/affiliate/settings' },
+  { type: 'item', name: 'Skin Journey', icon: 'face', path: '/affiliate/skin/journey' },
+
+  { type: 'label', text: 'Affiliate' },
+  { type: 'item', name: 'Link Affiliate', icon: 'link', path: '/affiliate/links?tab=links' },
+  { type: 'item', name: 'Kode Referral', icon: 'qr_code_2', path: '/affiliate/links?tab=referral' },
+  { type: 'item', name: 'Voucher', icon: 'local_offer', path: '/affiliate/vouchers' },
+  { type: 'item', name: 'Status Mitra', icon: 'workspace_premium', path: '/affiliate/status' },
+
+  { type: 'label', text: 'Promosi' },
+  { type: 'item', name: 'Materi Promo', icon: 'campaign', path: '/affiliate/marketing' },
+  { type: 'item', name: 'Event Terdekat', icon: 'event', path: '/affiliate/events' },
+  { type: 'item', name: 'Edukasi Bisnis', icon: 'school', path: '/affiliate/education' },
+
+  { type: 'label', text: 'Team' },
+  { type: 'item', name: 'Team', icon: 'groups', path: '/affiliate/team' },
+  { type: 'item', name: 'Leaderboard', icon: 'emoji_events', path: '/affiliate/leaderboard' },
+
+  { type: 'label', text: 'Penghasilan' },
+  { type: 'item', name: 'Dompet & Penarikan', icon: 'account_balance_wallet', path: '/affiliate/withdrawals' },
+  { type: 'item', name: 'Riwayat Komisi', icon: 'payments', path: '/affiliate/commissions' },
+  { type: 'item', name: 'Omset Tim', icon: 'monitoring', path: '/affiliate/stats' },
+
+  { type: 'item', name: 'Komunitas', icon: 'forum', path: '/affiliate/community' },
+  { type: 'item', name: 'Kembali Ke Toko', icon: 'shopping_basket', path: '/', end: true },
+  { type: 'item', name: 'Bantuan', icon: 'help', path: '/contact' },
+  { type: 'button', name: 'Logout', icon: 'logout' }
 ];
 
 const SidebarLink = ({ item, collapsed }) => {
   const location = useLocation();
   
-  // Custom active logic to handle query params (e.g., ?tab=journey)
   const isActive = (() => {
     const [itemPath, itemSearch] = item.path.split('?');
     
     // Handle home and root affiliate strictly
     if (itemPath === '/' || itemPath === '/affiliate') {
       return location.pathname === itemPath;
+    }
+
+    if (itemSearch) {
+      return location.pathname === itemPath && location.search.includes(itemSearch);
+    }
+
+    if (location.search && !itemSearch) {
+      return false;
     }
 
     // For other paths, use exact match for better precision in this layout
@@ -50,7 +69,7 @@ const SidebarLink = ({ item, collapsed }) => {
       to={item.path}
       end={item.end}
       className={() =>
-        `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${isActive
+        `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group relative ${collapsed ? 'justify-center' : ''} ${isActive
           ? 'active bg-indigo-500/10 text-indigo-400 border-l-4 border-indigo-500'
           : 'text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/5'
         }`
@@ -120,7 +139,7 @@ const AffiliateLayout = () => {
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
     } catch (_e) {
-      console.error('Failed to fetch notifications:', e);
+      console.error('Failed to fetch notifications:', _e);
     }
   };
 
@@ -199,6 +218,12 @@ const AffiliateLayout = () => {
     return <Navigate to="/login" replace />;
   }
 
+  // [Security Fix] Prevent non-affiliate roles (buyer) from accessing affiliate layout
+  const allowedRoles = ['affiliate', 'merchant', 'admin', 'superadmin'];
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
   // Per spec: Merchant = Mitra + Merchant. Merchant role users get BOTH areas.
   // Merchant Area link is inserted right after Dashboard for merchant role users.
   const finalMenuItems = [...menuItems];
@@ -257,9 +282,39 @@ const AffiliateLayout = () => {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-3 mb-8">
-        {finalMenuItems.map((item) => (
-          <SidebarLink key={item.path} item={item} collapsed={!sidebarOpen && !isMobile} />
-        ))}
+        {finalMenuItems.map((item, idx) => {
+          if (item.type === 'label') {
+            return (sidebarOpen || isMobile) ? (
+              <div key={`lbl-${idx}`} className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 py-2 mt-4 mb-1">
+                {item.text}
+              </div>
+            ) : (
+              <div key={`lbl-${idx}`} className="h-[1px] bg-white/5 my-3 mx-2" />
+            );
+          }
+          if (item.type === 'button') {
+            return (
+              <button
+                key={`btn-${idx}`}
+                onClick={handleLogout}
+                className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-all text-left group relative ${(!sidebarOpen && !isMobile) ? 'justify-center' : ''}`}
+                title={(!sidebarOpen && !isMobile) ? item.name : ''}
+              >
+                <span className="material-symbols-outlined flex-shrink-0" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}>
+                  {item.icon}
+                </span>
+                {(sidebarOpen || isMobile) && (
+                  <span className="text-[13px] font-semibold tracking-wider uppercase whitespace-nowrap">
+                    {item.name}
+                  </span>
+                )}
+              </button>
+            );
+          }
+          return (
+            <SidebarLink key={item.path + '-' + idx} item={item} collapsed={!sidebarOpen && !isMobile} />
+          );
+        })}
       </nav>
 
       {/* Affiliate ID card */}
@@ -275,21 +330,6 @@ const AffiliateLayout = () => {
           </div>
         </div>
       )}
-
-      {/* Bottom actions */}
-      <div className="px-3 pb-8 space-y-1">
-        <button onClick={() => navigate('/contact')} className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all text-left">
-          <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'wght' 300" }}>help</span>
-          {(sidebarOpen || isMobile) && <span className="text-[12px] font-semibold uppercase tracking-wider">Bantuan</span>}
-        </button>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 py-3 px-4 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all text-left"
-        >
-          <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'wght' 300" }}>logout</span>
-          {(sidebarOpen || isMobile) && <span className="text-[12px] font-semibold uppercase tracking-wider">Logout</span>}
-        </button>
-      </div>
     </div>
   );
 

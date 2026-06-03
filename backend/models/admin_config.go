@@ -99,6 +99,8 @@ type Merchant struct {
 	
 	// Akuglow Specifics
 	City              string  `gorm:"type:varchar(100)" json:"city"` // Untuk filtering merchant terdekat
+	Province          string  `gorm:"type:varchar(100)" json:"province"`
+	AreaName          string  `gorm:"type:varchar(255)" json:"area_name"`
 	ActiveMitraCount int     `gorm:"default:0" json:"active_mitra_count"`
 	TeamMonthlyTurnover float64 `gorm:"type:decimal(15,2);default:0" json:"team_monthly_turnover"`
 	DistributionFeePercent float64 `gorm:"type:decimal(5,2);default:0" json:"distribution_fee_percent"` // Komisi distribusi
@@ -303,21 +305,7 @@ type LogisticChannel struct {
 	IsActive bool   `gorm:"default:true" json:"is_active"`
 }
 
-// AffiliateClick log untuk deteksi fraud & deep tracking
-type AffiliateClick struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	AffiliateID string    `gorm:"type:uuid" json:"affiliate_id"`
-	ProductID   string    `gorm:"type:uuid" json:"product_id"`
-	Referrer    string    `gorm:"type:text" json:"referrer"`
-	IPAddress   string    `gorm:"type:inet" json:"ip_address"`
-	UserAgent   string    `gorm:"type:text" json:"user_agent"`
-	SubID1      string    `gorm:"type:varchar(100)" json:"sub_id_1"` // Support professional tracking
-	SubID2      string    `gorm:"type:varchar(100)" json:"sub_id_2"`
-	SubID3      string    `gorm:"type:varchar(100)" json:"sub_id_3"`
-	IsBot       bool      `gorm:"default:false" json:"is_bot"`
-	IsFraud     bool      `gorm:"default:false" json:"is_fraud"`
-	CreatedAt   time.Time `json:"created_at"`
-}
+// AffiliateClick log untuk tracking click (model utama ada di affiliate.go)
 
 // UserInteraction mencatat interaksi user (pencet/view) untuk algoritma rekomendasi
 type UserInteraction struct {
@@ -508,7 +496,7 @@ func (Attribute) TableName() string           { return "attributes" }
 func (Voucher) TableName() string             { return "vouchers" }
 func (Dispute) TableName() string             { return "disputes" }
 func (LogisticChannel) TableName() string     { return "logistic_channels" }
-func (AffiliateClick) TableName() string      { return "affiliate_clicks" }
+// AffiliateClick.TableName removed — model consolidated to affiliate.go
 func (Region) TableName() string              { return "regions" }
 func (ProductVariant) TableName() string      { return "product_variants" }
 func (Cart) TableName() string                { return "carts" }

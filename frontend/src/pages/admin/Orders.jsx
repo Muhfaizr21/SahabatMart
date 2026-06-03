@@ -348,7 +348,7 @@ export default function AdminOrders() {
                 }}
                 onClick={() => setTab(t.val)}
               >
-                <i className={t.icon} style={{ fontSize: 16 }} />
+                <i className={`bx ${t.icon}`} style={{ fontSize: 16 }} />
                 {t.label}
               </button>
             );

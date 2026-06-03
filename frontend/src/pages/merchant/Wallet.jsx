@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchJson, MERCHANT_API_BASE } from '../../lib/api';
 import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, A, statusBadge, idr, fmtDate } from '../../lib/adminStyles.jsx';
+import toast from 'react-hot-toast';
 
 export default function MerchantWallet() {
   const [wallet, setWallet] = useState(null);
@@ -23,18 +24,20 @@ export default function MerchantWallet() {
       setWallet(w?.data || w);
       setHistory(Array.isArray(h?.data) ? h.data : (Array.isArray(h) ? h : []));
       setTransactions(Array.isArray(t?.data) ? t.data : (Array.isArray(t) ? t : []));
-    }).catch(console.error).finally(() => setLoading(false));
+    }).catch(() => toast.error("Gagal memuat data wallet")).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadData(); }, []);
 
   const handleWithdraw = async () => {
     if (Number(withdrawAmount) > wallet?.available_balance) {
-      alert("Saldo tidak mencukupi untuk nominal penarikan ini.");
+      toast.error("Saldo tidak mencukupi untuk nominal penarikan ini.");
       return;
     }
     setRequesting(true);
     try {
+      // [BUG-M2 Fix] Ambil data bank dari wallet/store profile, jangan dari form.
+      // Backend akan pakai data bank yang sudah tersimpan di profile merchant.
       await fetchJson(`${MERCHANT_API_BASE}/wallet/withdraw`, {
         method: 'POST',
         body: JSON.stringify({ amount: Number(withdrawAmount), note: withdrawNote })
@@ -42,9 +45,10 @@ export default function MerchantWallet() {
       setShowPayoutModal(false);
       setWithdrawAmount('');
       setWithdrawNote('');
+      toast.success("Penarikan berhasil diajukan!");
       loadData();
     } catch (_err) {
-      alert("Gagal melakukan penarikan: " + _err.message);
+      toast.error("Gagal melakukan penarikan: " + _err.message);
     } finally {
       setRequesting(false);
     }

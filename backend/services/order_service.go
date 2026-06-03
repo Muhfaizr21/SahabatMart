@@ -173,14 +173,13 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				}
 			}
 
-			if requestedCourier == "" && len(shippingInfo.MerchantGroups) > 0 {
-				requestedCourier = shippingInfo.MerchantGroups[0].CourierCode
-				requestedService = shippingInfo.MerchantGroups[0].CourierService
-				if requestedService == "" {
-					requestedService = shippingInfo.MerchantGroups[0].ServiceCode
-				}
-				groupShippingCost = shippingInfo.MerchantGroups[0].ShippingCost
-				requestedType = shippingInfo.MerchantGroups[0].ShippingType
+			if requestedCourier == "" {
+				// [BUG-C5 Fix] Jangan ambil courier dari group[0] — itu milik merchant lain.
+				// Default ke PICKUP/SELF agar backend tidak pakai ongkir merchant A untuk merchant B.
+				requestedCourier = "PICKUP"
+				requestedService = "SELF"
+				groupShippingCost = 0
+				requestedType = "pickup"
 			}
 
 			group := models.OrderMerchantGroup{
@@ -376,10 +375,11 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 func (s *OrderService) CompletePayment(tx *gorm.DB, orderID string) error {
 	var order models.Order
-	if err := tx.First(&order, "id = ?", orderID).Error; err != nil {
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&order, "id = ?", orderID).Error; err != nil {
 		return err
 	}
 
+	// [BUG-C1 Fix] Gunakan FOR UPDATE agar lock row — cegah race condition dengan CancelOrder.
 	// [BUG-C3 Fix] Hanya proses order yang masih menunggu pembayaran.
 	// Order yang sudah Cancelled/Expired TIDAK boleh diproses ulang — ini security hole.
 	// Tripay webhook untuk order expired/failed cukup di-acknowledge tanpa action.
@@ -475,7 +475,8 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	platAmt = 0.0
 
 	var product models.Product
-	db.Where("id = ?", item.ProductID).First(&product)
+	// [BUG-H3 Fix] FOR UPDATE di dalam transaction untuk cegah race dengan concurrent admin
+	db.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", item.ProductID).First(&product)
 
 	// 2. COGS
 	cogs = product.COGS
@@ -541,6 +542,8 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 			// Cek apakah produk punya preset multi-level
 			if presetID != nil && *presetID != "" {
 				// [Sync Fix] Hitung TOTAL seluruh level dalam preset untuk liabilitas keuangan Admin
+				// [Double Commission Fix] Set affAmt=0 karena DistributePresetCommissions akan handles
+				// semua payout per-level. Jangan set item.CommissionAmount agar fallback skip.
 				var levels []models.CommissionPresetLevel
 				if err := db.Where("preset_id = ?", *presetID).Order("level ASC").Find(&levels).Error; err == nil {
 					var totalRate float64
@@ -548,7 +551,7 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 						totalRate += l.Rate
 					}
 					affRate = totalRate
-					affAmt = subtotal * affRate
+					// affAmt stays 0 — DistributePresetCommissions handles all per-level payouts
 				}
 			} else {
 				// Fallback ke logika lama (no preset)
@@ -690,7 +693,13 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 				continue
 			}
 		}
-		holdUntil := time.Now().AddDate(0, 0, holdDays)
+		var holdUntil *time.Time
+		commStatus := models.CommissionApproved
+		if holdDays > 0 {
+			t := time.Now().AddDate(0, 0, holdDays)
+			holdUntil = &t
+			commStatus = models.CommissionPending
+		}
 
 		// Buat record AffiliateCommission untuk level ini
 		commRecord := models.AffiliateCommission{
@@ -702,8 +711,8 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 			GrossAmount: subtotal,
 			RateApplied: pl.Rate,
 			Amount:      commAmt,
-			Status:      models.CommissionPending, // Akan di-update saat wallet settlement
-			HoldUntil:   &holdUntil,
+			Status:      commStatus,
+			HoldUntil:   holdUntil,
 		}
 		if err := tx.Create(&commRecord).Error; err != nil {
 			return results, err
@@ -732,12 +741,16 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var order models.Order
-		if err := tx.Preload("Items").First(&order, "id = ?", orderID).Error; err != nil {
+		// [BUG-C1 Fix] FOR UPDATE + Preload untuk cegah race dengan CompletePayment
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Preload("Items").First(&order, "id = ?", orderID).Error; err != nil {
 			return err
 		}
 
+		// [BUG-H1 Fix] Tambah 'paid' ke daftar status yang tidak bisa di-cancel.
+		// Order yang sudah dibayar harus melalui proses refund, bukan cancel langsung.
 		if order.Status == models.OrderCancelled || order.Status == models.OrderCompleted || 
-		   order.Status == models.OrderShipped || order.Status == models.OrderDelivered {
+		   order.Status == models.OrderShipped || order.Status == models.OrderDelivered ||
+		   order.Status == models.OrderPaid {
 			return fmt.Errorf("pesanan tidak dapat dibatalkan (Status saat ini: %s)", order.Status)
 		}
 
@@ -883,16 +896,26 @@ func (s *OrderService) SyncOrderStatusFromGroups(tx *gorm.DB, orderID string) er
 		return nil
 	}
 
+	// [BUG-H2 Fix] Baca latest order dengan FOR UPDATE lalu update status.
+	// Cegah blind overwrite dari concurrent merchant group updates.
+	var order models.Order
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&order, "id = ?", orderID).Error; err != nil {
+		return err
+	}
+
 	// Jika status berubah menjadi COMPLETED, trigger turnover update
 	if newStatus == models.OrderCompleted {
-		var order models.Order
-		tx.First(&order, "id = ?", orderID)
 		if order.Status != models.OrderCompleted {
 			// Trigger Turnover Snapshot Update untuk Affiliate secara Rekursif
 			if order.AffiliateID != nil {
 				go s.Affiliate.UpdateUplineSnapshotsRecursive(*order.AffiliateID)
 			}
 		}
+	}
+
+	// Skip update jika status sudah sama — tidak perlu write
+	if order.Status == newStatus {
+		return nil
 	}
 
 	return tx.Model(&models.Order{}).Where("id = ?", orderID).Update("status", newStatus).Error

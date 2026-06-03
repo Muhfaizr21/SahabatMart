@@ -308,8 +308,8 @@ func (s *AuthService) RequestPasswordReset(email string) (string, error) {
 
 	// Kirim Email Reset Password
 	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.Email.getBaseFrontendURL(), token)
-	subject := "🔒 Permintaan Atur Ulang Kata Sandi - SahabatMart"
-	body := fmt.Sprintf("Halo %s,\n\nKami menerima permintaan untuk mengatur ulang kata sandi akun SahabatMart Anda.\n\nKlik link di bawah ini untuk mengatur kata sandi baru:\n%s\n\nLink ini akan kadaluarsa dalam 1 jam.\n\nJika Anda tidak merasa melakukan permintaan ini, abaikan email ini.\n\nTerima kasih,\nTim SahabatMart", user.Profile.FullName, resetLink)
+	subject := "🔒 Permintaan Atur Ulang Kata Sandi - AkuGlow"
+	body := fmt.Sprintf("Halo %s,\n\nKami menerima permintaan untuk mengatur ulang kata sandi akun AkuGlow Anda.\n\nKlik link di bawah ini untuk mengatur kata sandi baru:\n%s\n\nLink ini akan kadaluarsa dalam 1 jam.\n\nJika Anda tidak merasa melakukan permintaan ini, abaikan email ini.\n\nTerima kasih,\nTim AkuGlow", user.Profile.FullName, resetLink)
 	
 	err := s.Email.SendEmail(email, subject, body)
 	if err != nil {

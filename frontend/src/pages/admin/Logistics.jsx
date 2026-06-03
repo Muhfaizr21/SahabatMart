@@ -245,7 +245,9 @@ const AdminLogistics = () => {
                                     {areas.map(a => (
                                         <div key={a.id} onClick={() => updatePusatArea(a)} style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
                                             <div style={{ fontWeight: 800, fontSize: 13 }}>{a.name}</div>
-                                            <div style={{ color: '#64748b', fontSize: 11 }}>{a.city_name}, {a.province_name}</div>
+                                            <div style={{ color: '#64748b', fontSize: 11 }}>
+                                                {a.administrative_division_level_2_name || a.city_name || ''}, {a.administrative_division_level_1_name || a.province_name || ''} ({a.postal_code || '-'})
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

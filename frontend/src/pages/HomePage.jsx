@@ -16,7 +16,7 @@ import SEO from '../components/SEO';
 /**
  * HomePage Component
  * 
- * Landing page utama untuk SahabatMart / AkuGlow.
+ * Landing page utama untuk AkuGlow.
  * Implementasi rinci dengan arsitektur clean code.
  * Setiap section dipisahkan menjadi komponen mandiri untuk maintainability tinggi.
  */
@@ -26,15 +26,15 @@ const HomePage = () => {
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "SahabatMart",
-    "alternateName": "AkuGlow",
+    "name": "AkuGlow",
+    "alternateName": "AkuGlow Premium",
     "url": siteUrl,
     "logo": `${siteUrl}/akuglow.jpg`,
     "sameAs": [
-      "https://facebook.com/sahabatmart",
+      "https://facebook.com/akuglow",
       "https://instagram.com/akuglow"
     ],
-    "description": "SahabatMart (AkuGlow) - Platform marketplace kecantikan dan kesehatan premium terpercaya di Indonesia."
+    "description": "AkuGlow - Platform marketplace kecantikan dan kesehatan premium terpercaya di Indonesia."
   };
 
   const websiteSchema = {
@@ -55,7 +55,7 @@ const HomePage = () => {
     <main className="home-page overflow-hidden">
       <SEO 
         title="Pusat Kecantikan & Kesehatan Premium" 
-        description="Temukan produk kecantikan terbaik dari AkuGlow di SahabatMart. Rahasia kulit sehat terpancar dari pilihan komunitas kami."
+        description="Temukan produk kecantikan terbaik dari AkuGlow. Rahasia kulit sehat terpancar dari pilihan komunitas kami."
         schema={[organizationSchema, websiteSchema]}
       />
       {/* 1. Hero Experience - Visual Utama & Branding */}

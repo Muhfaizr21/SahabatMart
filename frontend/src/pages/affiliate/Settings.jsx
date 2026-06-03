@@ -1,19 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchJson, uploadFile, formatImage, AFFILIATE_API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
-
-const toast = (msg, type = 'success') => {
-  const el = document.createElement('div');
-  el.textContent = msg;
-  el.style.cssText = `
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-    padding: 12px 20px; border-radius: 12px; font-size: 13px; font-weight: 700;
-    background: ${type === 'success' ? '#7c3aed' : '#dc2626'};
-    color: white; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  `;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-};
+import toast from 'react-hot-toast';
 
 const InputField = ({ label, name, type = 'text', value, onChange, placeholder, disabled }) => (
   <div>
@@ -38,16 +26,19 @@ export default function AffiliateSettings() {
   const storedUser = getStoredUser();
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState(null);
+  const [eligibility, setEligibility] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [form, setForm] = useState({
+    email: '',
     full_name: '',
     avatar_url: '',
     bank_name: '',
     bank_account_number: '',
     bank_account_name: '',
     postback_url: '',
+    ktp_number: '',
   });
 
   const fetchProfile = useCallback(async () => {
@@ -58,15 +49,25 @@ export default function AffiliateSettings() {
       const aff = res.affiliate || {};
       const user = res.user || {};
       setForm({
+        email: user.email || '',
         full_name: user.profile?.full_name || '',
         avatar_url: user.profile?.avatar_url || '',
         bank_name: aff.bank_name || '',
         bank_account_number: aff.bank_account_number || '',
         bank_account_name: aff.bank_account_name || '',
         postback_url: aff.postback_url || '',
+        ktp_number: aff.ktp_number || '',
       });
+      
+      // Fetch eligibility
+      try {
+        const elig = await fetchJson(`${AFFILIATE_API_BASE}/merchant-eligibility`);
+        setEligibility(elig);
+      } catch (e) {
+        console.error("Gagal memuat eligibility:", e);
+      }
     } catch (_err) {
-      console.error(_err);
+      toast.error('Gagal memuat profil');
     } finally {
       setLoading(false);
     }
@@ -108,13 +109,26 @@ export default function AffiliateSettings() {
     e.preventDefault();
     setSaving(true);
     try {
+      // [BUG-S1 Fix] Hanya kirim field yang diisi — jangan kirim postback_url kosong
+      // agar tidak overwrite value yang sudah diset admin.
+      const payload = {};
+      if (form.email) payload.email = form.email;
+      if (form.full_name) payload.full_name = form.full_name;
+      if (form.avatar_url) payload.avatar_url = form.avatar_url;
+      if (form.bank_name) payload.bank_name = form.bank_name;
+      if (form.bank_account_number) payload.bank_account_number = form.bank_account_number;
+      if (form.bank_account_name) payload.bank_account_name = form.bank_account_name;
+      if (form.ktp_number) payload.ktp_number = form.ktp_number;
+      // postback_url tidak dikirim dari form — diatur oleh admin via panel
+
       await fetchJson(`${AFFILIATE_API_BASE}/profile/update`, {
         method: 'PUT',
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
-      toast('Profil berhasil diperbarui!');
+      toast.success('Profil berhasil diperbarui!');
+      fetchProfile(); // Reload to refresh stored tokens/details
     } catch (_err) {
-      toast(_err.message || 'Gagal menyimpan', 'error');
+      toast.error(_err.message || 'Gagal menyimpan');
     } finally {
       setSaving(false);
     }
@@ -223,6 +237,123 @@ export default function AffiliateSettings() {
               </div>
             </div>
 
+            {/* Syarat Naik Level Card */}
+            {eligibility && (
+              <div className="rounded-2xl p-6" style={baseStyle}>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">
+                  Syarat Naik Level
+                </p>
+                {eligibility.next_tier ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-black text-white">Level Selanjutnya</span>
+                      <span className="text-[10px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.5 rounded-full uppercase">
+                        {eligibility.next_tier.name}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* 1. Mitra Aktif */}
+                      {eligibility.requirements.min_mitra > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[11px] font-bold mb-1">
+                            <span className="text-slate-400">Mitra Aktif</span>
+                            <span className="text-white">
+                              {eligibility.active_mitra} / {eligibility.requirements.min_mitra}
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, (eligibility.active_mitra / eligibility.requirements.min_mitra) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Turnover Bulanan */}
+                      {eligibility.requirements.min_turnover > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[11px] font-bold mb-1">
+                            <span className="text-slate-400">Omset Bulanan</span>
+                            <span className="text-white">
+                              Rp {Number(eligibility.monthly_turnover).toLocaleString('id-ID')} / Rp {Number(eligibility.requirements.min_turnover).toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, (eligibility.monthly_turnover / eligibility.requirements.min_turnover) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. Total Transaksi */}
+                      {eligibility.requirements.min_total_transactions > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[11px] font-bold mb-1">
+                            <span className="text-slate-400">Total Transaksi</span>
+                            <span className="text-white">
+                              {eligibility.total_transactions} / {eligibility.requirements.min_total_transactions}
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, (eligibility.total_transactions / eligibility.requirements.min_total_transactions) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4. Mitra Langsung */}
+                      {eligibility.requirements.min_referrals > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[11px] font-bold mb-1">
+                            <span className="text-slate-400">Referral Langsung</span>
+                            <span className="text-white">
+                              {eligibility.direct_mitra} / {eligibility.requirements.min_referrals}
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, (eligibility.direct_mitra / eligibility.requirements.min_referrals) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 5. Performance Points */}
+                      {eligibility.requirements.min_performance_points > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[11px] font-bold mb-1">
+                            <span className="text-slate-400">Poin Performa</span>
+                            <span className="text-white">
+                              {eligibility.performance_points} / {eligibility.requirements.min_performance_points}
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, (eligibility.performance_points / eligibility.requirements.min_performance_points) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <span className="text-4xl mb-2 block">🏆</span>
+                    <p className="text-xs font-black text-amber-400 uppercase tracking-widest">Level Tertinggi</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Anda berada pada level keanggotaan tertinggi.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Account Info */}
             <div className="rounded-2xl p-6" style={baseStyle}>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">
@@ -257,13 +388,31 @@ export default function AffiliateSettings() {
               {/* Personal Info */}
               <div className="rounded-2xl p-6" style={baseStyle}>
                 <h3 className="text-white font-bold font-['Plus_Jakarta_Sans'] mb-5">Informasi Pribadi</h3>
-                <InputField
-                  label="Nama Lengkap"
-                  name="full_name"
-                  value={form.full_name}
-                  onChange={handleChange}
-                  placeholder="Masukkan nama lengkap"
-                />
+                <div className="space-y-4">
+                  <InputField
+                    label="Nama Lengkap"
+                    name="full_name"
+                    value={form.full_name}
+                    onChange={handleChange}
+                    placeholder="Masukkan nama lengkap"
+                  />
+                  <InputField
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="Masukkan email baru"
+                  />
+                  <InputField
+                    label="Nomor KTP (NIK)"
+                    name="ktp_number"
+                    type="text"
+                    value={form.ktp_number}
+                    onChange={handleChange}
+                    placeholder="Masukkan 16 digit Nomor KTP"
+                  />
+                </div>
               </div>
 
               {/* Bank Info */}

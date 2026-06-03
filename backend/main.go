@@ -28,12 +28,12 @@ func ConnectDB() {
 	}
 
 	DB.AutoMigrate(
-		&models.User{}, &models.UserProfile{},
+		&models.User{}, &models.UserProfile{}, &models.Media{},
 		&models.Merchant{}, &models.AffiliateMember{}, &models.MembershipTier{},
 		&models.Category{}, &models.Product{}, &models.ProductVariant{}, &models.ProductTierCommission{},
 		&models.Order{}, &models.OrderMerchantGroup{}, &models.OrderItem{},
 		&models.Cart{}, &models.CartItem{},
-		&models.AffiliateClick{}, &models.UserInteraction{}, &models.PlatformConfig{},
+		&models.AffiliateClickLog{}, &models.UserInteraction{}, &models.PlatformConfig{},
 		&models.Brand{}, &models.Attribute{}, &models.Voucher{},
 		&models.Dispute{}, &models.LogisticChannel{}, &models.Region{},
 		&models.BlogPost{}, &models.Banner{},
@@ -74,6 +74,19 @@ func ConnectDB() {
 	// Patch existing order items to populate product_image_url from products table
 	if err := DB.Exec("UPDATE order_items SET product_image_url = (SELECT image FROM products WHERE products.id = order_items.product_id) WHERE product_image_url = '' OR product_image_url IS NULL").Error; err != nil {
 		log.Printf("⚠️ Failed to patch product_image_url: %v", err)
+	}
+
+	// [Financial Sync] Force set all existing membership tiers hold days to 0
+	if err := DB.Exec("UPDATE membership_tiers SET commission_hold_days = 0 WHERE commission_hold_days > 0").Error; err != nil {
+		log.Printf("⚠️ Failed to patch membership_tiers commission_hold_days: %v", err)
+	}
+
+	// [Referral Code Sync] Force uppercase all existing referral codes & references
+	if err := DB.Exec("UPDATE affiliate_members SET ref_code = UPPER(ref_code), upline_code = UPPER(upline_code)").Error; err != nil {
+		log.Printf("⚠️ Failed to patch affiliate_members ref_code uppercase: %v", err)
+	}
+	if err := DB.Exec("UPDATE orders SET affiliate_ref_code = UPPER(affiliate_ref_code) WHERE affiliate_ref_code IS NOT NULL").Error; err != nil {
+		log.Printf("⚠️ Failed to patch orders affiliate_ref_code uppercase: %v", err)
 	}
 
 	// Patch standard Biteship Area IDs to fully-qualified ones (with IDZ suffix)

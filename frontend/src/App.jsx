@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
@@ -7,6 +7,7 @@ import ProductSection from './components/ProductSection';
 import PromoBanner from './components/PromoBanner';
 import VoucherSection from './components/VoucherSection';
 import Footer from './components/Footer';
+import MaintenancePage from './pages/MaintenancePage';
 import { getStoredUser, isAdminUser } from './lib/auth';
 import { captureAffiliate } from './lib/api';
 import { Toaster } from 'react-hot-toast';
@@ -83,7 +84,6 @@ import AdminModeration from './pages/admin/Moderation';
 import AdminFinance from './pages/admin/Finance';
 import AdminDataSavingDetail from './pages/admin/DataSavingDetail';
 import AdminProfitShareDetail from './pages/admin/ProfitShareDetail';
-import AdminCommissions from './pages/admin/Commissions';
 import AdminPayouts from './pages/admin/Payouts';
 import AdminSettings from './pages/admin/Settings';
 import AdminAuditLog from './pages/admin/AuditLog';
@@ -105,6 +105,7 @@ import AdminRBAC from './pages/admin/RBAC';
 import AdminRestock from './pages/admin/RestockModeration';
 import WishlistStats from './pages/admin/WishlistStats';
 import SkinPreTest from './pages/affiliate/SkinPreTest';
+import AdminMediaLibrary from './pages/admin/Media';
 import SkinJourney from './pages/affiliate/SkinJourney';
 
 import SkinJourneyAdmin from './pages/admin/SkinJourneyAdmin';
@@ -119,8 +120,9 @@ import { ThemeProvider } from './context/ThemeContext';
 
 
 // ── Penanganan Khusus Header/Footer ─────────
-function NavbarManager() {
+function NavbarManager({ maintenanceActive }) {
   const location = useLocation();
+  if (maintenanceActive) return null;
   const hidePaths = ['/admin', '/merchant', '/affiliate'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return (
@@ -131,8 +133,10 @@ function NavbarManager() {
   );
 }
 
-function FooterManager() {
+// [BUG-H3 Fix] Hembuskan parameter mode pemeliharaan agar footer ikut sembunyi saat maintenance aktif.
+function FooterManager({ maintenanceActive }) {
   const location = useLocation();
+  if (maintenanceActive) return null;
   const hidePaths = ['/admin', '/merchant', '/affiliate'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return <Footer />;
@@ -221,12 +225,74 @@ export default function App() {
 function AppContent() {
   const location = useLocation();
   const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
+  const [maintenance, setMaintenance] = useState({ active: false, message: '' });
+
+  // Check maintenance mode on mount + interval
+  useEffect(() => {
+    const checkMaintenance = () => {
+      // Use the same API_BASE resolution as the rest of the app
+      const base = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.API_BASE)
+        ? window.APP_CONFIG.API_BASE.replace(/\/+$/, '')
+        : (import.meta.env.VITE_API_BASE || '');
+      fetch(`${base}/api/public/configs`, {
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      })
+        .then(async r => {
+          // 503 = maintenance mode active. Try to parse custom message from JSON.
+          if (r.status === 503) {
+            try {
+              const errData = await r.json();
+              setMaintenance({
+                active: true,
+                message: errData.message || 'Maaf, platform sedang dalam pemeliharaan.',
+              });
+            } catch {
+              setMaintenance({
+                active: true,
+                message: 'Maaf, platform sedang dalam pemeliharaan.',
+              });
+            }
+            return null;
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          const raw = data.data || {};
+          const maint = raw.platform_maintenance || raw['platform_maintenance'] || '';
+          if (maint === 'true' || maint === true) {
+            setMaintenance({
+              active: true,
+              message: raw.platform_maint_msg || 'Maaf, AkuGlow sedang dalam pemeliharaan rutin.',
+            });
+          } else {
+            setMaintenance({ active: false, message: '' });
+          }
+        })
+        .catch(() => {});
+    };
+    checkMaintenance();
+    // Recheck every 30 seconds while app is open
+    const interval = setInterval(checkMaintenance, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Show maintenance page for non-admin users
+  const user = typeof getStoredUser === 'function' ? getStoredUser() : null;
+  const isAdminPath = location.pathname.startsWith('/admin');
+  const isLoginPath = location.pathname === '/login';
+  const adminRoles = ['admin', 'superadmin'];
+  const isAdminUser = user && adminRoles.includes(user.role);
+
+  if (maintenance.active && !isAdminPath && !isLoginPath && !isAdminUser) {
+    return <MaintenancePage message={maintenance.message} />;
+  }
 
   return (
     <div className={`min-h-screen flex flex-col ${isPanel ? 'bg-slate-50' : 'bg-white'}`}>
       <ScrollToTop />
       <Toaster position="top-right" reverseOrder={false} />
-      <NavbarManager />
+      <NavbarManager maintenanceActive={maintenance.active} />
       <div className={`flex-1 ${isPanel ? '' : 'bg-white'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -279,7 +345,6 @@ function AppContent() {
             <Route path="finance" element={<AdminFinance />} />
             <Route path="finance/data-saving" element={<AdminDataSavingDetail />} />
             <Route path="finance/profit-share" element={<AdminProfitShareDetail />} />
-            <Route path="commissions" element={<AdminCommissions />} />
             <Route path="payouts" element={<AdminPayouts />} />
             <Route path="brands" element={<AdminBrands />} />
             <Route path="attributes" element={<AdminAttributes />} />
@@ -290,6 +355,7 @@ function AppContent() {
             <Route path="regions" element={<AdminRegions />} />
             <Route path="security" element={<AdminSecurity />} />
             <Route path="audit" element={<AdminAuditLog />} />
+            <Route path="media" element={<AdminMediaLibrary />} />
             <Route path="blogs" element={<AdminBlogs />} />
             <Route path="banners" element={<AdminBanners />} />
             <Route path="education" element={<AdminEducation />} />
@@ -343,7 +409,7 @@ function AppContent() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
-      <FooterManager />
+      <FooterManager maintenanceActive={maintenance.active} />
     </div>
   );
 }

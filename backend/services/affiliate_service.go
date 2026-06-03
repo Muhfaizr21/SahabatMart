@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 	"gorm.io/gorm"
 )
+
+// Mutex per-affiliate untuk mencegah race condition saat tier upgrade trigger dari multiple goroutines
+var tierUpgradeMu sync.Map
 
 type AffiliateService struct {
 	DB    *gorm.DB
@@ -54,24 +58,30 @@ func (s *AffiliateService) TrackClick(req TrackClickRequest) (*models.AffiliateM
 	// Fraud Shield+: Cek spam klik dalam 1 menit terakhir
 	var recentClicks int64
 	cutoff := time.Now().Add(-1 * time.Minute)
-	s.DB.Model(&models.AffiliateClick{}).
+	s.DB.Model(&models.AffiliateClickLog{}).
 		Where("ip_address = ? AND created_at > ?", req.IP, cutoff).
 		Count(&recentClicks)
 
 	// Proteksi agresif: Jika lebih dari 15 klik per menit dari IP yang sama
 	isFraud := recentClicks > 15 || isBot
-	
+
 	// Jika klik ke produk yang sama persis dalam 3 detik (Double Click/Spam)
 	var duplicateClick int64
-	s.DB.Model(&models.AffiliateClick{}).
+	s.DB.Model(&models.AffiliateClickLog{}).
 		Where("ip_address = ? AND product_id = ? AND created_at > ?", req.IP, req.ProductID, time.Now().Add(-3 * time.Second)).
 		Count(&duplicateClick)
-	
+
 	if duplicateClick > 0 {
 		isFraud = true
 	}
 
-	click := models.AffiliateClick{
+	// [BUG-M1 Fix] Cek fraud DAHULU sebelum menyimpan click ke DB.
+	// Fraud click jangan disimpan sama sekali — cegah table bloat & false attribution.
+	if isFraud {
+		return nil, errors.New("fraud detected: activity blocked")
+	}
+
+	click := models.AffiliateClickLog{
 		AffiliateID: affiliate.ID,
 		ProductID:   req.ProductID,
 		Referrer:    req.Referrer,
@@ -80,15 +90,10 @@ func (s *AffiliateService) TrackClick(req TrackClickRequest) (*models.AffiliateM
 		SubID1:      req.SubID1,
 		SubID2:      req.SubID2,
 		SubID3:      req.SubID3,
-		IsFraud:     isFraud,
+		IsFraud:     false,
 		IsBot:       isBot,
 	}
 	s.DB.Create(&click)
-	
-	// Jika terdeteksi fraud, jangan kembalikan data affiliate (cegah atribusi)
-	if isFraud {
-		return nil, errors.New("fraud detected: activity blocked")
-	}
 
 	// Record specific custom link click if linkCode is provided
 	if req.LinkCode != "" {
@@ -122,12 +127,18 @@ func (s *AffiliateService) GetDashboardStats(affiliateID string) (*models.Affili
 	}
 
 	var totalClicks int64
-	s.DB.Model(&models.AffiliateClick{}).Where("affiliate_id = ?", affiliateID).Count(&totalClicks)
+	s.DB.Model(&models.AffiliateClickLog{}).Where("affiliate_id = ?", affiliateID).Count(&totalClicks)
 
 	return &affiliate, totalClicks, nil
 }
 
 func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
+	// [Race Fix] Gunakan mutex per-affiliate agar upgrade check tidak running bersamaan untuk affiliate yang sama
+	muVal, _ := tierUpgradeMu.LoadOrStore(affiliateMemberID, &sync.Mutex{})
+	mu := muVal.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+
 	var affiliate models.AffiliateMember
 	if err := s.DB.Preload("Tier").First(&affiliate, "id = ?", affiliateMemberID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -329,6 +340,100 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 	}
 
 	return totalDownlines, teamTurnover, nil
+}
+
+// GetFullEligibility: Full eligibility check that returns ALL 5 upgrade requirements from next MembershipTier.
+// [Sync Fix] Ensures frontend receives all 5 params: mitra, turnover, referrals, transactions, performance_points.
+func (s *AffiliateService) GetFullEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64, qualifiedMitra int64, directMitra int64, totalTransactions int, performancePoints int, nextTier *models.MembershipTier) {
+	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
+
+	// 1. Total jaringan (semua level)
+	s.DB.Raw(`
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT COUNT(*) FROM subordinates
+	`, affiliateID).Scan(&activeMitra)
+
+	// 2. Qualified Mitra (directs yang punya downline)
+	s.DB.Raw(`
+		SELECT COUNT(DISTINCT am.id)
+		FROM affiliate_members am
+		JOIN affiliate_members child ON child.upline_id = am.id
+		WHERE am.upline_id = ?
+	`, affiliateID).Scan(&qualifiedMitra)
+
+	// 3. Direct Mitra
+	s.DB.Model(&models.AffiliateMember{}).Where("upline_id = ?", affiliateID).Count(&directMitra)
+
+	// 4. Total Transaksi affiliate
+	var txCount int64
+	s.DB.Model(&models.Order{}).
+		Where("affiliate_id = ? AND status IN ?", affiliateID, completedOrderStatuses).
+		Count(&txCount)
+	totalTransactions = int(txCount)
+
+	// 5. Performance Points (currently: total earned / 10000, bisa dikembangkan)
+	// Use direct affiliate total_earned as proxy
+	var totalEarned float64
+	s.DB.Model(&models.AffiliateMember{}).Where("id = ?", affiliateID).Select("total_earned").Scan(&totalEarned)
+	performancePoints = int(totalEarned / 10000)
+
+	// 6. Team Monthly Turnover
+	var allDescIDs []string
+	s.DB.Raw(`
+		WITH RECURSIVE subordinates AS (
+			SELECT id, 1 as depth, ARRAY[id::text] as path
+			FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id, s.depth + 1, s.path || a.id::text
+			FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
+		)
+		SELECT id FROM subordinates
+	`, affiliateID).Scan(&allDescIDs)
+
+	if len(allDescIDs) > 0 {
+		s.DB.Model(&models.Order{}).
+			Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", allDescIDs, completedOrderStatuses, startTime).
+			Select("COALESCE(SUM(subtotal), 0)").
+			Scan(&monthlyTurnover)
+	}
+
+	// 7. Ambil next tier dari MembershipTier (sumber kebenaran tunggal)
+	var currentTier int
+	s.DB.Model(&models.AffiliateMember{}).Where("id = ?", affiliateID).Select("membership_tier_id").Scan(&currentTier)
+
+	var nt models.MembershipTier
+	if err := s.DB.Order("level ASC").Where("level > ? AND is_active = true", currentTier).First(&nt).Error; err == nil {
+		nextTier = &nt
+		reqMitra = nt.MinActiveMitra
+		reqTurnover = nt.MinMonthlyTurnover
+	}
+
+	// 8. Evaluasi eligibility dari next tier requirements
+	isEligible = true
+	if nextTier != nil {
+		if nextTier.MinActiveMitra > 0 && activeMitra < int64(nextTier.MinActiveMitra) {
+			isEligible = false
+		}
+		if nextTier.MinMonthlyTurnover > 0 && monthlyTurnover < nextTier.MinMonthlyTurnover {
+			isEligible = false
+		}
+		if nextTier.MinReferrals > 0 && directMitra < int64(nextTier.MinReferrals) {
+			isEligible = false
+		}
+		if nextTier.MinTotalTransactions > 0 && totalTransactions < nextTier.MinTotalTransactions {
+			isEligible = false
+		}
+		if nextTier.MinPerformancePoints > 0 && performancePoints < nextTier.MinPerformancePoints {
+			isEligible = false
+		}
+	}
+
+	return
 }
 
 // CheckMerchantEligibility: Cek kelayakan upgrade ke Merchant
@@ -547,8 +652,15 @@ func (s *AffiliateService) SyncLeaderboard() error {
 	s.DB.Raw(query).Scan(&results)
 
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		// Bersihkan cache lama
-		tx.Exec("DELETE FROM leaderboard_cache")
+		// [BUG-M4 Fix] Hapus yang tidak top 50 terlebih dahulu, lalu upsert.
+		// Jangan DELETE ALL — cegah window kosong saat konkurensi baca.
+		var keepIDs []string
+		for _, res := range results {
+			keepIDs = append(keepIDs, res.AffiliateID)
+		}
+		if len(keepIDs) > 0 {
+			tx.Where("affiliate_id NOT IN ?", keepIDs).Delete(&models.LeaderboardCache{})
+		}
 
 		for i, res := range results {
 			cache := models.LeaderboardCache{
@@ -559,9 +671,8 @@ func (s *AffiliateService) SyncLeaderboard() error {
 				TotalEarned: res.TotalEarned,
 				LastSynced:  time.Now(),
 			}
-			if err := tx.Create(&cache).Error; err != nil {
-				return err
-			}
+			// Upsert — insert or update on conflict
+			tx.Where("affiliate_id = ?", res.AffiliateID).Assign(cache).FirstOrCreate(&models.LeaderboardCache{})
 		}
 		return nil
 	})

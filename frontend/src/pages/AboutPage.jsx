@@ -7,8 +7,8 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900 font-['Plus_Jakarta_Sans']">
       <SEO 
-        title="Tentang Kami - SahabatMart"
-        description="Kenali lebih dekat SahabatMart (AkuGlow). Misi kami adalah memberdayakan individu melalui produk kecantikan premium dan peluang bisnis yang adil."
+        title="Tentang Kami - AkuGlow"
+        description="Kenali lebih dekat AkuGlow. Misi kami adalah memberdayakan individu melalui produk kecantikan premium dan peluang bisnis yang adil."
       />
       {/* Intro Section */}
       <section className="pt-32 pb-24 px-6 overflow-hidden">

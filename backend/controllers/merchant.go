@@ -3,7 +3,6 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -644,21 +643,20 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				}
 			}
 
-			unitPrice := product.Price
-			if variant.ID != "" {
-				unitPrice = variant.Price
+		// [BUG-M1 Fix] Harga WAJIB dari database (product.Price / variant.Price).
+		// Jangan trusted item.Price dari client — merchant bisa jual harga berapapun.
+		// Client hanya boleh override harga jika >= product.Price dan >= variant.Price.
+		unitPrice := product.Price
+		if variant.ID != "" {
+			unitPrice = variant.Price
+		}
+		if item.Price > 0 {
+			// Validasi: harga dari client tidak boleh lebih rendah dari harga di database
+			if item.Price < unitPrice {
+				return fmt.Errorf("harga %s tidak boleh lebih rendah dari harga asli (Rp %.2f)", product.Name, unitPrice)
 			}
-			if item.Price > 0 {
-				// [Security] Price Protection: Prevent selling below wholesale price
-				minAllowed := product.WholesalePrice
-				if variant.ID != "" && variant.WholesalePrice > 0 {
-					minAllowed = variant.WholesalePrice
-				}
-				if item.Price < minAllowed {
-					return fmt.Errorf("harga %s terlalu rendah (Min: %.2f)", product.Name, minAllowed)
-				}
-				unitPrice = item.Price
-			}
+			unitPrice = item.Price
+		}
 
 			subtotal += unitPrice * float64(item.Quantity)
 			
@@ -692,16 +690,17 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				dbInv = dbInv.Where("product_variant_id IS NULL OR product_variant_id = ''")
 			}
 
-			if err := dbInv.First(&inv).Error; err != nil {
-				msg := product.Name
-				if variant.ID != "" { msg += " (" + variant.Name + ")" }
-				return fmt.Errorf("stok merchant tidak ditemukan untuk %s", msg)
-			}
-			if inv.Stock < item.Quantity {
-				msg := product.Name
-				if variant.ID != "" { msg += " (" + variant.Name + ")" }
-				return fmt.Errorf("stok merchant tidak mencukupi untuk %s (Tersedia: %d)", msg, inv.Stock)
-			}
+			// [BUG-M11 Fix] FOR UPDATE untuk cegah race condition stock checkout bersamaan
+		if err := dbInv.Set("gorm:query_option", "FOR UPDATE").First(&inv).Error; err != nil {
+			msg := product.Name
+			if variant.ID != "" { msg += " (" + variant.Name + ")" }
+			return fmt.Errorf("stok merchant tidak ditemukan untuk %s", msg)
+		}
+		if inv.Stock < item.Quantity {
+			msg := product.Name
+			if variant.ID != "" { msg += " (" + variant.Name + ")" }
+			return fmt.Errorf("stok merchant tidak mencukupi untuk %s (Tersedia: %d)", msg, inv.Stock)
+		}
 			
 			stockBefore := inv.Stock
 			if err := dbInv.Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
@@ -784,15 +783,13 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 			return err
 		}
 
-		// 4. Create Order Merchant Group
+		// 4. Create Order Merchant Group (Per-Merchant Group Inisialisasi)
 		mg := &models.OrderMerchantGroup{
-			OrderID:        order.ID,
-			MerchantID:     merchantID,
-			Status:         models.MOrderCompleted,
-			Subtotal:       subtotal,
-			MerchantPayout: 0, // IMPORTANT: Merchant gets nothing directly
-			PlatformFee:    grandTotal, // Technically Pusat takes all
-			CreatedAt:      time.Now(),
+			OrderID:    order.ID,
+			MerchantID: merchantID,
+			Status:     models.MOrderCompleted,
+			Subtotal:   subtotal,
+			CreatedAt:  time.Now(),
 		}
 		if err := tx.Create(mg).Error; err != nil {
 			return err
@@ -1013,8 +1010,6 @@ func (mc *MerchantController) GetMemberByCode(w http.ResponseWriter, r *http.Req
 		parts := strings.Split(code, ":")
 		code = parts[len(parts)-1]
 	}
-
-	log.Printf("🔍 [POS] Scanning Member with code: '%s'", code)
 
 	var user models.User
 	query := mc.DB.Preload("Profile").

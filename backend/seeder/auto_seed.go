@@ -26,7 +26,7 @@ func AutoSeedCriticalData(db *gorm.DB) {
 			MinActiveMitra:      0,
 			MinMonthlyTurnover:  0,
 			MinWithdrawalAmount: 50000,
-			CommissionHoldDays:  14,
+			CommissionHoldDays:  0,
 			CookieDurationDays:  30,
 			Color:               "#cd7f32",
 			Icon:                "military_tech",
@@ -96,6 +96,9 @@ func AutoSeedCriticalData(db *gorm.DB) {
 
 	// [Merchants] Auto-seed at least 1 merchant for testing
 	SeedMerchants(db)
+
+	// Sync existing images to Media Library
+	SyncExistingImagesToMediaLibrary(db)
 
 	// [Finance] We no longer auto-seed high-fidelity finance data here to avoid startup lag.
 	// Use 'go run cmd/seeder/main.go' for that.

@@ -95,7 +95,7 @@ export default function SkinJourney() {
       try {
         const histData = await fetchJson(`${API_BASE}/api/skin/history`);
         setHistory(histData || []);
-      } catch (_e) { console.error("History fetch error:", e); }
+      } catch (_e) { console.error("History fetch error:", _e); }
       
       setShowSelector(false);
     } catch (_err) { 
@@ -312,7 +312,7 @@ export default function SkinJourney() {
         try {
           processedBlob = await processAndValidateImage(skinPhoto);
         } catch (_e) {
-          toast.error(e.message, { id: 'ai-analyze' });
+          toast.error(_e.message, { id: 'ai-analyze' });
           setAnalyzing(false);
           return;
         }

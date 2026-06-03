@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 
@@ -18,6 +19,8 @@ const toast = (msg, type = 'success') => {
 
 export default function AffiliateLinks() {
   const user = getStoredUser();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'links';
   const [links, setLinks] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +34,7 @@ export default function AffiliateLinks() {
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
 
-  const refCode = user?.affiliate_ref_code || 'AGL-REF';
+  const refCode = (user?.affiliate?.ref_code || user?.affiliate_ref_code || 'AGL-REF').toUpperCase();
 
   const fetchLinks = useCallback(async () => {
     setLoading(true);
@@ -128,341 +131,501 @@ export default function AffiliateLinks() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-white font-['Plus_Jakarta_Sans']">
-            Generate <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Links</span>
+            {activeTab === 'links' ? (
+              <>
+                Generate <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Links</span>
+              </>
+            ) : (
+              <>
+                Kode <span style={{ background: 'linear-gradient(135deg, #ddb7ff, #b76dff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Referral</span>
+              </>
+            )}
           </h1>
-          <p className="text-slate-400 text-sm mt-0.5">Buat dan kelola link afiliasi trackable Anda</p>
+          <p className="text-slate-400 text-sm mt-0.5">
+            {activeTab === 'links' 
+              ? 'Buat dan kelola link afiliasi trackable Anda' 
+              : 'Bagikan QR Code dan Kode Referral Anda untuk merekrut mitra baru'}
+          </p>
         </div>
+
+        {activeTab === 'links' && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
+          >
+            <span className="material-symbols-outlined text-lg">add_link</span>
+            Buat Link Baru
+          </button>
+        )}
+      </div>
+
+      {/* Tabs Selector */}
+      <div className="flex bg-white/5 border border-white/10 p-1 rounded-xl max-w-xs sm:max-w-md">
         <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
+          onClick={() => setSearchParams({ tab: 'links' })}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all uppercase tracking-wider ${
+            activeTab === 'links'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/35'
+              : 'text-slate-400 hover:text-white'
+          }`}
         >
-          <span className="material-symbols-outlined text-lg">add_link</span>
-          Buat Link Baru
+          Link Affiliate
+        </button>
+        <button
+          onClick={() => setSearchParams({ tab: 'referral' })}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all uppercase tracking-wider ${
+            activeTab === 'referral'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/35'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Kode Referral
         </button>
       </div>
 
-      {/* Quick Links per user request */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all group flex flex-col justify-between">
-              <div>
-                <span className="material-symbols-outlined text-purple-400 mb-2">home</span>
-                <h4 className="text-white font-bold text-sm">Link Utama Website</h4>
-                <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda AkuGlow.</p>
-              </div>
-              <button 
-                onClick={() => copyURL(`${window.location.origin}?ref=${refCode}`)}
-                className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-purple-600 transition-all"
-              >
-                Salin Link Utama
-              </button>
-          </div>
+      {activeTab === 'referral' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left: The grand dynamic QR Card */}
+          <div className="lg:col-span-7 rounded-3xl p-8 relative overflow-hidden flex flex-col items-center justify-center text-center shadow-2xl border"
+            style={{
+              ...baseStyle,
+              background: 'linear-gradient(145deg, rgba(30, 27, 75, 0.4), rgba(15, 23, 42, 0.4))',
+              borderColor: 'rgba(99, 102, 241, 0.25)',
+              boxShadow: '0 25px 50px -12px rgba(99, 102, 241, 0.1)'
+            }}
+          >
+            {/* Ambient glows */}
+            <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-green-500/50 transition-all group flex flex-col justify-between shadow-lg shadow-green-500/5 border-green-500/20">
-              <div>
-                <span className="material-symbols-outlined text-green-400 mb-2">group_add</span>
-                <div className="flex items-center gap-2">
-                  <h4 className="text-white font-bold text-sm">Link Rekrutmen</h4>
-                  <span className="text-[8px] bg-green-500 text-white px-1 rounded-sm animate-pulse">NEW</span>
-                </div>
-                <p className="text-slate-500 text-[10px] mt-1">Link khusus pendaftaran mitra baru (Otomatis isi Referral).</p>
-              </div>
-              <button 
-                onClick={() => copyURL(`${window.location.origin}/register?ref=${refCode}`)}
-                className="mt-4 w-full py-2 rounded-lg bg-green-600/20 text-green-400 text-[10px] font-bold uppercase tracking-wider group-hover:bg-green-600 group-hover:text-white transition-all border border-green-500/30"
-              >
-                Salin Link Daftar
-              </button>
-          </div>
+            {/* AkuGlow Brand Logo */}
+            <img 
+              src="/akuglow.jpg" 
+              alt="AkuGlow Logo" 
+              className="h-10 w-auto object-contain brightness-110 mb-6 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]" 
+            />
 
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 transition-all group flex flex-col justify-between">
-              <div>
-                <span className="material-symbols-outlined text-blue-400 mb-2">shopping_bag</span>
-                <h4 className="text-white font-bold text-sm">Link Langsung Produk</h4>
-                <p className="text-slate-500 text-[10px] mt-1">Arahkan langsung ke halaman detail produk tertentu.</p>
-              </div>
-              <button 
-                 onClick={() => { setShowForm(true); setForm({ ...form, product_id: products[0]?.id || '' })}}
-                 className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-blue-600 transition-all"
-              >
-                Pilih Produk
-              </button>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-pink-500/50 transition-all group flex flex-col justify-between">
-              <div>
-                <span className="material-symbols-outlined text-pink-400 mb-2">campaign</span>
-                <h4 className="text-white font-bold text-sm">Link Promo Khusus</h4>
-                <p className="text-slate-500 text-[10px] mt-1">Link untuk kampanye marketing atau landing page event.</p>
-              </div>
-              <button 
-                onClick={() => copyURL(`${window.location.origin}/promo/special?ref=${refCode}`)}
-                className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-pink-600 transition-all"
-              >
-                Salin Link Promo
-              </button>
-          </div>
-      </div>
-
-      {/* Create Form */}
-      {showForm && (
-        <div className="rounded-2xl p-6 relative z-50" style={baseStyle}>
-          <h3 className="text-white font-bold mb-5 font-['Plus_Jakarta_Sans']">Buat Link Afiliasi Baru</h3>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Judul Link
-              </label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="cth: Link Promo Ramadan"
-                className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500"
-                style={{
-                  background: 'rgba(12, 19, 36, 0.6)',
-                  border: '1px solid rgba(77, 67, 84, 0.3)',
-                }}
+            {/* QR Frame with inner glow and gradient border */}
+            <div className="relative p-6 rounded-2xl bg-white/5 border border-white/10 shadow-2xl mb-6">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/register?ref=' + refCode)}`} 
+                alt="Referral QR Code" 
+                className="w-48 h-48 sm:w-56 sm:h-56 rounded-lg border-4 border-[#0c1324]" 
               />
+              <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-indigo-400" />
+              <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-indigo-400" />
+              <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-indigo-400" />
+              <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-indigo-400" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Pilih Produk (Searchable)
-                </label>
-                
-                {/* Custom Searchable Dropdown */}
-                <div className="relative group">
-                  <div 
-                    onClick={() => setShowProductSearch(!showProductSearch)}
-                    className="w-full px-4 py-3 rounded-xl text-sm text-white border cursor-pointer flex items-center justify-between transition-all hover:bg-white/5"
+            {/* Referral Info */}
+            <div className="space-y-2 mb-6">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400">
+                KODE REFERRAL ANDA
+              </span>
+              <h2 className="text-3xl font-black text-white tracking-widest uppercase">
+                {refCode}
+              </h2>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+              <button 
+                onClick={() => copyURL(refCode)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs uppercase tracking-wider transition-all border border-white/10 hover:border-white/20 active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-lg">content_copy</span>
+                Salin Kode
+              </button>
+              <button 
+                onClick={() => copyURL(`${window.location.origin}/register?ref=${refCode}`)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-lg">share</span>
+                Salin Link Daftar
+              </button>
+            </div>
+          </div>
+
+          {/* Right: How to use / Info card */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Quick Share Info */}
+            <div className="p-6 rounded-2xl border bg-white/5 border-white/10" style={baseStyle}>
+              <h3 className="text-white font-bold text-base mb-4 font-['Plus_Jakarta_Sans'] flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-400">help_outline</span>
+                Bagaimana Cara Menggunakannya?
+              </h3>
+              
+              <ul className="space-y-4 text-xs text-slate-400">
+                <li className="flex gap-3">
+                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center shrink-0">1</div>
+                  <p className="leading-relaxed">
+                    <strong className="text-white">Scan QR Code:</strong> Calon mitra memindai QR code di samping langsung menggunakan kamera ponsel mereka.
+                  </p>
+                </li>
+                <li className="flex gap-3">
+                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center shrink-0">2</div>
+                  <p className="leading-relaxed">
+                    <strong className="text-white">Otomatis Terisi:</strong> Mereka akan langsung diarahkan ke halaman pendaftaran mitra dengan kode referral Anda yang otomatis terisi.
+                  </p>
+                </li>
+                <li className="flex gap-3">
+                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center shrink-0">3</div>
+                  <p className="leading-relaxed">
+                    <strong className="text-white">Bagikan Link/Kode:</strong> Anda juga bisa langsung menyalin Kode Referral Anda atau Link Rekrutmen untuk dibagikan lewat chat.
+                  </p>
+                </li>
+              </ul>
+            </div>
+
+            {/* Perks card */}
+            <div className="p-6 rounded-2xl border bg-gradient-to-br from-indigo-500/5 to-purple-500/5"
+              style={{
+                ...baseStyle,
+                borderColor: 'rgba(99, 102, 241, 0.15)'
+              }}
+            >
+              <h3 className="text-white font-bold text-base mb-3 font-['Plus_Jakarta_Sans'] flex items-center gap-2">
+                <span className="material-symbols-outlined text-purple-400">military_tech</span>
+                Keuntungan Rekrutmen
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                Setiap mitra baru yang mendaftar menggunakan referral Anda akan tergabung ke dalam jaringan tim Anda.
+                Dapatkan bonus rekrutmen instan serta komisi multi-level dari setiap transaksi belanja tim Anda.
+              </p>
+              <Link to="/affiliate/status" className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-colors">
+                Lihat Jenjang Karir & Bonus
+                <span className="material-symbols-outlined text-xs">arrow_forward</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Quick Links per user request */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all group flex flex-col justify-between">
+                  <div>
+                    <span className="material-symbols-outlined text-purple-400 mb-2">home</span>
+                    <h4 className="text-white font-bold text-sm">Link Utama Website</h4>
+                    <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda AkuGlow.</p>
+                  </div>
+                  <button 
+                    onClick={() => copyURL(`${window.location.origin}?ref=${refCode}`)}
+                    className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-purple-600 transition-all"
+                  >
+                    Salin Link Utama
+                  </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-green-500/50 transition-all group flex flex-col justify-between shadow-lg shadow-green-500/5 border-green-500/20">
+                  <div>
+                    <span className="material-symbols-outlined text-green-400 mb-2">group_add</span>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-white font-bold text-sm">Link Rekrutmen</h4>
+                      <span className="text-[8px] bg-green-500 text-white px-1 rounded-sm animate-pulse">NEW</span>
+                    </div>
+                    <p className="text-slate-500 text-[10px] mt-1">Link khusus pendaftaran mitra baru (Otomatis isi Referral).</p>
+                  </div>
+                  <button 
+                    onClick={() => copyURL(`${window.location.origin}/register?ref=${refCode}`)}
+                    className="mt-4 w-full py-2 rounded-lg bg-green-600/20 text-green-400 text-[10px] font-bold uppercase tracking-wider group-hover:bg-green-600 group-hover:text-white transition-all border border-green-500/30"
+                  >
+                    Salin Link Daftar
+                  </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 transition-all group flex flex-col justify-between">
+                  <div>
+                    <span className="material-symbols-outlined text-blue-400 mb-2">shopping_bag</span>
+                    <h4 className="text-white font-bold text-sm">Link Langsung Produk</h4>
+                    <p className="text-slate-500 text-[10px] mt-1">Arahkan langsung ke halaman detail produk tertentu.</p>
+                  </div>
+                  <button 
+                     onClick={() => { setShowForm(true); setForm({ ...form, product_id: products[0]?.id || '' })}}
+                     className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-blue-600 transition-all"
+                  >
+                    Pilih Produk
+                  </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-pink-500/50 transition-all group flex flex-col justify-between">
+                  <div>
+                    <span className="material-symbols-outlined text-pink-400 mb-2">campaign</span>
+                    <h4 className="text-white font-bold text-sm">Link Promo Khusus</h4>
+                    <p className="text-slate-500 text-[10px] mt-1">Link untuk kampanye marketing atau landing page event.</p>
+                  </div>
+                  <button 
+                    onClick={() => copyURL(`${window.location.origin}/promo/special?ref=${refCode}`)}
+                    className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-pink-600 transition-all"
+                  >
+                    Salin Link Promo
+                  </button>
+              </div>
+          </div>
+
+          {/* Create Form */}
+          {showForm && (
+            <div className="rounded-2xl p-6 relative z-50" style={baseStyle}>
+              <h3 className="text-white font-bold mb-5 font-['Plus_Jakarta_Sans']">Buat Link Afiliasi Baru</h3>
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Judul Link
+                  </label>
+                  <input
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="cth: Link Promo Ramadan"
+                    className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500"
                     style={{
                       background: 'rgba(12, 19, 36, 0.6)',
                       border: '1px solid rgba(77, 67, 84, 0.3)',
                     }}
-                  >
-                    <span className={form.product_id ? "text-white font-semibold" : "text-slate-500"}>
-                      {form.product_id ? products.find(p => p.id === form.product_id)?.name : "-- Pilih Produk --"}
-                    </span>
-                    <span className="material-symbols-outlined text-slate-500 transition-transform" style={{ transform: showProductSearch ? 'rotate(180deg)' : 'none' }}>
-                      expand_more
-                    </span>
-                  </div>
+                  />
+                </div>
 
-                  {showProductSearch && (
-                    <div 
-                      className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl overflow-hidden border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
-                      style={{
-                        background: '#1a1f2e',
-                        border: '1px solid rgba(124, 58, 237, 0.3)',
-                        maxHeight: '300px',
-                      }}
-                    >
-                      <div className="p-2 border-b border-white/5 sticky top-0 bg-[#1a1f2e] z-10">
-                        <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
-                          <span className="material-symbols-outlined text-sm text-slate-500">search</span>
-                          <input 
-                            autoFocus
-                            type="text"
-                            value={productSearchQuery}
-                            onChange={(e) => setProductSearchQuery(e.target.value)}
-                            placeholder="Cari nama produk..."
-                            className="w-full bg-transparent border-none outline-none text-xs text-white placeholder-slate-600"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Pilih Produk (Searchable)
+                    </label>
+                    
+                    {/* Custom Searchable Dropdown */}
+                    <div className="relative group">
+                      <div 
+                        onClick={() => setShowProductSearch(!showProductSearch)}
+                        className="w-full px-4 py-3 rounded-xl text-sm text-white border cursor-pointer flex items-center justify-between transition-all hover:bg-white/5"
+                        style={{
+                          background: 'rgba(12, 19, 36, 0.6)',
+                          border: '1px solid rgba(77, 67, 84, 0.3)',
+                        }}
+                      >
+                        <span className={form.product_id ? "text-white font-semibold" : "text-slate-500"}>
+                          {form.product_id ? products.find(p => p.id === form.product_id)?.name : "-- Pilih Produk --"}
+                        </span>
+                        <span className="material-symbols-outlined text-slate-500 transition-transform" style={{ transform: showProductSearch ? 'rotate(180deg)' : 'none' }}>
+                          expand_more
+                        </span>
                       </div>
 
-                      <div className="overflow-y-auto" style={{ maxHeight: '240px' }}>
+                      {showProductSearch && (
                         <div 
-                          onClick={() => { setForm({ ...form, product_id: '' }); setShowProductSearch(false); }}
-                          className="px-4 py-3 text-xs text-slate-400 hover:bg-white/5 cursor-pointer font-bold"
+                          className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl overflow-hidden border shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
+                          style={{
+                            background: '#1a1f2e',
+                            border: '1px solid rgba(124, 58, 237, 0.3)',
+                            maxHeight: '300px',
+                          }}
                         >
-                          -- Kosongkan Pilihan --
-                        </div>
-                        {products
-                          .filter(p => !productSearchQuery || p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
-                          .map((p) => (
+                          <div className="p-2 border-b border-white/5 sticky top-0 bg-[#1a1f2e] z-10">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
+                              <span className="material-symbols-outlined text-sm text-slate-500">search</span>
+                              <input 
+                                autoFocus
+                                type="text"
+                                value={productSearchQuery}
+                                onChange={(e) => setProductSearchQuery(e.target.value)}
+                                placeholder="Cari nama produk..."
+                                className="w-full bg-transparent border-none outline-none text-xs text-white placeholder-slate-600"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="overflow-y-auto" style={{ maxHeight: '240px' }}>
                             <div 
-                              key={p.id}
-                              onClick={() => {
-                                setForm({ ...form, product_id: p.id });
-                                setShowProductSearch(false);
-                                setProductSearchQuery('');
-                              }}
-                              className="px-4 py-3 hover:bg-purple-600/20 cursor-pointer border-b border-white/5 last:border-none flex items-center justify-between group/item"
+                              onClick={() => { setForm({ ...form, product_id: '' }); setShowProductSearch(false); }}
+                              className="px-4 py-3 text-xs text-slate-400 hover:bg-white/5 cursor-pointer font-bold"
                             >
-                              <div className="min-w-0 pr-4">
-                                <p className="text-white text-[13px] font-bold truncate group-hover/item:text-purple-300">
-                                  {p.name}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500 group-hover/item:text-purple-400">
-                                    {p.category}
-                                  </span>
-                                  <span className="text-[10px] text-amber-500 font-bold">
-                                    Rp {Number(p.price).toLocaleString('id-ID')}
+                              -- Kosongkan Pilihan --
+                            </div>
+                            {products
+                              .filter(p => !productSearchQuery || p.name.toLowerCase().includes(productSearchQuery.toLowerCase()))
+                              .map((p) => (
+                                <div 
+                                  key={p.id}
+                                  onClick={() => {
+                                    setForm({ ...form, product_id: p.id });
+                                    setShowProductSearch(false);
+                                    setProductSearchQuery('');
+                                  }}
+                                  className="px-4 py-3 hover:bg-purple-600/20 cursor-pointer border-b border-white/5 last:border-none flex items-center justify-between group/item"
+                                >
+                                  <div className="min-w-0 pr-4">
+                                    <p className="text-white text-[13px] font-bold truncate group-hover/item:text-purple-300">
+                                      {p.name}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-500 group-hover/item:text-purple-400">
+                                        {p.category}
+                                      </span>
+                                      <span className="text-[10px] text-amber-500 font-bold">
+                                        Rp {Number(p.price).toLocaleString('id-ID')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="material-symbols-outlined text-sm text-purple-500 opacity-0 group-hover/item:opacity-100">
+                                    check_circle
                                   </span>
                                 </div>
-                              </div>
-                              <span className="material-symbols-outlined text-sm text-purple-500 opacity-0 group-hover/item:opacity-100">
-                                check_circle
-                              </span>
-                            </div>
-                          ))}
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Atau Masukkan URL Custom
+                    </label>
+                    <input
+                      type="url"
+                      value={form.target_url}
+                      onChange={(e) => setForm({ ...form, target_url: e.target.value })}
+                      placeholder="https://..."
+                      disabled={!!form.product_id}
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500 disabled:opacity-50"
+                      style={{
+                        background: 'rgba(12, 19, 36, 0.6)',
+                        border: '1px solid rgba(77, 67, 84, 0.3)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-60 transition-all"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
+                  >
+                    {creating ? (
+                      <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    ) : (
+                      <span className="material-symbols-outlined text-sm">add_link</span>
+                    )}
+                    {creating ? 'Membuat...' : 'Buat Link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="px-6 py-3 rounded-xl text-sm font-bold text-slate-400 border border-slate-600/30 hover:border-slate-500 transition-all"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Links List */}
+          <div className="rounded-2xl overflow-hidden" style={baseStyle}>
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <div>
+                <h3 className="text-white font-bold font-['Plus_Jakarta_Sans']">Link Afiliasi Saya</h3>
+                <p className="text-slate-400 text-xs mt-0.5">{links.length} link aktif</p>
+              </div>
+              <button
+                onClick={fetchLinks}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <span className="material-symbols-outlined">refresh</span>
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-8 h-8 rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-spin" />
+              </div>
+            ) : links.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                <span className="material-symbols-outlined text-5xl mb-3 opacity-30">link_off</span>
+                <p className="text-sm font-semibold">Belum ada link afiliasi</p>
+                <p className="text-xs mt-1">Klik "Buat Link Baru" untuk memulai</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {links.map((link) => {
+                  const shareURL = buildShareURL(link.short_code);
+                  return (
+                    <div
+                      key={link.id}
+                      className="p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-white/3 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: link.is_active ? '#4ade80' : '#64748b' }}
+                          />
+                          <p className="text-white font-bold text-sm truncate">{link.title || 'Link Afiliasi'}</p>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate font-mono">{shareURL}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">ads_click</span>
+                            {link.clicks_count || 0} klik
+                          </span>
+                          <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">shopping_cart_checkout</span>
+                            {link.conversions_count || 0} konversi
+                          </span>
+                          <span className="text-[10px] text-green-400 font-bold flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">payments</span>
+                            Rp {Number(link.total_commission || 0).toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => copyURL(shareURL)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-purple-300 border border-purple-500/30 hover:bg-purple-500/10 transition-all"
+                        >
+                          <span className="material-symbols-outlined text-sm">content_copy</span>
+                          Salin
+                        </button>
+                        <button
+                          onClick={() => handleDelete(link.id)}
+                          className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Atau Masukkan URL Custom
-                </label>
-                <input
-                  type="url"
-                  value={form.target_url}
-                  onChange={(e) => setForm({ ...form, target_url: e.target.value })}
-                  placeholder="https://..."
-                  disabled={!!form.product_id}
-                  className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500 disabled:opacity-50"
-                  style={{
-                    background: 'rgba(12, 19, 36, 0.6)',
-                    border: '1px solid rgba(77, 67, 84, 0.3)',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={creating}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-60 transition-all"
-                style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
-              >
-                {creating ? (
-                  <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                ) : (
-                  <span className="material-symbols-outlined text-sm">add_link</span>
-                )}
-                {creating ? 'Membuat...' : 'Buat Link'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-6 py-3 rounded-xl text-sm font-bold text-slate-400 border border-slate-600/30 hover:border-slate-500 transition-all"
-              >
-                Batal
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Links List */}
-      <div className="rounded-2xl overflow-hidden" style={baseStyle}>
-        <div className="p-6 border-b border-white/5 flex justify-between items-center">
-          <div>
-            <h3 className="text-white font-bold font-['Plus_Jakarta_Sans']">Link Afiliasi Saya</h3>
-            <p className="text-slate-400 text-xs mt-0.5">{links.length} link aktif</p>
+            )}
           </div>
-          <button
-            onClick={fetchLinks}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+
+          {/* Quick Share Info */}
+          <div
+            className="p-5 rounded-2xl"
+            style={{
+              background: 'rgba(124, 58, 237, 0.08)',
+              border: '1px solid rgba(124, 58, 237, 0.2)',
+            }}
           >
-            <span className="material-symbols-outlined">refresh</span>
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-spin" />
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-purple-400 mt-0.5">info</span>
+              <div>
+                <p className="text-sm font-bold text-purple-300 mb-1">Cara Kerja Link Afiliasi</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Setiap link memiliki kode unik. Ketika pelanggan mengklik link Anda dan melakukan pembelian,
+                  sistem akan otomatis mencatat konversi dan menghitung komisi berdasarkan kategori produk.
+                  Cookie berlaku selama 30 hari dari klik pertama.
+                </p>
+              </div>
+            </div>
           </div>
-        ) : links.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-            <span className="material-symbols-outlined text-5xl mb-3 opacity-30">link_off</span>
-            <p className="text-sm font-semibold">Belum ada link afiliasi</p>
-            <p className="text-xs mt-1">Klik "Buat Link Baru" untuk memulai</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {links.map((link) => {
-              const shareURL = buildShareURL(link.short_code);
-              return (
-                <div
-                  key={link.id}
-                  className="p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-white/3 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: link.is_active ? '#4ade80' : '#64748b' }}
-                      />
-                      <p className="text-white font-bold text-sm truncate">{link.title || 'Link Afiliasi'}</p>
-                    </div>
-                    <p className="text-xs text-slate-500 truncate font-mono">{shareURL}</p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">ads_click</span>
-                        {link.clicks_count || 0} klik
-                      </span>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">shopping_cart_checkout</span>
-                        {link.conversions_count || 0} konversi
-                      </span>
-                      <span className="text-[10px] text-green-400 font-bold flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">payments</span>
-                        Rp {Number(link.total_commission || 0).toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => copyURL(shareURL)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-purple-300 border border-purple-500/30 hover:bg-purple-500/10 transition-all"
-                    >
-                      <span className="material-symbols-outlined text-sm">content_copy</span>
-                      Salin
-                    </button>
-                    <button
-                      onClick={() => handleDelete(link.id)}
-                      className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                    >
-                      <span className="material-symbols-outlined text-sm">delete</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Quick Share Info */}
-      <div
-        className="p-5 rounded-2xl"
-        style={{
-          background: 'rgba(124, 58, 237, 0.08)',
-          border: '1px solid rgba(124, 58, 237, 0.2)',
-        }}
-      >
-        <div className="flex items-start gap-3">
-          <span className="material-symbols-outlined text-purple-400 mt-0.5">info</span>
-          <div>
-            <p className="text-sm font-bold text-purple-300 mb-1">Cara Kerja Link Afiliasi</p>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Setiap link memiliki kode unik. Ketika pelanggan mengklik link Anda dan melakukan pembelian,
-              sistem akan otomatis mencatat konversi dan menghitung komisi berdasarkan kategori produk.
-              Cookie berlaku selama 30 hari dari klik pertama.
-            </p>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

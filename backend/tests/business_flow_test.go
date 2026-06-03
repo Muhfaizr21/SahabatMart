@@ -62,6 +62,9 @@ func TestCheckoutMultiMerchant(t *testing.T) {
 func TestDuplicateWebhookProtection(t *testing.T) {
 	db := SetupTestDB()
 	
+	// Clean up any stale data from previous test runs
+	db.Exec("DELETE FROM payment_webhooks WHERE gateway = 'midtrans' AND external_id = 'TX-12345'")
+	
 	err := utils.HandleWebhook(db, "midtrans", "TX-12345", `{"status":"paid"}`, func(tx *gorm.DB) error {
 		return nil
 	})

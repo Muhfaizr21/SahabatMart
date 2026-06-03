@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
 import { isAuthenticated } from '../lib/auth';
+import toast from 'react-hot-toast';
 
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,7 +19,7 @@ export default function CartDrawer() {
       const cartItems = resp.items || resp.Items || [];
       setItems(cartItems);
     } catch (_err) {
-      console.error('CartDrawer Load Error:', _err);
+      // silent — cart load failure
     } finally {
       setLoading(false);
     }
@@ -58,7 +59,7 @@ export default function CartDrawer() {
       });
       window.dispatchEvent(new Event('cartUpdate'));
     } catch (_err) {
-      alert(_err.message);
+      toast.error(_err.message || 'Gagal update keranjang');
     } finally {
       setActing(null);
     }
@@ -72,7 +73,7 @@ export default function CartDrawer() {
       await fetchJson(url, { method: 'DELETE' });
       window.dispatchEvent(new Event('cartUpdate'));
     } catch (_err) {
-      alert(_err.message);
+      toast.error(_err.message || 'Gagal hapus item');
     }
   };
 

@@ -114,7 +114,7 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		       0 AS clicks,
 		       COUNT(*) AS orders
 		FROM affiliate_commissions
-		WHERE affiliate_id = ? AND created_at >= NOW() - INTERVAL '6 months'
+		WHERE affiliate_id = ? AND status NOT IN ('cancelled', 'rejected') AND created_at >= NOW() - INTERVAL '6 months'
 		GROUP BY DATE_TRUNC('month', created_at)
 		ORDER BY DATE_TRUNC('month', created_at) ASC
 	`, affiliateID).Scan(&monthlyData)
@@ -140,7 +140,8 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 			"pending_commission":   wallet.PendingBalance,
 			"total_commission":     wallet.TotalEarned,
 			"paid_commission":      wallet.TotalWithdrawn,
-			"approved_commission":  wallet.TotalEarned - wallet.TotalWithdrawn,
+			// [Sync Fix] approved_commission = Balance - Pending (ShoppingBalance is a separate column and not included in Balance)
+			"approved_commission":  wallet.Balance - wallet.PendingBalance,
 			"total_clicks":         affiliateMember.TotalClicks,
 			"total_orders":         totalOrders,
 			"total_orders_pending": pendingOrders,
@@ -208,7 +209,7 @@ func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Req
 		Paid     float64 `json:"paid"`
 	}
 	ac.DB.Table("affiliate_commissions").
-		Where("affiliate_id = ?", affiliateID).
+		Where("affiliate_id = ? AND status NOT IN ('cancelled', 'rejected')", affiliateID).
 		Select("COALESCE(SUM(amount), 0) as total").Scan(&summary.Total)
 	ac.DB.Table("affiliate_commissions").
 		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
@@ -335,6 +336,7 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 	}
 
 	var rows []ProductRow
+	// [BUG-M2 Fix] Filter order_items hanya dari order yang valid (tidak cancelled/expired)
 	ac.DB.Raw(`
 		SELECT p.id, p.name, p.price, p.image, p.category, 
 		       COALESCE(m.store_name, 'Official Store') as store_name,
@@ -344,6 +346,7 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 		LEFT JOIN merchants m ON m.id = p.merchant_id
 		LEFT JOIN category_commissions cc ON LOWER(cc.category_name) = LOWER(p.category)
 		LEFT JOIN order_items oi ON oi.product_id = p.id
+		LEFT JOIN orders o ON o.id = oi.order_id AND o.status NOT IN ('cancelled', 'expired', 'refunded')
 		WHERE p.status = 'active'
 		GROUP BY p.id, p.name, p.price, p.image, p.category, m.store_name, p.base_affiliate_fee, cc.fee_percent
 		ORDER BY total_sold DESC
@@ -434,11 +437,29 @@ func (ac *AffiliateController) RequestWithdrawal(w http.ResponseWriter, r *http.
 // GET /api/affiliate/profile
 func (ac *AffiliateController) GetProfile(w http.ResponseWriter, r *http.Request) {
 	affiliateID, _ := r.Context().Value("affiliate_id").(string)
-	if _, err := uuid.Parse(affiliateID); err != nil {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
-		return
-	}
 	userID, _ := r.Context().Value("user_id").(string)
+	role, _ := r.Context().Value("user_role").(string)
+
+	// [Admin/Superadmin] Jika tidak punya affiliate_id, cari berdasarkan user_id.
+	// Ini memungkinkan superadmin melihat profile affiliate mereka sendiri di panel.
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		// Coba cari affiliate dari user_id
+		if err2 := ac.DB.Where("user_id = ?", userID).First(&models.AffiliateMember{}).Error; err2 != nil {
+			// Bukan affiliate juga — kembalikan data user saja
+			var user models.User
+			ac.DB.Preload("Profile").Where("id = ?", userID).First(&user)
+			utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+				"status": "success",
+				"user":   user,
+			})
+			return
+		}
+		// Validasi ulang untuk superadmin — inject affiliate_id ke context lookup
+		var aff models.AffiliateMember
+		ac.DB.Where("user_id = ?", userID).First(&aff)
+		affiliateID = aff.ID
+		_ = role
+	}
 
 	var affiliate models.AffiliateMember
 	if err := ac.DB.Preload("Tier").Where("id = ?", affiliateID).First(&affiliate).Error; err != nil {
@@ -459,23 +480,51 @@ func (ac *AffiliateController) GetProfile(w http.ResponseWriter, r *http.Request
 // PUT /api/affiliate/profile/update
 func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	affiliateID, _ := r.Context().Value("affiliate_id").(string)
-	if _, err := uuid.Parse(affiliateID); err != nil {
-		utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
-		return
-	}
 	userID, _ := r.Context().Value("user_id").(string)
+	role, _ := r.Context().Value("user_role").(string)
+
+	// [Admin/Superadmin] Fallback ke user_id jika affiliate_id kosong
+	if _, err := uuid.Parse(affiliateID); err != nil {
+		var aff models.AffiliateMember
+		if err2 := ac.DB.Where("user_id = ?", userID).First(&aff).Error; err2 != nil {
+			utils.JSONError(w, http.StatusUnauthorized, "Sesi affiliate tidak valid")
+			return
+		}
+		affiliateID = aff.ID
+		_ = role
+	}
 
 	var req struct {
+		Email             string `json:"email"`
 		FullName          string `json:"full_name"`
 		AvatarUrl         string `json:"avatar_url"`
 		BankName          string `json:"bank_name"`
 		BankAccountNumber string `json:"bank_account_number"`
 		BankAccountName   string `json:"bank_account_name"`
 		PostbackURL       string `json:"postback_url"`
+		KTPNumber         string `json:"ktp_number"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
 		return
+	}
+
+	// Update email in users table if provided and different
+	if req.Email != "" {
+		var u models.User
+		if err := ac.DB.First(&u, "id = ?", userID).Error; err == nil {
+			if u.Email != req.Email {
+				var existingUser models.User
+				if err := ac.DB.Where("email = ? AND id != ?", req.Email, userID).First(&existingUser).Error; err == nil {
+					utils.JSONError(w, http.StatusConflict, "Email sudah terdaftar")
+					return
+				}
+				if err := ac.DB.Model(&u).Update("email", req.Email).Error; err != nil {
+					utils.JSONError(w, http.StatusInternalServerError, "Gagal memperbarui email")
+					return
+				}
+			}
+		}
 	}
 
 	// Update user_profiles (nama + foto)
@@ -490,7 +539,9 @@ func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Requ
 		ac.DB.Table("user_profiles").Where("user_id = ?", userID).Updates(profileUpdates)
 	}
 
-	// Update affiliate_members (data bank & postback)
+	// Update affiliate_members (data bank)
+	// [BUG-S1 Fix] Hanya update field yang dikirim — jangan overwrite dengan string kosong.
+	// postback_url diatur oleh admin via panel, tidak dari form affiliate.
 	updates := map[string]interface{}{}
 	if req.BankName != "" {
 		updates["bank_name"] = req.BankName
@@ -501,12 +552,28 @@ func (ac *AffiliateController) UpdateProfile(w http.ResponseWriter, r *http.Requ
 	if req.BankAccountName != "" {
 		updates["bank_account_name"] = req.BankAccountName
 	}
-	if req.PostbackURL != "" {
-		updates["postback_url"] = req.PostbackURL
+	if req.KTPNumber != "" {
+		updates["ktp_number"] = req.KTPNumber
 	}
 
 	if len(updates) > 0 {
 		ac.DB.Table("affiliate_members").Where("id = ?", affiliateID).Updates(updates)
+
+		// [Sync to Merchant] If merchant exists, update merchant bank info as well!
+		var merchant models.Merchant
+		if err := ac.DB.Where("user_id = ?", userID).First(&merchant).Error; err == nil {
+			merchantUpdates := map[string]interface{}{}
+			if req.BankName != "" {
+				merchantUpdates["bank_name"] = req.BankName
+			}
+			if req.BankAccountNumber != "" {
+				merchantUpdates["bank_account_number"] = req.BankAccountNumber
+			}
+			if req.BankAccountName != "" {
+				merchantUpdates["bank_account_name"] = req.BankAccountName
+			}
+			ac.DB.Model(&merchant).Updates(merchantUpdates)
+		}
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
@@ -562,6 +629,22 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 	levelFilter := r.URL.Query().Get("level") // "all", "1", "2" (2 means 2+)
 	offset := (page - 1) * limit
 
+	// [BUG-C2 Fix] Validasi levelFilter: hanya izinkan nilai yang dikenal.
+	// Jangan pernah langsung inject user input ke SQL.
+	allowedLevels := map[string]bool{"1": true, "2": true, "3": true, "4": true, "5": true}
+	switch levelFilter {
+	case "1":
+		levelFilter = "1"
+	case "2plus":
+		levelFilter = "2plus"
+	case "", "all":
+		levelFilter = ""
+	default:
+		if !allowedLevels[levelFilter] {
+			levelFilter = ""
+		}
+	}
+
 	// Get full downlines list using Recursive CTE
 	type DownlineRow struct {
 		AffiliateID  string    `json:"affiliate_id"`
@@ -579,21 +662,10 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 	
 	searchQuery := "%" + search + "%"
 	
-	// Prepare level condition
-	levelCond := ""
-	if levelFilter == "1" {
-		levelCond = "AND level = 1"
-	} else if levelFilter == "2plus" {
-		levelCond = "AND level >= 2"
-	} else if levelFilter != "" && levelFilter != "all" {
-		// Specific level filter (e.g., "2", "3")
-		levelCond = fmt.Sprintf("AND level = %s", levelFilter)
-	}
-
 	// Query with Recursive CTE to get all levels + Filter + Pagination
-	ac.DB.Raw(fmt.Sprintf(`
+	if levelFilter == "2plus" {
+		ac.DB.Raw(`
 		WITH RECURSIVE team AS (
-			-- Anchor: Direct downlines (Level 1 relative to target)
 			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
 			       1 as level, CAST('Anda' AS VARCHAR(150)) as referrer_name
 			FROM affiliate_members am
@@ -602,28 +674,85 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 			
 			UNION ALL
 			
-			-- Recursive member: Indirect downlines (Level 2+)
 			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
 			       t.level + 1, CAST(t.full_name AS VARCHAR(150)) as referrer_name
 			FROM affiliate_members am
 			LEFT JOIN user_profiles up ON up.user_id = am.user_id
 			JOIN team t ON am.upline_id = t.id
-			WHERE t.level < 10 
+			WHERE t.level < 100
 		)
 		SELECT t.id as affiliate_id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at as joined_at,
 		       t.level, t.referrer_name,
 		       COALESCE(SUM(o.subtotal), 0) as turnover
 		FROM team t
 		LEFT JOIN orders o ON o.affiliate_id = t.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
-		WHERE (t.full_name ILIKE ? OR t.user_id::text ILIKE ?) %s
+		WHERE (t.full_name ILIKE ? OR t.user_id::text ILIKE ?) AND t.level >= 2
 		GROUP BY t.id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at, t.level, t.referrer_name
 		ORDER BY t.level ASC, t.created_at DESC
 		LIMIT ? OFFSET ?
-	`, levelCond), targetID, searchQuery, searchQuery, limit, offset).Scan(&downlines)
+	`, targetID, searchQuery, searchQuery, limit, offset).Scan(&downlines)
+	} else if levelFilter != "" {
+		ac.DB.Raw(`
+		WITH RECURSIVE team AS (
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
+			       1 as level, CAST('Anda' AS VARCHAR(150)) as referrer_name
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			WHERE am.upline_id = ?
+			
+			UNION ALL
+			
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
+			       t.level + 1, CAST(t.full_name AS VARCHAR(150)) as referrer_name
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			JOIN team t ON am.upline_id = t.id
+			WHERE t.level < 100
+		)
+		SELECT t.id as affiliate_id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at as joined_at,
+		       t.level, t.referrer_name,
+		       COALESCE(SUM(o.subtotal), 0) as turnover
+		FROM team t
+		LEFT JOIN orders o ON o.affiliate_id = t.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
+		WHERE (t.full_name ILIKE ? OR t.user_id::text ILIKE ?) AND t.level = ?
+		GROUP BY t.id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at, t.level, t.referrer_name
+		ORDER BY t.level ASC, t.created_at DESC
+		LIMIT ? OFFSET ?
+	`, targetID, searchQuery, searchQuery, levelFilter, limit, offset).Scan(&downlines)
+	} else {
+		ac.DB.Raw(`
+		WITH RECURSIVE team AS (
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
+			       1 as level, CAST('Anda' AS VARCHAR(150)) as referrer_name
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			WHERE am.upline_id = ?
+			
+			UNION ALL
+			
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, up.avatar_url, am.status, am.created_at, 
+			       t.level + 1, CAST(t.full_name AS VARCHAR(150)) as referrer_name
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			JOIN team t ON am.upline_id = t.id
+			WHERE t.level < 100
+		)
+		SELECT t.id as affiliate_id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at as joined_at,
+		       t.level, t.referrer_name,
+		       COALESCE(SUM(o.subtotal), 0) as turnover
+		FROM team t
+		LEFT JOIN orders o ON o.affiliate_id = t.id AND o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
+		WHERE (t.full_name ILIKE ? OR t.user_id::text ILIKE ?)
+		GROUP BY t.id, t.user_id, t.upline_id, t.full_name, t.avatar_url, t.status, t.created_at, t.level, t.referrer_name
+		ORDER BY t.level ASC, t.created_at DESC
+		LIMIT ? OFFSET ?
+	`, targetID, searchQuery, searchQuery, limit, offset).Scan(&downlines)
+	}
 
 	// Count total filtered
 	var totalFiltered int64
-	ac.DB.Raw(fmt.Sprintf(`
+	if levelFilter == "2plus" {
+		ac.DB.Raw(`
 		WITH RECURSIVE team AS (
 			SELECT am.id, am.user_id, am.upline_id, up.full_name, 1 as level
 			FROM affiliate_members am
@@ -634,10 +763,43 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 			FROM affiliate_members am
 			LEFT JOIN user_profiles up ON up.user_id = am.user_id
 			JOIN team t ON am.upline_id = t.id
-			WHERE t.level < 10
+			WHERE t.level < 100
 		)
-		SELECT COUNT(*) FROM team WHERE (full_name ILIKE ? OR user_id::text ILIKE ?) %s
-	`, levelCond), targetID, searchQuery, searchQuery).Scan(&totalFiltered)
+		SELECT COUNT(*) FROM team WHERE (full_name ILIKE ? OR user_id::text ILIKE ?) AND level >= 2
+	`, targetID, searchQuery, searchQuery).Scan(&totalFiltered)
+	} else if levelFilter != "" {
+		ac.DB.Raw(`
+		WITH RECURSIVE team AS (
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, 1 as level
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			WHERE am.upline_id = ?
+			UNION ALL
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, t.level + 1
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			JOIN team t ON am.upline_id = t.id
+			WHERE t.level < 100
+		)
+		SELECT COUNT(*) FROM team WHERE (full_name ILIKE ? OR user_id::text ILIKE ?) AND level = ?
+	`, targetID, searchQuery, searchQuery, levelFilter).Scan(&totalFiltered)
+	} else {
+		ac.DB.Raw(`
+		WITH RECURSIVE team AS (
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, 1 as level
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			WHERE am.upline_id = ?
+			UNION ALL
+			SELECT am.id, am.user_id, am.upline_id, up.full_name, t.level + 1
+			FROM affiliate_members am
+			LEFT JOIN user_profiles up ON up.user_id = am.user_id
+			JOIN team t ON am.upline_id = t.id
+			WHERE t.level < 100
+		)
+		SELECT COUNT(*) FROM team WHERE (full_name ILIKE ? OR user_id::text ILIKE ?)
+	`, targetID, searchQuery, searchQuery).Scan(&totalFiltered)
+	}
 
 	totalPages := (totalFiltered + int64(limit) - 1) / int64(limit)
 
@@ -652,9 +814,29 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		`, targetID).Scan(&rootMember)
 	}
 
+	// Count active downlines in the last 30 days
+	var activeMitra int64
+	var descendantIDs []string
+	ac.DB.Raw(`
+		WITH RECURSIVE subordinates AS (
+			SELECT id FROM affiliate_members WHERE upline_id = ?
+			UNION ALL
+			SELECT a.id FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
+		)
+		SELECT id FROM subordinates
+	`, targetID).Scan(&descendantIDs)
+
+	if len(descendantIDs) > 0 {
+		ac.DB.Model(&models.Order{}).
+			Where("affiliate_id IN ? AND status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed') AND created_at >= NOW() - INTERVAL '30 days'", descendantIDs).
+			Select("COUNT(DISTINCT affiliate_id)").
+			Scan(&activeMitra)
+	}
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"total_downlines": totalDownlines,
 		"team_turnover":   teamTurnover,
+		"active_mitra":    activeMitra,
 		"downlines":       downlines,
 		"is_drill_down":   isDrillDown,
 		"root_member":     rootMember,
@@ -675,18 +857,51 @@ func (ac *AffiliateController) CheckMerchantEligibility(w http.ResponseWriter, r
 		return
 	}
 
-	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, qualifiedMitra := ac.Service.CheckMerchantEligibility(affiliateID)
+	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, qualifiedMitra, directMitra, totalTransactions, performancePoints, nextTier := ac.Service.GetFullEligibility(affiliateID)
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+	userID, _ := r.Context().Value("user_id").(string)
+	var userRole string
+	ac.DB.Table("users").Select("role").Where("id = ?", userID).Scan(&userRole)
+	isMerchant := userRole == "merchant"
+
+	if isMerchant {
+		isEligible = false
+	}
+
+	resp := map[string]interface{}{
 		"is_eligible":      isEligible,
+		"is_merchant":      isMerchant,
 		"active_mitra":     activeMitra,
 		"qualified_mitra":  qualifiedMitra,
+		"direct_mitra":     directMitra,
+		"total_transactions": totalTransactions,
+		"performance_points": performancePoints,
 		"monthly_turnover": monthlyTurnover,
 		"requirements": map[string]interface{}{
-			"min_mitra":    reqMitra,
-			"min_turnover": reqTurnover,
+			"min_mitra":              reqMitra,
+			"min_turnover":           reqTurnover,
+			"min_referrals":          0,
+			"min_total_transactions": 0,
+			"min_performance_points": 0,
 		},
-	})
+	}
+
+	// [Sync Fix] If there's a next tier, include ALL 5 upgrade requirements from it
+	if nextTier != nil {
+		resp["next_tier"] = map[string]interface{}{
+			"id":   nextTier.ID,
+			"name": nextTier.Name,
+		}
+		resp["requirements"] = map[string]interface{}{
+			"min_mitra":              nextTier.MinActiveMitra,
+			"min_turnover":           nextTier.MinMonthlyTurnover,
+			"min_referrals":          nextTier.MinReferrals,
+			"min_total_transactions": nextTier.MinTotalTransactions,
+			"min_performance_points": nextTier.MinPerformancePoints,
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, resp)
 }
 
 // GET /api/affiliate/leaderboard — sanitized, no bank data exposed

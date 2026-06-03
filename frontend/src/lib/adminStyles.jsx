@@ -319,17 +319,22 @@ export function Modal({ title, onClose, children, wide }) {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000000,
-      background: 'rgba(15, 23, 42, 0.7)', 
-      backdropFilter: 'blur(12px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
-      overflowY: 'auto',
-    }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div 
+      className="admin-modal-overlay"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000000,
+        background: 'rgba(15, 23, 42, 0.7)', 
+        backdropFilter: 'blur(12px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
+        overflowY: 'auto',
+      }} 
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       
       {/* Floating Close Button Outside (Premium Style) */}
       <button 
         onClick={onClose}
+        className="admin-modal-close-btn"
         style={{
           position: 'fixed', top: 30, right: 30,
           width: 54, height: 54, borderRadius: '50%',
@@ -348,27 +353,56 @@ export function Modal({ title, onClose, children, wide }) {
         <i className='bx bx-x'></i>
       </button>
 
-      <div style={{
-        background: '#fff', borderRadius: 32,
-        width: '100%', maxWidth: wide ? 900 : 550,
-        margin: 'auto',
-        boxShadow: '0 100px 150px -30px rgba(0,0,0,0.5)',
-        animation: 'modalEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-        overflow: 'hidden', position: 'relative'
-      }}>
+      <div 
+        className="admin-modal-box"
+        style={{
+          background: '#fff', borderRadius: 32,
+          width: '100%', maxWidth: wide ? 900 : 550,
+          maxHeight: '85vh',
+          display: 'flex', flexDirection: 'column',
+          margin: 'auto',
+          boxShadow: '0 100px 150px -30px rgba(0,0,0,0.5)',
+          animation: 'modalEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+          overflow: 'hidden', position: 'relative'
+        }}
+      >
         {title && (
-          <div style={{ padding: '35px 45px 25px', display: 'flex', alignItems: 'center', gap: 15 }}>
+          <div className="admin-modal-header" style={{ padding: '35px 45px 25px', display: 'flex', alignItems: 'center', gap: 15, flexShrink: 0 }}>
             <div style={{ width: 6, height: 24, background: '#4f46e5', borderRadius: 10 }}></div>
             <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.7px' }}>{title}</h2>
           </div>
         )}
-        <div style={{ padding: '0 45px 45px' }}>{children}</div>
+        <div className="admin-modal-body" style={{ padding: '0 45px 45px', flex: 1, overflowY: 'auto', minHeight: 0 }}>{children}</div>
       </div>
 
       <style>{`
         @keyframes modalEntrance { 
            from { opacity: 0; transform: translateY(50px) scale(0.9); } 
            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (max-width: 640px) {
+          .admin-modal-overlay {
+            padding: 16px !important;
+            align-items: flex-start !important;
+          }
+          .admin-modal-box {
+            border-radius: 24px !important;
+            margin-top: 60px !important;
+            margin-bottom: 20px !important;
+          }
+          .admin-modal-header {
+            padding: 24px 24px 16px !important;
+          }
+          .admin-modal-body {
+            padding: 0 24px 24px !important;
+          }
+          .admin-modal-close-btn {
+            top: 12px !important;
+            right: 12px !important;
+            width: 44px !important;
+            height: 44px !important;
+            font-size: 26px !important;
+          }
         }
       `}</style>
     </div>,

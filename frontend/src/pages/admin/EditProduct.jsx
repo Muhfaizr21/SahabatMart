@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import toast from 'react-hot-toast';
 import { A } from '../../lib/adminStyles';
+import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
 const API = ADMIN_API_BASE;
 
@@ -49,6 +50,10 @@ export default function AdminEditProduct() {
   });
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [editingVariant, setEditingVariant] = useState(null);
+
+  // Media Library states
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mediaModalType, setMediaModalType] = useState('main'); // 'main' or 'gallery'
 
   useEffect(() => {
     console.log("DEBUG: Fetching Product ID:", productId);
@@ -455,29 +460,17 @@ export default function AdminEditProduct() {
               Atur persentase komisi khusus untuk produk ini berdasarkan jenjang affiliate.
             </p>
 
-            <div className="input-row" style={{ marginTop: '20px', marginBottom: '20px' }}>
-              <div style={{ flex: 1 }}>
-                <label className="mini-label">Preset Komisi Chain</label>
-                <select 
-                  className="form-select" 
-                  value={p.commission_preset_id || ''} 
-                  onChange={e => setP({...p, commission_preset_id: e.target.value || null})}
-                >
-                  <option value="">-- Gunakan Default --</option>
-                  {presets.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label className="mini-label">Preset Komisi Tier</label>
-                <select 
-                  className="form-select" 
-                  value={p.tier_commission_preset_id || ''} 
-                  onChange={e => setP({...p, tier_commission_preset_id: e.target.value || null})}
-                >
-                  <option value="">-- Gunakan Default --</option>
-                  {tierPresets.map(tp => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
-                </select>
-              </div>
+            <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+              <label className="mini-label">Preset Komisi Chain</label>
+              <select 
+                className="form-select" 
+                value={p.commission_preset_id || ''} 
+                onChange={e => setP({...p, commission_preset_id: e.target.value || null})}
+                style={{ maxWidth: '400px' }}
+              >
+                <option value="">-- Gunakan Default --</option>
+                {presets.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
+              </select>
             </div>
             
             <div className="table-responsive">
@@ -613,8 +606,15 @@ export default function AdminEditProduct() {
                    <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'main')} />
                 </label>
              </div>
+             <button
+                type="button"
+                style={{ ...A.btnGhost, width: '100%', justifyContent: 'center', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+                onClick={() => { setMediaModalType('main'); setMediaModalOpen(true); }}
+             >
+                <i className="bx bx-images" /> Pilih dari Pustaka Media
+             </button>
              
-             <h5 className="sub-label-uppercase">Galeri Produk</h5>
+             <h5 className="sub-label-uppercase" style={{ marginTop: 20 }}>Galeri Produk</h5>
              <div className="gallery-grid">
                 {gallery.map((img, idx) => (
                   <div key={idx} className="gallery-item">
@@ -622,10 +622,20 @@ export default function AdminEditProduct() {
                     <button onClick={() => removeGalleryImage(idx)} className="btn-remove-img"><i className="bx bx-x" /></button>
                   </div>
                 ))}
-                <label className="gallery-add">
-                   <i className="bx bx-plus" />
-                   <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'gallery')} />
-                </label>
+                 <button
+                    type="button"
+                    className="gallery-add"
+                    style={{ borderStyle: 'dashed', borderWidth: '2.5px', background: '#fff', color: '#6366f1', display: 'flex', flexDirection: 'column', gap: 2, padding: 0 }}
+                    onClick={() => { setMediaModalType('gallery'); setMediaModalOpen(true); }}
+                    title="Ambil dari Media Library"
+                 >
+                    <i className="bx bx-images" style={{ fontSize: 18 }} />
+                    <span style={{ fontSize: 8, fontWeight: 800 }}>Media Lib</span>
+                 </button>
+                 <label className="gallery-add">
+                    <i className="bx bx-plus" />
+                    <input type="file" style={{ display: 'none' }} accept="image/*" onChange={e => handleUpload(e, 'gallery')} />
+                 </label>
              </div>
           </div>
 
@@ -1150,6 +1160,21 @@ export default function AdminEditProduct() {
           </div>
         </div>
       )}
+
+      <MediaLibraryModal 
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        multiple={mediaModalType === 'gallery'}
+        currentSelection={mediaModalType === 'gallery' ? gallery : p.image}
+        onSelect={(selected) => {
+          if (mediaModalType === 'main') {
+            setP(prev => ({ ...prev, image: selected }));
+          } else {
+            setGallery(selected);
+            setP(prev => ({ ...prev, images: JSON.stringify(selected) }));
+          }
+        }}
+      />
     </div>
   );
 }

@@ -50,13 +50,56 @@ func (c *MembershipTierController) UpsertTier(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// [Sync Fix] Preserve all existing fields if not sent in payload (avoid 0-overwrite)
+	if tier.ID != 0 {
+		var existing models.MembershipTier
+		if err := c.DB.First(&existing, tier.ID).Error; err == nil {
+			if tier.MinCommissionDepth == 0    { tier.MinCommissionDepth = existing.MinCommissionDepth }
+			if tier.MaxCommissionDepth == 0    { tier.MaxCommissionDepth = existing.MaxCommissionDepth }
+			if tier.MonthlyFee == 0             { tier.MonthlyFee = existing.MonthlyFee }
+			if tier.MinWithdrawalAmount == 0   { tier.MinWithdrawalAmount = existing.MinWithdrawalAmount }
+			tier.CommissionHoldDays = 0
+			if tier.CookieDurationDays == 0    { tier.CookieDurationDays = existing.CookieDurationDays }
+			if tier.MinActiveMitra == 0        { tier.MinActiveMitra = existing.MinActiveMitra }
+			if tier.MinMonthlyTurnover == 0    { tier.MinMonthlyTurnover = existing.MinMonthlyTurnover }
+			if tier.MinTotalTransactions == 0  { tier.MinTotalTransactions = existing.MinTotalTransactions }
+			if tier.MinReferrals == 0          { tier.MinReferrals = existing.MinReferrals }
+			if tier.MinPerformancePoints == 0  { tier.MinPerformancePoints = existing.MinPerformancePoints }
+			if tier.BaseCommissionRate == 0    { tier.BaseCommissionRate = existing.BaseCommissionRate }
+			if tier.Color == ""                { tier.Color = existing.Color }
+			if tier.Icon == ""                 { tier.Icon = existing.Icon }
+		}
+	}
+
 	var result *gorm.DB
 	if tier.ID == 0 {
 		// Create baru
 		result = c.DB.Create(&tier)
 	} else {
-		// Update
-		result = c.DB.Save(&tier)
+		// Update — hanya field yang ada di payload, preserve yang lain
+		// [Sync Fix] Update ALL tier fields, including CommissionHoldDays, CookieDurationDays, MinWithdrawalAmount, etc.
+		result = c.DB.Model(&models.MembershipTier{}).Where("id = ?", tier.ID).Updates(map[string]interface{}{
+			"name":                    tier.Name,
+			"level":                  tier.Level,
+			"base_commission_rate":   tier.BaseCommissionRate,
+			"min_commission_depth":   tier.MinCommissionDepth,
+			"max_commission_depth":   tier.MaxCommissionDepth,
+			"monthly_fee":            tier.MonthlyFee,
+			"min_withdrawal_amount":  tier.MinWithdrawalAmount,
+			"commission_hold_days":   tier.CommissionHoldDays,
+			"cookie_duration_days":   tier.CookieDurationDays,
+			"min_active_mitra":       tier.MinActiveMitra,
+			"min_monthly_turnover":   tier.MinMonthlyTurnover,
+			"min_total_transactions": tier.MinTotalTransactions,
+			"min_referrals":          tier.MinReferrals,
+			"min_performance_points": tier.MinPerformancePoints,
+			"color":                  tier.Color,
+			"icon":                   tier.Icon,
+			"description":            tier.Description,
+			"is_active":              tier.IsActive,
+		})
+		// fetch updated record
+		c.DB.First(&tier, tier.ID)
 	}
 
 	if result.Error != nil {

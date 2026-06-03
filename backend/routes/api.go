@@ -39,6 +39,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	skinCtrl := controllers.NewSkinController(db)
 	warehouseCtrl := controllers.NewWarehouseController(db)
 	tierCtrl := controllers.NewMembershipTierController(db)
+	mediaCtrl := controllers.NewMediaController(db)
 
 	// Middleware
 	cors := CorsMiddleware
@@ -48,7 +49,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	actorOnly := func(allowedRoles ...string) func(http.HandlerFunc) http.HandlerFunc {
 		return func(next http.HandlerFunc) http.HandlerFunc {
 			return func(w http.ResponseWriter, r *http.Request) {
+				// [Maintenance Audit] Sync dynamic maintenance state from DB
+				var isMaint models.PlatformConfig
 				maintenance := false
+				if err := db.Where("key = ?", "platform_maintenance").First(&isMaint).Error; err == nil {
+					maintenance = isMaint.Value == "true"
+				}
 
 				authHeader := r.Header.Get("Authorization")
 				if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -384,6 +390,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// Administrative - Dashboard & Stats
 	mux.HandleFunc("/api/admin/overview", adminOnly(adminCtrl.GetOverview))
+	mux.HandleFunc("/api/admin/export-report", adminOnly(adminCtrl.ExportReport))
 	mux.HandleFunc("/api/admin/stats", adminOnly(adminCtrl.GetUserStats)) // Alias for dashboard stats
 	mux.HandleFunc("/api/admin/users/stats", adminOnly(adminCtrl.GetUserStats))
 	mux.HandleFunc("/api/admin/merchants/stats", adminOnly(adminCtrl.GetMerchantStats))
@@ -402,6 +409,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/users/delete", can("manage_users")(adminCtrl.DeleteUser))
 	mux.HandleFunc("/api/admin/users/reset-password", adminOnly(adminCtrl.ResetUserPassword))
 	mux.HandleFunc("/api/admin/users/downlines", can("manage_users")(adminCtrl.GetUserDownlines))
+	mux.HandleFunc("/api/admin/users/bulk-notify", can("manage_users")(adminCtrl.BulkNotifyUsers))
 
 	// Merchant Management
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))
@@ -426,6 +434,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/categories", adminOnly(adminCtrl.GetCategories))
 	mux.HandleFunc("/api/admin/categories/add", adminOnly(adminCtrl.AddCategory))
 	mux.HandleFunc("/api/admin/categories/delete", adminOnly(adminCtrl.DeleteCategory))
+	mux.HandleFunc("/api/admin/categories/bulk-delete", adminOnly(adminCtrl.BulkDeleteCategories))
 	mux.HandleFunc("/api/admin/brands", adminOnly(adminCtrl.GetBrands))
 	mux.HandleFunc("/api/admin/brands/upsert", adminOnly(adminCtrl.UpsertBrand))
 	mux.HandleFunc("/api/admin/brands/delete", adminOnly(adminCtrl.DeleteBrand))
@@ -460,6 +469,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliates/withdrawals/process", adminOnly(adminCtrl.ProcessAffiliateWithdrawal))
 	mux.HandleFunc("/api/admin/affiliates/configs/delete", adminOnly(adminCtrl.DeleteAffiliateTier))
 	mux.HandleFunc("/api/admin/affiliates/member/update-tier", adminOnly(adminCtrl.UpdateMemberInfo))
+	mux.HandleFunc("/api/admin/affiliates/member/update-info", adminOnly(adminCtrl.UpdateMemberInfo))
 	mux.HandleFunc("/api/admin/vouchers", adminOnly(adminCtrl.GetVouchers))
 	mux.HandleFunc("/api/admin/vouchers/upsert", adminOnly(adminCtrl.UpsertVoucher))
 	mux.HandleFunc("/api/admin/commissions/category", adminOnly(adminCtrl.ManageCommissions))
@@ -516,6 +526,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/blogs", adminOnly(adminCtrl.GetBlogs))
 	mux.HandleFunc("/api/admin/blogs/upsert", adminOnly(adminCtrl.UpsertBlog))
 	mux.HandleFunc("/api/admin/blogs/delete", adminOnly(adminCtrl.DeleteBlog))
+	mux.HandleFunc("/api/admin/blogs/bulk-delete", adminOnly(adminCtrl.BulkDeleteBlogs))
 	mux.HandleFunc("/api/admin/banners", adminOnly(adminCtrl.ManageBanners))
 	mux.HandleFunc("/api/admin/banners/delete", superAdminOnly(adminCtrl.DeleteBanner))
 
@@ -523,12 +534,14 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/education", adminOnly(adminCtrl.GetEducation))
 	mux.HandleFunc("/api/admin/education/upsert", adminOnly(adminCtrl.UpsertEducation))
 	mux.HandleFunc("/api/admin/education/delete", adminOnly(adminCtrl.DeleteEducation))
+	mux.HandleFunc("/api/admin/education/bulk-delete", adminOnly(adminCtrl.BulkDeleteEducation))
 	mux.HandleFunc("/api/admin/events", adminOnly(adminCtrl.GetEvents))
 	mux.HandleFunc("/api/admin/events/upsert", adminOnly(adminCtrl.UpsertEvent))
 	mux.HandleFunc("/api/admin/events/delete", adminOnly(adminCtrl.DeleteEvent))
 	mux.HandleFunc("/api/admin/promo", adminOnly(adminCtrl.GetPromoMaterials))
 	mux.HandleFunc("/api/admin/promo/upsert", adminOnly(adminCtrl.UpsertPromoMaterial))
 	mux.HandleFunc("/api/admin/promo/delete", adminOnly(adminCtrl.DeletePromoMaterial))
+	mux.HandleFunc("/api/admin/promo/bulk-delete", adminOnly(adminCtrl.BulkDeletePromoMaterials))
 
 	// CMS & Inbox
 	mux.HandleFunc("/api/admin/inbox", superAdminOnly(contactCtrl.GetMessages))
@@ -547,9 +560,15 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/rbac/stats", superAdminOnly(rbacCtrl.GetStats))
 	mux.HandleFunc("/api/admin/rbac/admins", superAdminOnly(rbacCtrl.GetAdmins))
 
+	// Media Library Management
+	mux.HandleFunc("/api/admin/media", adminOnly(mediaCtrl.GetMedia))
+	mux.HandleFunc("/api/admin/media/upload", adminOnly(mediaCtrl.UploadMedia))
+	mux.HandleFunc("/api/admin/media/delete", adminOnly(mediaCtrl.DeleteMedia))
+
 	// System & Config
 	mux.HandleFunc("/api/admin/configs", adminOnly(adminCtrl.GetSettings))
 	mux.HandleFunc("/api/admin/configs/upsert", adminOnly(adminCtrl.UpsertSettings))
+	mux.HandleFunc("/api/admin/configs/test-email", adminOnly(adminCtrl.TestEmailSettings))
 	mux.HandleFunc("/api/admin/logistics", adminOnly(adminCtrl.GetLogistics))
 	mux.HandleFunc("/api/admin/logistics/toggle", adminOnly(adminCtrl.ToggleLogistic))
 	mux.HandleFunc("/api/admin/logistics/sync", adminOnly(adminCtrl.SyncCouriers))

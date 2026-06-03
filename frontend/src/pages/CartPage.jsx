@@ -24,7 +24,6 @@ export default function CartPage() {
       const cartItems = resp.items || resp.Items || [];
       setItems(cartItems);
     } catch (_err) {
-      console.error('Cart Load Error:', _err);
       setError('Gagal memuat keranjang');
     } finally {
       setLoading(false);
@@ -101,8 +100,8 @@ export default function CartPage() {
   return (
     <main className="bg-gray-50 min-h-screen">
       <SEO 
-        title="Keranjang Belanja - SahabatMart"
-        description="Kelola belanjaan Anda di SahabatMart. Nikmati kemudahan berbelanja produk kecantikan terbaik."
+        title="Keranjang Belanja - AkuGlow"
+        description="Kelola belanjaan Anda di AkuGlow. Nikmati kemudahan berbelanja produk kecantikan terbaik."
         noindex={true}
       />
       {/* Header */}

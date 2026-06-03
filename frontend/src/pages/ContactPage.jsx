@@ -35,8 +35,8 @@ export default function ContactPage() {
   return (
     <main className="max-w-6xl mx-auto px-6 py-16">
       <SEO 
-        title="Hubungi Kami - SahabatMart"
-        description="Ada pertanyaan atau butuh bantuan? Hubungi SahabatMart (AkuGlow) melalui formulir kontak, WhatsApp, atau email. Tim kami siap membantu Anda."
+        title="Hubungi Kami - AkuGlow"
+        description="Ada pertanyaan atau butuh bantuan? Hubungi AkuGlow melalui formulir kontak, WhatsApp, atau email. Tim kami siap membantu Anda."
       />
       <div className="text-center mb-16">
         <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Hubungi <span className="text-rose-600">Kami</span></h1>

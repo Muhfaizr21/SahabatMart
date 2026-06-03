@@ -42,8 +42,8 @@ export default function LoginPage() {
       }).then(user => {
         localStorage.setItem('user', JSON.stringify(user));
         navigate(getRedirectPath(user), { replace: true });
-      }).catch(err => {
-        setError('Gagal sinkronisasi data Google: ' + err.message);
+      }).catch(() => {
+        setError('Gagal sinkronisasi data Google. Silakan coba lagi.');
         setLoading(false);
       });
     }

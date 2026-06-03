@@ -34,6 +34,8 @@ export default function AffiliateDashboard() {
   const [joining, setJoining] = useState(false);
   const [joinRefCode, setJoinRefCode] = useState('');
 
+  const [showCardModal, setShowCardModal] = useState(false);
+
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -55,7 +57,7 @@ export default function AffiliateDashboard() {
     if (!joinRefCode.trim()) return;
     setJoining(true);
     try {
-      await fetchJson(`${AFFILIATE_API_BASE}/join-team`, {
+      await fetchJson(`${AFFILIATE_API_BASE}/link-upline`, {
         method: 'POST',
         body: JSON.stringify({ ref_code: joinRefCode })
       });
@@ -89,15 +91,15 @@ export default function AffiliateDashboard() {
 
       <div className="space-y-6 animate-in fade-in duration-500">
         {/* Top Bar: Referral, Member Card & Tier */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="lg:col-span-1 flex flex-col gap-6">
             <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-[32px] flex justify-between items-center shadow-xl shadow-indigo-500/20 relative overflow-hidden h-full">
               <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
               <div className="relative z-10">
                 <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kode Referral Anda</p>
-                <h3 className="text-white text-3xl font-black tracking-widest">{data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || '-'}</h3>
+                <h3 className="text-white text-3xl font-black tracking-widest">{(data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || '-').toUpperCase()}</h3>
                 <div className="mt-4 flex gap-2">
-                  <button onClick={() => { navigator.clipboard.writeText(data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || ''); toast.success('Kode disalin!'); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
+                  <button onClick={() => { navigator.clipboard.writeText((data?.affiliate?.ref_code || user?.affiliate?.ref_code || user?.affiliate_ref_code || '').toUpperCase()); toast.success('Kode disalin!'); }} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg text-[10px] font-black transition-all">SALIN KODE</button>
                   <button onClick={() => window.open('/affiliate/links', '_self')} className="px-4 py-2 bg-indigo-900/40 text-white rounded-lg text-[10px] font-black hover:bg-indigo-900/60">GENERATE LINK</button>
                 </div>
               </div>
@@ -107,8 +109,16 @@ export default function AffiliateDashboard() {
             </div>
           </div>
 
-          <div className="lg:col-span-1">
-            <MemberCard user={user} profile={user?.profile || data?.user?.profile} />
+          <div 
+            onClick={() => setShowCardModal(true)} 
+            className="lg:col-span-1 cursor-pointer relative group/card flex flex-col justify-between"
+          >
+            <MemberCard user={user} profile={user?.profile || data?.user?.profile} size="small" />
+            <div className="text-center mt-2 opacity-40 group-hover/card:opacity-90 transition-opacity duration-300">
+              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase flex items-center justify-center gap-1.5">
+                <span className="material-symbols-outlined text-xs">zoom_in</span> Klik untuk memperbesar
+              </span>
+            </div>
           </div>
         </div>
 
@@ -136,7 +146,7 @@ export default function AffiliateDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard icon="ads_click" label="Klik" value={formatNum(stats.total_clicks)} sub="Total klik link Anda" color="#ddb7ff" />
           <StatCard icon="shopping_cart" label="Order" value={formatNum(stats.total_orders)} sub={`${stats.total_orders_pending || 0} menunggu bayar`} color="#fabc4e" />
-          <StatCard icon="payments" label="Komisi Aktif" value={formatRp(stats.balance)} sub={`Pending: ${formatRp(stats.pending_commission)}`} color="#4ade80" />
+          <StatCard icon="payments" label="Komisi Siap Tarik" value={formatRp(stats.approved_commission !== undefined ? stats.approved_commission : (stats.balance - (stats.pending_commission || 0)))} sub={`Total: ${formatRp(stats.total_commission || stats.balance)}`} color="#4ade80" />
           <StatCard icon="groups" label="Total Tim" value={formatNum(stats.total_downline)} sub={`${activeMitraCount} mitra aktif`} color="#f43f5e" />
         </div>
 
@@ -234,6 +244,31 @@ export default function AffiliateDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Premium Fullscreen Member Card Modal */}
+      {showCardModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/95 backdrop-blur-2xl animate-in fade-in duration-300"
+          onClick={() => setShowCardModal(false)}
+        >
+          {/* Close trigger button */}
+          <div className="absolute top-6 right-6 z-50">
+            <button 
+              onClick={() => setShowCardModal(false)} 
+              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/10 transition-all active:scale-95 flex items-center justify-center shadow-lg"
+            >
+              <span className="material-symbols-outlined text-2xl">close</span>
+            </button>
+          </div>
+
+          <div 
+            className="w-full max-w-[1063px] transform scale-95 md:scale-100 transition-all duration-500 ease-out animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MemberCard user={user} profile={user?.profile || data?.user?.profile} size="large" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

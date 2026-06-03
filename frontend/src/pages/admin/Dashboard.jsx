@@ -99,6 +99,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear().toString());
 
+  const [exporting, setExporting] = useState(false);
+
   const loadData = () => {
     setLoading(true);
     Promise.all([
@@ -108,6 +110,35 @@ export default function AdminDashboard() {
       setOverview(ov);
       setMonthly(Array.isArray(mo) ? mo : (mo?.data || []));
     }).catch(console.error).finally(() => setLoading(false));
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/export-report`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Gagal mengekspor laporan');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `akuglow_report_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || 'Gagal mengekspor laporan');
+    } finally {
+      setExporting(false);
+    }
   };
 
   useEffect(() => { loadData(); }, [year]);
@@ -154,16 +185,16 @@ export default function AdminDashboard() {
             <i className="bx bx-refresh" style={{ fontSize: '20px' }} />
             Sync Data
           </button>
-          <button className="btn-primary" style={{
+          <button onClick={handleExport} disabled={exporting} className="btn-primary" style={{
             display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+            background: exporting ? '#94a3b8' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
             border: 'none', borderRadius: '14px',
-            fontSize: '14px', fontWeight: '700', color: '#fff', cursor: 'pointer',
-            boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.4)',
+            fontSize: '14px', fontWeight: '700', color: '#fff', cursor: exporting ? 'not-allowed' : 'pointer',
+            boxShadow: exporting ? 'none' : '0 10px 25px -5px rgba(79, 70, 229, 0.4)',
             transition: 'all 0.2s'
           }}>
-            <i className="bx bx-cloud-download" style={{ fontSize: '20px' }} />
-            Export Report
+            <i className={`bx ${exporting ? 'bx-loader-alt bx-spin' : 'bx-cloud-download'}`} style={{ fontSize: '20px' }} />
+            {exporting ? 'Exporting...' : 'Export Report'}
           </button>
         </div>
       </div>

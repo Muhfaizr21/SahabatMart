@@ -10,9 +10,11 @@ export default function AdminBlogs() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const loadBlogs = () => {
     setLoading(true);
+    setSelectedIds([]);
     fetchJson(`${ADMIN_API_BASE}/blogs`)
       .then(d => setBlogs(d || []))
       .catch(err => toast.error('Gagal memuat blog'))
@@ -20,6 +22,32 @@ export default function AdminBlogs() {
   };
 
   useEffect(() => { loadBlogs(); }, []);
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === blogs.length) setSelectedIds([]);
+    else setSelectedIds(blogs.map(b => b.id));
+  };
+
+  const bulkDelete = () => {
+    if (!window.confirm(`Hapus ${selectedIds.length} artikel terpilih secara permanen?`)) return;
+    setLoading(true);
+    fetchJson(`${ADMIN_API_BASE}/blogs/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids: selectedIds })
+    })
+      .then(() => {
+        toast.success('Artikel terpilih dihapus');
+        loadBlogs();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Gagal menghapus artikel');
+        setLoading(false);
+      });
+  };
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
@@ -55,7 +83,7 @@ export default function AdminBlogs() {
       toast.success(isEdit ? 'Artikel diperbarui' : 'Artikel diterbitkan');
       setShowModal(false);
       loadBlogs();
-    }).catch(err => toast.error(_err.message))
+    }).catch(err => toast.error(err.message))
     .finally(() => setSaving(false));
   };
 
@@ -66,7 +94,7 @@ export default function AdminBlogs() {
         toast.success('Artikel dihapus');
         loadBlogs();
       })
-      .catch(err => toast.error(_err.message));
+      .catch(err => toast.error(err.message));
   };
 
   return (
@@ -83,11 +111,39 @@ export default function AdminBlogs() {
         </button>
       </PageHeader>
 
-      <TablePanel loading={loading}>
+      <TablePanel 
+        loading={loading}
+        toolbar={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {selectedIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 12px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fee2e2' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
+                <button 
+                  onClick={bulkDelete}
+                  style={{ ...A.btnPrimary, background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
+                >
+                  <i className="bx bx-trash" /> Hapus Terpilih
+                </button>
+              </div>
+            )}
+            <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
+              {loading ? 'Memuat...' : `${blogs.length} artikel`}
+            </span>
+          </div>
+        }
+      >
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ ...A.th, paddingLeft: 24 }}>Artikel</th>
+              <th style={{ ...A.th, width: 40, paddingLeft: 24 }}>
+                <input 
+                  type="checkbox" 
+                  checked={blogs.length > 0 && selectedIds.length === blogs.length} 
+                  onChange={toggleSelectAll}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                />
+              </th>
+              <th style={A.th}>Artikel</th>
               <th style={A.th}>Kategori</th>
               <th style={A.th}>Penulis</th>
               <th style={A.th}>Status</th>
@@ -95,37 +151,57 @@ export default function AdminBlogs() {
             </tr>
           </thead>
           <tbody>
-            {blogs.map(b => (
-              <tr key={b.id}>
-                <td style={{ ...A.td, paddingLeft: 24 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 64, height: 44, borderRadius: 10, overflow: 'hidden', border: '1px solid #f1f5f9', background: '#f8fafc', flexShrink: 0 }}>
-                      <img src={formatImage(b.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+            {blogs.map((b, idx) => {
+              const isSelected = selectedIds.includes(b.id);
+              const isLast = idx === blogs.length - 1;
+              return (
+                <tr 
+                  key={b.id}
+                  style={{ 
+                    background: isSelected ? '#f5f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa'),
+                    borderBottom: isLast ? 'none' : '1px solid #f8fafc'
+                  }}
+                  onMouseEnter={e => !isSelected && (e.currentTarget.style.background = '#f8fafc')}
+                  onMouseLeave={e => !isSelected && (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
+                >
+                  <td style={{ ...A.td, paddingLeft: 24, width: 40 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected} 
+                      onChange={() => toggleSelect(b.id)}
+                      style={{ width: 17, height: 17, cursor: 'pointer' }}
+                    />
+                  </td>
+                  <td style={A.td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 64, height: 44, borderRadius: 10, overflow: 'hidden', border: '1px solid #f1f5f9', background: '#f8fafc', flexShrink: 0 }}>
+                        <img src={formatImage(b.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{b.title}</div>
+                        <div style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 700, fontFamily: 'monospace' }}>/{b.slug}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 800, color: '#0f172a' }}>{b.title}</div>
-                      <div style={{ fontSize: 10.5, color: '#6366f1', fontWeight: 700, fontFamily: 'monospace' }}>/{b.slug}</div>
-                    </div>
-                  </div>
-                </td>
-                <td style={A.td}>
-                   <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '3px 9px', borderRadius: 6 }}>{b.category}</span>
-                </td>
-                <td style={A.td}>{b.author}</td>
-                <td style={A.td}>
-                   <span style={statusBadge(b.status)}>{b.status}</span>
-                </td>
-                <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
-                   <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
-                      <button onClick={() => { setFormData(b); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
-                      <button onClick={() => deleteBlog(b.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
-                   </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td style={A.td}>
+                     <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '3px 9px', borderRadius: 6 }}>{b.category}</span>
+                  </td>
+                  <td style={A.td}>{b.author}</td>
+                  <td style={A.td}>
+                     <span style={statusBadge(b.status)}>{b.status}</span>
+                  </td>
+                  <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
+                     <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
+                        <button onClick={() => { setFormData(b); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
+                        <button onClick={() => deleteBlog(b.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
+                     </div>
+                  </td>
+                </tr>
+              );
+            })}
             {blogs.length === 0 && !loading && (
               <tr>
-                <td colSpan="5" style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
+                <td colSpan="6" style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
                    Belum ada artikel yang dipublikasikan.
                 </td>
               </tr>

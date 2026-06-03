@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate } from '../lib/api';
+import toast from 'react-hot-toast';
 
 const steps = ['Detail Pengiriman', 'Konfirmasi'];
 
@@ -101,8 +102,13 @@ export default function CheckoutPage() {
   const [useShoppingBalance, setUseShoppingBalance] = useState(false);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) setUser(JSON.parse(userData));
+    // [BUG-H4 Fix] JSON.parse localStorage dengan try/catch
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) setUser(JSON.parse(userData));
+    } catch (_e) {
+      localStorage.removeItem('user');
+    }
   }, []);
 
   const getItemPrice = (item) => {
@@ -128,8 +134,8 @@ export default function CheckoutPage() {
         const [cartData, profileData, channelsData, walletData] = await Promise.all([
           fetchJson(`${BUYER_API_BASE}/cart`),
           fetchJson(`${BUYER_API_BASE}/profile`),
-          fetchJson(`${API_BASE}/api/payment/channels`).catch(e => { console.error("Channels _err:", e); return null; }),
-          fetchJson(`${BUYER_API_BASE}/wallet`).catch(e => null)
+          fetchJson(`${API_BASE}/api/payment/channels`).catch(() => null),
+          fetchJson(`${BUYER_API_BASE}/wallet`).catch(() => null)
         ]);
 
         if (walletData) setWallet(walletData);
@@ -194,7 +200,7 @@ export default function CheckoutPage() {
           }
         }
       } catch (_err) {
-        console.error('Failed to pre-fill checkout:', _err);
+        // [BUG-M11 Fix] Jangan bocorkan error message ke console — bisa berisi info sensitif
       }
     };
     fetchCheckoutData();
@@ -254,7 +260,8 @@ export default function CheckoutPage() {
         throw new Error("Format voucher tidak dikenali");
       }
     } catch (_err) {
-      alert(_err.message);
+      // [BUG-H5 Fix] Ganti alert() dengan toast
+      toast.error(_err.message || 'Gagal memvalidasi voucher');
       setAppliedVoucher(null);
     } finally {
       setCheckingVoucher(false);
@@ -273,7 +280,6 @@ export default function CheckoutPage() {
       const areaList = res?.areas || (Array.isArray(res) ? res : []);
       setAreas(areaList);
     } catch (_err) {
-      console.error('Area search failed:', _err);
       setAreas([]);
     } finally {
       setSearchingArea(false);
@@ -338,7 +344,6 @@ export default function CheckoutPage() {
       setShippingCost(totalCost);
 
     } catch (_err) {
-      console.error('Fetch rates failed:', _err);
       setShippingRates({});
       setShippingWarning('Gagal mengambil ongkir. Pastikan koneksi stabil.');
     } finally {
@@ -376,7 +381,11 @@ export default function CheckoutPage() {
 
         const payload = {
           email: form.email,
-          password: form.password || '', // Only for guests
+          // [BUG-H10 Fix] JANGAN kirim password untuk user yang sudah login (token ada)
+          // password field ada di DOM hanya untuk guest, dan form.password tetap terisi
+          // meskipun user sudah login karena state tidak di-reset.
+          // Cegah kebocoran password plaintext ke API.
+          ...(!token && form.password ? { password: form.password } : {}),
           full_name: `${form.firstName} ${form.lastName}`,
           phone: form.phone,
           items: orderItems,
@@ -436,7 +445,7 @@ export default function CheckoutPage() {
             zip_code: form.postalCode,
             area_id: form.area_id
           })
-        }).catch(e => console.warn('Failed to sync profile address:', e));
+        }).catch(() => {});
       }
 
       const res = await fetchJson(`${PUBLIC_API_BASE}/checkout`, {
@@ -469,7 +478,8 @@ export default function CheckoutPage() {
         } 
       });
     } catch (_err) {
-      alert('Checkout gagal: ' + _err.message);
+      // [BUG-H5 Fix] Ganti alert() dengan toast
+      toast.error('Checkout gagal: ' + _err.message);
     } finally {
       setLoading(false);
     }
@@ -773,7 +783,7 @@ export default function CheckoutPage() {
                             {Object.entries(
                               cart.items.reduce((acc, item) => {
                                 const mId = item.merchant_id || '00000000-0000-0000-0000-000000000000';
-                                const mName = item.merchant?.store_name || 'Gudang Pusat SahabatMart';
+                                const mName = item.merchant?.store_name || 'Gudang Pusat AkuGlow';
                                 const mCity = item.merchant?.city || 'Jakarta Pusat';
                                 if (!acc[mId]) acc[mId] = { name: mName, city: mCity };
                                 return acc;
