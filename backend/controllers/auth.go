@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -67,6 +67,9 @@ func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Async sync past guest location logs
+	go SyncGuestLogsToUser(ac.Service.DB, user.ID, ac.getClientIP(r))
+
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"message": "Registrasi berhasil",
 		"token":   token,
@@ -93,6 +96,9 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Async sync past guest location logs
+	go SyncGuestLogsToUser(ac.Service.DB, user.ID, clientIP)
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"message": "Login berhasil",
 		"token":   token,
@@ -101,16 +107,22 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ac *AuthController) getClientIP(r *http.Request) string {
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff != "" {
-		ips := strings.Split(xff, ",")
-		return strings.TrimSpace(ips[0])
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+	if ip == "" {
+		var err error
+		ip, _, err = net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
 	}
-	return host
+	if strings.Contains(ip, ",") {
+		parts := strings.Split(ip, ",")
+		ip = strings.TrimSpace(parts[0])
+	}
+	return ip
 }
 
 // Impersonate memungkinkan Admin login sebagai user lain tanpa password
@@ -218,6 +230,9 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		utils.JSONErrorInternal(w, err, "")
 		return
 	}
+
+	// Async sync past guest location logs
+	go SyncGuestLogsToUser(ac.Service.DB, user.ID, ac.getClientIP(r))
 
 	frontendURL := ac.Service.GetFrontendURL()
 	

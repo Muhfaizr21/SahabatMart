@@ -20,7 +20,7 @@ export function useConfig() {
         setConfig(data);
       })
       .catch(err => {
-        console.error('Failed to fetch platform config:', _err);
+        console.error('Failed to fetch platform config:', err);
       })
       .finally(() => setLoading(false));
   }, []);

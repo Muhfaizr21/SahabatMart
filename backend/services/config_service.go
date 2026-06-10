@@ -1,7 +1,7 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"strconv"
 	"strings"
 	"time"
@@ -87,8 +87,43 @@ func (s *ConfigService) SeedFinancialConfigs() {
 }
 
 func (s *ConfigService) IsPayday() (bool, string) {
-	// If payout_payday_dates is empty or "all", it's always payday
-	datesStr := s.Get("payout_payday_dates", "all")
+	schedule := s.Get("payout_schedule", "weekly")
+	
+	if schedule == "daily" {
+		return true, ""
+	}
+	
+	if schedule == "weekly" {
+		payoutDay := strings.ToLower(s.Get("payout_day", "friday"))
+		todayWeekday := strings.ToLower(time.Now().Weekday().String())
+		if todayWeekday == payoutDay {
+			return true, ""
+		}
+		
+		var indonesianDay string
+		switch payoutDay {
+		case "monday":
+			indonesianDay = "Senin"
+		case "tuesday":
+			indonesianDay = "Selasa"
+		case "wednesday":
+			indonesianDay = "Rabu"
+		case "thursday":
+			indonesianDay = "Kamis"
+		case "friday":
+			indonesianDay = "Jumat"
+		case "saturday":
+			indonesianDay = "Sabtu"
+		case "sunday":
+			indonesianDay = "Minggu"
+		default:
+			indonesianDay = payoutDay
+		}
+		return false, "Hari " + indonesianDay
+	}
+	
+	// monthly schedule
+	datesStr := s.Get("payout_payday_dates", "25,30")
 	if datesStr == "all" || datesStr == "" {
 		return true, ""
 	}
@@ -101,5 +136,5 @@ func (s *ConfigService) IsPayday() (bool, string) {
 		}
 	}
 
-	return false, datesStr
+	return false, "Tanggal " + datesStr
 }

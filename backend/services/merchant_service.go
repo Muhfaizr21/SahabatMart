@@ -1,15 +1,13 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"gorm.io/gorm"
 	"time"
-	"github.com/google/uuid"
 )
 
 type MerchantService struct {
@@ -207,7 +205,7 @@ func (s *MerchantService) GetOrders(merchantID string, status string, page, limi
 	if page <= 0 { page = 1 }
 	offset := (page - 1) * limit
 
-	err := query.Preload("Items").Order("created_at desc").Limit(limit).Offset(offset).Find(&groups).Error
+	err := query.Preload("Order").Preload("Items").Order("created_at desc").Limit(limit).Offset(offset).Find(&groups).Error
 	
 	return map[string]interface{}{
 		"data": groups,
@@ -267,117 +265,21 @@ func (s *MerchantService) GetWallet(merchantID string) (map[string]interface{}, 
 	}
 
 	financeSvc := NewFinanceService(s.DB)
-	wallet, err := financeSvc.Repo.GetWalletWithLock(merchantID, models.WalletMerchant)
+	wallet, err := financeSvc.Repo.GetWalletWithLock(merchant.UserID, models.WalletMerchant)
 	if err != nil {
 		return nil, err
 	}
 
-	var comm models.MerchantCommission
-	s.DB.Where("merchant_id = ?", merchantID).First(&comm)
-	fee := comm.FeePercent
-	if fee == 0 {
-		var config models.PlatformConfig
-		if err := s.DB.Where("key = ?", "default_platform_fee").First(&config).Error; err == nil {
-			val, _ := strconv.ParseFloat(config.Value, 64)
-			fee = val
-		} else {
-			fee = 0.05 // Ultimate fallback
-		}
-	}
-
-	// If fee is from config (e.g. "5"), it's already a percentage. 
-	// If it was stored as "0.05", we normalize it.
-	displayFee := fee
-	if displayFee < 1 && displayFee > 0 {
-		displayFee = displayFee * 100
-	}
-
 	return map[string]interface{}{
-		"available_balance": wallet.Balance,
+		"balance":           wallet.Balance,
 		"pending_balance":   wallet.PendingBalance,
-		"total_sales":       wallet.TotalEarned,
-		"service_fee":       displayFee,
+		"total_earned":      wallet.TotalEarned,
+		"service_fee":       0.0,
 	}, nil
 }
 
 func (s *MerchantService) RequestPayout(merchantID string, amount float64, note string, bankName, accNo, accName string) (*models.PayoutRequest, error) {
-	configSvc := NewConfigService(s.DB)
-	
-	// [Akuglow - Payday Restriction]
-	isPayday, allowedDates := configSvc.IsPayday()
-	if !isPayday {
-		return nil, fmt.Errorf("penarikan dana hanya dapat dilakukan pada tanggal: %s", allowedDates)
-	}
-
-	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
-	if amount < minWithdrawal {
-		return nil, fmt.Errorf("minimum penarikan adalah Rp %.0f", minWithdrawal)
-	}
-
-	// Fetch bank details from affiliate_members if they are empty
-	if bankName == "" || accNo == "" || accName == "" {
-		var merchant models.Merchant
-		if err := s.DB.First(&merchant, "id = ?", merchantID).Error; err == nil {
-			var aff models.AffiliateMember
-			if err2 := s.DB.Where("user_id = ?", merchant.UserID).First(&aff).Error; err2 == nil {
-				if bankName == "" {
-					bankName = aff.BankName
-				}
-				if accNo == "" {
-					accNo = aff.BankAccountNumber
-				}
-				if accName == "" {
-					accName = aff.BankAccountName
-				}
-			}
-		}
-	}
-
-	payout := &models.PayoutRequest{
-		ID:                uuid.New().String(),
-		MerchantID:        merchantID,
-		Amount:            amount,
-		BankName:          bankName,
-		BankAccountNumber: accNo,
-		BankAccountName:   accName,
-		Status:            "pending",
-		Note:              note,
-		RequestedAt:       time.Now(),
-	}
-
-	financeSvc := NewFinanceService(s.DB)
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Get Wallet with Lock (Must be inside transaction)
-		// Re-initialize repo with transaction tx
-		repo := &repositories.FinanceRepository{DB: tx}
-		wallet, err := repo.GetWalletWithLock(merchantID, models.WalletMerchant)
-		if err != nil {
-			return err
-		}
-
-		if wallet.Balance < amount {
-			return errors.New("saldo tidak mencukupi")
-		}
-
-		// 2. Get Merchant to find UserID
-		var merchant models.Merchant
-		if err := tx.First(&merchant, "id = ?", merchantID).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Create(payout).Error; err != nil {
-			return err
-		}
-		
-		desc := fmt.Sprintf("Penarikan Dana / Payout PID:%s", payout.ID)
-		if err := financeSvc.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxWithdrawalRequest, -amount, payout.ID, "payout_request", desc, nil); err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	return payout, err
+	return nil, fmt.Errorf("penarikan dana dinonaktifkan untuk merchant — seluruh transaksi langsung dikelola oleh pusat")
 }
 
 func (s *MerchantService) GetPayoutHistory(merchantID string) ([]models.PayoutRequest, error) {
@@ -387,8 +289,13 @@ func (s *MerchantService) GetPayoutHistory(merchantID string) ([]models.PayoutRe
 }
 
 func (s *MerchantService) GetWalletTransactions(merchantID string, limit int) ([]models.WalletTransaction, error) {
+	var merchant models.Merchant
+	if err := s.DB.Where("id = ?", merchantID).First(&merchant).Error; err != nil {
+		return nil, err
+	}
+
 	var wallet models.Wallet
-	if err := s.DB.Where("owner_id = ? AND owner_type = ?", merchantID, models.WalletMerchant).First(&wallet).Error; err != nil {
+	if err := s.DB.Where("owner_id = ? AND owner_type = ?", merchant.UserID, models.WalletMerchant).First(&wallet).Error; err != nil {
 		return nil, err
 	}
 
@@ -463,7 +370,7 @@ func (s *MerchantService) GetStoreProfile(merchantID string) (*models.Merchant, 
 	// 2. Sinkronisasi Balance dari Wallet (Source of Truth)
 	var balance float64
 	s.DB.Table("wallets").
-		Where("owner_id = ? AND owner_type = ?", merchantID, models.WalletMerchant).
+		Where("owner_id = ? AND owner_type = ?", m.UserID, models.WalletMerchant).
 		Select("COALESCE(balance, 0)").
 		Scan(&balance)
 	m.Balance = balance
@@ -562,7 +469,7 @@ func (s *MerchantService) GetDetailedAnalytics(merchantID string, year int) (map
 func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var req models.RestockRequest
-		if err := tx.Preload("Items").First(&req, "id = ? AND merchant_id = ?", requestID, merchantID).Error; err != nil {
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Preload("Items").First(&req, "id = ? AND merchant_id = ?", requestID, merchantID).Error; err != nil {
 			return err
 		}
 
@@ -576,7 +483,7 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 			tx.First(&prod, "id = ?", item.ProductID)
 
 			var inv models.Inventory
-			dbInv := tx.Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID)
+			dbInv := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", merchantID, item.ProductID)
 			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 				dbInv = dbInv.Where("product_variant_id = ?", *item.ProductVariantID)
 			} else {

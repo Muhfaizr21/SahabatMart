@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"strings"
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -117,6 +117,35 @@ func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Requ
 		fmt.Sprintf("Merchant baru saja mengirimkan permintaan restock untuk %d item.", len(req.Items)), "/admin/merchants/restock")
 
 	utils.JSONResponse(w, http.StatusCreated, request)
+}
+
+// GET /api/merchant/restock/{id}/track
+func (mc *MerchantController) TrackRestock(w http.ResponseWriter, r *http.Request) {
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+
+	restockID := strings.TrimPrefix(r.URL.Path, "/api/merchant/restock/")
+	restockID = strings.TrimSuffix(restockID, "/track")
+
+	var restock models.RestockRequest
+	if err := mc.DB.Where("id = ? AND merchant_id = ?", restockID, merchantID).First(&restock).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Restock tidak ditemukan")
+		return
+	}
+
+	if restock.TrackingNumber == "" || restock.CourierCode == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Resi atau kode kurir belum tersedia")
+		return
+	}
+
+	shippingSvc := services.NewShippingService(mc.DB)
+	trackingData, err := shippingSvc.GetPublicTracking(restock.TrackingNumber, restock.CourierCode)
+	if err != nil {
+		utils.JSONErrorInternal(w, err, "Gagal melacak resi via Biteship")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, trackingData)
 }
 
 // ─────────────────────────────────────────
@@ -413,6 +442,18 @@ func (mc *MerchantController) UpdateStoreProfile(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Validate store name uniqueness if being changed
+	if newName, ok := updates["store_name"].(string); ok && newName != "" {
+		var conflict int64
+		mc.DB.Model(&models.Merchant{}).
+			Where("store_name = ? AND id != ?", newName, merchantID).
+			Count(&conflict)
+		if conflict > 0 {
+			utils.JSONError(w, http.StatusConflict, "Nama toko '"+newName+"' sudah digunakan merchant lain. Silakan gunakan nama lain.")
+			return
+		}
+	}
+
 	store, err := mc.Service.UpdateStoreProfile(merchantID, updates)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal update profil toko")
@@ -707,18 +748,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				return err
 			}
 
-			// [Security & Sync] Update Master Catalog Stock (Global Consistency)
-			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
-				if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
-					UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-					return err
-				}
-			} else {
-				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-					UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-					return err
-				}
-			}
+
 			
 			// LOG MUTATION (Mata Elang)
 			tx.Create(&models.StockMutation{
@@ -1056,3 +1086,225 @@ func (mc *MerchantController) GetMemberByCode(w http.ResponseWriter, r *http.Req
 		"ref_code":  actualRefCode,
 	})
 }
+
+// ─────────────────────────────────────────
+// SHIPPING LABEL & PACKING SLIP
+// ─────────────────────────────────────────
+
+// POST /api/merchant/orders/generate-label
+// Generate resi otomatis via Biteship API
+func (mc *MerchantController) GenerateShippingLabel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	valRole := r.Context().Value("user_role")
+	userRole, _ := valRole.(string)
+	isAdmin := userRole == "admin" || userRole == "superadmin"
+
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if !isAdmin && merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+
+	var req struct {
+		GroupID string `json:"group_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.GroupID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "group_id dibutuhkan")
+		return
+	}
+
+	// Ambil group dan validasi kepemilikan
+	var group models.OrderMerchantGroup
+	var err error
+	if isAdmin {
+		err = mc.DB.Preload("Items").First(&group, "id = ?", req.GroupID).Error
+	} else {
+		err = mc.DB.Preload("Items").First(&group, "id = ? AND merchant_id = ?", req.GroupID, merchantID).Error
+	}
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan")
+		return
+	}
+
+	// Ambil order induk
+	var order models.Order
+	if err := mc.DB.First(&order, "id = ?", group.OrderID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Order tidak ditemukan")
+		return
+	}
+
+	shippingSvc := services.NewShippingService(mc.DB)
+
+	// Jika belum ada biteship_order_id, buat order baru
+	if group.BiteshipOrderID == "" {
+		biteshipOrderID, waybillID, err := shippingSvc.CreateOrder(order, group)
+		if err != nil {
+			// Jika Biteship gagal (dev mode / no API key), kembalikan error yang informatif
+			utils.JSONError(w, http.StatusServiceUnavailable,
+				fmt.Sprintf("Gagal generate resi via Biteship: %v. Silakan input resi manual.", err))
+			return
+		}
+
+		now := time.Now()
+		updates := map[string]interface{}{
+			"biteship_order_id": biteshipOrderID,
+			"tracking_number":   waybillID,
+			"status":            string(models.MOrderShipped),
+			"shipped_at":        &now,
+		}
+		if err := mc.DB.Model(&group).Updates(updates).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan data resi")
+			return
+		}
+		group.BiteshipOrderID = biteshipOrderID
+		group.TrackingNumber = waybillID
+		group.Status = models.MOrderShipped
+		group.ShippedAt = &now
+	}
+
+	// Ambil label URL dari Biteship (jika tersedia)
+	labelURL := ""
+	if group.BiteshipOrderID != "" {
+		if detail, err := shippingSvc.GetOrderLabel(group.BiteshipOrderID); err == nil {
+			if courier, ok := detail["courier"].(map[string]interface{}); ok {
+				if url, ok := courier["waybill_url"].(string); ok {
+					labelURL = url
+				}
+			}
+		}
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":            "success",
+		"tracking_number":   group.TrackingNumber,
+		"biteship_order_id": group.BiteshipOrderID,
+		"courier_code":      group.CourierCode,
+		"label_url":         labelURL,
+	})
+}
+
+// POST /api/merchant/orders/manual-tracking
+// Input nomor resi manual
+func (mc *MerchantController) SetManualTracking(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	valRole := r.Context().Value("user_role")
+	userRole, _ := valRole.(string)
+	isAdmin := userRole == "admin" || userRole == "superadmin"
+
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if !isAdmin && merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+
+	var req struct {
+		GroupID        string `json:"group_id"`
+		TrackingNumber string `json:"tracking_number"`
+		CourierCode    string `json:"courier_code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+	if req.GroupID == "" || req.TrackingNumber == "" {
+		utils.JSONError(w, http.StatusBadRequest, "group_id dan tracking_number dibutuhkan")
+		return
+	}
+
+	// Validasi kepemilikan group
+	var group models.OrderMerchantGroup
+	var err error
+	if isAdmin {
+		err = mc.DB.First(&group, "id = ?", req.GroupID).Error
+	} else {
+		err = mc.DB.First(&group, "id = ? AND merchant_id = ?", req.GroupID, merchantID).Error
+	}
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan")
+		return
+	}
+
+	now := time.Now()
+	updates := map[string]interface{}{
+		"tracking_number": req.TrackingNumber,
+		"courier_code":    req.CourierCode,
+		"status":          string(models.MOrderShipped),
+		"shipped_at":      &now,
+	}
+	if err := mc.DB.Model(&group).Updates(updates).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan nomor resi")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status":          "success",
+		"tracking_number": req.TrackingNumber,
+		"courier_code":    req.CourierCode,
+	})
+}
+
+// GET /api/merchant/orders/packing-slip?group_id=...
+// Ambil data lengkap untuk cetak packing slip
+func (mc *MerchantController) GetPackingSlipData(w http.ResponseWriter, r *http.Request) {
+	valRole := r.Context().Value("user_role")
+	userRole, _ := valRole.(string)
+	isAdmin := userRole == "admin" || userRole == "superadmin"
+
+	val := r.Context().Value("merchant_id")
+	merchantID, _ := val.(string)
+	if !isAdmin && merchantID == "" {
+		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
+		return
+	}
+
+	groupID := r.URL.Query().Get("group_id")
+	if groupID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "group_id dibutuhkan")
+		return
+	}
+
+	// Ambil group dengan relasi lengkap
+	var group models.OrderMerchantGroup
+	var err error
+	if isAdmin {
+		err = mc.DB.
+			Preload("Items").
+			Preload("Merchant").
+			First(&group, "id = ?", groupID).Error
+	} else {
+		err = mc.DB.
+			Preload("Items").
+			Preload("Merchant").
+			First(&group, "id = ? AND merchant_id = ?", groupID, merchantID).Error
+	}
+	if err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan")
+		return
+	}
+
+	// Ambil order induk (data pembeli & alamat)
+	var order models.Order
+	mc.DB.First(&order, "id = ?", group.OrderID)
+
+	// Ambil info toko merchant (nama & alamat)
+	var merchant models.Merchant
+	mc.DB.Preload("User.Profile").First(&merchant, "id = ?", group.MerchantID)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data": map[string]interface{}{
+			"group":    group,
+			"order":    order,
+			"merchant": merchant,
+		},
+	})
+}
+

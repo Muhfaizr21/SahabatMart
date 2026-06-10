@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"os"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/routes"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/seeder"
+	"akuglow/backend/models"
+	"akuglow/backend/routes"
+	"akuglow/backend/services"
+	"akuglow/backend/seeder"
 	"flag"
 
 	"github.com/joho/godotenv"
@@ -66,10 +66,41 @@ func ConnectDB() {
 		&models.MerchantCommissionPreset{},
 		// Finance models
 		&models.FinanceRevenueAllocation{}, &models.FinancialLocation{}, &models.MoneyMutation{},
+		// Demographics models
+		&models.UserLocationLog{}, &models.IPLocationCache{},
 	)
 	
-	// [Migration Fixes] Migrasi manual/one-time dipindahkan ke seeder jika diperlukan.
-	// Menjalankan ALTER TABLE setiap restart menyebabkan lock database.
+	// [Stock Sync Heal] Sync GORM products/variants stock with actual Central Warehouse Inventory
+	log.Println("🔄 Running Auto-Healing Stock Synchronization...")
+	if err := DB.Exec(`
+		UPDATE product_variants pv
+		SET stock = COALESCE(
+			(SELECT inv.stock FROM inventories inv
+			 WHERE inv.product_id = pv.product_id 
+			   AND inv.product_variant_id = pv.id 
+			   AND inv.merchant_id = '00000000-0000-0000-0000-000000000000'), 0)
+	`).Error; err != nil {
+		log.Printf("⚠️ Failed to heal product_variants stock: %v", err)
+	}
+	if err := DB.Exec(`
+		UPDATE products p
+		SET stock = COALESCE(
+			(SELECT SUM(pv.stock) FROM product_variants pv WHERE pv.product_id = p.id), 0)
+		WHERE (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) > 0
+	`).Error; err != nil {
+		log.Printf("⚠️ Failed to heal aggregated products stock: %v", err)
+	}
+	if err := DB.Exec(`
+		UPDATE products p
+		SET stock = COALESCE(
+			(SELECT inv.stock FROM inventories inv
+			 WHERE inv.product_id = p.id 
+			   AND inv.product_variant_id IS NULL 
+			   AND inv.merchant_id = '00000000-0000-0000-0000-000000000000'), 0)
+		WHERE (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) = 0
+	`).Error; err != nil {
+		log.Printf("⚠️ Failed to heal base products stock: %v", err)
+	}
 
 	// Patch existing order items to populate product_image_url from products table
 	if err := DB.Exec("UPDATE order_items SET product_image_url = (SELECT image FROM products WHERE products.id = order_items.product_id) WHERE product_image_url = '' OR product_image_url IS NULL").Error; err != nil {
@@ -136,7 +167,7 @@ func buildDSN() string {
 		getEnv("DB_HOST", "localhost"),
 		getEnv("DB_USER", "postgres"),
 		getEnv("DB_PASSWORD", ""),
-		getEnv("DB_NAME", "sahabatmart"),
+		getEnv("DB_NAME", "akuglow"),
 		getEnv("DB_PORT", "5432"),
 		sslMode,
 	)

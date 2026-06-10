@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 
 	"gorm.io/gorm"
 )
@@ -84,13 +84,12 @@ func (fc *AdminFinanceController) getMutSum(cat, status, period string) float64 
 }
 
 // getIncomeBreakdown computes:
-// - totalGrossRevenue = sum of ALL revenue (wallet tx + orders revenue)
-// - breakdown by source name
+// - totalGrossRevenue = orders.grand_total (active) + manual income mutations
+// - breakdown by income source name from config (wallet tx mapping for display)
 // - totalCapitalCost (COGS) from non-cancelled order_items
 //
-// REVENUE = sale_revenue (wallet_tx, positive only) + commission_earned + manual income + order grand_total
-// We use wallet_transactions as source of truth for cash flow.
-// We use orders table to verify sale revenue (warn on mismatch).
+// Single Source of Truth: orders.grand_total for revenue KPI
+// Breakdown maps wallet tx types to config source names (for display only, NOT revenue KPI)
 func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross float64, breakdown map[string]float64, totalCOGS float64) {
 	_, _, isList := fc.loadConfig()
 	breakdown = make(map[string]float64)
@@ -100,7 +99,7 @@ func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross 
 		breakdown[it["name"].(string)] = 0
 	}
 
-	// ─── 1. WALLET TRANSACTIONS NET (cash inflow sources) ───
+	// ─── 1. WALLET TRANSACTIONS — map types to source names (for breakdown display ONLY)
 	type WTRow struct {
 		Type   string
 		Amount float64
@@ -109,6 +108,7 @@ func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross 
 	periodWhere(
 		fc.DB.Table("wallet_transactions").
 			Select("type, SUM(amount) as amount").
+			Where("amount != 0").
 			Group("type"),
 		"created_at", period,
 	).Scan(&walletRows)
@@ -128,25 +128,8 @@ func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross 
 		}
 	}
 
-	// ─── 2. SALE REVENUE — use wallet_transactions as source of truth (net of reversals) ───
+	// ─── 2. SALE REVENUE — orders.grand_total as SOLE source for gross revenue KPI
 	var saleRevenue float64
-	periodWhere(
-		fc.DB.Table("wallet_transactions").
-			Select("COALESCE(SUM(amount),0) as amount").
-			Where("type IN (?, ?)", string(models.TxSaleRevenue), string(models.TxSaleRevenueReversed)),
-		"created_at", period,
-	).Scan(&saleRevenue)
-
-	// Sale revenue from wallet tx
-	for _, it := range isList {
-		if it["type"].(string) == string(models.TxSaleRevenue) {
-			breakdown[it["name"].(string)] = saleRevenue
-			break
-		}
-	}
-
-	// Verify against orders table (warn only — orders table can have cancelled)
-	var orderRevenue float64
 	activeStatuses := []string{
 		string(models.OrderCompleted), string(models.OrderDelivered),
 		string(models.OrderShipped), string(models.OrderReadyToShip),
@@ -157,17 +140,14 @@ func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross 
 			Select("COALESCE(SUM(grand_total),0)").
 			Where("status IN ?", activeStatuses),
 		"created_at", period,
-	).Scan(&orderRevenue)
+	).Scan(&saleRevenue)
 
-	// If orders have revenue but wallet doesn't, use orders as backup
-	if orderRevenue > 0 && saleRevenue == 0 {
-		for _, it := range isList {
-			if it["type"].(string) == string(models.TxSaleRevenue) {
-				breakdown[it["name"].(string)] = orderRevenue
-				break
-			}
+	// Assign sale revenue to matching income source in breakdown (for display)
+	for _, it := range isList {
+		if it["type"].(string) == string(models.TxSaleRevenue) {
+			breakdown[it["name"].(string)] = saleRevenue
+			break
 		}
-		saleRevenue = orderRevenue
 	}
 
 	// ─── 3. MANUAL INCOME MUTATIONS (non-auto) ───
@@ -184,12 +164,9 @@ func (fc *AdminFinanceController) getIncomeBreakdown(period string) (totalGross 
 		}
 	}
 
-	// ─── 4. TOTAL GROSS REVENUE ───
-	walletTotal := 0.0
-	for _, v := range breakdown {
-		walletTotal += v
-	}
-	totalGross = walletTotal
+	// ─── 4. TOTAL GROSS REVENUE = saleRevenue (orders) + manualIncome ONLY
+	// NOT from breakdown sum — breakdown can contain commission/platform_fee which are NOT gross revenue
+	totalGross = saleRevenue + manualIncome
 
 	// ─── 5. CAPITAL COST (COGS) from non-cancelled/non-refunded order_items ───
 	var capitalCost float64
@@ -285,11 +262,13 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	go fc.ensureAllocations(period)
 
 	configSvc := services.NewConfigService(fc.DB)
-	gross, breakdown, capitalCost := fc.getIncomeBreakdown(period)
+	gross, _, capitalCost := fc.getIncomeBreakdown(period)
 	dsList, psList, isList := fc.loadConfig()
 
-	// Build data_saving & profit_shares from gross_profit
+	// ── GROSS PROFIT ─────────────────────────────────────────
 	grossProfit := gross - capitalCost
+
+	// ── DATA SAVING ALLOCATION ─────────────────────────────
 	dataSaving := make(map[string]interface{})
 	totalSaving := 0.0
 	for _, it := range dsList {
@@ -300,6 +279,7 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	}
 	dataSaving["total"] = totalSaving
 
+	// ── NET PROFIT & PROFIT SHARE ──────────────────────────
 	netProfit := grossProfit - totalSaving
 	profitShares := make(map[string]interface{})
 	totalPSPercent := 0.0
@@ -316,13 +296,160 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 		"value":   netProfit - totalPSValue,
 	}
 
+	// ── CASH FLOW IN → ITEMIZED ────────────────────────────
+	type CashFlowItem struct {
+		Label       string  `json:"label"`
+		Type        string  `json:"type"` // in | out
+		Amount      float64 `json:"amount"`
+		Description string  `json:"description"`
+	}
+
+	// IN 1: Penjualan dari orders (active statuses)
+	var saleRevenue float64
+	activeStatuses := []string{
+		string(models.OrderCompleted), string(models.OrderDelivered),
+		string(models.OrderShipped), string(models.OrderReadyToShip),
+		string(models.OrderPaid), string(models.OrderProcessing),
+	}
+	periodWhere(
+		fc.DB.Table("orders").Select("COALESCE(SUM(grand_total),0)").Where("status IN ?", activeStatuses),
+		"created_at", period,
+	).Scan(&saleRevenue)
+
+	// IN 2: Refund masuk (positive refund tx)
+	var refundIn float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(amount),0)").
+			Where("type = 'refund' AND amount > 0"),
+		"created_at", period,
+	).Scan(&refundIn)
+
+	// IN 3: Manual income mutations
+	var manualIncomeIn float64
+	periodWhere(
+		fc.DB.Table("money_mutations").Select("COALESCE(SUM(amount),0)").
+			Where("type = 'income' AND (description LIKE 'Auto-Sync:%' OR description = '' OR description IS NULL) = false"),
+		"created_at", period,
+	).Scan(&manualIncomeIn)
+
+	// IN 4: Deposit / topup ke platform wallet
+	var depositIn float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(amount),0)").
+			Where("type = 'deposit' AND amount > 0"),
+		"created_at", period,
+	).Scan(&depositIn)
+
+	// IN 5: Other positive tx (bonus, adjustment positive)
+	var otherIn float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(amount),0)").
+			Where("amount > 0 AND type NOT IN (?, ?, ?, ?, ?, ?, ?)",
+				models.TxSaleRevenue, models.TxCommissionEarned, models.TxRefundDeduction,
+				models.TxPlatformFee, models.TxPayoutOutflow, "deposit", "refund"),
+		"created_at", period,
+	).Scan(&otherIn)
+
+	totalCashIn := saleRevenue + refundIn + manualIncomeIn + depositIn + otherIn
+
+	// ── CASH FLOW OUT → ITEMIZED ───────────────────────────
+	// OUT 1: COGS (modal barang)
+	outCOGS := capitalCost
+
+	// OUT 2: Affiliate commissions paid
+	var affCommissionOut float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
+			Where("type = 'commission_earned' AND amount > 0"),
+		"created_at", period,
+	).Scan(&affCommissionOut)
+
+	// OUT 3: Merchant payouts (sale_revenue to merchant wallets)
+	var merchantPayoutOut float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
+			Where("type = 'sale_revenue' AND amount > 0 AND wallet_id IN (SELECT id FROM wallets WHERE owner_type = 'merchant')"),
+		"created_at", period,
+	).Scan(&merchantPayoutOut)
+
+	// OUT 4: Platform fees paid out (platform keeps fee = outflow from customer perspective)
+	var platformFeeOut float64
+	periodWhere(
+		fc.DB.Table("orders").Select("COALESCE(SUM(total_platform_fee),0)").
+			Where("status IN ?", activeStatuses),
+		"created_at", period,
+	).Scan(&platformFeeOut)
+
+	// OUT 5: Refund ke customer (negative)
+	var refundOut float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
+			Where("type = 'refund_deduction' AND amount < 0"),
+		"created_at", period,
+	).Scan(&refundOut)
+
+	// OUT 6: Payout outflow (platform pays out to users)
+	var payoutOutflow float64
+	periodWhere(
+		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
+			Where("type = 'payout_outflow' AND amount < 0"),
+		"created_at", period,
+	).Scan(&payoutOutflow)
+
+	// OUT 7: Manual expense mutations
+	var manualExpenseOut float64
+	periodWhere(
+		fc.DB.Table("money_mutations").Select("COALESCE(SUM(amount),0)").
+			Where("type = 'expense' AND (description LIKE 'Auto-Sync:%' OR description = '' OR description IS NULL) = false"),
+		"created_at", period,
+	).Scan(&manualExpenseOut)
+
+	// OUT 8: Data saving allocation (computed, not actual outflow yet)
+	outDataSaving := totalSaving
+
+	// OUT 9: Profit share distribution
+	outProfitShare := totalPSValue
+
+	totalCashOut := outCOGS + affCommissionOut + merchantPayoutOut + platformFeeOut + refundOut + payoutOutflow + manualExpenseOut + outDataSaving + outProfitShare
+
+	// ── CASH BALANCE → LOKASI KAS ─────────────────────────
 	var locations []models.FinancialLocation
 	fc.DB.Order("is_primary desc, name asc").Find(&locations)
+	totalLocationBalance := 0.0
+	for _, l := range locations {
+		totalLocationBalance += l.Balance
+	}
 
+	// ── WALLET BALANCE BY OWNER TYPE ─────────────────────
+	type WalletBalance struct {
+		OwnerType string  `json:"owner_type"`
+		Balance   float64 `json:"balance"`
+		Count     int64   `json:"count"`
+	}
+	var walletBalances []WalletBalance
+	fc.DB.Table("wallets").
+		Select("owner_type, COALESCE(SUM(balance),0) as balance, COUNT(*) as count").
+		Group("owner_type").Scan(&walletBalances)
+	platformWalletBalance := 0.0
+	for _, wb := range walletBalances {
+		if wb.OwnerType == "admin" || wb.OwnerType == "platform" {
+			platformWalletBalance += wb.Balance
+		}
+	}
+
+	// ── PENDING PAYOUT ──────────────────────────────────
+	var pendingPayout float64
+	periodWhere(
+		fc.DB.Table("payout_requests").Select("COALESCE(SUM(amount),0)").
+			Where("status = 'pending'"),
+		"created_at", period,
+	).Scan(&pendingPayout)
+
+	// ── MUTATIONS (manual) ────────────────────────────────
 	var mutations []models.MoneyMutation
 	periodWhere(fc.DB.Order("created_at desc").Limit(50), "created_at", period).Find(&mutations)
 
-	// Fetch recent orders with COGS — only non-cancelled for financial accuracy
+	// ── RECENT ORDERS ──────────────────────────────────
 	type OrderSummary struct {
 		ID          string    `json:"id"`
 		CreatedAt   time.Time `json:"created_at"`
@@ -340,12 +467,11 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 			Joins("LEFT JOIN user_profiles up ON up.user_id = u.id").
 			Where("o.status != ?", string(models.OrderCancelled)).
 			Group("o.id, o.created_at, o.grand_total, o.status, up.full_name").
-			Order("o.created_at desc").
-			Limit(20),
+			Order("o.created_at desc").Limit(30),
 		"o.created_at", period,
 	).Scan(&recentOrders)
 
-	// Fetch wallet activity — filter out zero-amount and reversed for clean audit
+	// ── WALLET ACTIVITY ─────────────────────────────────
 	type WalletActivity struct {
 		ID          string    `json:"id"`
 		Type        string    `json:"type"`
@@ -362,32 +488,98 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 			Joins("LEFT JOIN users u ON u.id = w.owner_id").
 			Joins("LEFT JOIN user_profiles up ON up.user_id = u.id").
 			Where("wt.amount != 0").
-			Order("wt.created_at desc").
-			Limit(100),
+			Order("wt.created_at desc").Limit(100),
 		"wt.created_at", period,
 	).Scan(&walletActivity)
 
+	// ── DAILY CASH FLOW TREND (last 30 days) ──────────
+	type DailyFlow struct {
+		Date       string  `json:"date"`
+		CashIn     float64 `json:"cash_in"`
+		CashOut    float64 `json:"cash_out"`
+		NetFlow    float64 `json:"net_flow"`
+	}
+	var dailyFlow []DailyFlow
+	fc.DB.Table("orders").Select(`
+		DATE(created_at) as date,
+		COALESCE(SUM(CASE WHEN status IN ('completed','delivered','shipped','ready_to_ship','paid','processing') THEN grand_total ELSE 0 END),0) as cash_in,
+		0 as cash_out,
+		COALESCE(SUM(CASE WHEN status IN ('completed','delivered','shipped','ready_to_ship','paid','processing') THEN grand_total ELSE 0 END),0) as net_flow
+	`).
+		Where("created_at >= NOW() - INTERVAL '30 days'").
+		Group("DATE(created_at)").Order("date DESC").Scan(&dailyFlow)
+
+	// ── BUILD CASH FLOW LINE ITEMS ─────────────────────
+	cashFlowItems := []CashFlowItem{
+		{Label: "Penjualan (Orders)", Type: "in", Amount: saleRevenue, Description: "Pendapatan dari pesanan pelanggan"},
+		{Label: "Refund Masuk", Type: "in", Amount: refundIn, Description: "Pengembalian dana ke platform"},
+		{Label: "Pemasukan Manual", Type: "in", Amount: manualIncomeIn, Description: "Pencatatan kas masuk manual"},
+		{Label: "Deposit / Topup", Type: "in", Amount: depositIn, Description: "Isi saldo / deposit ke platform"},
+		{Label: "Lain-lain (Masuk)", Type: "in", Amount: otherIn, Description: "Bonus, adjustment, dll"},
+	}
+	outItems := []CashFlowItem{
+		{Label: "Harga Modal (COGS)", Type: "out", Amount: outCOGS, Description: "Biaya modal barang terjual"},
+		{Label: "Komisi Affiliate", Type: "out", Amount: affCommissionOut, Description: "Komisi yang dibayarkan ke affiliate"},
+		{Label: "Pembagian Hasil ke Merchant", Type: "out", Amount: merchantPayoutOut, Description: "Payout ke rekening merchant"},
+		{Label: "Biaya Layanan Platform", Type: "out", Amount: platformFeeOut, Description: "Fee platform dari setiap transaksi"},
+		{Label: "Refund ke Customer", Type: "out", Amount: refundOut, Description: "Pengembalian dana ke pelanggan"},
+		{Label: "Payout ke User (Affiliate/Merchant)", Type: "out", Amount: payoutOutflow, Description: "Pencairan dana ke wallet user"},
+		{Label: "Pengeluaran Manual", Type: "out", Amount: manualExpenseOut, Description: "Pencatatan kas keluar manual"},
+		{Label: "Alokasi Data Saving", Type: "out", Amount: outDataSaving, Description: "Alokasi dari gross profit ke pos biaya"},
+		{Label: "Bagi Hasil Profit Share", Type: "out", Amount: outProfitShare, Description: "Distribusi bagi hasil ke stakeholder"},
+	}
+
+	netCashFlow := totalCashIn - totalCashOut
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"period":             period,
-		"gross_revenue":      gross,
-		"capital_cost":       capitalCost,
-		"gross_profit":       grossProfit,
-		"income_breakdown":   breakdown,
-		"data_saving":        dataSaving,
-		"net_profit":         netProfit,
-		"profit_shares":      profitShares,
-		"locations":         locations,
-		"mutations":          mutations,
-		"recent_orders":      recentOrders,
-		"wallet_activity":     walletActivity,
+		"period":              period,
+		"gross_revenue":        gross,
+		"capital_cost":         capitalCost,
+		"gross_profit":         grossProfit,
+		"net_profit":           netProfit,
+		"data_saving":          dataSaving,
+		"profit_shares":        profitShares,
+
+		// ── CASH FLOW SUMMARY ────────────────────────────
+		"cash_flow": map[string]interface{}{
+			"total_cash_in":   totalCashIn,
+			"total_cash_out":   totalCashOut,
+			"net_cash_flow":    netCashFlow,
+			"cash_in_items":    cashFlowItems,
+			"cash_out_items":   outItems,
+		},
+
+		// ── BALANCE ───────────────────────────────────
+		"balance": map[string]interface{}{
+			"total_location_balance":   totalLocationBalance,
+			"platform_wallet_balance":  platformWalletBalance,
+			"pending_payout":           pendingPayout,
+			"net_available":           totalLocationBalance - pendingPayout,
+		},
+
+		// ── LOCATION BALANCES ─────────────────────────
+		"locations": locations,
+
+		// ── WALLET BALANCES BY OWNER ──────────────────
+		"wallet_balances": walletBalances,
+
+		// ── DAILY TREND ──────────────────────────────
+		"daily_flow": dailyFlow,
+
+		// ── DETAIL DATA ─────────────────────────────
+		"mutations":      mutations,
+		"recent_orders":   recentOrders,
+		"wallet_activity": walletActivity,
+
+		// ── CONFIG ───────────────────────────────────
 		"config": map[string]interface{}{
-			"data_saving_list":    dsList,
-			"profit_share_list":    psList,
-			"income_source_list":   isList,
-			"payout_payday_dates":   configSvc.Get("payout_payday_dates", "all"),
-			"payout_min_amount":     configSvc.GetFloat("payout_min_amount", 50000.0),
-			"settlement_delay_hours": configSvc.GetInt("settlement_delay_hours", 24),
-			"platform_fee_percent":  configSvc.GetFloat("platform_fee_percent", 5.0),
+			"data_saving_list":        dsList,
+			"profit_share_list":        psList,
+			"income_source_list":      isList,
+			"payout_payday_dates":     configSvc.Get("payout_payday_dates", "all"),
+			"payout_min_amount":       configSvc.GetFloat("payout_min_amount", 50000.0),
+			"settlement_delay_hours":   configSvc.GetInt("settlement_delay_hours", 24),
+			"platform_fee_percent":     configSvc.GetFloat("platform_fee_percent", 5.0),
 		},
 	})
 }
@@ -633,12 +825,31 @@ func (fc *AdminFinanceController) UpdateConfig(w http.ResponseWriter, r *http.Re
 	}
 
 	for k, v := range req {
-		b, _ := json.Marshal(v)
+		var valStr string
+		switch val := v.(type) {
+		case string:
+			valStr = val
+		case float64:
+			if val == float64(int(val)) {
+				valStr = fmt.Sprintf("%d", int(val))
+			} else {
+				valStr = fmt.Sprintf("%f", val)
+				valStr = strings.TrimRight(strings.TrimRight(valStr, "0"), ".")
+			}
+		case int:
+			valStr = fmt.Sprintf("%d", val)
+		case bool:
+			valStr = fmt.Sprintf("%t", val)
+		default:
+			b, _ := json.Marshal(v)
+			valStr = string(b)
+		}
+
 		var pc models.PlatformConfig
 		if err := fc.DB.Where("key = ?", k).First(&pc).Error; err != nil {
-			fc.DB.Create(&models.PlatformConfig{Key: k, Value: string(b), UpdatedAt: time.Now()})
+			fc.DB.Create(&models.PlatformConfig{Key: k, Value: valStr, UpdatedAt: time.Now()})
 		} else {
-			pc.Value = string(b)
+			pc.Value = valStr
 			pc.UpdatedAt = time.Now()
 			fc.DB.Save(&pc)
 		}

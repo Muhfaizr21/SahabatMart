@@ -1,18 +1,102 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
+
+const CustomSelect = ({ label, value, options, onChange, icon }) => {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef();
+
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 16px', borderRadius: 12,
+          border: '1px solid #e2e8f0', background: '#fff',
+          fontSize: 13, fontWeight: 600, color: '#334155',
+          cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+        onClick={() => setOpen(!open)}
+      >
+        {icon && <i className={`bx ${icon}`} style={{ fontSize: 16, color: '#6366f1' }} />}
+        <span>{label}: <strong>{selectedOption ? selectedOption.label : 'Semua'}</strong></span>
+        <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 150,
+          background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+          minWidth: 180, overflow: 'hidden', padding: 4,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: 'none', background: String(value) === String(opt.value) ? '#f5f3ff' : 'transparent',
+                color: String(value) === String(opt.value) ? '#6366f1' : '#475569',
+                fontSize: 12.5, fontWeight: String(value) === String(opt.value) ? 700 : 500,
+                textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#0f172a';
+                }
+              }}
+              onMouseLeave={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#475569';
+                }
+              }}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function AdminMerchants() {
   const [merchants, setMerchants] = useState([]);
   const [stats, setStats] = useState({});
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [order, setOrder] = useState('desc');
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [note, setNote] = useState('');
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const isMobile = windowWidth < 640;
+  const isTablet = windowWidth < 1024;
 
   // Commission override state
   const [commission, setCommission] = useState({ fee_percent: 0, loading: false });
@@ -37,11 +121,13 @@ export default function AdminMerchants() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     const p = new URLSearchParams();
     if (filter) p.append('status', filter);
-    if (search) p.append('search', search);
+    if (debouncedSearch) p.append('search', debouncedSearch);
+    if (sortBy) p.append('sort', sortBy);
+    if (order) p.append('order', order);
     Promise.all([
       fetchJson(`${API}/merchants?${p}`),
       fetchJson(`${API}/merchants/stats`),
@@ -50,9 +136,25 @@ export default function AdminMerchants() {
       setMerchants(data);
       setStats(s || {});
     }).catch(console.error).finally(() => setLoading(false));
-  };
+  }, [filter, debouncedSearch, sortBy, order]);
 
-  useEffect(() => { load(); loadLogistics(); }, [filter]);
+  // Load logistics on mount
+  useEffect(() => {
+    loadLogistics();
+  }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Trigger load instantly when any filter/sort changes
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const loadCommission = (merchantId) => {
     setCommission({ ...commission, loading: true });
@@ -177,26 +279,81 @@ export default function AdminMerchants() {
     }).catch(alert);
   };
 
-  const isMobile = windowWidth < 640;
-  const isTablet = windowWidth < 1024;
+  const filterBar = (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, width: '100%', alignItems: 'center' }}>
+      {/* Search Input */}
+      <div style={{ ...A.searchWrap, minWidth: 280, flex: 1, position: 'relative' }}>
+        <i className="bx bx-search" style={A.searchIcon} />
+        <input
+          style={{ ...A.searchInput, width: '100%', paddingLeft: 40, paddingRight: 36, height: 42 }}
+          placeholder="Cari nama merchant..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button 
+            onClick={() => setSearch('')}
+            style={{ 
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4,
+              display: 'flex', alignItems: 'center'
+            }}
+          >
+            <i className="bx bxs-x-circle" style={{ fontSize: 18 }} />
+          </button>
+        )}
+      </div>
+
+      {/* Selects */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <CustomSelect 
+          label="Status" 
+          value={filter} 
+          icon="bx-toggle-left"
+          options={[
+            { value: '', label: 'Semua Status' },
+            { value: 'active', label: 'Operasional' },
+            { value: 'pending', label: 'Antrean Verifikasi' },
+            { value: 'suspended', label: 'Sanksi' }
+          ]}
+          onChange={setFilter}
+        />
+
+        <CustomSelect 
+          label="Urutan" 
+          value={sortBy} 
+          icon="bx-sort-alt-2"
+          options={[
+            { value: 'created_at', label: 'Tanggal Bergabung' },
+            { value: 'name', label: 'Nama Toko' },
+            { value: 'status', label: 'Status' },
+            { value: 'balance', label: 'Saldo' },
+            { value: 'total_sales', label: 'Omzet' }
+          ]}
+          onChange={setSortBy}
+        />
+
+        <CustomSelect 
+          label="Arah" 
+          value={order} 
+          icon="bx-transfer-alt"
+          options={[
+            { value: 'asc', label: 'ASC' },
+            { value: 'desc', label: 'DESC' }
+          ]}
+          onChange={setOrder}
+        />
+      </div>
+
+      <button style={{ ...A.btnGhost, height: 42, width: 42, padding: 0, justifyContent: 'center' }} onClick={load}>
+        <i className="bx bx-refresh" style={{ fontSize: 20 }} />
+      </button>
+    </div>
+  );
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Daftar Merchant & Tenant" subtitle="Pusat kendali mitra bisnis. Kelola verifikasi, batasan operasional, dan kesepakatan komisi khusus.">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
-          <div style={{ ...A.searchWrap, minWidth: 0, flex: 1, minWidth: isMobile ? '100%' : 250 }}>
-            <i className="bx bx-search" style={A.searchIcon} />
-            <input
-              style={A.searchInput}
-              placeholder="Cari nama merchant..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && load()}
-            />
-          </div>
-          <button style={{ ...A.btnGhost, flex: '0 0 auto' }} onClick={load}><i className={`bx bx-refresh ${loading ? 'bx-spin' : ''}`} /></button>
-        </div>
-      </PageHeader>
+      <PageHeader title="Daftar Merchant & Tenant" subtitle="Pusat kendali mitra bisnis. Kelola verifikasi, batasan operasional, dan kesepakatan komisi khusus." />
 
       <StatRow stats={[
         { label: 'Merchant Aktif', val: stats.active || 0, icon: 'bx-store', color: '#10b981' },
@@ -206,27 +363,59 @@ export default function AdminMerchants() {
 
       <TablePanel
         loading={loading}
-        tabs={
-          <div style={{ display: 'flex', overflowX: 'auto', gap: 10, paddingBottom: 4, scrollBehavior: 'smooth' }}>
-            {[
-              { val: '', label: 'Semua Status' },
-              { val: 'active', label: 'Operasional' },
-              { val: 'pending', label: 'Antrean Verifikasi' },
-              { val: 'suspended', label: 'Sanksi' },
-            ].map(t => (
-              <button key={t.val} style={{ ...A.tab(filter === t.val), whiteSpace: 'nowrap', fontSize: isMobile ? 12 : 14 }} onClick={() => setFilter(t.val)}>{t.label}</button>
-            ))}
-          </div>
-        }
+        toolbar={filterBar}
       >
         {/* Desktop Table View */}
         {!isMobile ? (
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
             <thead>
               <tr>
-                {['Entitas Toko', 'Status Operasional', 'Legalitas', 'Arus Kas', 'Bergabung', 'Aksi'].map((h, i) => (
-                  <th key={h} style={{ ...A.th, textAlign: i === 5 ? 'right' : 'left', paddingLeft: i === 0 ? 24 : 16, paddingRight: i === 5 ? 24 : 16 }}>{h}</th>
-                ))}
+                {[
+                  { key: 'name', label: 'Entitas Toko', sortable: true },
+                  { key: 'status', label: 'Status Operasional', sortable: true },
+                  { key: 'is_verified', label: 'Legalitas', sortable: false },
+                  { key: 'balance', label: 'Arus Kas', sortable: true },
+                  { key: 'joined_at', label: 'Bergabung', sortable: true },
+                ].map((h, i) => {
+                  const isCurrentSort = sortBy === h.key;
+                  return (
+                    <th 
+                      key={h.label} 
+                      style={{ 
+                        ...A.th, 
+                        textAlign: 'left',
+                        paddingLeft: i === 0 ? 24 : 16, 
+                        paddingRight: 16,
+                        cursor: h.sortable ? 'pointer' : 'default',
+                        userSelect: 'none'
+                      }}
+                      onClick={() => {
+                        if (!h.sortable) return;
+                        if (sortBy === h.key) {
+                          setOrder(o => o === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortBy(h.key);
+                          setOrder('desc');
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {h.label}
+                        {h.sortable && (
+                          <i className={`bx ${
+                            isCurrentSort 
+                              ? (order === 'asc' ? 'bx-chevron-up' : 'bx-chevron-down') 
+                              : 'bx-sort-alt-2'
+                          }`} style={{ 
+                            fontSize: 13, 
+                            color: isCurrentSort ? '#6366f1' : '#94a3b8' 
+                          }} />
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
+                <th style={{ ...A.th, textAlign: 'right', paddingRight: 24 }}>Aksi</th>
               </tr>
             </thead>
             <tbody>

@@ -8,6 +8,7 @@ const API = ADMIN_API_BASE;
 const STATUS_TABS = [
   { val: '', label: 'Semua', icon: 'bx-grid-alt', count: null },
   { val: 'pending_payment', label: 'Belum Bayar', icon: 'bx-time', color: '#d97706' },
+  { val: 'pending_confirmation', label: 'Konfirmasi Transfer', icon: 'bx-transfer', color: '#7c3aed' },
   { val: 'paid', label: 'Sudah Bayar', icon: 'bx-check-circle', color: '#2563eb' },
   { val: 'processing', label: 'Diproses', icon: 'bx-loader-circle', color: '#7c3aed' },
   { val: 'shipped', label: 'Dikirim', icon: 'bx-truck', color: '#6366f1' },
@@ -17,6 +18,7 @@ const STATUS_TABS = [
 
 const STATUS_MAP = {
   pending_payment: { color: '#d97706', bg: '#fffbeb', label: 'Belum Bayar' },
+  pending_confirmation: { color: '#7c3aed', bg: '#f5f3ff', label: 'Konfirmasi Transfer ⏳' },
   paid: { color: '#2563eb', bg: '#eff6ff', label: 'Sudah Bayar' },
   new: { color: '#64748b', bg: '#f1f5f9', label: 'Baru' },
   confirmed: { color: '#7c3aed', bg: '#f5f3ff', label: 'Konfirmasi' },
@@ -55,6 +57,9 @@ export default function AdminOrders() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [confirmModal, setConfirmModal] = useState(null); // { order_id, proof_url, action: 'approve'|'reject'|null }
+  const [confirmNote, setConfirmNote] = useState('');
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const limit = 10;
 
   const load = (targetPage = page) => {
@@ -82,6 +87,24 @@ export default function AdminOrders() {
     setPage(p);
     load(p);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleConfirmPayment = async (action) => {
+    if (!confirmModal) return;
+    setConfirmLoading(true);
+    try {
+      const res = await fetchJson(`${API}/orders/confirm-payment`, {
+        method: 'POST',
+        body: JSON.stringify({ order_id: confirmModal.order_id, action, note: confirmNote }),
+      });
+      setConfirmModal(null);
+      setConfirmNote('');
+      load(page);
+    } catch (e) {
+      alert('Gagal: ' + e.message);
+    } finally {
+      setConfirmLoading(false);
+    }
   };
 
   const renderMobileCard = (o, idx) => (
@@ -191,6 +214,7 @@ export default function AdminOrders() {
   );
 
   return (
+    <>
     <div style={{ ...A.page, padding: '24px 20px', background: '#fafbff' }} className="fade-in admin-page-container">
       <style>{`
         @media (max-width: 768px) {
@@ -427,15 +451,31 @@ export default function AdminOrders() {
                         <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>{fmtDate(o.created_at)}</div>
                       </td>
                       <td style={{ padding: '16px 24px 16px 16px', textAlign: 'right' }}>
-                        <Link to={`/admin/orders/detail/${o.id}`} style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                          padding: '6px 14px', borderRadius: 10,
-                          background: '#f1f5f9', border: 'none',
-                          color: '#475569', fontSize: 12, fontWeight: 600,
-                          textDecoration: 'none', transition: 'all 0.2s'
-                        }}>
-                          Detail <i className="bx bx-chevron-right" style={{ fontSize: 13 }} />
-                        </Link>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {o.status === 'pending_confirmation' && (
+                            <button
+                              onClick={() => setConfirmModal({ order_id: o.id, proof_url: o.payment_proof_url })}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                padding: '6px 12px', borderRadius: 10,
+                                background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+                                border: 'none', color: '#fff', fontSize: 11, fontWeight: 700,
+                                cursor: 'pointer', whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <i className="bx bx-transfer" /> Verifikasi
+                            </button>
+                          )}
+                          <Link to={`/admin/orders/detail/${o.id}`} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            padding: '6px 14px', borderRadius: 10,
+                            background: '#f1f5f9', border: 'none',
+                            color: '#475569', fontSize: 12, fontWeight: 600,
+                            textDecoration: 'none', transition: 'all 0.2s'
+                          }}>
+                            Detail <i className="bx bx-chevron-right" style={{ fontSize: 13 }} />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -504,5 +544,74 @@ export default function AdminOrders() {
         </div>
       )}
     </div>
+
+      {/* ── Modal Verifikasi Bukti Transfer ── */}
+      {confirmModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
+            <div style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', padding: '24px', color: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="bx bx-transfer" style={{ fontSize: 22 }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: 16 }}>Verifikasi Bukti Transfer</div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>Approve atau tolak bukti dari buyer</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: 24 }}>
+              {confirmModal.proof_url ? (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Bukti Transfer</div>
+                  <a href={confirmModal.proof_url} target="_blank" rel="noreferrer">
+                    <img src={confirmModal.proof_url} alt="Bukti Transfer" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc' }} />
+                  </a>
+                  <div style={{ fontSize: 11, color: '#6366f1', marginTop: 4 }}>Klik gambar untuk perbesar</div>
+                </div>
+              ) : (
+                <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: 12, marginBottom: 16, border: '1px dashed #e2e8f0' }}>
+                  <i className="bx bx-image" style={{ fontSize: 36, color: '#94a3b8', display: 'block', marginBottom: 8 }} />
+                  <p style={{ color: '#94a3b8', fontSize: 13 }}>Tidak ada bukti yang diupload</p>
+                </div>
+              )}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Catatan (alasan reject)</label>
+                <textarea
+                  value={confirmNote}
+                  onChange={e => setConfirmNote(e.target.value)}
+                  placeholder="Opsional untuk approve. Wajib diisi jika reject."
+                  rows={3}
+                  style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px', fontSize: 13, resize: 'none', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  onClick={() => { setConfirmModal(null); setConfirmNote(''); }}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                  disabled={confirmLoading}
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => handleConfirmPayment('reject')}
+                  disabled={confirmLoading}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                >
+                  {confirmLoading ? '...' : '✕ Tolak'}
+                </button>
+                <button
+                  onClick={() => handleConfirmPayment('approve')}
+                  disabled={confirmLoading}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #16a34a, #4ade80)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                >
+                  {confirmLoading ? '...' : '✓ Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

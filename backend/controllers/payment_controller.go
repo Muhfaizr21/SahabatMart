@@ -1,9 +1,9 @@
 package controllers
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"

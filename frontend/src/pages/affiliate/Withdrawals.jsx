@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
+import { getStoredUser } from '../../lib/auth';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
@@ -35,6 +36,7 @@ export default function AffiliateWithdrawals() {
   const [success, setSuccess] = useState('');
 
   const [config, setConfig] = useState({});
+  const [minWithdrawal, setMinWithdrawal] = useState(50000);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -48,6 +50,20 @@ export default function AffiliateWithdrawals() {
       setBalance(dRes?.stats?.balance || 0);
       setShoppingBalance(dRes?.stats?.shopping_balance || 0);
       setConfig(cRes || {});
+
+      // Calculate minimum withdrawal from active membership tier
+      let minAmt = 50000;
+      if (dRes?.affiliate?.tier?.min_withdrawal_amount !== undefined) {
+        minAmt = parseFloat(dRes.affiliate.tier.min_withdrawal_amount);
+      } else {
+        const storedUser = getStoredUser();
+        if (storedUser?.affiliate?.membership_tier?.min_withdrawal_amount !== undefined) {
+          minAmt = parseFloat(storedUser.affiliate.membership_tier.min_withdrawal_amount);
+        } else if (cRes?.payout_min_amount !== undefined) {
+          minAmt = parseFloat(cRes.payout_min_amount);
+        }
+      }
+      setMinWithdrawal(minAmt);
     } catch (_err) {
       console.error(_err);
     } finally {
@@ -64,7 +80,6 @@ export default function AffiliateWithdrawals() {
     setError('');
     setSuccess('');
     const amt = parseFloat(amount);
-    const minWithdrawal = parseFloat(config.payout_min_amount || 50000);
     if (isNaN(amt) || amt < minWithdrawal) {
       setError(`Minimum penarikan adalah Rp ${Number(minWithdrawal).toLocaleString('id-ID')}`);
       return;
@@ -121,11 +136,11 @@ export default function AffiliateWithdrawals() {
             <p className="text-4xl font-black text-white font-['Plus_Jakarta_Sans']">
               {formatRp(balance)}
             </p>
-            <p className="text-slate-400 text-xs mt-2">Minimum penarikan: Rp {Number(config.payout_min_amount || 50000).toLocaleString('id-ID')}</p>
+            <p className="text-slate-400 text-xs mt-2">Minimum penarikan: Rp {Number(minWithdrawal).toLocaleString('id-ID')}</p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            disabled={balance < (config.payout_min_amount || 50000)}
+            disabled={balance < minWithdrawal}
             className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
             style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}
           >
@@ -188,7 +203,7 @@ export default function AffiliateWithdrawals() {
                     const val = e.target.value.replace(/\D/g, '');
                     setAmount(val);
                   }}
-                  placeholder={(config.payout_min_amount || 50000).toLocaleString('id-ID')}
+                  placeholder={minWithdrawal.toLocaleString('id-ID')}
                   className="w-full pl-12 pr-4 py-3 rounded-xl text-sm text-white placeholder-slate-600 border outline-none transition-all focus:border-purple-500"
                   style={{
                     background: 'rgba(12, 19, 36, 0.6)',
@@ -212,7 +227,7 @@ export default function AffiliateWithdrawals() {
                 <button
                   type="button"
                   onClick={() => setAmount(Math.floor(balance).toString())}
-                  disabled={balance < (config.payout_min_amount || 50000)}
+                  disabled={balance < minWithdrawal}
                   className="px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-30"
                   style={{ background: 'rgba(124, 58, 237, 0.2)', color: '#ddb7ff' }}
                 >

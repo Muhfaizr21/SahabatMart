@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"gorm.io/gorm"
 	"time"
 )

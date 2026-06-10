@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
 	"fmt"
 	"log"
 	"time"
@@ -235,7 +235,11 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					inventoryMerchantID = pusatFallback
 				}
 
-				if inventory.Stock < item.Quantity {
+				var product models.Product
+				tx.Select("backorders").Where("id = ?", item.ProductID).First(&product)
+				allowBackorder := product.Backorders == "allow" || product.Backorders == "notify"
+
+				if inventory.Stock < item.Quantity && !allowBackorder {
 					// Attempt to find stock in Pusat if Merchant stock insufficient
 					pusatFallback := "00000000-0000-0000-0000-000000000000"
 					if inventoryMerchantID != pusatFallback {
@@ -261,16 +265,28 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					return err
 				}
 
-				// Update Master Catalog Stock (Variant vs Product)
-				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
-					if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
-						UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-						return err
-					}
-				} else {
-					if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-						UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
-						return err
+				// Update Master Catalog Stock (Variant vs Product) ONLY if fulfilled by Pusat
+				if inventoryMerchantID == "00000000-0000-0000-0000-000000000000" {
+					if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+						if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+							UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+							return err
+						}
+						// Sync parent product stock if not variable
+						var parentProduct models.Product
+						if err := tx.Select("id, product_type").First(&parentProduct, "id = ?", item.ProductID).Error; err == nil {
+							if parentProduct.ProductType != "variable" {
+								if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+									UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+									return err
+								}
+							}
+						}
+					} else {
+						if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+							UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+							return err
+						}
 					}
 				}
 
@@ -492,37 +508,8 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 	var merchant models.Merchant
 	db.Where("id = ?", merchantID).First(&merchant)
 
-	// 3. Distribution Fee (Merchant cut)
-	mPresetID := product.MerchantCommissionPresetID
-	
-	// Variant Override for Merchant Commission
-	if item.ProductVariantID != nil && *item.ProductVariantID != "" {
-		var variant models.ProductVariant
-		if err := db.Where("id = ?", *item.ProductVariantID).First(&variant).Error; err == nil {
-			if variant.MerchantCommissionPresetID != nil && *variant.MerchantCommissionPresetID != "" {
-				mPresetID = variant.MerchantCommissionPresetID
-			}
-		}
-	}
-
-	if mPresetID != nil && *mPresetID != "" {
-		var mPreset models.MerchantCommissionPreset
-		if err := db.Where("id = ? AND is_active = true", *mPresetID).First(&mPreset).Error; err == nil {
-			distAmt = subtotal * mPreset.Rate
-		}
-	}
-
-	if distAmt == 0 {
-		if product.MerchantCommissionPercent > 0 {
-			distAmt = subtotal * (product.MerchantCommissionPercent / 100.0)
-		} else if product.BaseDistributionFee > 0 {
-			distAmt = subtotal * (product.BaseDistributionFee / 100.0)
-		} else if product.BaseDistributionFeeNominal > 0 {
-			distAmt = product.BaseDistributionFeeNominal * float64(item.Quantity)
-		} else if merchant.DistributionFeePercent > 0 {
-			distAmt = subtotal * (merchant.DistributionFeePercent / 100.0)
-		}
-	}
+	// 3. Distribution Fee (Merchant cut - DISABLED per User Request)
+	distAmt = 0.0
 
 	// 4. Affiliate Fee — hanya hitung total untuk backward compat (Level 1 saja)
 	// Distribusi multi-level preset ditangani oleh DistributePresetCommissions
@@ -551,7 +538,10 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 						totalRate += l.Rate
 					}
 					affRate = totalRate
-					// affAmt stays 0 — DistributePresetCommissions handles all per-level payouts
+					// [Double Commission Fix] We MUST set affAmt here because item.CommissionAmount 
+					// will be populated using this value, which acts as the snapshot source of truth 
+					// for DistributePresetCommissions later.
+					affAmt = subtotal * (affRate / 100.0)
 				}
 			} else {
 				// Fallback ke logika lama (no preset)
@@ -580,10 +570,17 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 							affRate = affAmt / subtotal
 						}
 					} else {
-						// Standardize: Assume input is percentage (e.g. 3 = 3% = 0.03)
-						rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
-						affRate = rawComm / 100.0
-						affAmt = subtotal * affRate
+						// [Sync Fix] Cek CategoryCommission jika tidak ada fee produk
+						var catComm models.CategoryCommission
+						if product.Category != "" && db.Where("category_name = ?", product.Category).First(&catComm).Error == nil && catComm.AffiliateFee > 0 {
+							affRate = catComm.AffiliateFee / 100.0
+							affAmt = subtotal * affRate
+						} else {
+							// Standardize: Assume input is percentage (e.g. 3 = 3% = 0.03)
+							rawComm := s.ConfigService.GetFloat("default_affiliate_commission", 3.0)
+							affRate = rawComm / 100.0
+							affAmt = subtotal * affRate
+						}
 					}
 				}
 			}
@@ -769,16 +766,28 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 				return err
 			}
 
-			// 2. Restock Master Catalog (Variant-Aware)
-			if item.ProductVariantID != nil && *item.ProductVariantID != "" {
-				if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
-					UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
-					return err
-				}
-			} else {
-				if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-					UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
-					return err
+			// 2. Restock Master Catalog (Variant-Aware) ONLY if returned to Pusat
+			if item.MerchantID == "00000000-0000-0000-0000-000000000000" {
+				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+					if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+						UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+						return err
+					}
+					// Sync parent product stock if not variable
+					var parentProduct models.Product
+					if err := tx.Select("id, product_type").First(&parentProduct, "id = ?", item.ProductID).Error; err == nil {
+						if parentProduct.ProductType != "variable" {
+							if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+								UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+								return err
+							}
+						}
+					}
+				} else {
+					if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+						UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {
+						return err
+					}
 				}
 			}
 		}

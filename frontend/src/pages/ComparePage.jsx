@@ -35,7 +35,7 @@ export default function ComparePage() {
                     <div className="h-48 rounded-2xl bg-gray-50 mb-4 overflow-hidden border border-gray-100 flex items-center justify-center p-4">
                       <img src={p.img} alt={p.name} className="max-h-full object-contain mix-blend-multiply" />
                     </div>
-                    <Link to={`/product/${p.id}`} className="font-bold text-gray-900 text-lg hover:text-blue-600 transition-colors leading-snug line-clamp-2 block mb-2">{p.name}</Link>
+                    <Link to={`/product/${p.slug || p.id}`} className="font-bold text-gray-900 text-lg hover:text-blue-600 transition-colors leading-snug line-clamp-2 block mb-2">{p.name}</Link>
                     <div className="text-xl font-black text-blue-600 mb-4">{p.price}</div>
                     <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-blue-600/20">
                       Beli Sekarang

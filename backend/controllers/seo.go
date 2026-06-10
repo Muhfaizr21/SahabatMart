@@ -3,10 +3,12 @@ package controllers
 import (
 	"encoding/xml"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 )
 
 type URL struct {
@@ -23,8 +25,12 @@ type URLSet struct {
 
 // GenerateSitemap generates an XML sitemap for SEO
 func (ac *AdminController) GenerateSitemap(w http.ResponseWriter, r *http.Request) {
-	// Base URL of the frontend (should be configured in env, using hardcoded for now or request host)
-	baseURL := "https://akuglow.id" // Updated to .id as per project context
+	// Base URL of the frontend (should be configured in env, falling back to default)
+	baseURL := os.Getenv("FRONTEND_URL")
+	if baseURL == "" {
+		baseURL = "https://akuglow.id"
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	var urlSet URLSet
 
@@ -52,10 +58,14 @@ func (ac *AdminController) GenerateSitemap(w http.ResponseWriter, r *http.Reques
 
 	// Dynamic Products
 	var products []models.Product
-	if err := ac.DB.Select("id, updated_at").Find(&products).Error; err == nil {
+	if err := ac.DB.Select("id, slug, updated_at").Find(&products).Error; err == nil {
 		for _, p := range products {
+			productSlug := p.Slug
+			if productSlug == "" {
+				productSlug = p.ID
+			}
 			urlSet.URLs = append(urlSet.URLs, URL{
-				Loc:        baseURL + "/product/" + p.ID,
+				Loc:        baseURL + "/product/" + productSlug,
 				LastMod:    p.UpdatedAt.Format(time.RFC3339),
 				ChangeFreq: "weekly",
 				Priority:   0.6,

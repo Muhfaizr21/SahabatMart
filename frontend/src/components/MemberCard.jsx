@@ -20,14 +20,18 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
   return (
     <div 
       className="relative w-full group flex justify-center mx-auto select-none transition-all duration-300"
-      style={{ maxWidth: isLarge ? '1063px' : '480px' }}
+      style={{ 
+        maxWidth: isLarge ? '1063px' : '480px',
+        containerType: 'inline-size',
+        width: '100%'
+      }}
     >
       <div 
-        className="relative w-full text-white border border-blue-400/20 overflow-hidden shadow-2xl transition-transform duration-500 hover:scale-[1.01] flex flex-col justify-between"
+        className="relative w-full text-white border border-blue-400/20 overflow-hidden shadow-2xl transition-all duration-500 hover:scale-[1.01] flex flex-col justify-between"
         style={{
-          height: isLarge ? '650px' : '240px',
-          borderRadius: isLarge ? '48px' : '24px',
-          padding: isLarge ? '56px' : '22px',
+          height: '61.16cqw',
+          borderRadius: '4.5cqw',
+          padding: '5.2cqw',
           background: 'linear-gradient(135deg, #0b5fa8 0%, #00366f 45%, #011b3b 100%)',
           boxShadow: '0 20px 50px -10px rgba(0, 54, 111, 0.4)'
         }}
@@ -36,15 +40,15 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
         <div 
           className="absolute -left-1/4 -top-1/4 w-[150%] rotate-[18deg] opacity-40 blur-2xl pointer-events-none"
           style={{
-            height: isLarge ? '400px' : '150px',
+            height: '37cqw',
             background: 'radial-gradient(ellipse at center, rgba(56, 189, 248, 0.4) 0%, transparent 70%)'
           }}
         />
         <div 
           className="absolute -right-20 -bottom-10 w-[120%] rotate-[-12deg] opacity-25 rounded-full pointer-events-none"
           style={{
-            height: isLarge ? '400px' : '160px',
-            borderTop: '2px solid rgba(255, 255, 255, 0.2)',
+            height: '37cqw',
+            borderTop: '0.2cqw solid rgba(255, 255, 255, 0.2)',
             background: 'linear-gradient(180deg, rgba(6, 182, 212, 0.1) 0%, transparent 80%)',
             filter: 'blur(4px)'
           }}
@@ -52,8 +56,8 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
         <div 
           className="absolute left-10 top-20 w-[100%] rotate-[15deg] opacity-15 pointer-events-none"
           style={{
-            height: isLarge ? '300px' : '100px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+            height: '28cqw',
+            borderTop: '0.1cqw solid rgba(255, 255, 255, 0.3)',
             filter: 'blur(2px)'
           }}
         />
@@ -67,7 +71,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
               alt="AkuGlow" 
               className="w-auto object-contain"
               style={{
-                height: isLarge ? '90px' : '28px',
+                height: '8.4cqw',
                 mixBlendMode: 'multiply'
               }}
             />
@@ -78,14 +82,15 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
             className="flex items-center text-right rounded-full shadow-sm"
             style={{
               background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 50%, #a16207 100%)',
-              padding: isLarge ? '14px 28px' : '4px 10px',
-              gap: isLarge ? '12px' : '6px'
+              padding: '1.3cqw 2.6cqw',
+              gap: '1.1cqw',
+              borderRadius: '100px'
             }}
           >
             <span 
               className="font-extrabold font-sans text-amber-950"
               style={{
-                fontSize: isLarge ? '18px' : '8px',
+                fontSize: '1.7cqw',
                 letterSpacing: '0.05em'
               }}
             >
@@ -95,8 +100,8 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
               viewBox="0 0 24 24" 
               className="fill-amber-950 drop-shadow-[0_1px_2px_rgba(255,255,255,0.4)] animate-pulse" 
               style={{
-                width: isLarge ? '28px' : '12px',
-                height: isLarge ? '28px' : '12px'
+                width: '2.6cqw',
+                height: '2.6cqw'
               }}
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -111,7 +116,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
             <h2 
               className="text-white font-extrabold tracking-normal font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] leading-tight"
               style={{
-                fontSize: isLarge ? '76px' : '30px'
+                fontSize: '7.1cqw'
               }}
             >
               Member Card
@@ -119,7 +124,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
             <h3 
               className="text-white font-bold tracking-normal font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)] leading-tight"
               style={{
-                fontSize: isLarge ? '60px' : '24px',
+                fontSize: '5.6cqw',
                 opacity: 0.95
               }}
             >
@@ -131,11 +136,11 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
           <div 
             className="bg-white shadow-xl border border-white/20 transform group-hover:scale-[1.03] transition-transform duration-300 flex-shrink-0"
             style={{
-              padding: isLarge ? '24px' : '8px',
-              borderRadius: isLarge ? '40px' : '14px'
+              padding: '2.25cqw',
+              borderRadius: '3.7cqw'
             }}
           >
-            <div style={{ width: isLarge ? '210px' : '64px', height: isLarge ? '210px' : '64px' }}>
+            <div style={{ width: '19.7cqw', height: '19.7cqw' }}>
               <QRCodeSVG 
                 value={user.id} 
                 size="100%"
@@ -153,7 +158,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
           <div 
             className="text-left"
             style={{
-              gap: isLarge ? '16px' : '4px',
+              gap: '1.5cqw',
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -162,11 +167,9 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
             <p 
               className="font-mono text-white font-semibold"
               style={{
-                fontSize: isLarge ? '40px' : '16px',
-                letterSpacing: isLarge ? '0.24em' : '0.18em',
-                textShadow: isLarge 
-                  ? '1px 2px 2px rgba(0, 0, 0, 0.8), -1px -1px 0px rgba(255, 255, 255, 0.3)' 
-                  : '0.5px 1px 1px rgba(0, 0, 0, 0.8), -0.5px -0.5px 0px rgba(255, 255, 255, 0.3)'
+                fontSize: '3.76cqw',
+                letterSpacing: '0.24em',
+                textShadow: '1px 2px 2px rgba(0, 0, 0, 0.8), -1px -1px 0px rgba(255, 255, 255, 0.3)'
               }}
             >
               {cardNumber}
@@ -176,8 +179,8 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
               <p 
                 className="font-black text-white tracking-widest truncate"
                 style={{
-                  fontSize: isLarge ? '20px' : '10px',
-                  maxWidth: isLarge ? '500px' : '200px'
+                  fontSize: '1.88cqw',
+                  maxWidth: '47cqw'
                 }}
               >
                 {cardHolderName}
@@ -186,8 +189,8 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
                 className="font-bold tracking-wider"
                 style={{
                   color: '#eab308',
-                  fontSize: isLarge ? '14px' : '7.5px',
-                  marginTop: isLarge ? '6px' : '2px'
+                  fontSize: '1.3cqw',
+                  marginTop: '0.5cqw'
                 }}
               >
                 {tierName || 'MITRA'} MEMBER
@@ -200,7 +203,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
             <span 
               className="font-bold tracking-widest text-white/55 font-sans uppercase"
               style={{
-                fontSize: isLarge ? '20px' : '9.5px',
+                fontSize: '1.88cqw',
                 letterSpacing: '0.12em',
                 textShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"gorm.io/gorm"
 )
 
@@ -82,6 +82,80 @@ func StartHousekeeping(db *gorm.DB) {
 		_, errMerchant := affiliateService.CheckAndDowngradeMerchants()
 		if errMerchant != nil {
 			log.Printf("❌ Housekeeping Error (Merchant Downgrade Check): %v", errMerchant)
+		}
+
+		// 11. Cleanup Demographics Logs > 90 Days
+		db.Exec("DELETE FROM user_location_logs WHERE created_at < ?", time.Now().AddDate(0, 0, -90))
+		db.Exec("DELETE FROM ip_location_caches WHERE created_at < ?", time.Now().AddDate(0, 0, -90))
+
+		// 12. Send Weekly Demographics Report (Every Monday at 8 AM)
+		now := time.Now()
+		if now.Weekday() == time.Monday && now.Hour() == 8 {
+			weekStr := now.Format("2006-W02")
+			var sentCfg models.PlatformConfig
+			var lastSent string
+			if err := db.Where("key = ?", "last_demographics_report_sent").First(&sentCfg).Error; err == nil {
+				lastSent = sentCfg.Value
+			}
+
+			if lastSent != weekStr {
+				var reportEnabled models.PlatformConfig
+				var adminEmail models.PlatformConfig
+				db.Where("key = ?", "demographics_weekly_report").First(&reportEnabled)
+				db.Where("key = ?", "demographics_admin_email").First(&adminEmail)
+
+				if reportEnabled.Value == "true" && adminEmail.Value != "" {
+					var uniqueVisitors int64
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&uniqueVisitors)
+
+					var countriesCount int64
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("country_code").Count(&countriesCount)
+
+					type TopCity struct {
+						City  string
+						Count int64
+					}
+					var topCity TopCity
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Select("city, COUNT(DISTINCT ip_hash) as count").Group("city").Order("count DESC").Limit(1).Scan(&topCity)
+
+					var vCount, pCount, cCount, oCount int64
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&vCount)
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND visited_url LIKE ?", now.AddDate(0, 0, -7), "%/product%").Distinct("ip_hash").Count(&pCount)
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND (visited_url LIKE ? OR visited_url LIKE ?)", now.AddDate(0, 0, -7), "%/checkout%", "%/cart%").Distinct("ip_hash").Count(&cCount)
+					db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND is_converted = true", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&oCount)
+
+					recommendation := "- Performa konversi berjalan dengan baik. Pertimbangkan untuk meningkatkan kampanye marketing untuk kota teratas.\n"
+					if vCount > 0 && (float64(oCount)/float64(vCount)*100.0) < 2.0 {
+						recommendation = "- Rasio konversi mingguan Anda berada di bawah 2%. Pertimbangkan untuk menawarkan promo gratis ongkir atau diskon voucher di wilayah dengan traffic tinggi.\n"
+					}
+
+					emailBody := fmt.Sprintf("Halo Admin,\n\nBerikut adalah Laporan Demografi Mingguan AkuGlow untuk periode 7 hari terakhir:\n\nMETRIK UTAMA:\n- Total Pengunjung Unik: %d\n- Jumlah Negara Terdeteksi: %d\n- Kota dengan Traffic Tertinggi: %s (%d pengunjung)\n\nFUNNEL KONVERSI WILAYAH:\n- Total Pengunjung: %d\n- Lihat Produk: %d (%.1f%%)\n- Masuk Checkout/Keranjang: %d (%.1f%%)\n- Sukses Transaksi: %d (%.1f%%)\n\nREKOMENDASI SISTEM:\n%s\nSalam,\nSistem Analitik AkuGlow",
+						uniqueVisitors, countriesCount, topCity.City, topCity.Count, vCount, pCount, func() float64 {
+							if vCount > 0 { return float64(pCount)/float64(vCount)*100 }
+							return 0
+						}(), cCount, func() float64 {
+							if vCount > 0 { return float64(cCount)/float64(vCount)*100 }
+							return 0
+						}(), oCount, func() float64 {
+							if vCount > 0 { return float64(oCount)/float64(vCount)*100 }
+							return 0
+						}(), recommendation)
+
+					emailSvc := NewEmailService(db)
+					errEmail := emailSvc.SendEmail(adminEmail.Value, "Laporan Demografi Mingguan AkuGlow - "+weekStr, emailBody)
+					if errEmail != nil {
+						log.Printf("❌ Failed to send weekly demographics email: %v", errEmail)
+					} else {
+						log.Printf("📧 Weekly Demographics Report sent successfully to %s", adminEmail.Value)
+						if sentCfg.Key != "" {
+							sentCfg.Value = weekStr
+							db.Save(&sentCfg)
+						} else {
+							db.Create(&models.PlatformConfig{Key: "last_demographics_report_sent", Value: weekStr})
+						}
+					}
+				}
+			}
 		}
 
 	}

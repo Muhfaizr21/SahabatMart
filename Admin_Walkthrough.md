@@ -1,6 +1,6 @@
-# SahabatMart Super Admin Ecosystem Walkthrough
+# AkuGlow Super Admin Ecosystem Walkthrough
 
-The SahabatMart Super Admin platform is now 100% complete, featuring professional-grade management capabilities for every aspect of the eCommerce ecosystem.
+The AkuGlow Super Admin platform is now 100% complete, featuring professional-grade management capabilities for every aspect of the eCommerce ecosystem.
 
 ## 🏛️ 1. Master Data & Inventori Global
 - **Tree Kategori (Hierarchy):** Managed in **Kategori Produk**. Admins can create parent-child structures for an organized catalog.

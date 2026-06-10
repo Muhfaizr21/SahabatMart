@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 )
 
 // ToggleMaintenanceMode mengaktifkan atau menonaktifkan mode pemeliharaan platform

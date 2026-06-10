@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -49,19 +49,21 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		}
 
 		actualPayout := group.MerchantPayout
-		settleDate := time.Now().Add(24 * time.Hour) 
-		
-		descPayout := fmt.Sprintf("Bagi Hasil Penjualan (Pesanan #%s)", order.OrderNumber)
-		
-		// Debit Admin (Source)
-		descDebitAdmin := fmt.Sprintf("Alokasi Penjualan Merchant %s (Pesanan #%s)", merchant.StoreName, order.OrderNumber)
-		if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -actualPayout, order.ID, "order", descDebitAdmin, nil); err != nil {
-			return err
-		}
+		if actualPayout > 0 {
+			settleDate := time.Now().Add(24 * time.Hour) 
+			
+			descPayout := fmt.Sprintf("Bagi Hasil Penjualan (Pesanan #%s)", order.OrderNumber)
+			
+			// Debit Admin (Source)
+			descDebitAdmin := fmt.Sprintf("Alokasi Penjualan Merchant %s (Pesanan #%s)", merchant.StoreName, order.OrderNumber)
+			if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -actualPayout, order.ID, "order", descDebitAdmin, nil); err != nil {
+				return err
+			}
 
-		// Credit Merchant (Destination)
-		if err := s.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxSaleRevenue, actualPayout, order.ID, "order", descPayout, &settleDate); err != nil {
-			return err
+			// Credit Merchant (Destination)
+			if err := s.ProcessTransaction(tx, merchant.UserID, models.WalletMerchant, models.TxSaleRevenue, actualPayout, order.ID, "order", descPayout, &settleDate); err != nil {
+				return err
+			}
 		}
 
 		// 3. [ALLOCATION] Affiliate Commission Distribution
@@ -512,8 +514,17 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 		}
 	}
 
-	// [SYNC] Mark all commissions for this order as cancelled
-	tx.Model(&models.AffiliateCommission{}).Where("order_id = ?", orderID).Update("status", models.CommissionCancelled)
+	// [SYNC] Mark all commissions for this order as cancelled and trigger recalculation
+	var comms []models.AffiliateCommission
+	if err := tx.Where("order_id = ?", orderID).Find(&comms).Error; err == nil {
+		tx.Model(&models.AffiliateCommission{}).Where("order_id = ?", orderID).Update("status", models.CommissionCancelled)
+		
+		// Recalculate total_earned for each affected affiliate
+		affSvc := NewAffiliateService(tx, nil)
+		for _, c := range comms {
+			_ = affSvc.TriggerTierUpgrade(c.AffiliateID)
+		}
+	}
 
 	return nil
 }

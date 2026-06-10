@@ -31,7 +31,7 @@ export default function AffiliateProducts() {
   }, [fetchProducts]);
 
   const generateLink = (product) => {
-    return `${window.location.origin}/product/${product.id}?ref=${refCode}`;
+    return `${window.location.origin}/product/${product.slug || product.id}?ref=${refCode}`;
   };
 
   const copyLink = (product) => {

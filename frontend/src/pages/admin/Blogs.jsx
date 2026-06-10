@@ -1,27 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
-import { A, PageHeader, Modal, TablePanel, statusBadge, FieldLabel, fmtDate } from '../../lib/adminStyles.jsx';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { A, PageHeader, TablePanel, statusBadge, fmtDate } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
+const CustomSelect = ({ label, value, options, onChange, icon }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 16px', borderRadius: 12,
+          border: '1px solid #e2e8f0', background: '#fff',
+          fontSize: 13, fontWeight: 600, color: '#334155',
+          cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+        onClick={() => setOpen(!open)}
+      >
+        {icon && <i className={`bx ${icon}`} style={{ fontSize: 16, color: '#6366f1' }} />}
+        <span>{label}: <strong>{selectedOption ? selectedOption.label : 'Semua'}</strong></span>
+        <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 150,
+          background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+          minWidth: 180, overflow: 'hidden', padding: 4,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: 'none', background: String(value) === String(opt.value) ? '#f5f3ff' : 'transparent',
+                color: String(value) === String(opt.value) ? '#6366f1' : '#475569',
+                fontSize: 12.5, fontWeight: String(value) === String(opt.value) ? 700 : 500,
+                textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#0f172a';
+                }
+              }}
+              onMouseLeave={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#475569';
+                }
+              }}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminBlogs() {
+  const navigate = useNavigate();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ id: 0, title: '', summary: '', content: '', author: 'Admin', category: 'General', image: '', status: 'published' });
-  const [showModal, setShowModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // Pagination & Filtering
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sort, setSort] = useState('created_at');
+  const [order, setOrder] = useState('desc');
+  const limit = 10;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadBlogs = () => {
     setLoading(true);
     setSelectedIds([]);
-    fetchJson(`${ADMIN_API_BASE}/blogs`)
-      .then(d => setBlogs(d || []))
-      .catch(err => toast.error('Gagal memuat blog'))
+
+    const query = new URLSearchParams({
+      search: debouncedSearch,
+      category,
+      status,
+      sort,
+      order,
+      page: String(page),
+      limit: String(limit)
+    }).toString();
+
+    fetchJson(`${ADMIN_API_BASE}/blogs?${query}`)
+      .then(d => {
+        setBlogs(d?.data || []);
+        setTotalPages(Math.ceil((d?.total || 0) / limit) || 1);
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error('Gagal memuat blog');
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadBlogs(); }, []);
+  useEffect(() => { loadBlogs(); }, [debouncedSearch, category, status, sort, order, page]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -37,7 +150,7 @@ export default function AdminBlogs() {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/blogs/bulk-delete`, {
       method: 'POST',
-      body: JSON.stringify({ ids: selectedIds })
+      body: JSON.stringify({ ids: selectedIds.map(String) })
     })
       .then(() => {
         toast.success('Artikel terpilih dihapus');
@@ -49,67 +162,101 @@ export default function AdminBlogs() {
       });
   };
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    const fd = new FormData();
-    fd.append('image', file);
-    try {
-      const res = await uploadFile(`${ADMIN_API_BASE}/upload`, file);
-      const url = res.imageUrl || res.url || res.data?.url;
-      if (url) {
-        setFormData(prev => ({ ...prev, image: url }));
-        toast.success('Gambar terunggah');
-      }
-    } catch (_err) { 
-      toast.error('Upload gagal: ' + _err.message); 
-    } finally { 
-      setUploading(false); 
-    }
-  };
-
-  const handleSave = (e) => {
-    e.preventDefault();
-    setSaving(true);
-    const isEdit = formData.id;
-    const url = `${ADMIN_API_BASE}/blogs/upsert`;
-    
-    fetchJson(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    }).then(() => {
-      toast.success(isEdit ? 'Artikel diperbarui' : 'Artikel diterbitkan');
-      setShowModal(false);
-      loadBlogs();
-    }).catch(err => toast.error(err.message))
-    .finally(() => setSaving(false));
-  };
-
   const deleteBlog = (id) => {
-    if (!window.confirm("Hapus artikel ini?")) return;
+    if (!window.confirm('Hapus artikel ini secara permanen?')) return;
     fetchJson(`${ADMIN_API_BASE}/blogs/delete?id=${id}`, { method: 'DELETE' })
-      .then(() => {
-        toast.success('Artikel dihapus');
-        loadBlogs();
-      })
+      .then(() => { toast.success('Artikel dihapus'); loadBlogs(); })
       .catch(err => toast.error(err.message));
+  };
+
+  const handleSort = (col) => {
+    if (sort === col) {
+      setOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSort(col);
+      setOrder('asc');
+    }
+    setPage(1);
+  };
+
+  const SortHeader = ({ col, label, style = {} }) => {
+    const isSorted = sort === col;
+    return (
+      <th 
+        style={{ ...A.th, cursor: 'pointer', userSelect: 'none', ...style }} 
+        onClick={() => handleSort(col)}
+      >
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span>{label}</span>
+          <span style={{ fontSize: 14, color: isSorted ? '#6366f1' : '#94a3b8' }}>
+            {isSorted ? (order === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </div>
+      </th>
+    );
   };
 
   return (
     <div style={A.page}>
-      <PageHeader 
-        title="Articles & CMS" 
-        subtitle="Write news, tips and lifestyle content for your customers"
+      <PageHeader
+        title="Articles & CMS"
+        subtitle="Kelola konten blog, artikel tips & lifestyle untuk pelanggan AkuGlow"
       >
-        <button 
-          onClick={() => { setFormData({ id: 0, title: '', summary: '', content: '', author: 'Admin AkuGlow', category: 'Update', image: '', status: 'published' }); setShowModal(true); }}
+        <button
+          onClick={() => navigate('/admin/blogs/new')}
           style={A.btnPrimary}
         >
           <i className="bx bx-plus-circle" /> Tulis Artikel Baru
         </button>
       </PageHeader>
+
+      {/* FILTER & SEARCH BAR */}
+      <div style={{ ...A.card, overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
+        <div style={{ flex: 1, minWidth: 260, position: 'relative' }}>
+          <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
+          <input
+            style={{ ...A.input, paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
+            placeholder="Cari judul, summary atau konten artikel..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        <CustomSelect
+          label="Kategori"
+          value={category}
+          options={[
+            { label: 'Semua Kategori', value: '' },
+            { label: 'Update', value: 'Update' },
+            { label: 'Lifestyle', value: 'Lifestyle' },
+            { label: 'Tips', value: 'Tips' },
+            { label: 'General', value: 'General' }
+          ]}
+          onChange={val => { setCategory(val); setPage(1); }}
+          icon="bx-category"
+        />
+
+        <CustomSelect
+          label="Status"
+          value={status}
+          options={[
+            { label: 'Semua Status', value: '' },
+            { label: 'Published', value: 'published' },
+            { label: 'Draft', value: 'draft' }
+          ]}
+          onChange={val => { setStatus(val); setPage(1); }}
+          icon="bx-toggle-left"
+        />
+        
+        {(search || category || status) && (
+          <button
+            onClick={() => { setSearch(''); setCategory(''); setStatus(''); setPage(1); }}
+            style={{ ...A.btnGhost, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <i className="bx bx-x" /> Reset Filter
+          </button>
+        )}
+      </div>
 
       <TablePanel 
         loading={loading}
@@ -127,7 +274,7 @@ export default function AdminBlogs() {
               </div>
             )}
             <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-              {loading ? 'Memuat...' : `${blogs.length} artikel`}
+              {loading ? 'Memuat...' : `Artikel Halaman Ini: ${blogs.length}`}
             </span>
           </div>
         }
@@ -143,10 +290,10 @@ export default function AdminBlogs() {
                   style={{ width: 18, height: 18, cursor: 'pointer' }}
                 />
               </th>
-              <th style={A.th}>Artikel</th>
-              <th style={A.th}>Kategori</th>
-              <th style={A.th}>Penulis</th>
-              <th style={A.th}>Status</th>
+              <SortHeader col="title" label="Artikel" />
+              <SortHeader col="category" label="Kategori" />
+              <SortHeader col="author" label="Penulis" />
+              <SortHeader col="status" label="Status" />
               <th style={{ ...A.th, textAlign: 'right', paddingRight: 24 }}>Aksi</th>
             </tr>
           </thead>
@@ -192,8 +339,8 @@ export default function AdminBlogs() {
                   </td>
                   <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
                      <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
-                        <button onClick={() => { setFormData(b); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
-                        <button onClick={() => deleteBlog(b.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
+                        <button onClick={() => navigate(`/admin/blogs/edit/${b.id}`)} style={A.iconBtn()} title="Edit Artikel"><i className="bx bx-edit-alt" /></button>
+                        <button onClick={() => deleteBlog(b.id)} style={A.iconBtn('#ef4444', '#fef2f2')} title="Hapus"><i className="bx bx-trash" /></button>
                      </div>
                   </td>
                 </tr>
@@ -202,7 +349,7 @@ export default function AdminBlogs() {
             {blogs.length === 0 && !loading && (
               <tr>
                 <td colSpan="6" style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
-                   Belum ada artikel yang dipublikasikan.
+                   Belum ada artikel yang ditemukan.
                 </td>
               </tr>
             )}
@@ -210,78 +357,52 @@ export default function AdminBlogs() {
         </table>
       </TablePanel>
 
-      {showModal && (
-        <Modal title={formData.id ? 'Edit Content' : 'Compose New Article'} onClose={() => setShowModal(false)} wide>
-           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 <div className="lg:col-span-2 space-y-6" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Article Title</FieldLabel>
-                       <input style={{ ...A.input, fontWeight: 800, fontSize: 16 }} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required placeholder="Enter a catchy title..." />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Summary</FieldLabel>
-                       <textarea style={{ ...A.textarea, height: 80 }} value={formData.summary} onChange={e => setFormData({ ...formData, summary: e.target.value })} placeholder="Brief introduction to the article..." />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Full Content</FieldLabel>
-                       <textarea style={{ ...A.textarea, height: 350, lineHeight: 1.6 }} value={formData.content} onChange={e => setFormData({ ...formData, content: e.target.value })} required placeholder="Write your story here..." />
-                    </div>
-                 </div>
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 40, paddingBottom: 40 }}>
+          <button 
+            onClick={() => setPage(p => Math.max(1, p - 1))} 
+            disabled={page === 1}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <i className="bx bx-chevron-left" /> Sebelumnya
+          </button>
+          
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i + 1)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  transition: 'all 0.2s',
+                  background: page === i + 1 ? '#6366f1' : '#fff',
+                  color: page === i + 1 ? '#fff' : '#64748b',
+                  border: page === i + 1 ? 'none' : '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  boxShadow: page === i + 1 ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
 
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                       <FieldLabel>Cover Image</FieldLabel>
-                       <div style={{ 
-                           height: 160, borderRadius: 16, border: '2px dashed #e2e8f0', 
-                           background: '#f8fafc', display: 'flex', alignItems: 'center', 
-                           justifyContent: 'center', position: 'relative', overflow: 'hidden' 
-                       }}>
-                          {formData.image ? <img src={formatImage(formData.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <i className="bx bx-image-add" style={{ fontSize: 32, color: '#cbd5e1' }} />}
-                          <input type="file" onChange={handleUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept="image/*" />
-                          {uploading && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner-border text-primary" /></div>}
-                       </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Penulis</FieldLabel>
-                       <input style={A.input} value={formData.author} onChange={e => setFormData({ ...formData, author: e.target.value })} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Category</FieldLabel>
-                       <input style={A.input} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                       <FieldLabel>Status</FieldLabel>
-                       <select style={A.select} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-                          <option value="published">📍 Published</option>
-                          <option value="draft">📁 Draft</option>
-                       </select>
-                    </div>
-
-                    <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-                       <button 
-                         type="submit" 
-                         disabled={saving}
-                         style={{ ...A.btnPrimary, width: '100%', justifyContent: 'center', padding: 14 }}
-                       >
-                         {saving ? <i className="bx bx-loader-alt animate-spin" /> : formData.id ? 'Save Changes' : 'Publish Article'}
-                       </button>
-                    </div>
-                 </div>
-              </div>
-           </form>
-        </Modal>
+          <button 
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+            disabled={page === totalPages}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            Berikutnya <i className="bx bx-chevron-right" />
+          </button>
+        </div>
       )}
 
-      <style>{`
-        .grid { display: grid; }
-        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-        @media (min-width: 768px) { .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (min-width: 1024px) { .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .lg\\:col-span-2 { grid-column: span 2 / span 2; } }
-      `}</style>
+
     </div>
   );
 }

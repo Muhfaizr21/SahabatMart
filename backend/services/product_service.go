@@ -2,7 +2,7 @@ package services
 
 import (
 	"errors"
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"gorm.io/gorm"
 )
 
@@ -42,6 +42,15 @@ func (s *ProductService) SyncProductRating(productID string) error {
 // Syarat: User harus sudah menyelesaikan pembelian produk tersebut (Order Completed)
 func (s *ProductService) AddReview(review *models.Review) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
+		// 0. Pastikan review diaktifkan untuk produk ini
+		var product models.Product
+		if err := tx.Select("enable_reviews").Where("id = ?", review.ProductID).First(&product).Error; err != nil {
+			return err
+		}
+		if !product.EnableReviews {
+			return errors.New("ulasan/review dinonaktifkan untuk produk ini")
+		}
+
 		// 1. Verifikasi Validitas Pembelian
 		var order models.Order
 		if err := tx.Preload("Items").Where("id = ? AND buyer_id = ?", review.OrderID, review.BuyerID).First(&order).Error; err != nil {
@@ -104,6 +113,14 @@ func (s *ProductService) GetProductReviews(productID string) ([]models.Review, e
 
 // CanUserReview mengecek apakah user bisa memberikan review (ada order completed & belum review)
 func (s *ProductService) CanUserReview(userID string, productID string) (bool, string, error) {
+	// Cek apakah review diaktifkan untuk produk ini
+	var product models.Product
+	if err := s.DB.Select("enable_reviews").Where("id = ?", productID).First(&product).Error; err == nil {
+		if !product.EnableReviews {
+			return false, "", nil
+		}
+	}
+
 	var order models.Order
 	// Cari order completed yang mengandung produk ini
 	err := s.DB.Joins("JOIN order_items ON order_items.order_id = orders.id").

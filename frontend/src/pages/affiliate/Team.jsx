@@ -55,18 +55,7 @@ export default function TeamPerformance() {
 
   useEffect(() => { loadStats(); }, [page]);
 
-  const toggleExpand = (id) => {
-    setExpandedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  // Helper to determine if a member should be visible
-  const isMemberVisible = (m) => {
-    if (m.level === 1) return true;
-    if (search) return true;
-    return expandedIds.includes(m.upline_id);
-  };
+  // toggleExpand and isMemberVisible were removed as they are unused
 
   const handleDrillDown = (member) => {
     const newRoot = { id: member.affiliate_id, name: member.full_name, avatar: member.avatar_url };
@@ -133,17 +122,13 @@ export default function TeamPerformance() {
 
   // Eligibility data
   const totalMitra = eligibility?.active_mitra || 0;
-  const reqMitra = eligibility?.requirements?.min_mitra || 100;
   const monthlyTurnover = eligibility?.monthly_turnover || 0;
-  const reqTurnover = eligibility?.requirements?.min_turnover || 10000000;
   const directMitra = eligibility?.direct_mitra || 0;
   const totalTransactions = eligibility?.total_transactions || 0;
   const performancePoints = eligibility?.performance_points || 0;
   
   // Use totalMitra for progress as requested (Total Affiliate instead of Qualified)
-  const mitraProgress = Math.min((totalMitra / reqMitra) * 100, 100);
-  const turnoverProgress = Math.min((monthlyTurnover / reqTurnover) * 100, 100);
-  const isEligible = eligibility?.is_eligible;
+  // Use totalMitra for progress as requested (Total Affiliate instead of Qualified)
   const activeMitra = stats?.active_mitra || 0; // Derived from stats
 
   return (

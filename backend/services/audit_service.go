@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
 	"net"
 	"strings"
 )

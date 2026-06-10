@@ -136,6 +136,12 @@ export default function ShopPage() {
   };
 
   let filtered = allProducts.filter(p => {
+    // WooCommerce-style Visibility Filter
+    // Non-admin users cannot see hidden/catalog/search-only products
+    if (p.visibility === 'hidden') return false;
+    if (p.visibility === 'catalog' && searchTerm) return false;
+    if (p.visibility === 'search' && !searchTerm) return false;
+
     if (activeCategory !== 'Semua' && p.category !== activeCategory) return false;
 
     if (searchTerm) {
@@ -198,9 +204,9 @@ export default function ShopPage() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-5 py-2 rounded-full text-[11px] font-black whitespace-nowrap transition-all border ${activeCategory === cat
-                    ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-100'
-                    : 'bg-white border-gray-200 text-gray-500 hover:border-rose-300'
+                className={`px-5 py-2 rounded-full text-[11px] font-extrabold whitespace-nowrap transition-all border ${activeCategory === cat
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
+                    : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300'
                   }`}
               >
                 {cat}
@@ -211,26 +217,26 @@ export default function ShopPage() {
           {/* Search & Filter Controls */}
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="relative flex-1 group">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-black group-focus-within:text-rose-500 transition-colors">search</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-bold group-focus-within:text-blue-500 transition-colors">search</span>
               <input
                 type="text"
                 placeholder="Cari produk..."
-                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:bg-white focus:border-rose-500 transition-all text-xs font-bold"
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:bg-white focus:border-blue-500 transition-all text-xs font-bold"
                 value={searchTerm}
                 onChange={(e) => handleLocalSearch(e.target.value)}
               />
               {searchTerm && (
                 <button
                   onClick={() => handleLocalSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 p-1"
                 >
-                  <span className="material-symbols-outlined text-sm font-black">close</span>
+                  <span className="material-symbols-outlined text-sm font-bold">close</span>
                 </button>
               )}
             </div>
             <button
               onClick={() => setIsMobileFilterOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-xs font-black text-gray-700 shadow-sm active:scale-95 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 shadow-sm active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-sm">tune</span>
               Filter
@@ -244,7 +250,7 @@ export default function ShopPage() {
           {/* Desktop Sidebar Filter (Hidden on Mobile) */}
           <aside className="hidden lg:block lg:w-64 flex-shrink-0 space-y-6">
             <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-              <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
+              <h3 className="font-extrabold text-gray-900 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
                 <span className="w-1 h-4 bg-blue-600 rounded-full"></span>
                 Kategori
               </h3>
@@ -269,7 +275,7 @@ export default function ShopPage() {
             </div>
 
             <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-              <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
+              <h3 className="font-extrabold text-gray-900 mb-5 flex items-center gap-2 text-sm uppercase tracking-wider">
                 <span className="w-1 h-4 bg-blue-600 rounded-full"></span>
                 Rentang Harga
               </h3>
@@ -351,33 +357,33 @@ export default function ShopPage() {
                 <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-100">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
                   >
-                    <span className="material-symbols-outlined font-black text-xl">grid_view</span>
+                    <span className="material-symbols-outlined font-bold text-xl">grid_view</span>
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-rose-600' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
                   >
-                    <span className="material-symbols-outlined font-black text-xl">view_list</span>
+                    <span className="material-symbols-outlined font-bold text-xl">view_list</span>
                   </button>
                 </div>
 
                 <div className="relative flex-1 min-w-[300px] group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-black pointer-events-none group-focus-within:text-rose-500 transition-colors">search</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-xl font-bold pointer-events-none group-focus-within:text-blue-500 transition-colors">search</span>
                   <input
                     type="text"
                     placeholder="Cari di toko ini..."
-                    className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-rose-500 transition-all text-sm font-bold"
+                    className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:bg-white focus:border-blue-500 transition-all text-sm font-bold"
                     value={searchTerm}
                     onChange={(e) => handleLocalSearch(e.target.value)}
                   />
                   {searchTerm && (
                     <button
                       onClick={() => handleLocalSearch('')}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-lg font-black">close</span>
+                      <span className="material-symbols-outlined text-lg font-bold">close</span>
                     </button>
                   )}
                 </div>
@@ -388,7 +394,7 @@ export default function ShopPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-gray-50 border border-gray-100 text-gray-800 text-sm font-black px-6 py-3 rounded-2xl outline-none focus:border-rose-500 transition-all cursor-pointer"
+                  className="bg-gray-50 border border-gray-100 text-gray-800 text-sm font-extrabold px-6 py-3 rounded-2xl outline-none focus:border-blue-500 transition-all cursor-pointer"
                 >
                   {sortOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
@@ -400,7 +406,7 @@ export default function ShopPage() {
               <div className="mb-8 flex items-center gap-3 animate-in fade-in slide-in-from-left duration-500">
                 <div className="bg-blue-50 px-4 py-2 rounded-2xl border border-blue-100 flex items-center gap-3">
                   <span className="text-sm text-blue-600 font-bold">Hasil pencarian:</span>
-                  <span className="text-sm text-blue-900 font-black italic">"{searchParam}"</span>
+                  <span className="text-sm text-blue-900 font-extrabold italic">"{searchParam}"</span>
                   <button
                     onClick={() => setSearchParams(prev => {
                       const newParams = new URLSearchParams(prev);
@@ -409,7 +415,7 @@ export default function ShopPage() {
                     })}
                     className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
                   >
-                    <span className="material-symbols-outlined text-[14px] font-black">close</span>
+                    <span className="material-symbols-outlined text-[14px] font-bold">close</span>
                   </button>
                 </div>
                 <p className="text-sm text-gray-400 font-bold">Menampilkan {filtered.length} produk</p>
@@ -424,18 +430,18 @@ export default function ShopPage() {
             ) : filtered.length === 0 ? (
               <div className="py-20 text-center animate-in fade-in zoom-in duration-500">
                 <div className="relative inline-block mb-6">
-                  <div className="absolute inset-0 bg-rose-100 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+                  <div className="absolute inset-0 bg-blue-100 rounded-full blur-2xl opacity-20 animate-pulse"></div>
                   <span className="relative material-symbols-outlined text-7xl text-gray-200">inventory_2</span>
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mb-2">Produk Tidak Ditemukan</h3>
+                <h3 className="text-2xl font-extrabold text-gray-800 mb-2">Produk Tidak Ditemukan</h3>
                 <p className="text-gray-500 font-bold mb-8 max-w-xs mx-auto">
                   Maaf, kami tidak menemukan produk yang cocok dengan pencarian Anda.
                 </p>
 
                 {(searchParam?.toLowerCase().includes('kontak') || searchParam?.toLowerCase().includes('hubungi') || searchParam?.toLowerCase().includes('bantuan')) && (
-                  <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
-                    <p className="text-rose-600 font-black text-sm mb-3">Mencari bantuan atau kontak kami?</p>
-                    <Link to="/contact" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                  <div className="bg-blue-50 p-6 rounded-[24px] border border-blue-100 max-w-sm mx-auto mb-8">
+                    <p className="text-blue-600 font-extrabold text-sm mb-3">Mencari bantuan atau kontak kami?</p>
+                    <Link to="/contact" className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
                       <span className="material-symbols-outlined text-lg">support_agent</span>
                       Hubungi AkuGlow Care
                     </Link>
@@ -443,9 +449,9 @@ export default function ShopPage() {
                 )}
 
                 {(searchParam?.toLowerCase().includes('tentang') || searchParam?.toLowerCase().includes('profil')) && (
-                  <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
-                    <p className="text-rose-600 font-black text-sm mb-3">Ingin tahu lebih banyak tentang kami?</p>
-                    <Link to="/peluang-bisnis" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                  <div className="bg-blue-50 p-6 rounded-[24px] border border-blue-100 max-w-sm mx-auto mb-8">
+                    <p className="text-blue-600 font-extrabold text-sm mb-3">Ingin tahu lebih banyak tentang kami?</p>
+                    <Link to="/peluang-bisnis" className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
                       <span className="material-symbols-outlined text-lg">info</span>
                       Tentang AkuGlow
                     </Link>
@@ -453,9 +459,9 @@ export default function ShopPage() {
                 )}
 
                 {(searchParam?.toLowerCase().includes('bisnis') || searchParam?.toLowerCase().includes('peluang') || searchParam?.toLowerCase().includes('affiliate')) && (
-                  <div className="bg-rose-50 p-6 rounded-[24px] border border-rose-100 max-w-sm mx-auto mb-8">
-                    <p className="text-rose-600 font-black text-sm mb-3">Ingin tahu peluang bisnis kami?</p>
-                    <Link to="/about" className="inline-flex items-center gap-2 bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-sm shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all">
+                  <div className="bg-blue-50 p-6 rounded-[24px] border border-blue-100 max-w-sm mx-auto mb-8">
+                    <p className="text-blue-600 font-extrabold text-sm mb-3">Ingin tahu peluang bisnis kami?</p>
+                    <Link to="/about" className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
                       <span className="material-symbols-outlined text-lg">business_center</span>
                       Peluang Bisnis AkuGlow
                     </Link>
@@ -464,73 +470,112 @@ export default function ShopPage() {
 
                 <button
                   onClick={() => setSearchParams({})}
-                  className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-sm hover:bg-black transition-all shadow-xl shadow-gray-200"
+                  className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-bold text-sm hover:bg-black transition-all shadow-xl shadow-gray-200"
                 >
                   Hapus Semua Filter
                 </button>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
                 {currentProducts.map(product => (
-                  <div key={product.id} className="group bg-white rounded-[32px] border border-gray-100/80 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] transition-all duration-700 overflow-hidden hover:-translate-y-3 flex flex-col relative">
-                    <Link to={`/product/${product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-[1/1.1]">
-                      <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" />
+                  <div key={product.id} className="group bg-white rounded-[24px] sm:rounded-[32px] border border-gray-100/80 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] transition-all duration-700 overflow-hidden hover:-translate-y-3 flex flex-col relative">
+                    <Link to={`/product/${product.slug || product.id}`} className="block relative overflow-hidden bg-gray-50 aspect-[1/1.1]">
+                      <img 
+                        src={formatImage(product.image)} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" 
+                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }}
+                      />
                       {product.badge && (
-                        <div className="absolute top-4 left-4 z-10">
-                          <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-xl backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
+                        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
+                          <span className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-white shadow-xl backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
                             {product.badge}
+                          </span>
+                        </div>
+                      )}
+                      {/* WooCommerce-style Featured Badge */}
+                      {product.is_featured && (
+                        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
+                          <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-yellow-400 shadow-lg flex items-center justify-center">
+                            <svg width="10" height="10" fill="#fff" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          </span>
+                        </div>
+                      )}
+                      {(product.product_type === 'digital' || product.is_virtual) && (
+                        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10" style={{ top: product.badge ? '32px' : '12px' }}>
+                          <span className="px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-extrabold uppercase tracking-widest text-white bg-indigo-500/90 shadow-lg backdrop-blur-md flex items-center gap-1">
+                            💾 Digital
                           </span>
                         </div>
                       )}
                       {isLoggedIn && (
                         <button
                           onClick={e => { e.preventDefault(); handleToggleWishlist(product.id); }}
-                          className={`absolute top-4 right-4 z-10 w-10 h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 ${liked[product.id] ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur-md text-gray-400 hover:bg-white hover:text-red-500'}`}
+                          className={`absolute top-3 right-3 sm:top-4 sm:right-4 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 ${liked[product.id] ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur-md text-gray-400 hover:bg-white hover:text-red-500'}`}
                         >
-                          <svg width="18" height="18" fill={liked[product.id] ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <svg width="14" height="14" className="sm:w-[18px] sm:h-[18px]" fill={liked[product.id] ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                             <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                           </svg>
                         </button>
                       )}
                     </Link>
 
-                    <div className="p-5 sm:p-7 flex-1 flex flex-col">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-black uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-lg">
+                    <div className="p-3.5 sm:p-6 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between gap-1.5 mb-2 sm:mb-3">
+                        <Link to={`/shop?cat=${product.category}`} className="text-[9px] sm:text-[10px] text-blue-600 font-extrabold uppercase tracking-widest bg-blue-50 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg truncate">
                           {product.category}
                         </Link>
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-50">
-                          <svg width="12" height="12" fill="#facc15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                          <span className="text-[10px] font-black text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
-                          <span className="text-[9px] text-gray-400 font-bold">({product.reviews || 0})</span>
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg bg-yellow-50 flex-shrink-0">
+                          <svg width="10" height="10" fill="#facc15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                          <span className="text-[9px] sm:text-[10px] font-extrabold text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
+                          <span className="text-[8px] sm:text-[9px] text-gray-400 font-bold">({product.reviews || 0})</span>
                         </div>
                       </div>
-                      <Link to={`/product/${product.id}`} className="text-[14px] sm:text-[16px] font-black text-gray-900 hover:text-blue-700 transition-colors leading-snug mb-4 block line-clamp-2 min-h-[2.8em]">
+                      <Link to={`/product/${product.slug || product.id}`} className="text-[12px] sm:text-[15px] font-bold text-gray-900 hover:text-blue-700 transition-colors leading-snug mb-2 sm:mb-4 block line-clamp-2 min-h-[2.8em]">
                         {product.name}
                       </Link>
-                      <div className="flex items-center gap-2 mb-6 group/store">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] text-blue-600 font-black">
+                      <div className="flex items-center gap-1.5 mb-4 sm:mb-6 group/store">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-blue-100 flex items-center justify-center text-[7px] sm:text-[8px] text-blue-600 font-bold flex-shrink-0">
                           {product.store_name?.charAt(0) || "A"}
                         </div>
-                        <span className="text-[11px] font-bold text-gray-400 group-hover/store:text-blue-600 transition-colors truncate">{product.store_name || "AkuGlow Official"}</span>
+                        <span className="text-[9px] sm:text-[11px] font-bold text-gray-400 group-hover/store:text-blue-600 transition-colors truncate">{product.store_name || "AkuGlow Official"}</span>
                       </div>
-                      <div className="mt-auto pt-5 border-t border-gray-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</p>
-                            <h4 className="font-black text-gray-900 text-base sm:text-xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                      <div className="mt-auto pt-3 sm:pt-5 border-t border-gray-50">
+                        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+                          <div className="min-w-0">
+                            {product.product_type === 'variable' && (
+                              <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Mulai Dari</p>
+                            )}
+                            <div className="flex flex-col">
+                              {product.old_price > product.price && (
+                                <span className="text-[9px] sm:text-xs text-red-500 line-through decoration-gray-400 font-medium truncate">
+                                  Rp{product.old_price.toLocaleString('id')}
+                                </span>
+                              )}
+                              {product.product_type === 'variable' && product.max_price > product.price ? (
+                                <h4 className="font-extrabold text-gray-900 text-sm sm:text-[17px] truncate tracking-tight">Rp{(product.price || 0).toLocaleString('id')} - Rp{product.max_price.toLocaleString('id')}</h4>
+                              ) : (
+                                <h4 className="font-extrabold text-gray-900 text-sm sm:text-lg truncate tracking-tight">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                              )}
+                            </div>
+                            {/* WooCommerce-style Stock Status */}
+                            {product.stock === 0 && product.backorders !== 'yes' && product.backorders !== 'notify' ? (
+                              <span className="text-[8px] sm:text-[10px] text-red-500 font-bold mt-0.5">Habis</span>
+                            ) : product.stock <= (product.low_stock_threshold || 5) ? (
+                              <span className="text-[8px] sm:text-[10px] text-orange-500 font-bold mt-0.5">Tersisa {product.stock}</span>
+                            ) : null}
                           </div>
                           {isLoggedIn && (
                             <button
                               onClick={() => handleAddToCart(product)}
-                              className="w-9 h-9 rounded-xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
+                              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#0A0A0B] hover:bg-blue-600 text-white shadow-lg shadow-gray-200 transition-all active:scale-90 flex items-center justify-center flex-shrink-0"
                             >
-                              <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
+                              <span className="material-symbols-outlined font-bold text-base sm:text-lg">shopping_cart</span>
                             </button>
                           )}
                         </div>
                         {!isLoggedIn && (
-                          <Link to="/login" className="block w-full py-2.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all text-center">
+                          <Link to="/login" className="block w-full py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl bg-blue-50 text-blue-600 text-[9px] sm:text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all text-center">
                             Login untuk beli
                           </Link>
                         )}
@@ -543,40 +588,65 @@ export default function ShopPage() {
               <div className="space-y-6">
                 {currentProducts.map(product => (
                   <div key={product.id} className="bg-white rounded-[32px] border border-gray-100/80 hover:shadow-[0_20px_50px_rgba(0,0,0,0.05)] transition-all duration-500 p-6 flex flex-col md:flex-row gap-8 group relative overflow-hidden">
-                    <Link to={`/product/${product.id}`} className="w-full md:w-56 h-56 flex-shrink-0 rounded-3xl overflow-hidden bg-gray-50 relative">
-                      <img src={formatImage(product.image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                    <Link to={`/product/${product.slug || product.id}`} className="w-full md:w-56 h-56 flex-shrink-0 rounded-3xl overflow-hidden bg-gray-50 relative">
+                      <img 
+                        src={formatImage(product.image)} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }}
+                      />
                       {product.badge && (
                         <div className="absolute top-3 left-3 z-10">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-white backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest text-white backdrop-blur-md ${badgeColors[product.badgeClass] || 'bg-blue-600/90'}`}>
                             {product.badge}
+                          </span>
+                        </div>
+                      )}
+                      {(product.product_type === 'digital' || product.is_virtual) && (
+                        <div className="absolute top-3 left-3 z-10" style={{ top: product.badge ? '32px' : '12px' }}>
+                          <span className="px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest text-white bg-indigo-500/90 shadow-lg backdrop-blur-md flex items-center gap-1">
+                            💾 Digital
                           </span>
                         </div>
                       )}
                     </Link>
                     <div className="flex-1 flex flex-col py-2">
                       <div className="flex items-center gap-3 mb-3">
-                        <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-black uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-lg hover:bg-blue-100 transition-colors">
+                        <Link to={`/shop?cat=${product.category}`} className="text-[10px] text-blue-600 font-extrabold uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-lg hover:bg-blue-100 transition-colors">
                           {product.category}
                         </Link>
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-50">
                           <StarRating rating={product.rating || 0} />
-                          <span className="text-[10px] font-black text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
+                          <span className="text-[10px] font-extrabold text-yellow-700">{(product.rating || 0).toFixed(1)}</span>
                           <span className="text-[10px] text-gray-400 font-bold">({product.reviews || 0} Ulasan)</span>
                         </div>
                       </div>
-                      <Link to={`/product/${product.id}`} className="text-xl sm:text-2xl font-black text-gray-900 hover:text-blue-700 transition-colors leading-tight mb-4 line-clamp-2">
+                      <Link to={`/product/${product.slug || product.id}`} className="text-xl sm:text-2xl font-bold text-gray-900 hover:text-blue-700 transition-colors leading-tight mb-4 line-clamp-2">
                         {product.name}
                       </Link>
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 font-black">
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 font-bold">
                           {product.store_name?.charAt(0) || "A"}
                         </div>
                         <span className="text-xs font-bold text-gray-400">{product.store_name || "AkuGlow Official"}</span>
                       </div>
                       <div className="mt-auto flex items-center justify-between pt-6 border-t border-gray-50">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mulai Dari</span>
-                          <h4 className="font-black text-gray-900 text-2xl">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                          {product.product_type === 'variable' && (
+                            <span className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mulai Dari</span>
+                          )}
+                          <div className="flex flex-col">
+                            {product.old_price > product.price && (
+                              <span className="text-xs sm:text-sm text-red-500 line-through decoration-gray-400 font-medium truncate">
+                                Rp{product.old_price.toLocaleString('id')}
+                              </span>
+                            )}
+                            {product.product_type === 'variable' && product.max_price > product.price ? (
+                              <h4 className="font-extrabold text-gray-900 text-lg sm:text-[22px] truncate tracking-tight">Rp{(product.price || 0).toLocaleString('id')} - Rp{product.max_price.toLocaleString('id')}</h4>
+                            ) : (
+                              <h4 className="font-extrabold text-gray-900 text-lg sm:text-2xl truncate tracking-tight">Rp{(product.price || 0).toLocaleString('id')}</h4>
+                            )}
+                          </div>
                         </div>
                         {isLoggedIn ? (
                           <div className="flex items-center gap-3">
@@ -584,18 +654,18 @@ export default function ShopPage() {
                               onClick={() => handleToggleWishlist(product.id)}
                               className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${liked[product.id] ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500'}`}
                             >
-                              <span className="material-symbols-outlined font-black">{liked[product.id] ? 'favorite' : 'favorite_border'}</span>
+                              <span className="material-symbols-outlined font-bold">{liked[product.id] ? 'favorite' : 'favorite_border'}</span>
                             </button>
                             <button
                               onClick={() => handleAddToCart(product)}
-                              className="bg-[#0A0A0B] hover:bg-blue-600 text-white font-black px-8 py-3.5 rounded-2xl shadow-xl shadow-gray-200 transition-all flex items-center gap-3 active:scale-95"
+                              className="bg-[#0A0A0B] hover:bg-blue-600 text-white font-bold px-8 py-3.5 rounded-2xl shadow-xl shadow-gray-200 transition-all flex items-center gap-3 active:scale-95"
                             >
-                              <span className="material-symbols-outlined font-black text-lg">shopping_cart</span>
+                              <span className="material-symbols-outlined font-bold text-lg">shopping_cart</span>
                               <span>Beli Sekarang</span>
                             </button>
                           </div>
                         ) : (
-                          <Link to="/login" className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl text-xs font-black hover:bg-blue-100 transition-all">
+                          <Link to="/login" className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl text-xs font-bold hover:bg-blue-100 transition-all">
                             Login untuk Berbelanja
                           </Link>
                         )}
@@ -612,13 +682,13 @@ export default function ShopPage() {
                   disabled={currentPage === 1}
                   className={`w-12 h-12 rounded-2xl border border-gray-200 flex items-center justify-center transition-all ${currentPage === 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600 hover:text-white hover:border-blue-600 text-gray-600'}`}
                 >
-                  <span className="material-symbols-outlined font-black">chevron_left</span>
+                  <span className="material-symbols-outlined font-bold">chevron_left</span>
                 </button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
                   <button
                     key={n}
                     onClick={() => setCurrentPage(n)}
-                    className={`w-12 h-12 rounded-2xl text-sm font-black transition-all ${n === currentPage ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                    className={`w-12 h-12 rounded-2xl text-sm font-bold transition-all ${n === currentPage ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                   >
                     {n}
                   </button>
@@ -628,7 +698,7 @@ export default function ShopPage() {
                   disabled={currentPage === totalPages}
                   className={`w-12 h-12 rounded-2xl border border-gray-200 flex items-center justify-center transition-all ${currentPage === totalPages ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600 hover:text-white hover:border-blue-600 text-gray-600'}`}
                 >
-                  <span className="material-symbols-outlined font-black">chevron_right</span>
+                  <span className="material-symbols-outlined font-bold">chevron_right</span>
                 </button>
               </div>
             )}
@@ -641,14 +711,14 @@ export default function ShopPage() {
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
             <div className="p-8">
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-black text-gray-900">Filter & Urutkan</h2>
+                <h2 className="text-xl font-extrabold text-gray-900">Filter & Urutkan</h2>
                 <button onClick={() => setIsMobileFilterOpen(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
-                  <span className="material-symbols-outlined font-black">close</span>
+                  <span className="material-symbols-outlined font-bold">close</span>
                 </button>
               </div>
               <div className="space-y-10 pb-10">
                 <div>
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Urutkan Produk</h3>
+                  <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Urutkan Produk</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {sortOptions.map(opt => (
                       <button
@@ -663,7 +733,7 @@ export default function ShopPage() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rentang Harga</h3>
+                  <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Rentang Harga</h3>
                   <div className="space-y-3">
                     {priceRanges.map((range, i) => (
                       <button
@@ -678,7 +748,7 @@ export default function ShopPage() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Rating Minimal</h3>
+                  <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Rating Minimal</h3>
                   <div className="flex flex-wrap gap-3">
                     {[5, 4, 3, 2, 1].map(r => (
                       <button
@@ -687,14 +757,14 @@ export default function ShopPage() {
                         className={`py-3 px-5 rounded-2xl flex items-center gap-2 transition-all border ${minRating === r ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-white border-gray-100 text-gray-600'
                           }`}
                       >
-                        <span className="text-xs font-black">{r}</span>
+                        <span className="text-xs font-bold">{r}</span>
                         <StarRating rating={r} />
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Pilih Brand</h3>
+                  <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Pilih Brand</h3>
                   <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 no-scrollbar">
                     {allBrands.map(brand => (
                       <button
@@ -715,7 +785,7 @@ export default function ShopPage() {
               <div className="pt-6 border-t border-gray-100 mt-4">
                 <button
                   onClick={() => setIsMobileFilterOpen(false)}
-                  className="w-full bg-[#0A0A0B] text-white py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all"
+                  className="w-full bg-[#0A0A0B] text-white py-4 rounded-2xl font-bold text-sm shadow-xl active:scale-95 transition-all"
                 >
                   Tampilkan {filtered.length} Produk
                 </button>

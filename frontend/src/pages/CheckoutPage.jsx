@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate } from '../lib/api';
+import { API_BASE, BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, captureAffiliate, formatImage } from '../lib/api';
 import toast from 'react-hot-toast';
 
 const steps = ['Detail Pengiriman', 'Konfirmasi'];
 
-const CourierLogo = ({ code, name }) => {
+const CourierLogo = ({ code, name, customLogo }) => {
   const [imgError, setImgError] = useState(false);
   
   const brandConfigs = {
@@ -40,7 +40,7 @@ const CourierLogo = ({ code, name }) => {
     rpx: 'https://seeklogo.com/images/R/rpx-holding-logo-2CC70A5E04-seeklogo.com.png',
   };
 
-  const imageUrl = logoUrls[codeLower];
+  const imageUrl = customLogo ? formatImage(customLogo) : logoUrls[codeLower];
 
   if (config.isIcon) {
     return (
@@ -100,6 +100,23 @@ export default function CheckoutPage() {
   const [user, setUser] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [useShoppingBalance, setUseShoppingBalance] = useState(false);
+  // "Kirim ke Alamat Lain" — gunakan form terpisah, TIDAK simpan ke profil
+  const [useAltAddress, setUseAltAddress] = useState(false);
+  const [altForm, setAltForm] = useState({
+    firstName: '', lastName: '', phone: '',
+    address: '', city: '', province: '', postalCode: '', notes: '',
+    area_id: '', area_name: '', district: '',
+  });
+  const [altAreaSearch, setAltAreaSearch] = useState('');
+  const [altAreas, setAltAreas] = useState([]);
+  const [searchingAltArea, setSearchingAltArea] = useState(false);
+  const [manualTransferConfig, setManualTransferConfig] = useState(null); // { enabled, bank_name, account_number, account_holder, instructions }
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [proofFile, setProofFile] = useState(null);
+  const [proofPreview, setProofPreview] = useState(null);
+  const [proofNote, setProofNote] = useState('');
+  const [uploadingProof, setUploadingProof] = useState(false);
+
 
   useEffect(() => {
     // [BUG-H4 Fix] JSON.parse localStorage dengan try/catch
@@ -120,6 +137,30 @@ export default function CheckoutPage() {
     return item.product_variant?.price || item.product?.price || 0;
   };
 
+  // Fetch manual transfer config — selalu dijalankan, tidak perlu login
+  useEffect(() => {
+    fetch(`${API_BASE}/api/public/configs`, {
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' }
+    })
+      .then(r => r.json())
+      .then(res => {
+        const cfg = res?.data || {};
+        console.log('[ManualTransfer] enabled?', cfg['payment_manual_transfer_enabled']);
+        if (cfg['payment_manual_transfer_enabled'] === 'true') {
+          setManualTransferConfig({
+            enabled: true,
+            bank_name: cfg['payment_manual_bank_name'] || '',
+            account_number: cfg['payment_manual_account_number'] || '',
+            account_holder: cfg['payment_manual_account_holder'] || '',
+            instructions: cfg['payment_manual_instructions'] || '',
+          });
+        } else {
+          setManualTransferConfig(null);
+        }
+      })
+      .catch(e => console.error('[ManualTransfer] fetch error:', e));
+  }, []);
+
   useEffect(() => {
     const fetchCheckoutData = async () => {
       try {
@@ -130,12 +171,12 @@ export default function CheckoutPage() {
           return;
         }
 
-        // Parallel fetch for speed
+        // Parallel fetch for speed (tanpa publicConfigData - sudah di-fetch terpisah)
         const [cartData, profileData, channelsData, walletData] = await Promise.all([
           fetchJson(`${BUYER_API_BASE}/cart`),
           fetchJson(`${BUYER_API_BASE}/profile`),
           fetchJson(`${API_BASE}/api/payment/channels`).catch(() => null),
-          fetchJson(`${BUYER_API_BASE}/wallet`).catch(() => null)
+          fetchJson(`${BUYER_API_BASE}/wallet`).catch(() => null),
         ]);
 
         if (walletData) setWallet(walletData);
@@ -209,7 +250,65 @@ export default function CheckoutPage() {
 
   const subtotal = cart.items?.reduce((s, i) => s + getItemPrice(i) * i.quantity, 0) || 0;
   const shipping = 0;
-  
+
+  // Deteksi apakah SEMUA item di cart adalah produk digital/virtual
+  // Jika ya: skip form pengiriman & ongkir
+  const allDigital = cart.items?.length > 0 && cart.items.every(i =>
+    i.product?.product_type === 'digital' || i.product?.is_virtual
+  );
+
+  // ============================================================
+  // WooCommerce-style Tax Calculation
+  // ============================================================
+  // Tax rates per tax_class (default Indonesia PPN 11%)
+  const TAX_RATES = {
+    'standard': 0.11,    // 11% PPN
+    'reduced': 0.05,      // 5% PPN reduzido
+    'zero': 0,            // 0% Bebas pajak
+  };
+
+  // Get tax rate for an item
+  const getItemTaxRate = (item) => {
+    const taxStatus = item.product?.tax_status || item.product_variant?.tax_status || 'taxable';
+    if (taxStatus === 'none') return 0; // Zero rate
+    if (taxStatus === 'reduced') return TAX_RATES.reduced;
+    if (taxStatus === 'taxable') {
+      const taxClass = item.product?.tax_class || item.product_variant?.tax_class || 'standard';
+      return TAX_RATES[taxClass] || TAX_RATES.standard;
+    }
+    return 0;
+  };
+
+  // Check if sale is active (sale schedule validation)
+  const isSaleActive = (item) => {
+    const product = item.product;
+    if (!product?.old_price || product.old_price <= 0) return false;
+    if (product.old_price <= product.price) return false;
+    const now = new Date();
+    if (product.sale_start && new Date(product.sale_start) > now) return false;
+    if (product.sale_end && new Date(product.sale_end) < now) return false;
+    return true;
+  };
+
+  // Get effective price (sale price if active, otherwise regular price)
+  const getEffectivePrice = (item) => {
+    const basePrice = item.product_variant?.price || item.product?.price || 0;
+    const salePrice = item.product_variant?.old_price || item.product?.old_price || 0;
+    if (salePrice > 0 && salePrice > basePrice && isSaleActive(item)) {
+      return salePrice; // Sale is active, use sale price
+    }
+    return basePrice;
+  };
+
+  // Calculate tax per item
+  const calculateItemTax = (item) => {
+    const taxableAmount = getEffectivePrice(item) * item.quantity;
+    return taxableAmount * getItemTaxRate(item);
+  };
+
+  // Total tax for all items
+  const totalTax = cart.items?.reduce((s, i) => s + calculateItemTax(i), 0) || 0;
+
   // Calculate Discount — utamakan nilai dari server (sudah memperhitungkan max_discount)
   let discount = 0;
   if (appliedVoucher) {
@@ -225,7 +324,9 @@ export default function CheckoutPage() {
     }
   }
 
-  const total = subtotal + (shippingType === 'expedition' ? shippingCost : 0) - discount;
+  // Total: untuk produk digital, shipping selalu 0
+  const effectiveShipping = allDigital ? 0 : (shippingType === 'expedition' ? shippingCost : 0);
+  const total = subtotal + effectiveShipping + totalTax - discount;
   const shoppingBalanceDeduction = useShoppingBalance ? Math.min(wallet?.shopping_balance || 0, total) : 0;
   const remainingTotal = total - shoppingBalanceDeduction;
 
@@ -351,11 +452,90 @@ export default function CheckoutPage() {
     }
   };
 
+  // Cari area untuk alamat alternatif
+  const handleSearchAltArea = async (input) => {
+    if (input.length < 3) { setAltAreas([]); return; }
+    setSearchingAltArea(true);
+    try {
+      const res = await fetchJson(`${API_BASE}/api/shipping/areas?input=${encodeURIComponent(input)}`);
+      setAltAreas(res?.areas || []);
+    } catch (_) { setAltAreas([]); }
+    finally { setSearchingAltArea(false); }
+  };
+
+  const handleSelectAltArea = (area) => {
+    const postalCode = area.name.split('.').pop().trim();
+    setAltForm(f => ({
+      ...f,
+      city: area.administrative_division_level_2_name,
+      province: area.administrative_division_level_1_name,
+      postalCode,
+      area_id: area.id,
+      area_name: area.name,
+      district: area.administrative_division_level_3_name,
+    }));
+    setAltAreaSearch(area.name);
+    setAltAreas([]);
+    // Fetch ongkir pakai area alternatif
+    fetchRates(area.id);
+  };
+
+  // Resolve: pakai altForm jika useAltAddress, else pakai form biasa
+  const activeForm = useAltAddress ? altForm : form;
+
+  // Handle file pick untuk bukti transfer
+  const handleProofFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setProofFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setProofPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  // Upload bukti dan submit order sekaligus
+  const handleProofSubmit = async () => {
+    if (!proofFile) { toast.error('Upload bukti transfer terlebih dahulu'); return; }
+    setUploadingProof(true);
+    try {
+      // 1. Upload file ke backend
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', proofFile);
+      const uploadRes = await fetch(`${API_BASE}/api/buyer/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.url) throw new Error(uploadData.message || 'Gagal upload bukti');
+      const proofUrl = uploadData.url;
+
+      // 2. Submit checkout dengan proof_url
+      setShowProofModal(false);
+      await doCheckout(proofUrl, proofNote);
+    } catch (err) {
+      toast.error('Gagal: ' + err.message);
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Jika manual transfer → tampilkan modal upload bukti dulu
+    if (paymentMethod === 'manual_transfer') {
+      setShowProofModal(true);
+      return;
+    }
+    await doCheckout(null, '');
+  };
+
+  const doCheckout = async (proofUrl, proofNote) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+
       
       const orderItems = cart.items.map(item => ({
           merchant_id: item.merchant_id || '00000000-0000-0000-0000-000000000000',
@@ -390,14 +570,14 @@ export default function CheckoutPage() {
           phone: form.phone,
           items: orderItems,
           shipping_info: {
-            shipping_name: `${form.firstName} ${form.lastName}`,
-            shipping_phone: form.phone,
-            shipping_address: form.address,
-            shipping_district: form.district, // BUG-P3 fix: kecamatan wajib untuk ekspedisi
-            shipping_city: form.city,
-            shipping_province: form.province,
-            shipping_postal_code: form.postalCode,
-            destination_area_id: form.area_id,
+            shipping_name: `${activeForm.firstName} ${activeForm.lastName}`,
+            shipping_phone: activeForm.phone,
+            shipping_address: activeForm.address,
+            shipping_district: activeForm.district,
+            shipping_city: activeForm.city,
+            shipping_province: activeForm.province,
+            shipping_postal_code: activeForm.postalCode,
+            destination_area_id: activeForm.area_id,
             total_shipping_cost: shippingCost,
             notes: form.notes,
             merchant_groups: (() => {
@@ -424,11 +604,24 @@ export default function CheckoutPage() {
           voucher_code: appliedVoucher?.code || '',
           payment_method: paymentMethod,
           use_shopping_balance: useShoppingBalance,
+          payment_proof_url: proofUrl || '',
+          payment_proof_note: proofNote || '',
           total_weight: cart.items?.reduce((w, i) => w + ((i.product_variant?.weight || i.product?.weight || 200) * i.quantity), 0) || 0,
+          // WooCommerce-style Tax Data
+          tax_amount: totalTax,
+          tax_breakdown: cart.items?.map(i => ({
+            product_id: i.product_id,
+            product_variant_id: i.product_variant_id || null,
+            tax_rate: getItemTaxRate(i),
+            taxable_amount: getEffectivePrice(i) * i.quantity,
+            tax_amount: calculateItemTax(i),
+          })),
         };
 
-      // [Sync Fix] Update profile address automatically if logged in
-      if (token) {
+
+      // [Sync Fix] Hanya update profil jika TIDAK pakai alamat lain
+      // Jika pakai alamat lain (useAltAddress), jangan timpa profil utama
+      if (token && !useAltAddress) {
         fetchJson(`${BUYER_API_BASE}/profile`, {
           method: 'PUT',
           headers: {
@@ -474,9 +667,11 @@ export default function CheckoutPage() {
       navigate('/order-success', { 
         state: { 
           order: res.order, 
-          payment: res.payment 
+          payment: res.payment,
+          isManualTransfer: paymentMethod === 'manual_transfer',
         } 
       });
+
     } catch (_err) {
       // [BUG-H5 Fix] Ganti alert() dengan toast
       toast.error('Checkout gagal: ' + _err.message);
@@ -486,6 +681,7 @@ export default function CheckoutPage() {
   };
 
   return (
+    <>
     <main className="bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white py-12">
@@ -513,7 +709,17 @@ export default function CheckoutPage() {
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Left: Form */}
             <div className="flex-1 space-y-6">
-              {/* Shipping Info */}
+              {/* Shipping Info — disembunyikan untuk produk digital */}
+              {allDigital ? (
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 shadow-sm p-6 flex items-center gap-5">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl shadow-lg flex-shrink-0">💾</div>
+                  <div>
+                    <div className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-1">Semua Item Digital</div>
+                    <h2 className="font-black text-indigo-900 text-base">Tidak Ada Pengiriman Fisik</h2>
+                    <p className="text-xs text-indigo-500 mt-1 leading-relaxed">Produk digital akan langsung dapat diakses setelah pembayaran berhasil. Pastikan email Anda aktif untuk menerima link akses.</p>
+                  </div>
+                </div>
+              ) : (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-5">
                    <h2 className="font-bold text-gray-900 text-lg">Informasi Pengiriman</h2>
@@ -648,9 +854,122 @@ export default function CheckoutPage() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors resize-none" />
                   </div>
                 </div>
-              </div>
 
-              {/* Shipping Method */}
+                {/* ── TOGGLE: Kirim ke Alamat Lain ── */}
+                <div className="mt-5 pt-5 border-t border-dashed border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseAltAddress(v => {
+                        const next = !v;
+                        // Kalau baru diaktifkan, prefill nama & hp dari form utama
+                        if (next && !altForm.firstName) {
+                          setAltForm(f => ({
+                            ...f,
+                            firstName: form.firstName,
+                            lastName: form.lastName,
+                            phone: form.phone,
+                          }));
+                        }
+                        // Reset ongkir kalau switch
+                        setShippingRates({});
+                        setSelectedShippings({});
+                        setShippingCost(0);
+                        return next;
+                      });
+                    }}
+                    className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border-2 transition-all ${
+                      useAltAddress
+                        ? 'border-orange-400 bg-orange-50 text-orange-700'
+                        : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${useAltAddress ? 'bg-orange-500 text-white shadow-md shadow-orange-200' : 'bg-white text-gray-400 border border-gray-200'}`}>
+                        <span className="material-symbols-outlined text-lg">add_location_alt</span>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-black text-sm leading-none mb-0.5">Kirim ke Alamat Lain</p>
+                        <p className="text-[10px] opacity-60 font-medium">
+                          {useAltAddress ? 'Aktif — paket dikirim ke alamat di bawah' : 'Klik untuk kirim ke alamat berbeda dari profil'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`w-11 h-6 rounded-full transition-all relative ${useAltAddress ? 'bg-orange-500' : 'bg-gray-200'}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all ${useAltAddress ? 'left-5' : 'left-0.5'}`}></div>
+                    </div>
+                  </button>
+
+                  {/* Form Alamat Alternatif — muncul hanya saat toggle ON */}
+                  {useAltAddress && (
+                    <div className="mt-4 p-5 rounded-2xl bg-orange-50/60 border border-orange-100 space-y-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-orange-500 text-base">info</span>
+                        <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">Alamat ini hanya dipakai untuk pengiriman — profil kamu tidak akan berubah</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 block mb-1">Nama Penerima *</label>
+                          <input required={useAltAddress} type="text" placeholder="Nama lengkap penerima" value={altForm.firstName}
+                            onChange={e => setAltForm(f => ({ ...f, firstName: e.target.value }))}
+                            className="w-full border border-orange-200 bg-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-400 transition-colors" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 block mb-1">No. HP Penerima *</label>
+                          <input required={useAltAddress} type="tel" placeholder="08xxxxxxxxxx" value={altForm.phone}
+                            onChange={e => setAltForm(f => ({ ...f, phone: e.target.value }))}
+                            className="w-full border border-orange-200 bg-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-400 transition-colors" />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs font-bold text-gray-600 block mb-1">Alamat Lengkap *</label>
+                          <input required={useAltAddress} type="text" placeholder="Jl. Nama Jalan No. XX, RT/RW, Kelurahan" value={altForm.address}
+                            onChange={e => setAltForm(f => ({ ...f, address: e.target.value }))}
+                            className="w-full border border-orange-200 bg-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-400 transition-colors" />
+                        </div>
+                        <div className="sm:col-span-2 relative">
+                          <label className="text-xs font-bold text-gray-600 block mb-1">Kecamatan / Kota *</label>
+                          <input
+                            type="text"
+                            placeholder="Ketik min. 3 huruf, misal: 'Kebayoran'"
+                            value={altAreaSearch}
+                            className="w-full border border-orange-200 bg-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-400 transition-colors"
+                            onChange={e => {
+                              setAltAreaSearch(e.target.value);
+                              setAltForm(f => ({ ...f, area_id: '', city: '', province: '', postalCode: '', district: '' }));
+                              handleSearchAltArea(e.target.value);
+                            }}
+                          />
+                          {searchingAltArea && <div className="absolute right-4 top-9 text-[10px] text-orange-500 animate-pulse">Mencari...</div>}
+                          {altAreas.length > 0 && (
+                            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                              {altAreas.map(a => (
+                                <button key={a.id} type="button" onClick={() => handleSelectAltArea(a)}
+                                  className="w-full text-left px-4 py-2 text-xs hover:bg-orange-50 border-b border-gray-50 last:border-0">
+                                  <div className="font-bold">{a.name}</div>
+                                  <div className="text-gray-500">{a.administrative_division_level_2_name}, {a.administrative_division_level_1_name}</div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {altForm.area_id ? (
+                            <div className="mt-2 text-[10px] text-green-600 font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-full w-fit">
+                              <span className="text-green-500">✓</span> {altForm.district}, {altForm.city}, {altForm.province}
+                            </div>
+                          ) : altAreaSearch.length >= 3 && !searchingAltArea && altAreas.length === 0 ? (
+                            <div className="mt-2 text-[10px] text-red-500 font-bold">⚠️ Lokasi tidak ditemukan.</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+              )}
+
+
+              {/* Shipping Method — hanya untuk produk fisik */}
+              {!allDigital && (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="font-bold text-gray-900 text-lg">Metode Pengiriman</h2>
@@ -726,7 +1045,7 @@ export default function CheckoutPage() {
                                     }}
                                     className="accent-blue-600 w-4 h-4 flex-shrink-0" 
                                   />
-                                  <CourierLogo code={method.courier_code} name={method.courier_name} />
+                                  <CourierLogo code={method.courier_code} name={method.courier_name} customLogo={method.logo_url} />
                                   <div className="flex-1 min-w-0">
                                     <div className="font-bold text-gray-900 text-xs uppercase tracking-tight flex items-center gap-1.5 flex-wrap">
                                       <span>{method.courier_name}</span> 
@@ -824,6 +1143,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
+              )}{/* end !allDigital shipping method */}
 
               {/* Saldo Bonus Belanja Toggle */}
               {wallet && wallet.shopping_balance > 0 && (
@@ -952,6 +1272,67 @@ export default function CheckoutPage() {
                      <p className="text-red-600 text-xs font-bold">Tidak ada metode pembayaran aktif.</p>
                    </div>
                 )}
+
+                {/* Manual Transfer Option — tampil jika admin mengaktifkannya */}
+                {manualTransferConfig?.enabled && (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('manual_transfer')}
+                      className={`w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-left transition-all relative ${
+                        paymentMethod === 'manual_transfer'
+                          ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-50/50'
+                          : 'border-gray-200 hover:border-blue-300 bg-white'
+                      }`}
+                    >
+                      {paymentMethod === 'manual_transfer' && (
+                        <div className="absolute top-0 right-0 bg-blue-500 text-white px-2 py-0.5 rounded-bl-lg rounded-tr-2xl text-[10px] font-bold">
+                          Terpilih
+                        </div>
+                      )}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
+                        paymentMethod === 'manual_transfer' ? 'bg-blue-600 shadow-lg shadow-blue-200' : 'bg-gray-100'
+                      }`}>
+                        <i className={`bx bx-transfer text-2xl ${paymentMethod === 'manual_transfer' ? 'text-white' : 'text-gray-500'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-gray-900 text-sm">Transfer Manual</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">
+                          Transfer ke {manualTransferConfig.bank_name || 'rekening toko'}, lalu upload bukti
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
+                        paymentMethod === 'manual_transfer' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'
+                      }`}>0 Fee</span>
+                    </button>
+
+                    {/* Info rekening — tampil saat dipilih */}
+                    {paymentMethod === 'manual_transfer' && (
+                      <div className="mt-3 p-4 rounded-2xl bg-gradient-to-br from-blue-700 to-blue-900 text-white animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-3">Rekening Tujuan Transfer</div>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <i className="bx bx-credit-card text-xl" />
+                          </div>
+                          <div>
+                            <div className="text-base font-black">{manualTransferConfig.bank_name || '—'}</div>
+                            <div className="text-lg font-extrabold tracking-widest">{manualTransferConfig.account_number || '—'}</div>
+                            <div className="text-xs opacity-70">a.n. {manualTransferConfig.account_holder || '—'}</div>
+                          </div>
+                        </div>
+                        {manualTransferConfig.instructions && (
+                          <div className="text-[11px] bg-white/10 rounded-xl p-3 leading-relaxed opacity-80 whitespace-pre-wrap">
+                            {manualTransferConfig.instructions}
+                          </div>
+                        )}
+                        <div className="mt-3 flex items-center gap-2 text-[10px] font-bold opacity-60">
+                          <i className="bx bx-info-circle" />
+                          Setelah transfer, konfirmasi ke admin melalui WhatsApp atau halaman pesanan Anda.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               ) : (
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100 shadow-sm p-6 flex flex-col items-center justify-center text-center py-8">
@@ -988,7 +1369,7 @@ export default function CheckoutPage() {
                           <div className="relative flex-shrink-0">
                             {item.product?.image_url || item.product?.image ? (
                               <img
-                                src={item.product?.image_url || item.product?.image}
+                                src={formatImage(item.product?.image_url || item.product?.image)}
                                 alt={item.product?.name}
                                 className="w-12 h-12 rounded-xl object-cover border border-gray-100"
                               />
@@ -1002,7 +1383,21 @@ export default function CheckoutPage() {
                           <div className="flex-1 min-w-0">
                             <div className="text-[11px] text-gray-900 font-bold leading-tight line-clamp-1 truncate">{item.product?.name}</div>
                             <div className="text-[10px] text-blue-600 font-medium leading-tight line-clamp-1">{item.product_variant?.name || 'Default Varian'}</div>
-                            <div className="text-[11px] font-bold text-gray-900 mt-0.5">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id-ID')}</div>
+                            {/* WooCommerce-style Price Display with Sale */}
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {isSaleActive(item) ? (
+                                <>
+                                  <span className="text-[11px] font-bold text-red-500">Rp{(getEffectivePrice(item) * item.quantity).toLocaleString('id-ID')}</span>
+                                  <span className="text-[10px] text-gray-400 line-through">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id-ID')}</span>
+                                </>
+                              ) : (
+                                <span className="text-[11px] font-bold text-gray-900">Rp{(getItemPrice(item) * item.quantity).toLocaleString('id-ID')}</span>
+                              )}
+                            </div>
+                            {/* Stock Status Indicator */}
+                            {item.product?.stock === 0 && item.product?.backorders !== 'yes' && item.product?.backorders !== 'notify' && (
+                              <div className="text-[9px] text-red-500 font-bold mt-0.5">⚠️ Stok Habis</div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1040,6 +1435,13 @@ export default function CheckoutPage() {
                     <span>Subtotal</span>
                     <span className="font-medium text-gray-900">Rp{subtotal.toLocaleString('id-ID')}</span>
                   </div>
+                  {/* WooCommerce-style Tax Display */}
+                  {totalTax > 0 && (
+                    <div className="flex justify-between text-amber-600">
+                      <span>Pajak (PPN 11%)</span>
+                      <span className="font-medium">Rp{totalTax.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-[10px] text-gray-400">
                     <span>Total Berat</span>
                     <span>{((cart.items?.reduce((w, i) => w + ((i.product_variant?.weight || i.product?.weight || 200) * i.quantity), 0) || 0) / 1000).toFixed(2)} kg</span>
@@ -1112,5 +1514,123 @@ export default function CheckoutPage() {
         </form>
       </div>
     </main>
+
+      {/* ── Modal Upload Bukti Transfer Manual ── */}
+      {showProofModal && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-700 to-blue-900 p-6 text-white">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <i className="bx bx-transfer text-2xl" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black">Upload Bukti Transfer</h2>
+                  <p className="text-blue-200 text-xs">Wajib untuk menyelesaikan pesanan</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Info rekening tujuan */}
+              {manualTransferConfig && (
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i className="bx bx-credit-card text-white text-xl" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">Transfer ke</div>
+                    <div className="font-black text-gray-900">{manualTransferConfig.bank_name}</div>
+                    <div className="text-blue-700 font-bold text-lg tracking-widest">{manualTransferConfig.account_number}</div>
+                    <div className="text-xs text-gray-500">a.n. {manualTransferConfig.account_holder}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Area Upload */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Screenshot Bukti Transfer <span className="text-red-500">*</span></label>
+                <label
+                  htmlFor="proof-upload"
+                  className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl cursor-pointer transition-all min-h-[140px] overflow-hidden ${
+                    proofPreview ? 'border-blue-400 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+                  }`}
+                >
+                  {proofPreview ? (
+                    <img src={proofPreview} alt="preview" className="w-full max-h-48 object-contain rounded-xl" />
+                  ) : (
+                    <div className="text-center p-6">
+                      <i className="bx bx-image-add text-4xl text-gray-400 mb-2" />
+                      <p className="text-sm font-bold text-gray-500">Klik untuk upload foto</p>
+                      <p className="text-xs text-gray-400 mt-1">JPG, PNG, WebP — maks. 5MB</p>
+                    </div>
+                  )}
+                  <input
+                    id="proof-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleProofFileChange}
+                  />
+                </label>
+                {proofPreview && (
+                  <button
+                    type="button"
+                    onClick={() => { setProofFile(null); setProofPreview(null); }}
+                    className="mt-2 text-xs text-red-500 hover:underline"
+                  >Ganti foto</button>
+                )}
+              </div>
+
+              {/* Catatan */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Catatan (opsional)</label>
+                <textarea
+                  value={proofNote}
+                  onChange={e => setProofNote(e.target.value)}
+                  placeholder="Contoh: Transfer dari BCA atas nama Budi, jam 10.30"
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                />
+              </div>
+
+              {/* Info tunggu konfirmasi */}
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <i className="bx bx-info-circle text-amber-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  Setelah submit, pesanan akan masuk status <strong>Menunggu Konfirmasi Admin</strong>. 
+                  Admin akan memverifikasi bukti transfer Anda dalam 1×24 jam.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowProofModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition"
+                  disabled={uploadingProof}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProofSubmit}
+                  disabled={!proofFile || uploadingProof}
+                  className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {uploadingProof ? (
+                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Mengupload...</>
+                  ) : (
+                    <><i className="bx bx-send" /> Kirim & Konfirmasi</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

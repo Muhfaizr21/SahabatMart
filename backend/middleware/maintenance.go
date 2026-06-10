@@ -1,9 +1,8 @@
 package middleware
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
-	"fmt"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"net/http"
 	"strings"
 
@@ -37,7 +36,6 @@ func MaintenanceMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
-			fmt.Printf("[DEBUG] MaintenanceMiddleware: path='%s', isAuth=%v, isAdminBypass=%v\n", path, isAuthEndpoint(path), isAdminBypass(r))
 
 			// Admin/superadmin with valid JWT bypass maintenance
 			if isAdminBypass(r) {

@@ -74,6 +74,15 @@ export const A = {
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
 
+  // Light button
+  btnLight: {
+    display: 'inline-flex', alignItems: 'center', gap: 7,
+    padding: '9px 18px', borderRadius: 11,
+    border: '1px solid #e2e8f0', background: '#f1f5f9',
+    color: '#334155', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+  },
+
   // Small icon action button
   iconBtn: (color = '#6366f1', bg = 'rgba(99,102,241,0.08)') => ({
     width: 34, height: 34, borderRadius: 10, border: 'none',

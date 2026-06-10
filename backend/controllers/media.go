@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 
 	"gorm.io/gorm"
 )
@@ -76,7 +76,7 @@ func (mc *MediaController) UploadMedia(w http.ResponseWriter, r *http.Request) {
 
 	adminID, _ := r.Context().Value("user_id").(string)
 
-	err := r.ParseMultipartForm(10 << 20) // max 10MB
+	err := r.ParseMultipartForm(50 << 20) // max 50MB
 	if err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Ukuran file terlalu besar")
 		return

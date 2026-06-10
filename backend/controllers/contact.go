@@ -3,8 +3,8 @@ package controllers
 import (
 	"encoding/json"
 	"net/http"
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"gorm.io/gorm"
 )
 

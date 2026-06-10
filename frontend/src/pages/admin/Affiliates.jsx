@@ -15,6 +15,85 @@ const STATUS_BADGE = {
   processed: { bg: '#dbeafe', color: '#2563eb' },
 };
 
+const CustomSelect = ({ label, value, options, onChange, icon }) => {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef();
+
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 16px', borderRadius: 12,
+          border: '1px solid #e2e8f0', background: '#fff',
+          fontSize: 13, fontWeight: 600, color: '#334155',
+          cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+        onClick={() => setOpen(!open)}
+      >
+        {icon && <i className={`bx ${icon}`} style={{ fontSize: 16, color: '#6366f1' }} />}
+        <span>{label}: <strong>{selectedOption ? selectedOption.label : 'Semua'}</strong></span>
+        <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 150,
+          background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+          minWidth: 180, overflow: 'hidden', padding: 4,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: 'none', background: String(value) === String(opt.value) ? '#f5f3ff' : 'transparent',
+                color: String(value) === String(opt.value) ? '#6366f1' : '#475569',
+                fontSize: 12.5, fontWeight: String(value) === String(opt.value) ? 700 : 500,
+                textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#0f172a';
+                }
+              }}
+              onMouseLeave={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#475569';
+                }
+              }}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminAffiliates() {
   const [affiliates, setAffiliates] = useState([]);
   const [total, setTotal]           = useState(0);
@@ -26,6 +105,10 @@ export default function AdminAffiliates() {
   const [processWd, setProcessWd]   = useState(null);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState('');
+  const [selectedTier, setSelectedTier] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [sort, setSort]             = useState('commission');
+  const [order, setOrder]           = useState('desc');
   const [page, setPage]             = useState(1);
   const [limit, setLimit]           = useState(20);
 
@@ -33,6 +116,10 @@ export default function AdminAffiliates() {
     setLoading(true);
     const p = new URLSearchParams();
     if (search) p.append('search', search);
+    if (selectedTier) p.append('tier_id', selectedTier);
+    if (selectedStatus) p.append('status', selectedStatus);
+    if (sort) p.append('sort', sort);
+    if (order) p.append('order', order);
     p.append('page', page);
     p.append('limit', limit);
 
@@ -46,12 +133,12 @@ export default function AdminAffiliates() {
       setTiers(Array.isArray(cfg) ? cfg : (cfg?.data || []));
       setWithdrawals(Array.isArray(wd) ? wd : (wd?.data || []));
     }).catch(console.error).finally(() => setLoading(false));
-  }, [search, page, limit]);
+  }, [search, page, limit, selectedTier, selectedStatus, sort, order]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Reset page on search
-  useEffect(() => { setPage(1); }, [search, limit]);
+  // Reset page on search, filter, sort, order change
+  useEffect(() => { setPage(1); }, [search, limit, selectedTier, selectedStatus, sort, order]);
 
 
   const processWithdrawal = (action) => {
@@ -119,17 +206,83 @@ export default function AdminAffiliates() {
       {tab === 'members' && (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-            <div style={{ ...A.searchWrap, minWidth: 300, flex: 1, position: 'relative' }}>
-              <i className="bx bx-search" style={A.searchIcon} />
-              <input style={{ ...A.searchInput, width: '100%', paddingLeft: 40, height: 42 }} placeholder="Cari Nama, Email, atau Ref Code..." value={search} onChange={e => setSearch(e.target.value)} />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minWidth: 280, flex: 1 }}>
+              <i className="bx bx-search" style={{ position: 'absolute', left: 14, fontSize: 18, color: '#94a3b8' }} />
+              <input 
+                style={{ 
+                  width: '100%', padding: '10px 16px 10px 42px', borderRadius: 12,
+                  border: '1px solid #e2e8f0', fontSize: 13, color: '#334155',
+                  background: '#fff', outline: 'none', height: 42,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)', transition: 'all 0.2s'
+                }} 
+                placeholder="Cari Nama, Email, atau Ref Code..." 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+              />
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <select style={{ ...A.select, height: 42, minWidth: 100 }} value={limit} onChange={e => setLimit(parseInt(e.target.value))}>
-                <option value="20">20 / Hal</option>
-                <option value="50">50 / Hal</option>
-                <option value="100">100 / Hal</option>
-              </select>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <CustomSelect 
+                label="Tier" 
+                value={selectedTier} 
+                icon="bx-layer"
+                options={[
+                  { value: '', label: 'Semua Tier' },
+                  ...tiers.map(t => ({ value: String(t.id), label: t.name }))
+                ]}
+                onChange={setSelectedTier}
+              />
+
+              <CustomSelect 
+                label="Status" 
+                value={selectedStatus} 
+                icon="bx-toggle-left"
+                options={[
+                  { value: '', label: 'Semua Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'pending_verification', label: 'Pending Verification' },
+                  { value: 'suspended', label: 'Suspended' }
+                ]}
+                onChange={setSelectedStatus}
+              />
+
+              <CustomSelect 
+                label="Urutan" 
+                value={sort} 
+                icon="bx-sort-alt-2"
+                options={[
+                  { value: 'commission', label: 'Komisi' },
+                  { value: 'balance', label: 'Saldo' },
+                  { value: 'turnover', label: 'Omzet Tim' },
+                  { value: 'name', label: 'Nama' },
+                  { value: 'ref_code', label: 'Ref Code' },
+                  { value: 'tier', label: 'Tier Level' }
+                ]}
+                onChange={setSort}
+              />
+
+              <CustomSelect 
+                label="Arah" 
+                value={order} 
+                icon="bx-transfer-alt"
+                options={[
+                  { value: 'desc', label: 'DESC' },
+                  { value: 'asc', label: 'ASC' }
+                ]}
+                onChange={setOrder}
+              />
+
+              <CustomSelect 
+                label="Per Hal" 
+                value={String(limit)} 
+                icon="bx-list-ol"
+                options={[
+                  { value: '20', label: '20' },
+                  { value: '50', label: '50' },
+                  { value: '100', label: '100' }
+                ]}
+                onChange={(val) => setLimit(parseInt(val))}
+              />
             </div>
           </div>
 
@@ -138,9 +291,53 @@ export default function AdminAffiliates() {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
                 <thead>
                   <tr>
-                    {['Member', 'Ref Code', 'Tier', 'Info Bank', 'Komisi', 'Saldo', 'Omzet Tim', 'Aksi'].map((h, i) => (
-                      <th key={h} style={{ ...A.th, paddingLeft: i === 0 ? 24 : 14, paddingRight: i === 7 ? 24 : 14 }}>{h}</th>
-                    ))}
+                    {[
+                      { key: 'name', label: 'Member', sortable: true },
+                      { key: 'ref_code', label: 'Ref Code', sortable: true },
+                      { key: 'tier', label: 'Tier', sortable: true },
+                      { key: 'bank', label: 'Info Bank', sortable: false },
+                      { key: 'commission', label: 'Komisi', sortable: true },
+                      { key: 'balance', label: 'Saldo', sortable: true },
+                      { key: 'turnover', label: 'Omzet Tim', sortable: true },
+                      { key: 'action', label: 'Aksi', sortable: false }
+                    ].map((h, i) => {
+                      const isCurrentSort = sort === h.key;
+                      return (
+                        <th 
+                          key={h.label} 
+                          style={{ 
+                            ...A.th, 
+                            paddingLeft: i === 0 ? 24 : 14, 
+                            paddingRight: i === 7 ? 24 : 14,
+                            cursor: h.sortable ? 'pointer' : 'default',
+                            userSelect: 'none'
+                          }}
+                          onClick={() => {
+                            if (!h.sortable) return;
+                            if (sort === h.key) {
+                              setOrder(o => o === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setSort(h.key);
+                              setOrder('desc');
+                            }
+                          }}
+                        >
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {h.label}
+                            {h.sortable && (
+                              <i className={`bx ${
+                                isCurrentSort 
+                                  ? (order === 'asc' ? 'bx-chevron-up' : 'bx-chevron-down') 
+                                  : 'bx-sort-alt-2'
+                              }`} style={{ 
+                                fontSize: 13, 
+                                color: isCurrentSort ? '#6366f1' : '#94a3b8' 
+                              }} />
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
               <tbody>

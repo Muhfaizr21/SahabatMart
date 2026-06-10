@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -283,7 +283,7 @@ func (rc *RBACController) ToggleAdminStatus(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if (user.Email == "admin@sahabatmart.id" || user.Email == "superadmin@sahabatmart.id") && input.Status != "active" {
+	if (user.Email == "admin@akuglow.id" || user.Email == "superadmin@akuglow.id") && input.Status != "active" {
 		utils.JSONError(w, http.StatusForbidden, "Akun superadmin utama tidak dapat dinonaktifkan")
 		return
 	}
@@ -316,7 +316,7 @@ func (rc *RBACController) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Protect the default superadmin
-	if user.Email == "admin@sahabatmart.id" || user.Email == "superadmin@sahabatmart.id" {
+	if user.Email == "admin@akuglow.id" || user.Email == "superadmin@akuglow.id" {
 		utils.JSONError(w, http.StatusForbidden, "Akun superadmin utama tidak dapat dihapus")
 		return
 	}

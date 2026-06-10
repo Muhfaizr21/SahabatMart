@@ -7,20 +7,21 @@ import (
 type OrderStatus string
 
 const (
-	OrderPendingPayment OrderStatus = "pending_payment"
-	OrderPaid           OrderStatus = "paid"
-	OrderProcessing     OrderStatus = "processing"
-	OrderReadyToShip    OrderStatus = "ready_to_ship"
-	OrderShipped        OrderStatus = "shipped"
-	OrderDelivered      OrderStatus = "delivered"
-	OrderReadyForPickup OrderStatus = "ready_for_pickup"
-	OrderCompleted      OrderStatus = "completed"
-	OrderCancelled      OrderStatus = "cancelled"
-	OrderRefundRequested OrderStatus = "refund_requested"
+	OrderPendingPayment    OrderStatus = "pending_payment"
+	OrderPendingConfirmation OrderStatus = "pending_confirmation" // Bukti transfer sudah diupload, menunggu konfirmasi admin
+	OrderPaid             OrderStatus = "paid"
+	OrderProcessing       OrderStatus = "processing"
+	OrderReadyToShip      OrderStatus = "ready_to_ship"
+	OrderShipped          OrderStatus = "shipped"
+	OrderDelivered        OrderStatus = "delivered"
+	OrderReadyForPickup   OrderStatus = "ready_for_pickup"
+	OrderCompleted        OrderStatus = "completed"
+	OrderCancelled        OrderStatus = "cancelled"
+	OrderRefundRequested  OrderStatus = "refund_requested"
 	OrderRefundProcessing OrderStatus = "refund_processing"
-	OrderRefunded       OrderStatus = "refunded"
-	OrderDisputed       OrderStatus = "disputed"
-	OrderFrozen         OrderStatus = "frozen" // Transaksi dibekukan oleh admin
+	OrderRefunded         OrderStatus = "refunded"
+	OrderDisputed         OrderStatus = "disputed"
+	OrderFrozen           OrderStatus = "frozen" // Transaksi dibekukan oleh admin
 )
 
 type MerchantOrderStatus string
@@ -83,6 +84,14 @@ type Order struct {
 	CancelledBy         *string        `gorm:"type:varchar(100)" json:"cancelled_by"`
 	CancelledAt         *time.Time     `json:"cancelled_at"`
 
+	// Manual Transfer Payment Proof
+	PaymentProofURL     string         `gorm:"type:text" json:"payment_proof_url"`
+	PaymentProofNote    string         `gorm:"type:text" json:"payment_proof_note"`
+	ProofSubmittedAt    *time.Time     `json:"proof_submitted_at"`
+	ProofReviewedAt     *time.Time     `json:"proof_reviewed_at"`
+	ProofReviewedBy     *string        `gorm:"type:varchar(100)" json:"proof_reviewed_by"`
+	ProofRejectReason   string         `gorm:"type:text" json:"proof_reject_reason"`
+
 	PaidAt              *time.Time     `json:"paid_at"`
 	ExpiredAt           *time.Time     `json:"expired_at"`
 	CompletedAt         *time.Time     `json:"completed_at"`
@@ -124,6 +133,7 @@ type OrderMerchantGroup struct {
 	DeliveredAt     *time.Time          `json:"delivered_at"`
 	
 	Merchant        *Merchant           `gorm:"foreignKey:MerchantID" json:"merchant"`
+	Order           *Order              `gorm:"foreignKey:OrderID" json:"order"`
 	CreatedAt       time.Time           `json:"created_at"`
 	UpdatedAt       time.Time           `json:"updated_at"`
 

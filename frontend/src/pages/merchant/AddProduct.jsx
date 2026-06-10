@@ -85,10 +85,10 @@ export default function AddEditProduct() {
           setVariants(product.variants || []);
           
           // Sync Gallery
-          try { setGallery(JSON.parse(product.images || '[]')); } catch(e) { setGallery([]); }
+          try { setGallery(JSON.parse(product.images || '[]')); } catch(_e) { setGallery([]); }
           
           // Sync Attributes
-          try { setSelectedAttrs(JSON.parse(product.attributes || '{}')); } catch(e) { setSelectedAttrs({}); }
+          try { setSelectedAttrs(JSON.parse(product.attributes || '{}')); } catch(_e) { setSelectedAttrs({}); }
         }
       }).catch(console.error).finally(() => setLoading(false));
     }

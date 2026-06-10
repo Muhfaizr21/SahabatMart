@@ -1,8 +1,8 @@
 package main
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/seeder"
+	"akuglow/backend/models"
+	"akuglow/backend/seeder"
 	"fmt"
 	"log"
 	"os"

@@ -114,12 +114,12 @@ const MerchantLayout = () => {
   const menuItems = [
     { name: 'Dashboard', icon: 'dashboard', path: '/merchant', end: true },
     { name: 'POS Kasir', icon: 'point_of_sale', path: '/merchant/pos' },
+    { name: 'Buku Kas', icon: 'account_balance_wallet', path: '/merchant/wallet' },
     { name: 'Mitra Area', icon: 'stars', path: '/affiliate' },
     { name: 'Analitik', icon: 'insights', path: '/merchant/analytics' },
     { name: 'Inventori', icon: 'inventory_2', path: '/merchant/products' },
     { name: 'Restok', icon: 'rebase_edit', path: '/merchant/restock' },
     { name: 'Pesanan', icon: 'shopping_cart', path: '/merchant/orders' },
-    { name: 'Dompet', icon: 'account_balance_wallet', path: '/merchant/wallet' },
     { name: 'Pengaturan', icon: 'settings', path: '/merchant/settings' },
   ];
 
@@ -332,12 +332,7 @@ const MerchantLayout = () => {
         </main>
       </div>
 
-      <button 
-        onClick={() => navigate('/merchant/restock')}
-        className="fixed bottom-10 right-10 w-16 h-16 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group border-4 border-white/20"
-      >
-          <span className="material-symbols-outlined text-3xl transition-transform group-hover:rotate-90">rebase_edit</span>
-      </button>
+
 
       <style>{`
         body { background: #f3f7fb; }

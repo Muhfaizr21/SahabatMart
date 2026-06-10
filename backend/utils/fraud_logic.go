@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"time"
 
 	"gorm.io/gorm"

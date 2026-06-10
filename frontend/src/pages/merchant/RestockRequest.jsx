@@ -11,7 +11,8 @@ export default function RestockRequest() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedProductForVariant, setSelectedProductForVariant] = useState(null);
-
+  const [trackingModal, setTrackingModal] = useState(null);
+  const [trackingData, setTrackingData] = useState(null);
   useEffect(() => {
     loadRequests();
   }, []);
@@ -128,6 +129,18 @@ export default function RestockRequest() {
     }
   };
 
+  const trackRestock = async (rid) => {
+    setTrackingModal(rid);
+    setTrackingData(null);
+    try {
+      const data = await fetchJson(`${MERCHANT_API_BASE}/restock/${rid}/track`);
+      setTrackingData(data);
+    } catch (_err) {
+      alert(`Gagal melacak: ${_err.message}`);
+      setTrackingModal(null);
+    }
+  };
+
   return (
     <div className="premium-restock-page">
       {/* HEADER SECTION */}
@@ -234,10 +247,16 @@ export default function RestockRequest() {
 
                       <div className="card-footer-v2">
                         {req.status === 'shipped' ? (
-                          <button className="btn-receive-confirm" onClick={() => handleReceive(req.id)}>
-                            <span className="material-symbols-outlined">front_loader</span>
-                            Konfirmasi Penerimaan
-                          </button>
+                          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                            <button className="btn-receive-confirm" style={{ flex: 1, padding: '10px' }} onClick={() => handleReceive(req.id)}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>front_loader</span>
+                              Terima
+                            </button>
+                            <button style={{ flex: 1, background: '#e2e8f0', color: '#0f172a', border: 'none', borderRadius: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }} onClick={() => trackRestock(req.id)}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>location_on</span>
+                              Lacak Resi
+                            </button>
+                          </div>
                         ) : (
                           <div className="footer-info">
                             <span className="material-symbols-outlined">info</span>
@@ -407,6 +426,66 @@ export default function RestockRequest() {
           </div>
         </div>
       )}
+
+      {/* TRACKING MODAL */}
+      {trackingModal && (
+        <div className="premium-modal-overlay" style={{ zIndex: 10001 }}>
+          <div className="tracking-modal-container" style={{ background: 'white', width: '100%', maxWidth: 480, borderRadius: 28, padding: 24, boxShadow: '0 30px 60px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Lacak Pengiriman</h3>
+              <button onClick={() => setTrackingModal(null)} style={{ border: 'none', background: '#f1f5f9', color: '#64748b', width: 36, height: 36, borderRadius: 10, cursor: 'pointer' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            {!trackingData ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div className="mini-spinner" style={{ borderColor: 'rgba(67, 56, 202, 0.2)', borderTopColor: '#4338ca', margin: '0 auto 16px auto' }}></div>
+                <p style={{ color: '#64748b', fontWeight: 600 }}>Memuat data resi...</p>
+              </div>
+            ) : (
+              <div>
+                <div style={{ background: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Kurir</span>
+                    <span style={{ fontSize: 14, color: '#1e293b', fontWeight: 800, textTransform: 'uppercase' }}>{trackingData.courier?.name || '-'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Resi</span>
+                    <span style={{ fontSize: 14, color: '#1e293b', fontWeight: 800 }}>{trackingData.waybill_id || '-'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Status Terkini</span>
+                    <span style={{ fontSize: 14, color: '#4338ca', fontWeight: 800, textTransform: 'uppercase' }}>{trackingData.status || '-'}</span>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 8 }} className="custom-scrollbar">
+                  {trackingData.history && trackingData.history.length > 0 ? (
+                    trackingData.history.map((h, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <div style={{ width: 12, height: 12, borderRadius: '50%', background: i === 0 ? '#4338ca' : '#cbd5e1' }}></div>
+                          {i !== trackingData.history.length - 1 && <div style={{ width: 2, flex: 1, background: '#e2e8f0', margin: '4px 0' }}></div>}
+                        </div>
+                        <div style={{ flex: 1, paddingBottom: 16 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: i === 0 ? '#1e293b' : '#64748b' }}>{h.note}</div>
+                          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                            {new Date(h.updated_at).toLocaleString('id-ID')}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '20px 0' }}>Belum ada riwayat pelacakan</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
 
       <style>{`
         /* VARIANT PICKER STYLES */

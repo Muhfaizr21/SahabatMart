@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { formatPaymentMethod } from '../lib/api';
 
 export default function OrderSuccessPage() {
   const { state } = useLocation();
@@ -54,7 +55,7 @@ export default function OrderSuccessPage() {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Metode Pembayaran</p>
-                  <p className="font-bold text-gray-900">{payment.payment_name || payment.payment_method}</p>
+                  <p className="font-bold text-gray-900">{formatPaymentMethod(payment.payment_name || payment.payment_method)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Bayar</p>

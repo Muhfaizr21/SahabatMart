@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"fmt"
 	"github.com/google/uuid"
 	"gorm.io/gorm"

@@ -467,12 +467,19 @@ export default function MediaLibraryModal({ isOpen, onClose, onSelect, multiple 
                           }
                         }}
                       >
-                        <img 
-                          className="media-grid-item-thumbnail" 
-                          src={formatImage(item.url)} 
-                          alt={item.filename} 
-                          loading="lazy"
-                        />
+                        {item.mime_type && item.mime_type.startsWith('image/') ? (
+                          <img 
+                            className="media-grid-item-thumbnail" 
+                            src={formatImage(item.url)} 
+                            alt={item.filename} 
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8', flexDirection: 'column' }}>
+                            <i className="bx bx-file" style={{ fontSize: 32 }} />
+                            <span style={{ fontSize: 9, marginTop: 4, maxWidth: '80%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.filename.split('.').pop().toUpperCase()}</span>
+                          </div>
+                        )}
                         {isSelected && (
                           <div className="media-check-badge">
                             {multiple ? (
@@ -548,12 +555,11 @@ export default function MediaLibraryModal({ isOpen, onClose, onSelect, multiple 
               </div>
             </>
           ) : (
-            /* Upload View */
             <label className="media-upload-area">
               <input 
                 type="file" 
                 style={{ display: 'none' }} 
-                accept="image/*" 
+                accept="image/*,video/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" 
                 multiple 
                 onChange={handleUpload} 
                 disabled={uploading}
@@ -573,7 +579,7 @@ export default function MediaLibraryModal({ isOpen, onClose, onSelect, multiple 
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>Klik untuk Unggah Berkas Media</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Mendukung berkas JPG, PNG, WEBP, GIF. Maks: 5MB per berkas.</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Mendukung berkas Gambar, Video, ZIP, PDF, Word, Excel. Maks: 5MB per berkas.</div>
                   </div>
                 </>
               )}
@@ -589,11 +595,18 @@ export default function MediaLibraryModal({ isOpen, onClose, onSelect, multiple 
                 Rincian Media
               </div>
               <div style={{ aspectRatio: '1.4', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img 
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                  src={formatImage(selectedItem.url)} 
-                  alt={selectedItem.filename}
-                />
+                {selectedItem.mime_type && selectedItem.mime_type.startsWith('image/') ? (
+                  <img 
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                    src={formatImage(selectedItem.url)} 
+                    alt={selectedItem.filename}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#94a3b8' }}>
+                    <i className="bx bx-file" style={{ fontSize: 48 }} />
+                    <span style={{ marginTop: 8, fontSize: 14, fontWeight: 700 }}>{selectedItem.filename.split('.').pop().toUpperCase()} FILE</span>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>

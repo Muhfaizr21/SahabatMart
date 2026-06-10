@@ -1,27 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, AFFILIATE_API_BASE, fetchJson, formatImage } from '../../lib/api';
-import { A, PageHeader, Modal, TablePanel, statusBadge, FieldLabel } from '../../lib/adminStyles.jsx';
+import React, { useState, useEffect, useRef } from 'react';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { A, PageHeader, TablePanel, statusBadge } from '../../lib/adminStyles.jsx';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+
+const CustomSelect = ({ label, value, options, onChange, icon }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 16px', borderRadius: 12,
+          border: '1px solid #e2e8f0', background: '#fff',
+          fontSize: 13, fontWeight: 600, color: '#334155',
+          cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+        onClick={() => setOpen(!open)}
+      >
+        {icon && <i className={`bx ${icon}`} style={{ fontSize: 16, color: '#6366f1' }} />}
+        <span>{label}: <strong>{selectedOption ? selectedOption.label : 'Semua'}</strong></span>
+        <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 150,
+          background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+          minWidth: 180, overflow: 'hidden', padding: 4,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: 'none', background: String(value) === String(opt.value) ? '#f5f3ff' : 'transparent',
+                color: String(value) === String(opt.value) ? '#6366f1' : '#475569',
+                fontSize: 12.5, fontWeight: String(value) === String(opt.value) ? 700 : 500,
+                textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#0f172a';
+                }
+              }}
+              onMouseLeave={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#475569';
+                }
+              }}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function AdminEducation() {
   const [edu, setEdu] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ id: 0, title: '', content: '', video_url: '', category: 'Marketing', image_url: '', is_featured: false, is_active: true });
-  const [showModal, setShowModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const navigate = useNavigate();
+
+  // Pagination & Filtering
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sort, setSort] = useState('created_at');
+  const [order, setOrder] = useState('desc');
+  const limit = 10;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadData = () => {
     setLoading(true);
     setSelectedIds([]);
-    fetchJson(`${ADMIN_API_BASE}/education`)
-      .then(d => setEdu(d || []))
-      .catch(err => toast.error('Gagal memuat materi edukasi'))
+
+    const query = new URLSearchParams({
+      search: debouncedSearch,
+      category,
+      status,
+      sort,
+      order,
+      page: String(page),
+      limit: String(limit)
+    }).toString();
+
+    fetchJson(`${ADMIN_API_BASE}/education?${query}`)
+      .then(d => {
+        setEdu(d?.data || []);
+        setTotalPages(Math.ceil((d?.total || 0) / limit) || 1);
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error('Gagal memuat materi edukasi');
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [debouncedSearch, category, status, sort, order, page]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -37,7 +150,7 @@ export default function AdminEducation() {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/education/bulk-delete`, {
       method: 'POST',
-      body: JSON.stringify({ ids: selectedIds })
+      body: JSON.stringify({ ids: selectedIds.map(String) })
     })
       .then(() => {
         toast.success('Materi terpilih dihapus');
@@ -47,37 +160,6 @@ export default function AdminEducation() {
         toast.error(err.message || 'Gagal menghapus materi');
         setLoading(false);
       });
-  };
-
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    const fd = new FormData();
-    fd.append('image', file);
-    try {
-      const res = await fetchJson(`${ADMIN_API_BASE}/upload`, { method: 'POST', body: fd });
-      if (res.url) {
-        setFormData(prev => ({ ...prev, image_url: res.url }));
-        toast.success('Gambar terunggah');
-      }
-    } catch (_err) { toast.error('Upload gagal'); }
-    finally { setUploading(false); }
-  };
-
-  const handleSave = (e) => {
-    e.preventDefault();
-    setSaving(true);
-    fetchJson(`${ADMIN_API_BASE}/education/upsert`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    }).then(() => {
-      toast.success(formData.id ? 'Materi diperbarui' : 'Materi ditambahkan');
-      setShowModal(false);
-      loadData();
-    }).catch(err => toast.error(err.message))
-      .finally(() => setSaving(false));
   };
 
   const deleteItem = (id) => {
@@ -90,6 +172,33 @@ export default function AdminEducation() {
       .catch(err => toast.error(err.message));
   };
 
+  const handleSort = (col) => {
+    if (sort === col) {
+      setOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSort(col);
+      setOrder('asc');
+    }
+    setPage(1);
+  };
+
+  const SortHeader = ({ col, label, style = {} }) => {
+    const isSorted = sort === col;
+    return (
+      <th 
+        style={{ ...A.th, cursor: 'pointer', userSelect: 'none', ...style }} 
+        onClick={() => handleSort(col)}
+      >
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span>{label}</span>
+          <span style={{ fontSize: 14, color: isSorted ? '#6366f1' : '#94a3b8' }}>
+            {isSorted ? (order === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   return (
     <div style={A.page}>
       <PageHeader
@@ -97,12 +206,59 @@ export default function AdminEducation() {
         subtitle="Manage learning materials for your partners"
       >
         <button
-          onClick={() => { setFormData({ id: 0, title: '', content: '', video_url: '', category: 'Marketing', image_url: '', is_featured: false, is_active: true }); setShowModal(true); }}
+          onClick={() => navigate('/admin/education/new')}
           style={A.btnPrimary}
         >
           <i className="bx bx-plus-circle" /> Tambah Materi
         </button>
       </PageHeader>
+
+      {/* FILTER & SEARCH BAR */}
+      <div style={{ ...A.card, overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
+        <div style={{ flex: 1, minWidth: 260, position: 'relative' }}>
+          <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
+          <input
+            style={{ ...A.input, paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
+            placeholder="Cari judul atau konten materi..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        <CustomSelect
+          label="Kategori"
+          value={category}
+          options={[
+            { label: 'Semua Kategori', value: '' },
+            { label: 'Marketing', value: 'Marketing' },
+            { label: 'Product', value: 'Product' },
+            { label: 'Sales', value: 'Sales' }
+          ]}
+          onChange={val => { setCategory(val); setPage(1); }}
+          icon="bx-category"
+        />
+
+        <CustomSelect
+          label="Status"
+          value={status}
+          options={[
+            { label: 'Semua Status', value: '' },
+            { label: 'Active (Tampil)', value: 'active' },
+            { label: 'Hidden', value: 'inactive' }
+          ]}
+          onChange={val => { setStatus(val); setPage(1); }}
+          icon="bx-toggle-left"
+        />
+        
+        {(search || category || status) && (
+          <button
+            onClick={() => { setSearch(''); setCategory(''); setStatus(''); setPage(1); }}
+            style={{ ...A.btnGhost, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <i className="bx bx-x" /> Reset Filter
+          </button>
+        )}
+      </div>
 
       <TablePanel 
         loading={loading}
@@ -120,7 +276,7 @@ export default function AdminEducation() {
               </div>
             )}
             <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-              {loading ? 'Memuat...' : `${edu.length} materi`}
+              {loading ? 'Memuat...' : `Materi Halaman Ini: ${edu.length}`}
             </span>
           </div>
         }
@@ -136,10 +292,10 @@ export default function AdminEducation() {
                   style={{ width: 18, height: 18, cursor: 'pointer' }}
                 />
               </th>
-              <th style={A.th}>Materi</th>
-              <th style={A.th}>Kategori</th>
-              <th style={A.th}>Featured</th>
-              <th style={A.th}>Status</th>
+              <SortHeader col="title" label="Materi" />
+              <SortHeader col="category" label="Kategori" />
+              <SortHeader col="is_featured" label="Featured" />
+              <SortHeader col="is_active" label="Status" />
               <th style={{ ...A.th, textAlign: 'right', paddingRight: 24 }}>Aksi</th>
             </tr>
           </thead>
@@ -154,8 +310,8 @@ export default function AdminEducation() {
                     background: isSelected ? '#f5f7ff' : (idx % 2 === 0 ? '#fff' : '#fafafa'),
                     borderBottom: isLast ? 'none' : '1px solid #f8fafc'
                   }}
-                  onMouseEnter={e => !isSelected && (e.currentTarget.style.background = '#f8fafc')}
-                  onMouseLeave={e => !isSelected && (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
+                  onMouseEnter={ev => !isSelected && (ev.currentTarget.style.background = '#f8fafc')}
+                  onMouseLeave={ev => !isSelected && (ev.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa')}
                 >
                   <td style={{ ...A.td, paddingLeft: 24, width: 40 }}>
                     <input 
@@ -183,7 +339,7 @@ export default function AdminEducation() {
                   </td>
                   <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
                     <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
-                      <button onClick={() => { setFormData(e); setShowModal(true); }} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
+                      <button onClick={() => navigate(`/admin/education/edit/${e.id}`)} style={A.iconBtn()}><i className="bx bx-edit-alt" /></button>
                       <button onClick={() => deleteItem(e.id)} style={A.iconBtn('#ef4444', '#fef2f2')}><i className="bx bx-trash" /></button>
                     </div>
                   </td>
@@ -193,7 +349,7 @@ export default function AdminEducation() {
             {edu.length === 0 && !loading && (
               <tr>
                 <td colSpan="6" style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
-                   Belum ada materi edukasi yang dipublikasikan.
+                   Belum ada materi edukasi yang ditemukan.
                 </td>
               </tr>
             )}
@@ -201,58 +357,51 @@ export default function AdminEducation() {
         </table>
       </TablePanel>
 
-      {showModal && (
-        <Modal title={formData.id ? 'Edit Materi' : 'Tambah Materi Baru'} onClose={() => setShowModal(false)} wide>
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <FieldLabel>Judul Materi</FieldLabel>
-                  <input style={A.input} value={formData.title} onChange={ev => setFormData({ ...formData, title: ev.target.value })} required />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <FieldLabel>Deskripsi / Konten</FieldLabel>
-                  <textarea style={{ ...A.textarea, height: 200 }} value={formData.content} onChange={ev => setFormData({ ...formData, content: ev.target.value })} required />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <FieldLabel>Video URL (Embed)</FieldLabel>
-                  <input style={A.input} value={formData.video_url} onChange={ev => setFormData({ ...formData, video_url: ev.target.value })} placeholder="https://www.youtube.com/embed/..." />
-                </div>
-              </div>
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 40, paddingBottom: 40 }}>
+          <button 
+            onClick={() => setPage(p => Math.max(1, p - 1))} 
+            disabled={page === 1}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <i className="bx bx-chevron-left" /> Sebelumnya
+          </button>
+          
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i + 1)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  transition: 'all 0.2s',
+                  background: page === i + 1 ? '#6366f1' : '#fff',
+                  color: page === i + 1 ? '#fff' : '#64748b',
+                  border: page === i + 1 ? 'none' : '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  boxShadow: page === i + 1 ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div>
-                  <FieldLabel>Thumbnail</FieldLabel>
-                  <div style={{ height: 160, borderRadius: 16, border: '2px dashed #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                    {formData.image_url ? <img src={formatImage(formData.image_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <i className="bx bx-image-add" style={{ fontSize: 32, color: '#cbd5e1' }} />}
-                    <input type="file" onChange={handleUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept="image/*" />
-                    {uploading && <div className="spinner-border text-primary" />}
-                  </div>
-                </div>
-                <div>
-                  <FieldLabel>Kategori</FieldLabel>
-                  <select style={A.select} value={formData.category} onChange={ev => setFormData({ ...formData, category: ev.target.value })}>
-                    <option value="Marketing">📢 Marketing</option>
-                    <option value="Product">📦 Product Knowledge</option>
-                    <option value="Sales">💰 Sales Strategy</option>
-                  </select>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input type="checkbox" checked={formData.is_featured} onChange={ev => setFormData({ ...formData, is_featured: ev.target.checked })} />
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>Tampilkan di Unggulan</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input type="checkbox" checked={formData.is_active} onChange={ev => setFormData({ ...formData, is_active: ev.target.checked })} />
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>Aktif (Tampil ke Mitra)</span>
-                </div>
-                <button type="submit" disabled={saving} style={{ ...A.btnPrimary, marginTop: 20 }}>
-                  {saving ? 'Saving...' : 'Simpan Materi'}
-                </button>
-              </div>
-            </div>
-          </form>
-        </Modal>
+          <button 
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+            disabled={page === totalPages}
+            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            Berikutnya <i className="bx bx-chevron-right" />
+          </button>
+        </div>
       )}
+
     </div>
   );
 }

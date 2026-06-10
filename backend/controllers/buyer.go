@@ -6,10 +6,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
+	"net"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 	"math"
 	"os"
 	"strings"
@@ -160,6 +162,59 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 			log.Printf("[Shipping] ERROR for merchant %s: %v", mID, err)
 			continue
 		}
+
+		// Inject custom name/logo and filter out inactive services
+		var channels []models.LogisticChannel
+		if err := bc.DB.Find(&channels).Error; err == nil {
+			logoMap := make(map[string]string)
+			nameMap := make(map[string]string)
+			serviceActiveMap := make(map[string]bool)
+
+			for _, ch := range channels {
+				cCode := strings.ToLower(ch.Code)
+				logoMap[cCode] = ch.LogoURL
+				nameMap[cCode] = ch.Name
+
+				if ch.Services != "" {
+					type CourierService struct {
+						Code     string `json:"code"`
+						Name     string `json:"name"`
+						IsActive bool   `json:"is_active"`
+					}
+					var svcs []CourierService
+					if err := json.Unmarshal([]byte(ch.Services), &svcs); err == nil {
+						for _, s := range svcs {
+							key := fmt.Sprintf("%s:%s", cCode, strings.ToLower(s.Code))
+							serviceActiveMap[key] = s.IsActive
+						}
+					}
+				}
+			}
+
+			var activeRates []map[string]interface{}
+			for _, rate := range rates {
+				cCode, _ := rate["courier_code"].(string)
+				cCode = strings.ToLower(cCode)
+
+				sCode, _ := rate["courier_service_code"].(string)
+				sCode = strings.ToLower(sCode)
+
+				key := fmt.Sprintf("%s:%s", cCode, sCode)
+				if isActive, exists := serviceActiveMap[key]; exists && !isActive {
+					continue
+				}
+
+				if customLogo, ok := logoMap[cCode]; ok && customLogo != "" {
+					rate["logo_url"] = customLogo
+				}
+				if customName, ok := nameMap[cCode]; ok && customName != "" {
+					rate["courier_name"] = customName
+				}
+				activeRates = append(activeRates, rate)
+			}
+			rates = activeRates
+		}
+
 		merchantRates[mID] = rates
 	}
 
@@ -240,6 +295,8 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		AffiliateID         *string            `json:"affiliate_id"`
 		PaymentMethod       string             `json:"payment_method"`
 		UseShoppingBalance  bool               `json:"use_shopping_balance"`
+		PaymentProofURL     string             `json:"payment_proof_url"`   // untuk manual_transfer
+		PaymentProofNote    string             `json:"payment_proof_note"`  // catatan buyer
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -386,6 +443,32 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 			utils.JSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+	} else if req.PaymentMethod == "manual_transfer" {
+		// Manual Transfer: simpan bukti dan ubah status ke pending_confirmation
+		if req.PaymentProofURL == "" {
+			utils.JSONError(w, http.StatusBadRequest, "Bukti transfer wajib diupload untuk metode Transfer Manual")
+			return
+		}
+		now := time.Now()
+		if err := bc.DB.Model(order).Updates(map[string]interface{}{
+			"status":             models.OrderPendingConfirmation,
+			"payment_proof_url":  req.PaymentProofURL,
+			"payment_proof_note": req.PaymentProofNote,
+			"proof_submitted_at": &now,
+		}).Error; err != nil {
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan bukti transfer")
+			return
+		}
+		// Simpan juga payment record untuk tracking
+		payment := models.Payment{
+			OrderID:       order.ID,
+			PaymentMethod: "manual_transfer",
+			Status:        models.PaymentPending,
+			Gateway:       "manual",
+			Amount:        order.GrandTotal,
+			GatewayResponse: fmt.Sprintf(`{"proof_url":"%s","note":"%s"}`, req.PaymentProofURL, req.PaymentProofNote),
+		}
+		_ = bc.DB.Create(&payment)
 	} else if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
 		// Ambil data item lengkap untuk TriPay
 		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
@@ -431,6 +514,9 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 
 	// 4. Clear Cart after successful order
 	_ = bc.BuyerService.ClearCart(buyerID)
+
+	// Async sync past guest location logs and mark converted
+	go SyncGuestLogsToUser(bc.DB, buyerID, getClientIPForCheckout(r))
 
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"order":   order,
@@ -637,7 +723,7 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 
 	// 3. Integrasi TriPay (Copy-paste logic from standard Checkout)
 	var paymentData map[string]interface{}
-	if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
+	if req.PaymentMethod != "" && req.PaymentMethod != "manual" && req.PaymentMethod != "manual_transfer" {
 		// Ambil data item lengkap untuk TriPay
 		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
 		
@@ -679,6 +765,9 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 
 	// 4. Clear Cart after successful order
 	_ = bc.BuyerService.ClearCart(user.ID)
+
+	// Async sync past guest location logs and mark converted
+	go SyncGuestLogsToUser(bc.DB, user.ID, getClientIPForCheckout(r))
 
 	utils.JSONResponse(w, http.StatusCreated, map[string]interface{}{
 		"order":   order,
@@ -1044,7 +1133,13 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 	// Prepare result with reviewed status
 	type OrderItemWithReview struct {
 		models.OrderItem
-		IsReviewed bool `json:"is_reviewed"`
+		IsReviewed        bool   `json:"is_reviewed"`
+		IsDownloadable    bool   `json:"is_downloadable"`
+		DownloadableFiles string `json:"downloadable_files,omitempty"`
+		DownloadLimit     int    `json:"download_limit,omitempty"`
+		DownloadExpiry    int    `json:"download_expiry,omitempty"`
+		PurchaseNote      string `json:"purchase_note,omitempty"`
+		EnableReviews     bool   `json:"enable_reviews"`
 	}
 
 	type GroupWithReview struct {
@@ -1052,13 +1147,65 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 		Items []OrderItemWithReview `json:"items"`
 	}
 
+	isPaid := order.Status == models.OrderPaid || 
+		order.Status == models.OrderProcessing || 
+		order.Status == models.OrderCompleted || 
+		order.Status == models.OrderShipped || 
+		order.Status == models.OrderDelivered || 
+		order.Status == models.OrderReadyToShip || 
+		order.Status == models.OrderReadyForPickup
+
 	groups := make([]GroupWithReview, len(order.MerchantGroups))
 	for i, g := range order.MerchantGroups {
 		items := make([]OrderItemWithReview, len(g.Items))
 		for j, item := range g.Items {
+			var enableReviews bool = true
+			var isDownloadable bool
+			var downloadableFiles string
+			var downloadLimit, downloadExpiry int
+			var purchaseNote string
+
+			// Ambil info dari product
+			var p models.Product
+			if err := bc.DB.Select("purchase_note, enable_reviews, is_downloadable, downloadable_files, download_limit, download_expiry").First(&p, "id = CAST(? AS UUID)", item.ProductID).Error; err == nil {
+				enableReviews = p.EnableReviews
+				if isPaid {
+					purchaseNote = p.PurchaseNote
+					
+					// Jika produk digital (dan tidak pakai variasi)
+					if item.ProductVariantID == nil || *item.ProductVariantID == "" {
+						if p.IsDownloadable {
+							isDownloadable = true
+							downloadableFiles = p.DownloadableFiles
+							downloadLimit = p.DownloadLimit
+							downloadExpiry = p.DownloadExpiry
+						}
+					}
+				}
+			}
+
+			// Jika pakai variasi, ambil info digitalnya dari variasi
+			if isPaid && item.ProductVariantID != nil && *item.ProductVariantID != "" {
+				var v models.ProductVariant
+				if err := bc.DB.Select("is_downloadable, downloadable_files, download_limit, download_expiry").First(&v, "id = CAST(? AS UUID)", *item.ProductVariantID).Error; err == nil {
+					if v.IsDownloadable {
+						isDownloadable = true
+						downloadableFiles = v.DownloadableFiles
+						downloadLimit = v.DownloadLimit
+						downloadExpiry = v.DownloadExpiry
+					}
+				}
+			}
+
 			items[j] = OrderItemWithReview{
-				OrderItem:  item,
-				IsReviewed: reviewedProducts[item.ProductID],
+				OrderItem:         item,
+				IsReviewed:        reviewedProducts[item.ProductID],
+				IsDownloadable:    isDownloadable,
+				DownloadableFiles: downloadableFiles,
+				DownloadLimit:     downloadLimit,
+				DownloadExpiry:    downloadExpiry,
+				PurchaseNote:      purchaseNote,
+				EnableReviews:     enableReviews,
 			}
 		}
 		groups[i] = GroupWithReview{
@@ -1150,4 +1297,196 @@ func (bc *BuyerController) CancelOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Pesanan berhasil dibatalkan"})
+}
+
+// POST /api/buyer/orders/dispute
+func (bc *BuyerController) SubmitDispute(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+	var req struct {
+		OrderID     string   `json:"order_id"`
+		Reason      string   `json:"reason"`
+		Amount      float64  `json:"amount"`
+		Attachments []string `json:"attachments"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	if req.OrderID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Order ID harus diisi")
+		return
+	}
+	if req.Reason == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Alasan sengketa harus diisi")
+		return
+	}
+	if req.Amount <= 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Nominal pengembalian harus lebih dari 0")
+		return
+	}
+
+	// Fetch order
+	var order models.Order
+	if err := bc.DB.Where("id = ? AND buyer_id = ?", req.OrderID, buyerID).First(&order).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Pesanan tidak ditemukan atau Anda tidak memiliki akses")
+		return
+	}
+
+	// Validate status eligibility
+	// Eligible status: shipped, delivered, completed, refund_requested
+	eligible := false
+	if order.Status == models.OrderShipped || order.Status == models.OrderDelivered || order.Status == models.OrderCompleted || order.Status == models.OrderRefundRequested {
+		eligible = true
+	}
+	if !eligible {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Pesanan dengan status %s tidak dapat diajukan komplain", order.Status))
+		return
+	}
+
+	// Validate amount capped at GrandTotal
+	if req.Amount > order.GrandTotal {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Nominal pengembalian tidak boleh melebihi total pesanan (Rp %v)", order.GrandTotal))
+		return
+	}
+
+	// Resolve MerchantID from the first merchant group of this order
+	var firstGroup models.OrderMerchantGroup
+	if err := bc.DB.Where("order_id = ?", order.ID).First(&firstGroup).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data toko/merchant untuk pesanan ini")
+		return
+	}
+	merchantID := firstGroup.MerchantID
+
+	// Attachments serialized to JSON array string
+	attachmentsJSON, err := json.Marshal(req.Attachments)
+	if err != nil {
+		attachmentsJSON = []byte("[]")
+	}
+
+	// Start database transaction
+	err = bc.DB.Transaction(func(tx *gorm.DB) error {
+		// Update order status directly (bypassing ValidateOrderTransition)
+		if err := tx.Model(&order).Update("status", models.OrderDisputed).Error; err != nil {
+			return err
+		}
+
+		// Update order merchant group status to "disputed"
+		if err := tx.Model(&models.OrderMerchantGroup{}).Where("order_id = ?", order.ID).Update("status", "disputed").Error; err != nil {
+			return err
+		}
+
+		// Create models.Dispute record
+		dispute := models.Dispute{
+			OrderID:     order.ID,
+			BuyerID:     buyerID,
+			MerchantID:  merchantID,
+			Reason:      req.Reason,
+			Amount:      req.Amount,
+			Attachments: string(attachmentsJSON),
+			Status:      "open",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := tx.Create(&dispute).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan sengketa: "+err.Error())
+		return
+	}
+
+	// Push notifications outside transaction
+	notifSvc := services.NewNotificationService(bc.DB)
+	// Notify Admin
+	_ = notifSvc.Push(models.AdminID, "admin", "dispute_new", "Sengketa Baru Diajukan", fmt.Sprintf("Buyer mengajukan komplain untuk pesanan %s", order.OrderNumber), "/admin/disputes")
+	// Notify Merchant
+	_ = notifSvc.Push(merchantID, "merchant", "dispute_new", "Sengketa Diajukan oleh Pembeli", fmt.Sprintf("Pesanan %s diajukan komplain oleh pembeli", order.OrderNumber), "/merchant/disputes")
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Komplain berhasil diajukan"})
+}
+
+// ─────────────────────────────────────────────────────────
+// BUYER NOTIFICATIONS
+// ─────────────────────────────────────────────────────────
+
+// GET /api/buyer/notifications
+func (bc *BuyerController) GetNotifications(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("user_id").(string)
+
+	var notifs []models.Notification
+	if err := bc.DB.Where("user_id = ? AND receiver_type IN ?", userID, []string{"user", "buyer"}).
+		Order("created_at desc").Limit(20).Find(&notifs).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": notifs})
+}
+
+// PUT /api/buyer/notifications/read
+func (bc *BuyerController) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("user_id").(string)
+
+	var req struct {
+		ID string `json:"id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.ID == "" {
+		bc.DB.Model(&models.Notification{}).
+			Where("user_id = ? AND receiver_type IN ?", userID, []string{"user", "buyer"}).
+			Update("is_read", true)
+	} else {
+		bc.DB.Model(&models.Notification{}).Where("id = ? AND user_id = ?", req.ID, userID).
+			Update("is_read", true)
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/buyer/notifications/delete
+func (bc *BuyerController) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("user_id").(string)
+	id := r.URL.Query().Get("id")
+
+	if id == "" {
+		utils.JSONError(w, http.StatusBadRequest, "ID notifikasi diperlukan")
+		return
+	}
+
+	bc.DB.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Notification{})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/buyer/notifications/all
+func (bc *BuyerController) DeleteAllNotifications(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("user_id").(string)
+
+	bc.DB.Where("user_id = ? AND receiver_type IN ?", userID, []string{"user", "buyer"}).
+		Delete(&models.Notification{})
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func getClientIPForCheckout(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		var err error
+		ip, _, err = net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+	}
+	if strings.Contains(ip, ",") {
+		parts := strings.Split(ip, ",")
+		ip = strings.TrimSpace(parts[0])
+	}
+	return ip
 }

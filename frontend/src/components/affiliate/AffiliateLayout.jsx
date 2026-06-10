@@ -155,8 +155,8 @@ const AffiliateLayout = () => {
     fetchProfile();
     
     // [Akuglow Sync] Real-time SSE Connection
-    const affiliateID = user.affiliate?.id || user.id; // Usually affiliate.id is used for pushing
-    const sse = new EventSource(`${API_BASE}/api/notifications/stream?user_id=${affiliateID}`);
+    const token = localStorage.getItem('token');
+    const sse = new EventSource(`${API_BASE}/api/notifications/stream?t=${token}`);
     
     sse.onmessage = (e) => {
       try {

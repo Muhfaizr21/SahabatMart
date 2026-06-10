@@ -9,13 +9,12 @@ const AdminPOS = () => {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('qris');
+  const paymentMethod = 'qris';
   const [amountPaid, setAmountPaid] = useState(0);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [member, setMember] = useState(null);
-  const [memberCode, setMemberCode] = useState('');
   const [isMemberScanning, setIsMemberScanning] = useState(false);
   const searchInputRef = useRef(null);
 
@@ -76,7 +75,6 @@ const AdminPOS = () => {
     try {
       const data = await fetchJson(`${API_BASE}/api/merchant/pos/member/${code}`);
       setMember(data);
-      setMemberCode('');
       setIsMemberScanning(false);
       toast.success(`Member: ${data.full_name}`);
     } catch (_err) {
@@ -183,7 +181,7 @@ const AdminPOS = () => {
         config, 
         (text) => handleCameraScan(text)
       ).catch(err => {
-        console.error("Camera start error:", _err);
+        console.error("Camera start error:", err);
         toast.error("Gagal membuka kamera. Pastikan izin diberikan.");
       });
 
@@ -240,7 +238,6 @@ const AdminPOS = () => {
     }
   };
 
-  const quickPay = [50000, 100000, 200000, 500000];
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
@@ -329,72 +326,112 @@ const AdminPOS = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-              {products.map(p => (
-                <div 
-                  key={p.id} 
-                  onClick={() => {
-                    if (!p.variants || p.variants.length === 0) {
-                      addToCart(p);
-                      toast.success(`${p.name} ditambahkan`);
-                    } else {
-                      toast('Pilih varian produk di bawah', { icon: '👇' });
-                    }
-                  }}
-                  className="bg-white p-3 md:p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-start text-left relative active:scale-95 border border-transparent hover:border-indigo-100"
-                >
-                  <div className="relative w-full aspect-square mb-3 md:mb-4 rounded-xl overflow-hidden bg-slate-100">
-                    <img src={formatImage(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    {p.variants && p.variants.length > 0 && (
-                      <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase shadow-lg">
-                        {p.variants.length} Varian
+              {products.map(p => {
+                const isVariable = p.product_type === 'variable';
+                const useVariant = (isVariable && p.variants && p.variants.length === 1) || (!isVariable && p.variants && p.variants.length > 0);
+                const targetVariant = useVariant ? p.variants[0] : null;
+                const displayPrice = targetVariant ? targetVariant.price : p.price;
+                const displayStock = targetVariant ? targetVariant.stock : p.stock;
+
+                return (
+                  <div 
+                    key={p.id} 
+                    onClick={() => {
+                      if (!isVariable) {
+                        if (displayStock <= 0) {
+                          toast.error('Stok habis');
+                          return;
+                        }
+                        if (targetVariant) {
+                          addToCart(p, targetVariant);
+                        } else {
+                          addToCart(p);
+                        }
+                        toast.success(`${p.name} ditambahkan`);
+                      } else {
+                        if (p.variants && p.variants.length > 0) {
+                          toast('Pilih varian produk di bawah', { icon: '👇' });
+                        } else {
+                          if (displayStock <= 0) {
+                            toast.error('Stok habis');
+                            return;
+                          }
+                          addToCart(p);
+                          toast.success(`${p.name} ditambahkan`);
+                        }
+                      }
+                    }}
+                    className="bg-white p-3 md:p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col items-start text-left relative active:scale-95 border border-transparent hover:border-indigo-100"
+                  >
+                    <div className="relative w-full aspect-square mb-3 md:mb-4 rounded-xl overflow-hidden bg-slate-100">
+                      <img src={formatImage(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      {isVariable && p.variants && p.variants.length > 1 && (
+                        <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase shadow-lg">
+                          {p.variants.length} Varian
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-[13px] md:text-sm font-bold text-slate-800 line-clamp-2 h-9 md:h-10 mb-1 leading-snug">{p.name}</h3>
+                    <div className="flex items-center justify-between w-full mb-2 md:mb-3">
+                      <div className="text-indigo-600 font-extrabold text-[13px] md:text-sm">
+                        {formatIDR(displayPrice)}
                       </div>
+                      <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${displayStock > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                        {displayStock} Stok
+                      </div>
+                    </div>
+                    
+                    {isVariable && p.variants && p.variants.length > 1 ? (
+                      <div className="w-full flex flex-wrap gap-1 md:gap-1.5 mt-auto">
+                        {p.variants.map(v => (
+                          <button 
+                            key={v.id} 
+                            disabled={v.stock <= 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (v.stock <= 0) {
+                                toast.error('Stok varian habis');
+                                return;
+                              }
+                              addToCart(p, v);
+                              toast.success(`${p.name} (${v.name}) ditambahkan`);
+                            }} 
+                            className={`text-[8px] md:text-[9px] font-bold px-1.5 md:px-2 py-1 rounded-md transition-all active:scale-90 border ${
+                              v.stock > 0 
+                              ? 'bg-slate-50 border-slate-100 hover:bg-indigo-600 hover:text-white' 
+                              : 'bg-slate-100 text-slate-400 border-transparent cursor-not-allowed'
+                            }`}
+                          >
+                            {v.name} ({v.stock})
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <button 
+                        disabled={displayStock <= 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (displayStock <= 0) {
+                            toast.error('Stok habis');
+                            return;
+                          }
+                          if (targetVariant) {
+                            addToCart(p, targetVariant);
+                          } else {
+                            addToCart(p);
+                          }
+                          toast.success(`${p.name} ditambahkan`);
+                        }}
+                        className={`w-full mt-auto py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md active:shadow-none ${
+                          displayStock > 0 ? 'bg-slate-900 hover:bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                        }`}
+                      >
+                         <i className="bx bx-plus" /> {displayStock > 0 ? 'Tambah' : 'Stok Habis'}
+                      </button>
                     )}
                   </div>
-                  <h3 className="text-[13px] md:text-sm font-bold text-slate-800 line-clamp-2 h-9 md:h-10 mb-1 leading-snug">{p.name}</h3>
-                  <div className="flex items-center justify-between w-full mb-2 md:mb-3">
-                    <div className="text-indigo-600 font-extrabold text-[13px] md:text-sm">{formatIDR(p.price)}</div>
-                    <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.stock > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {p.stock} Stok
-                    </div>
-                  </div>
-                  
-                  {p.variants && p.variants.length > 0 ? (
-                    <div className="w-full flex flex-wrap gap-1 md:gap-1.5 mt-auto">
-                      {p.variants.map(v => (
-                        <button 
-                          key={v.id} 
-                          disabled={v.stock <= 0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (v.stock <= 0) {
-                              toast.error('Stok varian habis');
-                              return;
-                            }
-                            addToCart(p, v);
-                            toast.success(`${p.name} (${v.name}) ditambahkan`);
-                          }} 
-                          className={`text-[8px] md:text-[9px] font-bold px-1.5 md:px-2 py-1 rounded-md transition-all active:scale-90 border ${
-                            v.stock > 0 
-                            ? 'bg-slate-50 border-slate-100 hover:bg-indigo-600 hover:text-white' 
-                            : 'bg-slate-100 text-slate-400 border-transparent cursor-not-allowed'
-                          }`}
-                        >
-                          {v.name} ({v.stock})
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <button 
-                      disabled={p.stock <= 0}
-                      className={`w-full mt-auto py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md active:shadow-none ${
-                        p.stock > 0 ? 'bg-slate-900 hover:bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                      }`}
-                    >
-                       <i className="bx bx-plus" /> {p.stock > 0 ? 'Tambah' : 'Stok Habis'}
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

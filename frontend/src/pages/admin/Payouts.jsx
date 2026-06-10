@@ -33,7 +33,7 @@ export default function AdminPayouts() {
       setToast(`Payout request ${status === 'paid' ? 'marked as settled' : status === 'approved' ? 'approved for payment' : 'rejected'}`);
       setTimeout(() => setToast(''), 4000);
       setSelected(null); setNote(''); load();
-    }).catch(err => alert(_err.message))
+    }).catch(err => alert(err.message))
     .finally(() => setProcessing(false));
   };
 

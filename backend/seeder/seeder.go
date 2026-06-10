@@ -1,8 +1,8 @@
 package seeder
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"fmt"
 	"strings"
 	"time"
@@ -83,6 +83,7 @@ func SeedAll(db *gorm.DB) {
 	// 6. Seed Marketing & RBAC
 	seedMarketing(db)
 	seedRBAC(db)
+	seedDefaultRoles(db) // Create default admin roles with permissions
 	SeedConfigs(db)
 	seedBlogs(db)
 	seedBanners(db)
@@ -97,7 +98,7 @@ func SeedAll(db *gorm.DB) {
 	// 9. Akuglow Skin Journey Dynamic Data
 	SeedSkinJourney(db)
 
-	// 10. SahabatMart Dynamic Finance Data
+	// 10. AkuGlow Dynamic Finance Data
 	// [LIVE] Cleaned version now only initializes platform configs & locations
 	SeedFinance(db)
 
@@ -620,7 +621,7 @@ func SeedConfigs(db *gorm.DB) {
 		{Key: "payment_tripay_url", Value: "https://tripay.co.id/api-sandbox", Description: "Tripay Base URL"},
 		{Key: "payment_sandbox_mode", Value: "true", Description: "Payment Sandbox Mode"},
 		{Key: "notif_email_enabled", Value: "true", Description: "Email Notifikasi Aktif"},
-		{Key: "app_frontend_url", Value: "http://localhost:5173", Description: "URL Frontend Aplikasi"},
+		{Key: "app_frontend_url", Value: "https://akuglow.com", Description: "URL Frontend Aplikasi"},
 		{Key: "notif_smtp_host", Value: "smtp.gmail.com", Description: "SMTP Host"},
 		{Key: "notif_smtp_port", Value: "587", Description: "SMTP Port"},
 		{Key: "notif_smtp_user", Value: "faizramadhan021104@gmail.com", Description: "SMTP User"},
@@ -863,4 +864,121 @@ func seedBanners(db *gorm.DB) {
 			db.Model(&existing).Updates(b)
 		}
 	}
+}
+
+// seedDefaultRoles creates default admin roles with their permissions
+func seedDefaultRoles(db *gorm.DB) {
+	fmt.Println("  -> Seeding Default Admin Roles...")
+
+	type roleConfig struct {
+		Name        string
+		Description string
+		PermCodes   []string
+	}
+
+	defaultRoles := []roleConfig{
+		{
+			Name:        "Customer Service Lead",
+			Description: "Akses penuh untuk tim Customer Service — handle complaints, user management, order tracking",
+			PermCodes: []string{
+				"view_dashboard", "view_analytics", "view_notifications",
+				"user_view", "user_update", "user_suspend",
+				"order_view", "order_update_status", "order_cancel", "order_view_financial",
+				"merchant_view",
+				"affiliate_view", "affiliate_view_commission",
+				"rbac_view",
+				"view_notifications",
+			},
+		},
+		{
+			Name:        "Catalog Manager",
+			Description: "Kelola produk, inventaris, kategori, dan brand. Tidak punya akses keuangan.",
+			PermCodes: []string{
+				"view_dashboard", "view_analytics", "view_notifications",
+				"product_view", "product_create", "product_update", "product_delete",
+				"product_bulk_action", "product_manage_variant", "product_manage_pricing",
+				"inventory_view", "inventory_update", "inventory_inbound", "inventory_mutation",
+				"inventory_restock",
+				"category_view", "category_create", "category_update", "category_delete",
+				"product_import_export",
+				"merchant_view",
+				"view_analytics",
+			},
+		},
+		{
+			Name:        "Finance Officer",
+			Description: "Akses ringkasan keuangan, transaksi, payout, dan laporan. Tidak bisa ubah produk.",
+			PermCodes: []string{
+				"view_dashboard", "view_analytics", "view_notifications",
+				"finance_view_summary", "finance_view_transactions",
+				"finance_process_payout", "finance_view_reports", "finance_export_reports",
+				"order_view", "order_view_financial",
+				"merchant_view", "merchant_view_payout",
+				"affiliate_view", "affiliate_view_commission", "affiliate_approve_withdrawal",
+				"report_sales", "report_users", "report_export_all",
+				"view_analytics",
+			},
+		},
+		{
+			Name:        "Content Manager",
+			Description: "Kelola blog, banner, edukasi, event, dan bahan promosi. Tidak punya akses data sensitif.",
+			PermCodes: []string{
+				"view_dashboard", "view_analytics", "view_notifications",
+				"marketing_view_banner", "marketing_manage_banner",
+				"marketing_view_voucher", "marketing_create_voucher",
+				"marketing_update_voucher", "marketing_delete_voucher",
+				"content_blog",
+				"content_education", "content_event", "content_promo_material",
+				"merchant_view",
+				"affiliate_view", "affiliate_manage_materials",
+				"product_view",
+				"view_analytics",
+			},
+		},
+		{
+			Name:        "Operations Lead",
+			Description: "Kelola logistic, restitusi, dan konfigurasi platform. Akses sistem broadest.",
+			PermCodes: []string{
+				"view_dashboard", "view_analytics", "view_notifications",
+				"order_view", "order_update_status", "order_cancel", "order_refund", "order_export",
+				"order_view_financial",
+				"inventory_view", "inventory_update", "inventory_inbound", "inventory_mutation",
+				"inventory_restock", "inventory_report",
+				"merchant_view", "merchant_verify", "merchant_suspend",
+				"affiliate_view", "affiliate_update_tier", "affiliate_manage_tiers",
+				"settings_view", "settings_update",
+				"user_view", "user_suspend",
+				"report_inventory", "report_sales",
+				"view_analytics",
+			},
+		},
+	}
+
+	for _, rc := range defaultRoles {
+		// Load permissions by code
+		var perms []models.Permission
+		if len(rc.PermCodes) > 0 {
+			db.Where("code IN ?", rc.PermCodes).Find(&perms)
+		}
+
+		role := models.Role{
+			Name:        rc.Name,
+			Description: rc.Description,
+			Permissions: perms,
+		}
+		// Use FirstOrCreate to avoid duplicates on re-seed
+		var existing models.Role
+		if err := db.Preload("Permissions").Where("name = ?", rc.Name).First(&existing).Error; err == nil {
+			// Update description and permissions on existing role
+			existing.Description = rc.Description
+			existing.Permissions = perms
+			db.Save(&existing)
+			fmt.Printf("    -> Updated role: %s (%d permissions)\n", rc.Name, len(perms))
+		} else {
+			db.Create(&role)
+			fmt.Printf("    -> Created role: %s (%d permissions)\n", rc.Name, len(perms))
+		}
+	}
+
+	fmt.Println("  -> Default roles seeded.")
 }

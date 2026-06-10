@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
@@ -9,6 +9,7 @@ export default function AdminCategories() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
 
   // Search, Sorting & Pagination States
@@ -17,7 +18,7 @@ export default function AdminCategories() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  const EMPTY = { name: '', slug: '', description: '', order: 0 };
+  const EMPTY = { name: '', slug: '', description: '', order: 0, image: '' };
   
   const load = () => {
     setLoading(true);
@@ -62,6 +63,23 @@ export default function AdminCategories() {
   const handleName = (name) => {
     const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     setModal(p => ({ ...p, name, slug }));
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await uploadFile(`${API}/upload`, file);
+      const url = res.imageUrl || res.url || res.data?.url;
+      if (url) {
+        setModal(prev => ({ ...prev, image: url }));
+      }
+    } catch (_err) {
+      alert('Upload gagal: ' + _err.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const save = (e) => {
@@ -206,8 +224,12 @@ export default function AdminCategories() {
                   </td>
                   <td style={A.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 11, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <i className="bx bxs-category" style={{ fontSize: 18, color: '#6366f1' }} />
+                      <div style={{ width: 40, height: 40, borderRadius: 11, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                        {cat.image ? (
+                          <img src={formatImage(cat.image)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <i className="bx bxs-category" style={{ fontSize: 18, color: '#6366f1' }} />
+                        )}
                       </div>
                       <div>
                         <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{cat.name}</div>
@@ -344,6 +366,45 @@ export default function AdminCategories() {
               <div>
                 <FieldLabel>URL Slug (Auto)</FieldLabel>
                 <input style={{ ...A.select, width: '100%', fontFamily: 'monospace', color: '#6366f1', fontWeight: 700 }} placeholder="fashion-pria" value={modal.slug} onChange={e => setModal(p => ({ ...p, slug: e.target.value }))} required />
+              </div>
+              <div>
+                <FieldLabel>Thumbnail Kategori</FieldLabel>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  {/* Local Upload Box */}
+                  <div style={{ 
+                      width: 80, height: 80, borderRadius: 14, border: '2px dashed #cbd5e1', 
+                      background: '#f8fafc', display: 'flex', alignItems: 'center', 
+                      justifyContent: 'center', position: 'relative', overflow: 'hidden', flexShrink: 0 
+                  }}>
+                    {modal.image ? (
+                      <img src={formatImage(modal.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    ) : (
+                      <i className="bx bx-image-add" style={{ fontSize: 24, color: '#94a3b8' }} />
+                    )}
+                    <input 
+                      type="file" 
+                      onChange={handleUpload} 
+                      style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} 
+                      accept="image/*" 
+                    />
+                    {uploading && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="bx bx-loader-alt animate-spin" style={{ color: '#6366f1', fontSize: 20 }} />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Direct URL input */}
+                  <div style={{ flex: 1 }}>
+                    <FieldLabel>Atau masukkan URL Foto</FieldLabel>
+                    <input 
+                      style={{ ...A.select, width: '100%' }} 
+                      placeholder="https://example.com/kategori.jpg" 
+                      value={modal.image || ''} 
+                      onChange={e => setModal(p => ({ ...p, image: e.target.value }))} 
+                    />
+                  </div>
+                </div>
               </div>
               <div>
                 <FieldLabel>Urutan Tampil</FieldLabel>

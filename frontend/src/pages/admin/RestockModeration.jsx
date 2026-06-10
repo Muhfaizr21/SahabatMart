@@ -9,7 +9,7 @@ export default function RestockModeration() {
   const [modal, setModal] = useState(null);
   const [note, setNote] = useState('');
   const [filter, setFilter] = useState('');
-  const [trackingNumber, setTrackingNumber] = useState('');
+  const [courierCode, setCourierCode] = useState('jne');
 
   useEffect(() => { load(); }, [filter]);
 
@@ -40,7 +40,7 @@ export default function RestockModeration() {
         body = { admin_note: note };
       } else if (status === 'shipped') {
         url = `${ADMIN_API_BASE}/warehouse/restock/ship/${modal.id}`;
-        body = { tracking_number: trackingNumber, admin_note: note };
+        body = { courier_code: courierCode, admin_note: note };
       }
 
       await fetchJson(url, {
@@ -51,7 +51,6 @@ export default function RestockModeration() {
       toast.success(`Berhasil update status ke ${status}`, { id: loadingToast });
       setModal(null);
       setNote('');
-      setTrackingNumber('');
       load();
     } catch (_err) {
       toast.error('Gagal: ' + _err.message, { id: loadingToast });
@@ -121,7 +120,13 @@ export default function RestockModeration() {
                         </div>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{req.merchant?.store_name || "Unknown Store"}</div>
-                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{req.merchant_id.split('-')[0]}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace', letterSpacing: '-0.02em' }}>ID: {req.merchant_id.split('-')[0]}</div>
+                          {req.tracking_number && (
+                            <div style={{ fontSize: 11, color: '#0284c7', fontWeight: 600, marginTop: 4 }}>
+                              <i className='bx bx-receipt' style={{ marginRight: 4 }} />
+                              {req.courier_code?.toUpperCase()}: {req.tracking_number}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -234,35 +239,69 @@ export default function RestockModeration() {
                 {modal.status === 'approved' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ background: '#fff', padding: 16, borderRadius: 16, border: '1px solid #e2e8f0' }}>
-                      <FieldLabel>Nomor Resi / Surat Jalan (B2B)</FieldLabel>
-                      <input 
-                        type="text" 
-                        style={{ ...A.input, marginBottom: 16 }} 
-                        placeholder="Masukkan nomor pelacakan..." 
-                        value={trackingNumber}
-                        onChange={e => setTrackingNumber(e.target.value)}
-                      />
+                      <FieldLabel>Kurir (B2B)</FieldLabel>
+                      <select
+                        style={{ ...A.input, marginBottom: 12, padding: '12px 16px', background: '#f8fafc' }}
+                        value={courierCode}
+                        onChange={e => setCourierCode(e.target.value)}
+                      >
+                        <option value="jne">JNE</option>
+                        <option value="sicepat">SiCepat</option>
+                        <option value="jnt">J&T Express</option>
+                        <option value="anteraja">AnterAja</option>
+                        <option value="ninja">Ninja Xpress</option>
+                        <option value="lion">Lion Parcel</option>
+                        <option value="gojek">GoSend</option>
+                        <option value="grab">GrabExpress</option>
+                      </select>
                       <button 
                         onClick={() => handleModerate('shipped')} 
-                        disabled={!trackingNumber}
-                        style={{ ...A.btnPrimary, width: '100%', height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #0f172a, #334155)', opacity: !trackingNumber ? 0.6 : 1 }}
+                        style={{ ...A.btnPrimary, width: '100%', height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #0f172a, #334155)', marginTop: 16 }}
                       >
                         <i className='bx bxs-truck' style={{ marginRight: 8 }} />
-                        Konfirmasi Pengiriman
+                        Konfirmasi & Buat Pesanan Biteship
                       </button>
                     </div>
                   </div>
                 )}
-                {modal.status === 'shipped' && (
+                 {modal.status === 'shipped' && (
                   <div style={{ flex: 1, textAlign: 'center', padding: '24px', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 20, color: '#64748b', fontSize: 13, fontWeight: 600 }}>
                     <i className='bx bx-time-five' style={{ fontSize: 32, display: 'block', marginBottom: 12, color: '#94a3b8' }} />
-                    Menunggu konfirmasi penerimaan oleh Merchant...
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+                      Resi Terbit: <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', color: '#0f172a' }}>{modal.tracking_number}</span> ({modal.courier_code?.toUpperCase()})
+                    </div>
+                    {modal.shipping_label_url && (
+                      <a 
+                        href={modal.shipping_label_url} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 700, fontSize: 12, textDecoration: 'none', marginBottom: 16, cursor: 'pointer' }}
+                      >
+                        <i className='bx bx-cloud-download' style={{ fontSize: 16 }} /> Download Label Pengiriman
+                      </a>
+                    )}
+                    <div style={{ display: 'block' }}>Menunggu konfirmasi penerimaan oleh Merchant...</div>
                   </div>
                 )}
                 {(modal.status === 'received' || modal.status === 'rejected') && (
                   <div style={{ flex: 1, textAlign: 'center', padding: '24px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, color: '#0f172a', fontSize: 13, fontWeight: 700 }}>
                     <i className='bx bx-check-double' style={{ fontSize: 32, display: 'block', marginBottom: 12, color: '#16a34a' }} />
-                    Proses Selesai. Status Akhir: {modal.status.toUpperCase()}
+                    {modal.tracking_number && (
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 12 }}>
+                        Resi: <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', color: '#0f172a' }}>{modal.tracking_number}</span> ({modal.courier_code?.toUpperCase()})
+                      </div>
+                    )}
+                    {modal.shipping_label_url && (
+                      <a 
+                        href={modal.shipping_label_url} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 700, fontSize: 12, textDecoration: 'none', marginBottom: 16, cursor: 'pointer' }}
+                      >
+                        <i className='bx bx-cloud-download' style={{ fontSize: 16 }} /> Download Label Pengiriman
+                      </a>
+                    )}
+                    <div>Proses Selesai. Status Akhir: {modal.status.toUpperCase()}</div>
                   </div>
                 )}
               </div>

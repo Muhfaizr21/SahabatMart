@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
 	"fmt"
 	"time"
 	"gorm.io/gorm"
@@ -52,12 +52,12 @@ func (s *AdminService) UpdateUserStatus(adminID, userID, status, ip string) erro
 func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminNote, trackingNumber string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		var req models.RestockRequest
-		if err := tx.Preload("Items").First(&req, "id = ?", requestID).Error; err != nil {
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Preload("Items").First(&req, "id = ?", requestID).Error; err != nil {
 			return err
 		}
 
 		// Status Transition Validation
-		if req.Status != "pending" && req.Status != "requested" && status != "shipped" && status != "rejected" {
+		if req.Status != "pending" && req.Status != "requested" && status != "shipped" && status != "rejected" && status != "approved" {
 			return fmt.Errorf("transisi status tidak valid dari %s ke %s", req.Status, status)
 		}
 
@@ -66,8 +66,14 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 			// Deduct from Pusat
 			for _, item := range req.Items {
 				var pusatInv models.Inventory
-				err := tx.Where("merchant_id = ? AND product_id = ?", models.PusatID, item.ProductID).First(&pusatInv).Error
-				if err != nil {
+				dbInv := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", models.PusatID, item.ProductID)
+				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+					dbInv = dbInv.Where("product_variant_id = ?", *item.ProductVariantID)
+				} else {
+					dbInv = dbInv.Where("product_variant_id IS NULL OR product_variant_id = ''")
+				}
+
+				if err := dbInv.First(&pusatInv).Error; err != nil {
 					return fmt.Errorf("pusat tidak memiliki stok untuk produk %s", item.ProductID)
 				}
 				if pusatInv.Stock < item.Quantity {
@@ -80,16 +86,41 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 					return err
 				}
 
+				// Deduct from Master Tables (Sync for Admin UI)
+				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
+					if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+						Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+						return err
+					}
+
+					// Sync parent product stock if not variable
+					var parentProduct models.Product
+					if err := tx.Select("id, product_type").First(&parentProduct, "id = ?", item.ProductID).Error; err == nil {
+						if parentProduct.ProductType != "variable" {
+							if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+								Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+								return err
+							}
+						}
+					}
+				} else {
+					if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+						Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+						return err
+					}
+				}
+
 				// Log Mutation Pusat (OUT)
 				tx.Create(&models.StockMutation{
-					ProductID:   item.ProductID,
-					MerchantID:  models.PusatID,
-					Type:        "RESTOCK_OUT",
-					Quantity:    item.Quantity,
-					Reference:   req.ID,
-					StockBefore: stockBefore,
-					StockAfter:  pusatInv.Stock,
-					Note:        "Pengiriman ke Merchant: " + req.MerchantID,
+					ProductID:        item.ProductID,
+					ProductVariantID: item.ProductVariantID,
+					MerchantID:       models.PusatID,
+					Type:             "RESTOCK_OUT",
+					Quantity:         -item.Quantity,
+					Reference:        req.ID,
+					StockBefore:      stockBefore,
+					StockAfter:       pusatInv.Stock,
+					Note:             "Pengiriman ke Merchant: " + req.MerchantID,
 				})
 			}
 		}

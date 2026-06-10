@@ -1,9 +1,9 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
+	"akuglow/backend/utils"
 	"errors"
 	"fmt"
 	"strings"
@@ -94,9 +94,16 @@ func (s *AuthService) Register(email, password, fullName, phone, role, referralC
 		}
 
 		if role == "merchant" {
+			storeName := fullName + "'s Store"
+			slugName := utils.Slugify(storeName)
+			if slugName == "" {
+				slugName = "mitra-merchant"
+			}
+			slug := fmt.Sprintf("%s-%s", slugName, strings.ToLower(utils.GenerateShortCode(6)))
 			if err := tx.Create(&models.Merchant{
 				UserID:    user.ID,
-				StoreName: fullName + "'s Store",
+				StoreName: storeName,
+				Slug:      slug,
 				Status:    "pending",
 			}).Error; err != nil {
 				return err
@@ -160,15 +167,26 @@ func (s *AuthService) PopulatePermissions(user *models.User) {
 		user.Permissions = []string{"all"}
 		return
 	}
-	if user.Role == "admin" && user.AdminRole != "" {
-		var role models.Role
-		if err := s.DB.Preload("Permissions").First(&role, "name = ?", user.AdminRole).Error; err == nil {
-			var perms []string
-			for _, p := range role.Permissions {
-				perms = append(perms, p.Code)
+	if user.Role == "admin" {
+		// Try to load from admin_role (custom RBAC role name)
+		if user.AdminRole != "" {
+			var role models.Role
+			if err := s.DB.Preload("Permissions").First(&role, "name = ?", user.AdminRole).Error; err == nil {
+				var perms []string
+				for _, p := range role.Permissions {
+					perms = append(perms, p.Code)
+				}
+				user.Permissions = perms
+				return
 			}
-			user.Permissions = perms
 		}
+		// Fallback: admin without admin_role gets base dashboard access
+		user.Permissions = []string{
+			"view_dashboard",
+			"view_analytics",
+			"view_notifications",
+		}
+		return
 	}
 }
 

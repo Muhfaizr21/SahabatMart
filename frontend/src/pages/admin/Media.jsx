@@ -47,8 +47,8 @@ export default function AdminMediaLibrary() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`Berkas ${file.name} melebihi batas ukuran 5MB`);
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error(`Berkas ${file.name} melebihi batas ukuran 50MB`);
         continue;
       }
 
@@ -268,13 +268,13 @@ export default function AdminMediaLibrary() {
               </>
             ) : (
               <>
-                <i className="bx bx-cloud-upload" /> Unggah Foto
+                <i className="bx bx-cloud-upload" /> Unggah Media
               </>
             )}
             <input 
               type="file" 
               multiple 
-              accept="image/*" 
+              accept="image/*,video/*" 
               style={{ display: 'none' }} 
               onChange={handleUpload} 
               disabled={uploading} 
@@ -321,12 +321,22 @@ export default function AdminMediaLibrary() {
                         className={`media-card ${isSelected ? 'selected' : ''}`}
                         onClick={() => setSelectedItem(item)}
                       >
-                        <img 
-                          className="media-card-img" 
-                          src={formatImage(item.url)} 
-                          alt={item.filename} 
-                          loading="lazy"
-                        />
+                        {item.mime_type?.startsWith('video/') || item.url?.endsWith('.mp4') || item.url?.endsWith('.webm') || item.url?.endsWith('.mov') ? (
+                          <video 
+                            className="media-card-img" 
+                            src={formatImage(item.url)} 
+                            muted 
+                            playsInline
+                            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <img 
+                            className="media-card-img" 
+                            src={formatImage(item.url)} 
+                            alt={item.filename} 
+                            loading="lazy"
+                          />
+                        )}
                         {isSelected && (
                           <div className="media-card-badge">
                             <i className="bx bx-check" />
@@ -385,11 +395,20 @@ export default function AdminMediaLibrary() {
                 INFORMASI BERKAS
               </div>
               <div style={{ aspectRatio: '1.4', background: '#f8fafc', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img 
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                  src={formatImage(selectedItem.url)} 
-                  alt={selectedItem.filename}
-                />
+                {selectedItem.mime_type?.startsWith('video/') || selectedItem.url?.endsWith('.mp4') || selectedItem.url?.endsWith('.webm') || selectedItem.url?.endsWith('.mov') ? (
+                  <video 
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                    src={formatImage(selectedItem.url)} 
+                    controls
+                    playsInline
+                  />
+                ) : (
+                  <img 
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                    src={formatImage(selectedItem.url)} 
+                    alt={selectedItem.filename}
+                  />
+                )}
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

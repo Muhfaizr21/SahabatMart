@@ -26,7 +26,7 @@ export default function StatusMitra() {
     setApplying(true);
     setApplyResult(null);
     try {
-      const res = await fetchJson(`${AFFILIATE_API_BASE}/apply-merchant`, {
+      await fetchJson(`${AFFILIATE_API_BASE}/apply-merchant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ store_name: storeName }),

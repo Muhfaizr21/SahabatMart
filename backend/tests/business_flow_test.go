@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"fmt"
 	"os"
 	"testing"
@@ -30,7 +30,7 @@ func SetupTestDB() *gorm.DB {
 	}
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
-		dbName = "sahabatmart"
+		dbName = "akuglow"
 	}
 	dbName = dbName + "_test"
 	port := os.Getenv("DB_PORT")

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 	"math"
 	"strings"
 
@@ -1059,10 +1059,25 @@ func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.R
 		req.StoreName = profile.FullName + " Store"
 	}
 
+	slugName := utils.Slugify(req.StoreName)
+	if slugName == "" {
+		slugName = "toko-merchant"
+	}
+	slug := fmt.Sprintf("%s-%s", slugName, strings.ToLower(utils.GenerateShortCode(6)))
+
+	// Validate store name is unique
+	var nameConflict int64
+	ac.DB.Model(&models.Merchant{}).Where("store_name = ?", req.StoreName).Count(&nameConflict)
+	if nameConflict > 0 {
+		utils.JSONError(w, http.StatusConflict, fmt.Sprintf("Nama toko '%s' sudah digunakan merchant lain. Silakan gunakan nama lain.", req.StoreName))
+		return
+	}
+
 	// 4. Buat merchant record dengan status pending
 	newMerchant := models.Merchant{
 		UserID:    userID,
 		StoreName: req.StoreName,
+		Slug:      slug,
 		City:      req.City,
 		Status:    "pending",
 	}

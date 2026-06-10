@@ -1,6 +1,6 @@
-# 🏪 SahabatMart Merchant Portal - 100% Comprehensive Feature Specification
+# 🏪 AkuGlow Merchant Portal - 100% Comprehensive Feature Specification
 
-Dokumen ini adalah cetak biru (blueprint) final dan **komprehensif 100%** untuk pengembangan **Portal Merchant (Sisi Penjual)** pada ekosistem SahabatMart. Sebagai platform *Multi-Merchant dengan Affiliate terintegrasi*, Portal Merchant tidak hanya berfungsi sebagai alat input barang, tetapi sebagai *Command Center* bisnis setiap penjual.
+Dokumen ini adalah cetak biru (blueprint) final dan **komprehensif 100%** untuk pengembangan **Portal Merchant (Sisi Penjual)** pada ekosistem AkuGlow. Sebagai platform *Multi-Merchant dengan Affiliate terintegrasi*, Portal Merchant tidak hanya berfungsi sebagai alat input barang, tetapi sebagai *Command Center* bisnis setiap penjual.
 
 Semua fitur yang tercantum di bawah ini wajib diimplementasikan untuk mencapai standar siap-produksi (*Production-Ready*).
 

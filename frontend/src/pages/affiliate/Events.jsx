@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
 
 export default function Events() {
   const [events, setEvents] = useState([]);
@@ -30,6 +30,43 @@ export default function Events() {
   const handlePageChange = (p) => {
     fetchEvents(p);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getPaginationItems = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      
+      const leftBound = Math.max(2, page - 1);
+      const rightBound = Math.min(totalPages - 1, page + 1);
+      
+      let start = leftBound;
+      let end = rightBound;
+      if (page <= 3) {
+        end = 4;
+      } else if (page >= totalPages - 2) {
+        start = totalPages - 3;
+      }
+      
+      if (start > 2) {
+        pages.push('...');
+      }
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      
+      if (end < totalPages - 1) {
+        pages.push('...');
+      }
+      
+      pages.push(totalPages);
+    }
+    return pages;
   };
 
   if (loading) return (
@@ -71,22 +108,36 @@ export default function Events() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {events.map((event, idx) => (
-                <div key={idx} className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 flex flex-col justify-between">
+                <div key={idx} className="bg-slate-900/40 border border-white/5 rounded-3xl relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 flex flex-col justify-between">
                   <div>
-                    <div className="absolute top-4 right-4 bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-500/20">
-                      {event.type}
+                    {/* Header Image / Cover */}
+                    <div className="h-44 w-full overflow-hidden bg-slate-800 relative border-b border-white/5">
+                      {event.image_url ? (
+                        <img 
+                          src={formatImage(event.image_url)} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                          alt={event.title} 
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-900/40 to-slate-800/40">
+                          <span className="material-symbols-outlined text-5xl text-indigo-500/50">calendar_month</span>
+                        </div>
+                      )}
+                      <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-500/20">
+                        {event.type}
+                      </div>
                     </div>
                     
-                    <div className="mb-4">
-                      <span className="material-symbols-outlined text-3xl text-indigo-500 mb-2">calendar_month</span>
+                    <div className="p-6">
                       <div className="text-lg font-bold text-white mb-1 line-clamp-2">{event.title}</div>
-                      <div className="text-[11px] font-bold text-slate-400 italic">
+                      <div className="text-[11px] font-bold text-slate-400 italic mb-3">
                         {new Date(event.start_time).toLocaleDateString('id', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </div>
+                      <p className="text-slate-400 text-xs line-clamp-3 font-medium leading-relaxed">{event.description}</p>
                     </div>
                   </div>
 
-                  <div className="mt-4">
+                  <div className="p-6 pt-0 mt-2">
                     {event.type.toLowerCase() === 'online' ? (
                       <a href={event.location} target="_blank" rel="noreferrer" className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-center block shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 transition-colors">
                         Join Webinar <i className='bx bx-video ml-1'></i>
@@ -111,16 +162,25 @@ export default function Events() {
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
                 
-                <div className="flex gap-2">
-                  {[...Array(totalPages)].map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handlePageChange(i + 1)}
-                      className={`w-10 h-10 rounded-xl font-black text-xs transition-all ${page === i + 1 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
+                <div className="flex gap-2 items-center">
+                  {getPaginationItems().map((p, i) => {
+                    if (p === '...') {
+                      return (
+                        <span key={`dots-${i}`} className="text-slate-500 font-bold px-1 select-none">
+                          ...
+                        </span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => handlePageChange(p)}
+                        className={`w-10 h-10 rounded-xl font-black text-xs transition-all ${page === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <button 

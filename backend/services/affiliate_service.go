@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/repositories"
+	"akuglow/backend/models"
+	"akuglow/backend/repositories"
 	"errors"
 	"fmt"
 	"log"
@@ -787,7 +787,7 @@ func (s *AffiliateService) RequestWithdrawal(affiliateID string, amount float64)
 	configSvc := NewConfigService(s.DB)
 	isPayday, allowedDates := configSvc.IsPayday()
 	if !isPayday {
-		return nil, fmt.Errorf("penarikan komisi hanya dapat dilakukan pada tanggal: %s", allowedDates)
+		return nil, fmt.Errorf("penarikan komisi hanya dapat dilakukan pada: %s", allowedDates)
 	}
 
 	// 5. Minimum withdrawal amount

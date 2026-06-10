@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson, postJson, uploadFile, API_BASE, formatImage } from '../lib/api';
+import { BUYER_API_BASE, fetchJson, postJson, uploadFile, API_BASE, formatImage, formatPaymentMethod } from '../lib/api';
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -14,6 +14,52 @@ export default function OrderDetailPage() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewImage, setReviewImage] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Dispute State
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeAmount, setDisputeAmount] = useState('');
+  const [disputeImage, setDisputeImage] = useState(null);
+  const [submittingDispute, setSubmittingDispute] = useState(false);
+
+  const handleSubmitDispute = async () => {
+    if (!disputeReason.trim()) {
+      alert("Alasan komplain tidak boleh kosong");
+      return;
+    }
+    const amt = parseFloat(disputeAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Nominal pengembalian dana tidak valid");
+      return;
+    }
+    if (amt > order.grand_total) {
+      alert(`Nominal pengembalian tidak boleh melebihi total pesanan (Rp${order.grand_total?.toLocaleString('id')})`);
+      return;
+    }
+    setSubmittingDispute(true);
+    try {
+      let imageUrl = "";
+      if (disputeImage) {
+        const uploadRes = await uploadFile(`${API_BASE}/api/buyer/upload`, disputeImage, 'image');
+        if (uploadRes && uploadRes.url) {
+          imageUrl = uploadRes.url;
+        }
+      }
+      await postJson(`${BUYER_API_BASE}/orders/dispute`, {
+        order_id: id,
+        reason: disputeReason,
+        amount: amt,
+        attachments: imageUrl ? [imageUrl] : []
+      });
+      alert("Komplain berhasil diajukan!");
+      setDisputeModalOpen(false);
+      loadDetail();
+    } catch (_err) {
+      alert(_err.message || "Gagal mengajukan komplain");
+    } finally {
+      setSubmittingDispute(false);
+    }
+  };
 
   const handleOpenReview = (item) => {
     setSelectedItemForReview(item);
@@ -138,6 +184,8 @@ export default function OrderDetailPage() {
                     order.status === 'completed' ? 'bg-green-50 text-green-600' : 
                     order.status === 'shipped' ? 'bg-blue-50 text-blue-600' : 
                     order.status === 'cancelled' ? 'bg-red-50 text-red-600' : 
+                    order.status === 'disputed' ? 'bg-amber-50 text-amber-600' : 
+                    order.status === 'refunded' ? 'bg-gray-100 text-gray-600' : 
                     'bg-orange-50 text-orange-600'}`}>
                     {order.status}
                   </span>
@@ -177,7 +225,42 @@ export default function OrderDetailPage() {
                           <p className="text-xs text-gray-500 font-bold">{item.quantity}x <span className="text-gray-900">Rp{item.unit_price?.toLocaleString('id')}</span></p>
                           <p className="font-black text-gray-900 text-sm">Rp{(item.unit_price * item.quantity).toLocaleString('id')}</p>
                         </div>
-                        {order.status === 'completed' && (
+                        {item.is_downloadable && item.downloadable_files && (() => {
+                          let files = [];
+                          try {
+                            files = JSON.parse(item.downloadable_files || '[]');
+                          } catch (e) {
+                            files = [];
+                          }
+                          if (files.length === 0) return null;
+                          return (
+                            <div className="mt-3 p-3 bg-violet-50/70 border border-violet-100 rounded-2xl">
+                              <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">download</span>
+                                File Unduhan Digital
+                              </p>
+                              <div className="flex flex-col gap-1.5">
+                                {files.map((file, fidx) => (
+                                  <a key={fidx} href={file.file_url} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-xs text-violet-700 font-bold hover:text-violet-900 transition-colors">
+                                    <span className="material-symbols-outlined text-sm">download_for_offline</span>
+                                    {file.name || `Unduh File ${fidx + 1}`}
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {item.purchase_note && (
+                          <div className="mt-3 p-3 bg-blue-50/70 border border-blue-100 rounded-2xl flex items-start gap-2 text-blue-700">
+                            <span className="material-symbols-outlined text-base mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
+                            <div className="flex-1 text-xs">
+                              <p className="font-black uppercase tracking-wider text-[10px] text-blue-500 mb-0.5">Catatan Pembelian</p>
+                              <p className="font-semibold whitespace-pre-line leading-relaxed">{item.purchase_note}</p>
+                            </div>
+                          </div>
+                        )}
+                        {order.status === 'completed' && item.enable_reviews !== false && (
                           <div className="mt-3">
                             {item.is_reviewed ? (
                               <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-4 py-2 rounded-xl border border-green-100 w-fit">
@@ -272,6 +355,20 @@ export default function OrderDetailPage() {
                       Batalkan Pesanan
                     </button>
                   )}
+
+                  {(order.status === 'shipped' || order.status === 'delivered' || order.status === 'completed' || order.status === 'refund_requested') && (
+                    <button 
+                      onClick={() => {
+                        setDisputeReason('');
+                        setDisputeAmount(order.grand_total || 0);
+                        setDisputeImage(null);
+                        setDisputeModalOpen(true);
+                      }}
+                      className="w-full bg-amber-50 text-amber-700 font-bold py-3 rounded-2xl border border-amber-200 hover:bg-amber-600 hover:text-white transition-all text-xs"
+                    >
+                      Ajukan Komplain
+                    </button>
+                  )}
                  </div>
             </div>
 
@@ -282,7 +379,7 @@ export default function OrderDetailPage() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Metode</p>
-                    <p className="font-bold text-blue-900">{payment.payment_name || payment.payment_method}</p>
+                    <p className="font-bold text-blue-900">{formatPaymentMethod(payment.payment_name || payment.payment_method)}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Status</p>
@@ -377,6 +474,66 @@ export default function OrderDetailPage() {
                 className="w-full mt-4 bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all disabled:opacity-50"
               >
                 {submittingReview ? 'Mengirim...' : 'Kirim Ulasan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Modal */}
+      {disputeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setDisputeModalOpen(false)}
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-gray-900 transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+            <h2 className="text-xl font-black text-gray-900 mb-6">Ajukan Komplain</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-left">Alasan Sengketa / Komplain</label>
+                <textarea 
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-gray-900"
+                  rows="3"
+                  placeholder="Jelaskan alasan komplain secara detail (misal: barang rusak/kurang)..."
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-left">
+                  Nominal Refund Pengembalian Dana (Max Rp{order.grand_total?.toLocaleString('id')})
+                </label>
+                <input 
+                  type="number"
+                  value={disputeAmount}
+                  onChange={(e) => setDisputeAmount(e.target.value)}
+                  max={order.grand_total}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-gray-900"
+                  placeholder="Masukkan nominal refund..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-left">Foto Bukti (Opsional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setDisputeImage(e.target.files[0])}
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-6 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer"
+                />
+              </div>
+
+              <button 
+                onClick={handleSubmitDispute}
+                disabled={submittingDispute}
+                className="w-full mt-4 bg-amber-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-amber-500/20 hover:bg-amber-700 transition-all disabled:opacity-50"
+              >
+                {submittingDispute ? 'Mengirim...' : 'Kirim Komplain'}
               </button>
             </div>
           </div>

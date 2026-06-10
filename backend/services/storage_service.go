@@ -34,6 +34,22 @@ func (s *StorageService) SaveImage(file multipart.File, header *multipart.FileHe
 		".png":  true,
 		".webp": true,
 		".gif":  true,
+		".mp4":  true,
+		".mov":  true,
+		".avi":  true,
+		".mkv":  true,
+		".webm": true,
+		".pdf":  true,
+		".zip":  true,
+		".rar":  true,
+		".doc":  true,
+		".docx": true,
+		".xls":  true,
+		".xlsx": true,
+		".ppt":  true,
+		".pptx": true,
+		".txt":  true,
+		".csv":  true,
 	}
 	if !allowed[ext] {
 		return "", fmt.Errorf("ekstensi file tidak diizinkan: %s", ext)

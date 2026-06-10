@@ -2,6 +2,260 @@ import React, { useState, useEffect } from 'react';
 import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
 import { PageHeader, A, idr, fmtDate } from '../../lib/adminStyles.jsx';
 
+// ────────────────────────────────────────────────────────────
+// SHIPPING ACTION MODAL — replaces window.prompt
+// ────────────────────────────────────────────────────────────
+function ShippingActionModal({ order, onClose, onSuccess }) {
+  const [tab, setTab] = useState('biteship'); // 'biteship' | 'manual'
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [courierCode, setCourierCode] = useState('');
+  const [result, setResult] = useState(null);
+
+  const KURIR_OPTIONS = [
+    { value: 'jne', label: 'JNE' },
+    { value: 'j&t', label: 'J&T Express' },
+    { value: 'sicepat', label: 'SiCepat' },
+    { value: 'anteraja', label: 'AnterAja' },
+    { value: 'ninja', label: 'Ninja Xpress' },
+    { value: 'lion', label: 'Lion Parcel' },
+    { value: 'sap', label: 'SAP Express' },
+    { value: 'pos', label: 'Pos Indonesia' },
+    { value: 'tiki', label: 'TIKI' },
+    { value: 'wahana', label: 'Wahana' },
+    { value: 'other', label: 'Kurir Lainnya' },
+  ];
+
+  const handleBiteshipGenerate = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetchJson(`${MERCHANT_API_BASE}/orders/generate-label`, {
+        method: 'POST',
+        body: JSON.stringify({ group_id: order.id }),
+      });
+      setResult(res);
+      onSuccess?.(res);
+    } catch (err) {
+      setError(err.message || 'Gagal generate resi via Biteship. Coba input manual.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualSubmit = async () => {
+    if (!trackingNumber.trim()) {
+      setError('Nomor resi tidak boleh kosong');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetchJson(`${MERCHANT_API_BASE}/orders/manual-tracking`, {
+        method: 'POST',
+        body: JSON.stringify({
+          group_id: order.id,
+          tracking_number: trackingNumber.trim(),
+          courier_code: courierCode,
+        }),
+      });
+      setResult({ ...res, tracking_number: trackingNumber.trim(), courier_code: courierCode });
+      onSuccess?.(res);
+    } catch (err) {
+      setError(err.message || 'Gagal menyimpan nomor resi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrintPackingSlip = () => {
+    window.open(`/packing-slip/${order.id}`, '_blank');
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 32, width: '100%', maxWidth: 560, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.2)' }}>
+        {/* Header */}
+        <div style={{ padding: '28px 36px', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em' }}>🚚 Konfirmasi Pengiriman</div>
+            <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: 700 }}>Order #{order.id.slice(0, 8).toUpperCase()}</div>
+          </div>
+          <button onClick={onClose} style={{ background: '#E2E8F0', border: 'none', width: 40, height: 40, borderRadius: 14, cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900 }}>×</button>
+        </div>
+
+        {/* Result State */}
+        {result ? (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <div style={{ width: 72, height: 72, borderRadius: 24, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', border: '1px solid #DCFCE7' }}>
+              <i className="bx bx-check-circle" style={{ fontSize: 36, color: '#10B981' }} />
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', marginBottom: 8 }}>Resi Berhasil Dibuat!</div>
+            <div style={{ fontSize: 14, color: '#64748B', marginBottom: 28, fontWeight: 600 }}>Pesanan sudah dicatat sebagai <span style={{ color: '#3B82F6', fontWeight: 900 }}>Dikirim</span></div>
+
+            <div style={{ background: '#F8FAFC', borderRadius: 20, padding: 24, border: '1px solid #E2E8F0', marginBottom: 28, textAlign: 'left' }}>
+              <div style={{ fontSize: 11, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 16 }}>Detail Pengiriman</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Nomor Resi</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#8B5CF6', letterSpacing: 1 }}>{result.tracking_number || '-'}</span>
+              </div>
+              {result.courier_code && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Kurir</span>
+                  <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A', textTransform: 'uppercase' }}>{result.courier_code}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                onClick={handlePrintPackingSlip}
+                style={{ padding: '16px 24px', borderRadius: 18, border: 'none', background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: '#fff', fontSize: 15, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}
+              >
+                <i className="bx bx-printer" style={{ fontSize: 20 }} />
+                Cetak Packing Slip
+              </button>
+              {result.label_url && (
+                <a
+                  href={result.label_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ padding: '14px 24px', borderRadius: 18, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 14, fontWeight: 800, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}
+                >
+                  <i className="bx bx-label" style={{ fontSize: 18 }} />
+                  Unduh Label Biteship
+                </a>
+              )}
+              <button onClick={onClose} style={{ padding: '12px 24px', borderRadius: 18, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#64748B', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Tutup</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: 36 }}>
+            {/* Tab Selector */}
+            <div style={{ display: 'flex', gap: 8, background: '#F1F5F9', padding: 4, borderRadius: 16, marginBottom: 28 }}>
+              <button
+                onClick={() => { setTab('biteship'); setError(''); }}
+                style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', background: tab === 'biteship' ? '#fff' : 'transparent', color: tab === 'biteship' ? '#0F172A' : '#64748B', boxShadow: tab === 'biteship' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none' }}
+              >
+                🚀 Generate via Biteship
+              </button>
+              <button
+                onClick={() => { setTab('manual'); setError(''); }}
+                style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', background: tab === 'manual' ? '#fff' : 'transparent', color: tab === 'manual' ? '#0F172A' : '#64748B', boxShadow: tab === 'manual' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none' }}
+              >
+                ✏️ Input Manual
+              </button>
+            </div>
+
+            {/* Error Banner */}
+            {error && (
+              <div style={{ background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: 14, padding: '14px 18px', marginBottom: 20, fontSize: 13, color: '#BE123C', fontWeight: 700, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <i className="bx bx-error-circle" style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Tab: Biteship Auto */}
+            {tab === 'biteship' && (
+              <div>
+                <div style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #F0F9FF 100%)', borderRadius: 20, padding: 24, border: '1px solid #BFDBFE', marginBottom: 24 }}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 16, background: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <i className="bx bx-rocket" style={{ fontSize: 24, color: '#fff' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 900, color: '#1E40AF', marginBottom: 6 }}>Generate Otomatis via Biteship</div>
+                      <div style={{ fontSize: 13, color: '#3B82F6', fontWeight: 600, lineHeight: 1.6 }}>
+                        Resi akan dibuat secara otomatis menggunakan API Biteship. Nomor resi langsung tersimpan di sistem.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#F8FAFC', borderRadius: 18, padding: '16px 20px', border: '1px solid #E2E8F0', marginBottom: 24 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>Informasi Order</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Kurir Terpilih</span>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: '#0F172A', textTransform: 'uppercase' }}>{order.courier_code || 'Auto-detect'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Layanan</span>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: '#0F172A' }}>{order.courier_service || '-'}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleBiteshipGenerate}
+                  disabled={loading}
+                  style={{ width: '100%', padding: '18px 24px', borderRadius: 20, border: 'none', background: loading ? '#94A3B8' : 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', color: '#fff', fontSize: 15, fontWeight: 900, cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, boxShadow: loading ? 'none' : '0 8px 24px rgba(59,130,246,0.4)' }}
+                >
+                  {loading ? (
+                    <><i className="bx bx-loader-alt" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }} /> Memproses...</>
+                  ) : (
+                    <><i className="bx bx-rocket" style={{ fontSize: 20 }} /> Generate Resi Otomatis</>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Tab: Manual */}
+            {tab === 'manual' && (
+              <div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#374151', marginBottom: 8 }}>
+                    Nomor Resi <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={trackingNumber}
+                    onChange={e => setTrackingNumber(e.target.value.toUpperCase())}
+                    placeholder="Contoh: JNE001234567890"
+                    style={{ width: '100%', padding: '14px 18px', borderRadius: 16, border: '1.5px solid #E2E8F0', fontSize: 14, fontWeight: 700, color: '#0F172A', background: '#F8FAFC', outline: 'none', letterSpacing: 1, boxSizing: 'border-box', transition: 'all 0.2s' }}
+                    onFocus={e => { e.target.style.borderColor = '#8B5CF6'; e.target.style.background = '#fff'; }}
+                    onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.background = '#F8FAFC'; }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#374151', marginBottom: 8 }}>
+                    Kurir
+                  </label>
+                  <select
+                    value={courierCode}
+                    onChange={e => setCourierCode(e.target.value)}
+                    style={{ width: '100%', padding: '14px 18px', borderRadius: 16, border: '1.5px solid #E2E8F0', fontSize: 14, fontWeight: 700, color: '#0F172A', background: '#F8FAFC', outline: 'none', cursor: 'pointer', appearance: 'none', boxSizing: 'border-box' }}
+                  >
+                    <option value="">Pilih Kurir...</option>
+                    {KURIR_OPTIONS.map(k => (
+                      <option key={k.value} value={k.value}>{k.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleManualSubmit}
+                  disabled={loading}
+                  style={{ width: '100%', padding: '18px 24px', borderRadius: 20, border: 'none', background: loading ? '#94A3B8' : 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', color: '#fff', fontSize: 15, fontWeight: 900, cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, boxShadow: loading ? 'none' : '0 8px 24px rgba(15,23,42,0.3)' }}
+                >
+                  {loading ? (
+                    <><i className="bx bx-loader-alt" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }} /> Menyimpan...</>
+                  ) : (
+                    <><i className="bx bx-check-circle" style={{ fontSize: 20 }} /> Simpan Resi & Tandai Dikirim</>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// MAIN MERCHANT ORDER LIST
+// ────────────────────────────────────────────────────────────
 export default function MerchantOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,12 +264,13 @@ export default function MerchantOrders() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [shippingOrder, setShippingOrder] = useState(null); // modal target
   const [stats, setStats] = useState({ total: 0, pending: 0, completed: 0 });
   const limit = 10;
 
-  useEffect(() => { 
+  useEffect(() => {
     setPage(1);
-    loadOrders(1); 
+    loadOrders(1);
   }, [activeStatus]);
 
   const loadOrders = async (targetPage = page) => {
@@ -24,13 +279,10 @@ export default function MerchantOrders() {
       const data = await fetchJson(`${MERCHANT_API_BASE}/orders?status=${activeStatus}&page=${targetPage}&limit=${limit}`);
       const list = Array.isArray(data) ? data : (data.data || []);
       setOrders(list);
-      
+
       if (!Array.isArray(data)) {
         const total = data.total || 0;
         setTotalPages(Math.ceil(total / limit) || 1);
-        
-        // Simple heuristic for stats since backend might not provide them explicitly
-        // In a real app, these would come from a separate endpoint
         setStats({
           total: data.total || 0,
           pending: list.filter(o => ['new', 'confirmed', 'processing'].includes(o.status)).length,
@@ -38,37 +290,33 @@ export default function MerchantOrders() {
         });
       }
     } catch (_err) {
-      // silent — order load failure
+      // silent
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdateStatus = async (groupId, newStatus) => {
-    let trackingNumber = '';
-    let courierCode = '';
-    if (newStatus === 'shipped') {
-      trackingNumber = window.prompt('Masukkan Nomor Resi (Tracking Number):');
-      if (!trackingNumber) return;
-      courierCode = window.prompt('Masukkan Kode Kurir (misal: JNE, SICEPAT):', 'JNE');
-      if (!courierCode) return;
-    }
-
     setUpdating(groupId);
     try {
       await fetchJson(`${MERCHANT_API_BASE}/orders/status`, {
         method: 'POST',
-        body: JSON.stringify({ group_id: groupId, status: newStatus, tracking_number: trackingNumber, courier_code: courierCode })
+        body: JSON.stringify({ group_id: groupId, status: newStatus })
       });
       loadOrders(page);
-      if (selectedOrder?.id === groupId) {
-         setSelectedOrder(null);
-      }
+      if (selectedOrder?.id === groupId) setSelectedOrder(null);
     } catch (_err) {
       alert('Gagal update status: ' + _err.message);
     } finally {
       setUpdating(null);
     }
+  };
+
+  // Called from ShippingActionModal on success
+  const handleShippingSuccess = () => {
+    loadOrders(page);
+    if (selectedOrder?.id === shippingOrder?.id) setSelectedOrder(null);
+    setShippingOrder(null);
   };
 
   const handlePageChange = (p) => {
@@ -103,22 +351,15 @@ export default function MerchantOrders() {
     const delta = 2;
     const left = page - delta;
     const right = page + delta + 1;
-    
     for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= left && i < right)) {
-        range.push(i);
-      }
+      if (i === 1 || i === totalPages || (i >= left && i < right)) range.push(i);
     }
-
     const finalRange = [];
     let l;
     for (let i of range) {
       if (l) {
-        if (i - l === 2) {
-          finalRange.push(l + 1);
-        } else if (i - l !== 1) {
-          finalRange.push('...');
-        }
+        if (i - l === 2) finalRange.push(l + 1);
+        else if (i - l !== 1) finalRange.push('...');
       }
       finalRange.push(i);
       l = i;
@@ -128,51 +369,60 @@ export default function MerchantOrders() {
 
   return (
     <div style={{ ...A.page, background: '#F8FAFC', minHeight: '100vh', padding: '32px 40px' }} className="fade-in">
+      {/* Shipping Action Modal */}
+      {shippingOrder && (
+        <ShippingActionModal
+          order={shippingOrder}
+          onClose={() => setShippingOrder(null)}
+          onSuccess={handleShippingSuccess}
+        />
+      )}
+
       <div style={{ marginBottom: 40, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h1 style={{ fontSize: 32, fontWeight: 900, color: '#0F172A', letterSpacing: '-0.03em' }}>Pesanan Masuk</h1>
           <p style={{ fontSize: 15, color: '#64748B', marginTop: 6 }}>Manajemen alur kerja pemenuhan pesanan Anda secara real-time.</p>
         </div>
         <div style={{ padding: '8px 16px', background: '#F1F5F9', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#475569' }}>
-           <i className="bx bx-sync" style={{ marginRight: 8 }} />
-           Terakhir diperbarui: {new Date().toLocaleTimeString()}
+          <i className="bx bx-sync" style={{ marginRight: 8 }} />
+          Terakhir diperbarui: {new Date().toLocaleTimeString()}
         </div>
       </div>
 
       {/* Summary Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 24, marginBottom: 40 }}>
         <div style={{ background: '#fff', padding: 28, borderRadius: 24, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Total Pesanan</div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: '#0F172A', marginTop: 8 }}>{stats.total}</div>
-              </div>
-              <div style={{ width: 52, height: 52, borderRadius: 16, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', border: '1px solid #E2E8F0' }}>
-                <i className="bx bx-package text-2xl" />
-              </div>
-           </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Total Pesanan</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#0F172A', marginTop: 8 }}>{stats.total}</div>
+            </div>
+            <div style={{ width: 52, height: 52, borderRadius: 16, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', border: '1px solid #E2E8F0' }}>
+              <i className="bx bx-package text-2xl" />
+            </div>
+          </div>
         </div>
         <div style={{ background: '#fff', padding: 28, borderRadius: 24, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Perlu Diproses</div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: '#F59E0B', marginTop: 8 }}>{stats.pending}</div>
-              </div>
-              <div style={{ width: 52, height: 52, borderRadius: 16, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F59E0B', border: '1px solid #FEF3C7' }}>
-                <i className="bx bx-time-five text-2xl" />
-              </div>
-           </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Perlu Diproses</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#F59E0B', marginTop: 8 }}>{stats.pending}</div>
+            </div>
+            <div style={{ width: 52, height: 52, borderRadius: 16, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F59E0B', border: '1px solid #FEF3C7' }}>
+              <i className="bx bx-time-five text-2xl" />
+            </div>
+          </div>
         </div>
         <div style={{ background: '#fff', padding: 28, borderRadius: 24, border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Selesai</div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: '#10B981', marginTop: 8 }}>{stats.completed}</div>
-              </div>
-              <div style={{ width: 52, height: 52, borderRadius: 16, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981', border: '1px solid #DCFCE7' }}>
-                <i className="bx bx-check-circle text-2xl" />
-              </div>
-           </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>Selesai</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#10B981', marginTop: 8 }}>{stats.completed}</div>
+            </div>
+            <div style={{ width: 52, height: 52, borderRadius: 16, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981', border: '1px solid #DCFCE7' }}>
+              <i className="bx bx-check-circle text-2xl" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -184,33 +434,21 @@ export default function MerchantOrders() {
               <button
                 key={s.value}
                 onClick={() => setActiveStatus(s.value)}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: 12,
-                  fontSize: 14,
-                  fontWeight: 800,
-                  transition: 'all 0.2s ease',
-                  background: activeStatus === s.value ? '#fff' : 'transparent',
-                  color: activeStatus === s.value ? '#0F172A' : '#64748B',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: activeStatus === s.value ? '0 4px 12px rgba(0,0,0,0.05)' : 'none'
-                }}
+                style={{ padding: '10px 24px', borderRadius: 12, fontSize: 14, fontWeight: 800, transition: 'all 0.2s ease', background: activeStatus === s.value ? '#fff' : 'transparent', color: activeStatus === s.value ? '#0F172A' : '#64748B', border: 'none', cursor: 'pointer', boxShadow: activeStatus === s.value ? '0 4px 12px rgba(0,0,0,0.05)' : 'none' }}
               >
                 {s.label}
               </button>
             ))}
           </div>
-          
           <div style={{ position: 'relative', width: '100%', maxWidth: 320 }}>
-             <i className="bx bx-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-             <input 
-               type="text" 
-               placeholder="Cari ID Pesanan..." 
-               style={{ width: '100%', padding: '14px 16px 14px 48px', borderRadius: 18, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#0F172A', fontSize: 14, outline: 'none', transition: 'all 0.2s' }}
-               onFocus={e => { e.target.style.borderColor = '#94A3B8'; e.target.style.background = '#fff'; }}
-               onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.background = '#F8FAFC'; }}
-             />
+            <i className="bx bx-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+            <input
+              type="text"
+              placeholder="Cari ID Pesanan..."
+              style={{ width: '100%', padding: '14px 16px 14px 48px', borderRadius: 18, border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#0F172A', fontSize: 14, outline: 'none', transition: 'all 0.2s', boxSizing: 'border-box' }}
+              onFocus={e => { e.target.style.borderColor = '#94A3B8'; e.target.style.background = '#fff'; }}
+              onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.background = '#F8FAFC'; }}
+            />
           </div>
         </div>
 
@@ -222,7 +460,7 @@ export default function MerchantOrders() {
                 <th style={{ padding: '20px 32px', fontSize: 12, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>Identitas</th>
                 <th style={{ padding: '20px 32px', fontSize: 12, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>Produk</th>
                 <th style={{ padding: '20px 32px', fontSize: 12, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>Status</th>
-                <th style={{ padding: '20px 32px', fontSize: 12, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>Payout</th>
+                <th style={{ padding: '20px 32px', fontSize: 12, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>Total Belanja</th>
                 <th style={{ padding: '20px 32px', fontSize: 12, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>Aksi</th>
               </tr>
             </thead>
@@ -255,30 +493,42 @@ export default function MerchantOrders() {
                           <img src={formatImage(order.items?.[0]?.product_image_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>
-                            {order.items?.length || 0} Barang
-                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>{order.items?.length || 0} Barang</div>
                           {order.items?.length > 0 && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{order.items[0].product_name}</div>}
                         </div>
                       </div>
                     </td>
                     <td style={{ padding: '24px 32px' }}>
-                      <span style={{ padding: '8px 16px', borderRadius: 12, fontSize: 10, fontWeight: 900, textTransform: 'uppercase', background: s.bg, color: s.text, border: `1px solid ${s.text}30`, letterSpacing: 0.5 }}>
-                        {s.label}
-                      </span>
+                      <span style={{ padding: '8px 16px', borderRadius: 12, fontSize: 10, fontWeight: 900, textTransform: 'uppercase', background: s.bg, color: s.text, border: `1px solid ${s.text}30`, letterSpacing: 0.5 }}>{s.label}</span>
+                      {order.tracking_number && (
+                        <div style={{ fontSize: 11, color: '#8B5CF6', marginTop: 6, fontWeight: 800 }}>📦 {order.tracking_number}</div>
+                      )}
                     </td>
                     <td style={{ padding: '24px 32px' }}>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A' }}>{idr(order.merchant_payout || 0)}</div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A' }}>{idr(order.subtotal || 0)}</div>
                     </td>
                     <td style={{ padding: '24px 32px' }}>
-                      <button 
-                        onClick={() => setSelectedOrder(order)}
-                        style={{ padding: '10px 20px', borderRadius: 14, border: '1px solid #E2E8F0', fontSize: 13, fontWeight: 800, background: '#fff', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
-                        onMouseEnter={e => { e.target.style.background = '#0F172A'; e.target.style.color = '#fff'; e.target.style.borderColor = '#0F172A'; }}
-                        onMouseLeave={e => { e.target.style.background = '#fff'; e.target.style.color = '#475569'; e.target.style.borderColor = '#E2E8F0'; }}
-                      >
-                        Detail
-                      </button>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          style={{ padding: '10px 20px', borderRadius: 14, border: '1px solid #E2E8F0', fontSize: 13, fontWeight: 800, background: '#fff', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+                          onMouseEnter={e => { e.target.style.background = '#0F172A'; e.target.style.color = '#fff'; e.target.style.borderColor = '#0F172A'; }}
+                          onMouseLeave={e => { e.target.style.background = '#fff'; e.target.style.color = '#475569'; e.target.style.borderColor = '#E2E8F0'; }}
+                        >
+                          Detail
+                        </button>
+                        {order.tracking_number && (
+                          <button
+                            onClick={() => window.open(`/packing-slip/${order.id}`, '_blank')}
+                            title="Cetak Packing Slip"
+                            style={{ padding: '10px 14px', borderRadius: 14, border: '1px solid #EDE9FE', fontSize: 13, fontWeight: 800, background: '#F5F3FF', color: '#7C3AED', cursor: 'pointer', transition: 'all 0.2s' }}
+                            onMouseEnter={e => { e.target.style.background = '#7C3AED'; e.target.style.color = '#fff'; }}
+                            onMouseLeave={e => { e.target.style.background = '#F5F3FF'; e.target.style.color = '#7C3AED'; }}
+                          >
+                            <i className="bx bx-printer" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -291,34 +541,21 @@ export default function MerchantOrders() {
         {totalPages > 1 && (
           <div style={{ padding: '28px 32px', borderTop: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 13, color: '#94A3B8', fontWeight: 700 }}>
-              Menampilkan Halaman <span style={{ color: '#0F172A' }}>{page}</span> dari <span style={{ color: '#0F172A' }}>{totalPages}</span>
+              Halaman <span style={{ color: '#0F172A' }}>{page}</span> dari <span style={{ color: '#0F172A' }}>{totalPages}</span>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button onClick={() => handlePageChange(page - 1)} disabled={page === 1} style={{ background: '#fff', border: '1px solid #E2E8F0', color: '#475569', width: 40, height: 40, borderRadius: 14, cursor: 'pointer', opacity: page === 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <i className="bx bx-chevron-left text-xl" />
               </button>
-              
               <div style={{ display: 'flex', gap: 6 }}>
                 {renderPaginationRange().map((p, i) => (
                   p === '...' ? (
                     <span key={`sep-${i}`} style={{ padding: '0 8px', color: '#94A3B8' }}>...</span>
                   ) : (
-                    <button
-                      key={p}
-                      onClick={() => handlePageChange(p)}
-                      style={{
-                        width: 40, height: 40, borderRadius: 14, fontSize: 14, fontWeight: 900,
-                        background: page === p ? '#0F172A' : '#fff',
-                        color: page === p ? '#fff' : '#64748B',
-                        border: page === p ? '1px solid #0F172A' : '1px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s'
-                      }}
-                    >
-                      {p}
-                    </button>
+                    <button key={p} onClick={() => handlePageChange(p)} style={{ width: 40, height: 40, borderRadius: 14, fontSize: 14, fontWeight: 900, background: page === p ? '#0F172A' : '#fff', color: page === p ? '#fff' : '#64748B', border: page === p ? '1px solid #0F172A' : '1px solid #E2E8F0', cursor: 'pointer', transition: 'all 0.2s' }}>{p}</button>
                   )
                 ))}
               </div>
-
               <button onClick={() => handlePageChange(page + 1)} disabled={page === totalPages} style={{ background: '#fff', border: '1px solid #E2E8F0', color: '#475569', width: 40, height: 40, borderRadius: 14, cursor: 'pointer', opacity: page === totalPages ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <i className="bx bx-chevron-right text-xl" />
               </button>
@@ -332,86 +569,105 @@ export default function MerchantOrders() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
           <div style={{ background: '#fff', borderRadius: 32, width: '100%', maxWidth: 760, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 40px 100px rgba(0,0,0,0.15)' }}>
             <div style={{ padding: '32px 40px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC' }}>
-               <div>
-                 <div style={{ fontSize: 20, fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em' }}>Detail Transaksi #{selectedOrder.id.slice(0,8).toUpperCase()}</div>
-                 <div style={{ fontSize: 13, color: '#64748B', marginTop: 6, fontWeight: 700 }}>Diterima pada {fmtDate(selectedOrder.created_at)}</div>
-               </div>
-               <button onClick={() => setSelectedOrder(null)} style={{ border: 'none', background: '#E2E8F0', width: 44, height: 44, borderRadius: 16, cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="bx bx-x text-2xl" /></button>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em' }}>Detail Transaksi #{selectedOrder.id.slice(0, 8).toUpperCase()}</div>
+                <div style={{ fontSize: 13, color: '#64748B', marginTop: 6, fontWeight: 700 }}>Diterima pada {fmtDate(selectedOrder.created_at)}</div>
+              </div>
+              <button onClick={() => setSelectedOrder(null)} style={{ border: 'none', background: '#E2E8F0', width: 44, height: 44, borderRadius: 16, cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="bx bx-x text-2xl" /></button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 40 }}>
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 40 }}>
-                  <div style={{ padding: 28, background: '#F8FAFC', borderRadius: 24, border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 20 }}>Informasi Logistik</div>
-                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Metode</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.shipping_type === 'pickup' ? '🏪 Pickup' : '🚚 Kurir'}</span>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Kurir</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.courier_code || '-'}</span>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>No. Resi</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: '#8B5CF6' }}>{selectedOrder.tracking_number || 'Menunggu Input'}</span>
-                       </div>
-                     </div>
-                  </div>
-                  <div style={{ padding: 28, background: '#F8FAFC', borderRadius: 24, border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 20 }}>Analisis Keuangan</div>
-                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Gross Sales</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{idr(selectedOrder.subtotal)}</span>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Platform Fee</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: '#F43F5E' }}>-{idr(selectedOrder.platform_fee)}</span>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #CBD5E1', paddingTop: 16, marginTop: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>Net Payout</span>
-                          <span style={{ fontSize: 18, fontWeight: 900, color: '#10B981' }}>{idr(selectedOrder.merchant_payout)}</span>
-                       </div>
-                     </div>
-                  </div>
-               </div>
-
-               <div style={{ fontSize: 12, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 20 }}>Daftar Belanja</div>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {selectedOrder.items?.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: 24, padding: 24, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 24 }}>
-                       <div style={{ width: 72, height: 72, borderRadius: 18, overflow: 'hidden', border: '1px solid #F1F5F9' }}>
-                          <img src={formatImage(item.product_image_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                       </div>
-                       <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A' }}>{item.product_name}</div>
-                          <div style={{ fontSize: 13, color: '#64748B', marginTop: 6, fontWeight: 700 }}>{item.variant_name || 'Original Edition'}</div>
-                       </div>
-                       <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A' }}>{idr(item.unit_price)}</div>
-                          <div style={{ fontSize: 13, color: '#64748B', marginTop: 6, fontWeight: 700 }}>Qty: {item.quantity}</div>
-                       </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 40 }}>
+                <div style={{ padding: 28, background: '#F8FAFC', borderRadius: 24, border: '1px solid #E2E8F0' }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 20 }}>Informasi Logistik</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Metode</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.shipping_type === 'pickup' ? '🏪 Pickup' : '🚚 Kurir'}</span>
                     </div>
-                  ))}
-               </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Kurir</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.courier_code || '-'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>No. Resi</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#8B5CF6' }}>{selectedOrder.tracking_number || 'Menunggu Input'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: 28, background: '#F8FAFC', borderRadius: 24, border: '1px solid #E2E8F0' }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 20 }}>Tujuan Pengiriman</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Nama Penerima</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.order?.shipping_name || 'Pelanggan'}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>No. Telepon</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.order?.shipping_phone || '-'}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Alamat Lengkap</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: '#334155', lineHeight: 1.5 }}>
+                        {selectedOrder.order?.shipping_address ? (
+                          `${selectedOrder.order.shipping_address}, ${selectedOrder.order.shipping_district || ''}, ${selectedOrder.order.shipping_city || ''}, ${selectedOrder.order.shipping_province || ''} ${selectedOrder.order.shipping_postal_code || ''}`
+                        ) : 'Alamat tidak diset'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 12, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 20 }}>Daftar Belanja</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {selectedOrder.items?.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 24, padding: 24, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 24 }}>
+                    <div style={{ width: 72, height: 72, borderRadius: 18, overflow: 'hidden', border: '1px solid #F1F5F9' }}>
+                      <img src={formatImage(item.product_image_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A' }}>{item.product_name}</div>
+                      <div style={{ fontSize: 13, color: '#64748B', marginTop: 6, fontWeight: 700 }}>{item.variant_name || 'Original Edition'}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A' }}>{idr(item.unit_price)}</div>
+                      <div style={{ fontSize: 13, color: '#64748B', marginTop: 6, fontWeight: 700 }}>Qty: {item.quantity}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div style={{ padding: '32px 40px', borderTop: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', gap: 20 }}>
-               {selectedOrder.status === 'new' && (
-                 <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'confirmed')} disabled={updating}>Konfirmasi Pesanan</button>
-               )}
-               {selectedOrder.status === 'confirmed' && (
-                 <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'processing')} disabled={updating}>Mulai Proses</button>
-               )}
-               {selectedOrder.status === 'processing' && (
-                 selectedOrder.shipping_type === 'pickup' ? (
-                   <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'ready_for_pickup')} disabled={updating}>Siap Diambil</button>
-                 ) : (
-                   <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'shipped')} disabled={updating}>Input Resi & Kirim</button>
-                 )
-               )}
-               <button onClick={() => setSelectedOrder(null)} style={{ padding: '0 32px', height: 56, borderRadius: 18, border: '1px solid #E2E8F0', background: '#fff', color: '#64748B', fontWeight: 900, cursor: 'pointer' }}>Tutup</button>
+            {/* Action Footer */}
+            <div style={{ padding: '32px 40px', borderTop: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {selectedOrder.status === 'new' && (
+                <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900, minWidth: 180 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'confirmed')} disabled={updating}>Konfirmasi Pesanan</button>
+              )}
+              {selectedOrder.status === 'confirmed' && (
+                <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900, minWidth: 180 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'processing')} disabled={updating}>Mulai Proses</button>
+              )}
+              {selectedOrder.status === 'processing' && (
+                selectedOrder.shipping_type === 'pickup' ? (
+                  <button style={{ ...A.btnPrimary, flex: 1, background: '#0F172A', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900, minWidth: 180 }} onClick={() => handleUpdateStatus(selectedOrder.id, 'ready_for_pickup')} disabled={updating}>Siap Diambil</button>
+                ) : (
+                  <button
+                    style={{ flex: 1, background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)', color: '#fff', height: 56, borderRadius: 18, fontSize: 15, fontWeight: 900, minWidth: 180, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: '0 8px 24px rgba(124,58,237,0.4)' }}
+                    onClick={() => { setShippingOrder(selectedOrder); setSelectedOrder(null); }}
+                    disabled={updating}
+                  >
+                    <i className="bx bx-package" style={{ fontSize: 20 }} /> Kirim Pesanan
+                  </button>
+                )
+              )}
+              {selectedOrder.tracking_number && (
+                <button
+                  onClick={() => window.open(`/packing-slip/${selectedOrder.id}`, '_blank')}
+                  style={{ padding: '0 24px', height: 56, borderRadius: 18, border: '1px solid #EDE9FE', background: '#F5F3FF', color: '#7C3AED', fontWeight: 900, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <i className="bx bx-printer" /> Packing Slip
+                </button>
+              )}
+              <button onClick={() => setSelectedOrder(null)} style={{ padding: '0 32px', height: 56, borderRadius: 18, border: '1px solid #E2E8F0', background: '#fff', color: '#64748B', fontWeight: 900, cursor: 'pointer' }}>Tutup</button>
             </div>
           </div>
         </div>
@@ -419,4 +675,3 @@ export default function MerchantOrders() {
     </div>
   );
 }
-

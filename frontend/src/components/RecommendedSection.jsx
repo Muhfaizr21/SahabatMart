@@ -4,6 +4,7 @@ import { ProductCard } from './ProductSection';
 import { isAuthenticated } from '../lib/auth';
 
 export default function RecommendedSection({ 
+  productId = "",
   limit = 5, 
   title = "Rekomendasi Spesial ✨", 
   subtitle = "Berdasarkan aktivitas dan minat Anda.",
@@ -15,7 +16,10 @@ export default function RecommendedSection({
   useEffect(() => {
     const loadRecommended = async () => {
       try {
-        const data = await fetchJson(`${PUBLIC_API_BASE}/products/recommended?limit=${limit}`);
+        const url = productId 
+          ? `${PUBLIC_API_BASE}/products/recommended?limit=${limit}&product_id=${productId}`
+          : `${PUBLIC_API_BASE}/products/recommended?limit=${limit}`;
+        const data = await fetchJson(url);
         setRecommended(Array.isArray(data) ? data : (data.data || []));
       } catch (_err) {
         console.error('Failed to load recommendations:', _err);
@@ -24,7 +28,7 @@ export default function RecommendedSection({
       }
     };
     loadRecommended();
-  }, [limit]);
+  }, [limit, productId]);
 
   if (!loading && recommended.length === 0) return null;
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchJson, AFFILIATE_API_BASE, API_BASE, formatImage } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
 import toast from 'react-hot-toast';
 import MemberCard from '../../components/MemberCard';

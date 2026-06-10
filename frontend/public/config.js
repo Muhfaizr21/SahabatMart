@@ -16,6 +16,6 @@
  * 3. Simpan — perubahan langsung aktif tanpa rebuild!
  */
 window.APP_CONFIG = {
-  API_BASE: 'https://akuglow.com',
+  API_BASE: 'http://localhost:8080',
 };
 

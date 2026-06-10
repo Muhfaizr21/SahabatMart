@@ -21,7 +21,7 @@ const rawMenu = [
 
   { type: 'label', text: 'PESANAN' },
   { type: 'item', name: 'Semua Pesanan', icon: 'bxs-receipt', path: '/admin/orders', perm: 'order_view' },
-  { type: 'item', name: 'Komplain & Sengketa', icon: 'bx-error-circle', path: '/admin/disputes', perm: 'order_update_status' },
+
 
   { type: 'label', text: 'KASIR' },
   { type: 'item', name: 'Kasir / POS', icon: 'bxs-calculator', path: '/admin/pos', perm: 'order_view' },
@@ -42,6 +42,7 @@ const rawMenu = [
     children: [
       { name: 'Semua Toko', path: '/admin/merchants', perm: 'merchant_view' },
       { name: 'Permintaan Stok', path: '/admin/merchants/restock', perm: 'inventory_restock' },
+      { name: 'Monitor Stok', path: '/admin/merchants/stock', perm: 'merchant_view' },
     ]
   },
 
@@ -50,12 +51,13 @@ const rawMenu = [
   { type: 'item', name: 'Semua Produk', icon: 'bxs-shopping-bag-alt', path: '/admin/products', perm: 'product_view' },
   { type: 'item', name: 'Kategori Produk', icon: 'bxs-grid-alt', path: '/admin/categories', perm: 'category_view' },
   { type: 'item', name: 'Brand / Merek', icon: 'bxs-purchase-tag', path: '/admin/brands', perm: 'product_view' },
+  { type: 'item', name: 'Atribut Produk', icon: 'bx-slider-alt', path: '/admin/attributes', perm: 'product_view' },
   { type: 'item', name: 'Ulasan Produk', icon: 'bxs-star', path: '/admin/reviews', perm: 'product_view' },
-  { type: 'item', name: 'Moderasi Produk', icon: 'bxs-checkbox-checked', path: '/admin/moderation', perm: 'product_update' },
 
   { type: 'label', text: 'PROMOSI & MARKETING' },
   { type: 'item', name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist', perm: 'view_analytics' },
   { type: 'item', name: 'Voucher & Promo', icon: 'bxs-coupon', path: '/admin/vouchers', perm: 'marketing_view_voucher' },
+  { type: 'item', name: 'Demografi Pelanggan', icon: 'bx-globe', path: '/admin/demographics', perm: 'view_analytics' },
 
   { type: 'label', text: 'KEUANGAN' },
   { type: 'item', name: 'Buku Besar / Ledger', icon: 'bxs-bank', path: '/admin/finance', perm: 'finance_view_summary' },
@@ -589,7 +591,9 @@ const AdminLayout = () => {
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
                       {user.profile?.full_name?.split(' ')[0] || 'Admin'}
                     </div>
-                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>Superadmin</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+                      {user.role === 'superadmin' ? 'Superadmin' : (user.admin_role || user.role || 'Admin')}
+                    </div>
                   </div>
                   <i className={`bx bx-chevron-${openProfile ? 'up' : 'down'}`} style={{ color: '#94a3b8' }} />
                 </div>

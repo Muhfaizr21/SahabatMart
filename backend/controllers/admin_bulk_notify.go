@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 )
 
 // BulkNotifyUsers mengirimkan notifikasi khusus ke daftar ID user terpilih

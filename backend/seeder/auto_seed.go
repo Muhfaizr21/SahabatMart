@@ -3,7 +3,7 @@ package seeder
 import (
 	"log"
 
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -81,7 +81,11 @@ func AutoSeedCriticalData(db *gorm.DB) {
 
 	// [Platform Settings] Ensure default configs exist
 	SeedConfigs(db)
-	
+
+	// [RBAC] Seed permissions and default roles (idempotent — safe to run every startup)
+	seedRBAC(db)
+	seedDefaultRoles(db)
+
 	// [AkuGlow Products] Auto-seed products from official store
 	SeedAkuglowProducts(db)
 
@@ -100,6 +104,13 @@ func AutoSeedCriticalData(db *gorm.DB) {
 	// Sync existing images to Media Library
 	SyncExistingImagesToMediaLibrary(db)
 
+	// [Auto-Heal] Audit and repair roles, slugs, and wallets
+	HealAndSyncDatabase(db)
+
+	// [Demographics] Auto-seed mock demographics data if table is empty
+	SeedDemographics(db)
+
 	// [Finance] We no longer auto-seed high-fidelity finance data here to avoid startup lag.
 	// Use 'go run cmd/seeder/main.go' for that.
 }
+

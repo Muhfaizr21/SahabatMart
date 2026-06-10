@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson, formatImage } from '../lib/api';
+import { BUYER_API_BASE, PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 import SEO from '../components/SEO';
+import { ProductCard } from '../components/ProductSection';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function CartPage() {
   const [error, setError] = useState(null);
   const [coupon, setCoupon] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
+  const [crossSells, setCrossSells] = useState([]);
 
   const loadCart = useCallback(async () => {
     setLoading(true);
@@ -31,6 +33,66 @@ export default function CartPage() {
   }, []);
 
   useEffect(() => { loadCart(); }, [loadCart]);
+
+  useEffect(() => {
+    const loadCrossSells = async () => {
+      if (items.length === 0) {
+        setCrossSells([]);
+        return;
+      }
+      // Extract crosssell IDs from items
+      const ids = [];
+      items.forEach(item => {
+        const prod = item.product || {};
+        if (prod.crosssells) {
+          try {
+            const arr = JSON.parse(prod.crosssells);
+            if (Array.isArray(arr)) {
+              arr.forEach(id => {
+                if (id && !ids.includes(id)) ids.push(id);
+              });
+            }
+          } catch (e) {}
+        }
+      });
+
+      // Filter out items already in the cart
+      const filteredIds = ids.filter(id => !items.some(item => item.product_id === id));
+
+      if (filteredIds.length === 0) {
+        try {
+          const url = `${PUBLIC_API_BASE}/products/recommended?limit=5`;
+          const resp = await fetchJson(url);
+          const data = Array.isArray(resp) ? resp : (resp.data || []);
+          const finalData = data.filter(p => !items.some(item => item.product_id === p.id));
+          setCrossSells(finalData.slice(0, 5));
+        } catch (e) {
+          console.error('Failed to load fallback recommendations:', e);
+          setCrossSells([]);
+        }
+        return;
+      }
+
+      try {
+        const url = `${PUBLIC_API_BASE}/products?ids=${JSON.stringify(filteredIds)}`;
+        const resp = await fetchJson(url);
+        const data = Array.isArray(resp) ? resp : (resp.data || []);
+        const finalData = data.filter(p => !items.some(item => item.product_id === p.id));
+        if (finalData.length === 0) {
+          const urlRec = `${PUBLIC_API_BASE}/products/recommended?limit=5`;
+          const respRec = await fetchJson(urlRec);
+          const dataRec = Array.isArray(respRec) ? respRec : (respRec.data || []);
+          const finalDataRec = dataRec.filter(p => !items.some(item => item.product_id === p.id));
+          setCrossSells(finalDataRec.slice(0, 5));
+        } else {
+          setCrossSells(finalData);
+        }
+      } catch (e) {
+        console.error('Failed to load cross sells:', e);
+      }
+    };
+    loadCrossSells();
+  }, [items]);
 
   const updateQty = async (id, variantId, productId, merchantId, currentQty, delta) => {
     const newQty = Math.max(1, currentQty + delta);
@@ -159,12 +221,12 @@ export default function CartPage() {
                         {group.items.map(item => (
                           <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-5 items-center bg-white hover:bg-slate-50 transition-colors">
                             <div className="md:col-span-5 flex items-center gap-4">
-                              <Link to={`/product/${item.product_id}`} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
+                              <Link to={`/product/${item.product?.slug || item.product_id}`} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
                            <img src={formatImage(item.product?.image)} alt={item.product?.name} className="w-full h-full object-cover" />
                          </Link>
                          <div>
                            <div className="text-[10px] text-blue-600 mb-0.5 font-black uppercase tracking-widest">{item.product?.category}</div>
-                           <Link to={`/product/${item.product_id}`} className="text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+                           <Link to={`/product/${item.product?.slug || item.product_id}`} className="text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
                              {item.product?.name}
                            </Link>
                            {item.product_variant?.name !== "Default" && (
@@ -275,9 +337,22 @@ export default function CartPage() {
                    </div>
                  </div>
                </div>
-             </div>
-           </div>
-         )}
+            </div>
+            {crossSells.length > 0 && (
+              <div className="mt-16 w-full border-t border-gray-100 pt-12">
+                <div className="mb-8">
+                  <h2 className="text-2xl font-black text-gray-900">Mungkin Kamu Butuhkan 🛍️</h2>
+                  <p className="text-slate-500 text-sm mt-1">Produk pelengkap yang cocok untuk belanjaan kamu.</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                  {crossSells.map(p => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
        </div>
      </main>
   );

@@ -127,20 +127,7 @@ const AdminSecurity = () => {
                         </p>
                     </div>
 
-                    <div style={{ ...A.card, padding: 24 }}>
-                        <h4 style={{ fontSize: 14, fontWeight: 900, marginBottom: 16, margin: 0 }}>Security Actions</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-                            <button style={{ ...A.btnGhost, justifyContent: 'start', width: '100%', fontSize: 13 }}>
-                                <i className="bx bx-fingerprint opacity-50" /> Purge Logs
-                            </button>
-                            <button style={{ ...A.btnGhost, justifyContent: 'start', width: '100%', fontSize: 13 }}>
-                                <i className="bx bx-history opacity-50" /> Whitelist IP
-                            </button>
-                            <button style={{ ...A.btnGhost, justifyContent: 'start', width: '100%', color: '#ef4444', fontSize: 13 }}>
-                                <i className="bx bx-power-off opacity-50" /> Lockdown Mode
-                            </button>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>

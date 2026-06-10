@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 
 	"gorm.io/gorm"
 )
@@ -206,6 +206,15 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Stok berhasil masuk ke Gudang Pusat", "inbound_id": inbound.ID})
 }
 
+func (ctrl *WarehouseController) GetInbounds(w http.ResponseWriter, r *http.Request) {
+	var inbounds []models.InboundStock
+	if err := ctrl.DB.Preload("Supplier").Preload("Items").Order("created_at desc").Find(&inbounds).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil data inbound")
+		return
+	}
+	utils.JSONResponse(w, http.StatusOK, inbounds)
+}
+
 // ── AUDIT LOG (MATA ELANG) ───────────────────────────────────────
 
 func (ctrl *WarehouseController) GetStockHistory(w http.ResponseWriter, r *http.Request) {
@@ -238,24 +247,26 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 	}
 	json.NewDecoder(r.Body).Decode(&input)
 
+	tx := ctrl.DB.Begin()
+
 	var restock models.RestockRequest
-	if err := ctrl.DB.Preload("Items").First(&restock, "id = ?", restockID).Error; err != nil {
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").Preload("Items").First(&restock, "id = ?", restockID).Error; err != nil {
+		tx.Rollback()
 		utils.JSONError(w, http.StatusNotFound, "Request restock tidak ditemukan")
 		return
 	}
 
 	// Status requested is standard for new requests
 	if restock.Status != "requested" && restock.Status != "pending" {
+		tx.Rollback()
 		utils.JSONError(w, http.StatusBadRequest, "Request ini sudah diproses sebelumnya (Status: "+restock.Status+")")
 		return
 	}
 
-	tx := ctrl.DB.Begin()
-
 	// 1. Kurangi stok di Pusat (Variant Aware)
 	for _, item := range restock.Items {
 		var pusatInv models.Inventory
-		dbInv := tx.Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID)
+		dbInv := tx.Set("gorm:query_option", "FOR UPDATE").Where("product_id = ? AND merchant_id = ?", item.ProductID, models.PusatID)
 		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 			dbInv = dbInv.Where("product_variant_id = ?", *item.ProductVariantID)
 		} else {
@@ -299,11 +310,32 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 
 		// 1.2 Deduct from Master Tables (Sync for Admin UI)
 		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
-			tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
-				Update("stock", gorm.Expr("stock - ?", item.Quantity))
+			if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
+				Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+				tx.Rollback()
+				utils.JSONError(w, http.StatusInternalServerError, "Gagal update stok varian produk master: "+err.Error())
+				return
+			}
+
+			// Sync parent product stock if not variable
+			var parentProduct models.Product
+			if err := tx.Select("id, product_type").First(&parentProduct, "id = ?", item.ProductID).Error; err == nil {
+				if parentProduct.ProductType != "variable" {
+					if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+						Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+						tx.Rollback()
+						utils.JSONError(w, http.StatusInternalServerError, "Gagal update stok produk master: "+err.Error())
+						return
+					}
+				}
+			}
 		} else {
-			tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
-				Update("stock", gorm.Expr("stock - ?", item.Quantity))
+			if err := tx.Model(&models.Product{}).Where("id = ?", item.ProductID).
+				Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
+				tx.Rollback()
+				utils.JSONError(w, http.StatusInternalServerError, "Gagal update stok produk master: "+err.Error())
+				return
+			}
 		}
 
 		// 2. Log Mutasi (Mata Elang) - Tracking Stock OUT from Pusat
@@ -355,7 +387,7 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 	}
 
 	var input struct {
-		TrackingNumber string `json:"tracking_number"`
+		CourierCode    string `json:"courier_code"`
 		AdminNote      string `json:"admin_note"`
 	}
 
@@ -364,24 +396,42 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := ctrl.DB.Model(&models.RestockRequest{}).Where("id = ?", restockID).Updates(map[string]interface{}{
-		"status":          "shipped",
-		"tracking_number": input.TrackingNumber,
-		"admin_note":      input.AdminNote,
-		"updated_at":      time.Now(),
+	var restock models.RestockRequest
+	if err := ctrl.DB.Preload("Items").Preload("Merchant").First(&restock, "id = ?", restockID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Restock request tidak ditemukan")
+		return
+	}
+
+	shippingSvc := services.NewShippingService(ctrl.DB)
+	biteshipOrderID, waybillID, biteshipLabelURL, err := shippingSvc.CreateBiteshipOrderForRestock(restock, input.CourierCode)
+	if err != nil {
+		utils.JSONErrorInternal(w, err, "Gagal membuat resi Biteship otomatis")
+		return
+	}
+
+	if err := ctrl.DB.Model(&restock).Updates(map[string]interface{}{
+		"status":             "shipped",
+		"tracking_number":    waybillID,
+		"courier_code":       input.CourierCode,
+		"admin_note":         input.AdminNote,
+		"biteship_order_id":  biteshipOrderID,
+		"shipping_label_url": biteshipLabelURL,
+		"updated_at":         time.Now(),
 	}).Error; err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal update status pengiriman")
 		return
 	}
 
 	// Notify Merchant
-	var restock models.RestockRequest
-	ctrl.DB.First(&restock, "id = ?", restockID)
 	notif := services.NewNotificationService(ctrl.DB)
 	_ = notif.Push(restock.MerchantID, "merchant", "restock_update", "🚚 Restock Dikirim",
-		fmt.Sprintf("Restock %s dalam pengiriman (Resi: %s).", restock.ID, input.TrackingNumber), "/merchant/restock")
+		fmt.Sprintf("Restock %s sedang dalam pengiriman B2B via %s (Resi: %s).", restock.ID, strings.ToUpper(input.CourierCode), waybillID), "/merchant/restock")
 
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Barang dalam pengiriman B2B", "tracking_number": input.TrackingNumber})
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message": "Pengiriman berhasil diproses & resi terbit otomatis",
+		"tracking_number": waybillID,
+		"biteship_order_id": biteshipOrderID,
+	})
 }
 
 func (ctrl *WarehouseController) SyncInventory(w http.ResponseWriter, r *http.Request) {
@@ -431,4 +481,70 @@ func (ctrl *WarehouseController) SyncInventory(w http.ResponseWriter, r *http.Re
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Sync complete", "created": count})
+}
+
+func (ctrl *WarehouseController) BulkDeleteSuppliers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada ID yang dipilih")
+		return
+	}
+
+	if err := ctrl.DB.Delete(&models.Supplier{}, "id IN ?", req.IDs).Error; err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus supplier secara massal")
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Supplier terpilih berhasil dihapus"})
+}
+
+func (ctrl *WarehouseController) BulkDeleteInbounds(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "Tidak ada ID yang dipilih")
+		return
+	}
+
+	err := ctrl.DB.Transaction(func(tx *gorm.DB) error {
+		// Clean related items
+		if err := tx.Where("inbound_id IN ?", req.IDs).Delete(&models.InboundItem{}).Error; err != nil {
+			return err
+		}
+		// Delete main inbounds
+		if err := tx.Delete(&models.InboundStock{}, "id IN ?", req.IDs).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus inbound secara massal: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Catatan inbound terpilih berhasil dihapus"})
 }

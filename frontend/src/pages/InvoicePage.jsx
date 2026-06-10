@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BUYER_API_BASE, fetchJson } from '../lib/api';
+import { BUYER_API_BASE, fetchJson, formatPaymentMethod } from '../lib/api';
 import toast from 'react-hot-toast';
 
 export default function InvoicePage() {
@@ -76,8 +76,24 @@ export default function InvoicePage() {
             <h2 className="text-4xl sm:text-5xl font-black text-gray-100 mb-4 print:text-gray-200 tracking-tighter">INVOICE</h2>
             <div className="space-y-1">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nomor Pesanan</p>
-              <p className="text-base sm:text-lg font-black text-blue-600 tracking-wider">#{String(order.id).substring(0,8).toUpperCase()}</p>
+              <p className="text-base sm:text-lg font-black text-blue-600 tracking-wider">
+                {order.order_number || `#${String(order.id).substring(0,8).toUpperCase()}`}
+              </p>
             </div>
+            <div className="space-y-1 mt-3">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Order</p>
+              <p className="text-sm font-black text-gray-700">
+                {order.created_at ? new Date(order.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' }) : '-'}
+              </p>
+            </div>
+            {order.paid_at && (
+              <div className="space-y-1 mt-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Lunas</p>
+                <p className="text-sm font-black text-green-600">
+                  {new Date(order.paid_at).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -96,7 +112,7 @@ export default function InvoicePage() {
             <div className="space-y-3">
                 <div className="flex justify-between items-center">
                     <span className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Metode</span>
-                    <span className="font-black text-gray-900 text-xs sm:text-sm">{payment?.payment_name || payment?.payment_method || 'Transfer Bank'}</span>
+                    <span className="font-black text-gray-900 text-xs sm:text-sm">{formatPaymentMethod(payment?.payment_name || payment?.payment_method) || 'Transfer Bank'}</span>
                 </div>
                 <div className="flex justify-between items-center">
                     <span className="text-gray-400 text-[10px] font-black uppercase tracking-wider">Status</span>
@@ -128,6 +144,30 @@ export default function InvoicePage() {
                     <td className="px-5 sm:px-6 py-4 sm:py-5">
                       <p className="font-black text-gray-900 text-xs sm:text-sm">{item.product_name}</p>
                       <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{item.variant_name}</p>
+                      {item.is_downloadable && item.downloadable_files && (() => {
+                        let files = [];
+                        try {
+                          files = JSON.parse(item.downloadable_files || '[]');
+                        } catch (e) {
+                          files = [];
+                        }
+                        if (files.length === 0) return null;
+                        return (
+                          <div className="mt-2 p-2 bg-violet-50/70 border border-violet-100 rounded-xl print:hidden">
+                            <p className="text-[9px] font-black text-violet-600 uppercase tracking-widest mb-1">
+                              File Unduhan Digital:
+                            </p>
+                            <div className="flex flex-col gap-1">
+                              {files.map((file, fidx) => (
+                                <a key={fidx} href={file.file_url} target="_blank" rel="noopener noreferrer"
+                                  className="text-[11px] text-violet-700 font-bold hover:text-violet-900 transition-colors flex items-center gap-1">
+                                  <i className="bx bx-download" /> {file.name || `File ${fidx + 1}`}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 sm:px-6 py-4 sm:py-5 text-center font-bold text-gray-900 text-xs sm:text-sm">{item.quantity}</td>
                     <td className="px-5 sm:px-6 py-4 sm:py-5 text-right font-medium text-gray-500 text-xs sm:text-sm">Rp{item.unit_price?.toLocaleString('id')}</td>
@@ -138,6 +178,38 @@ export default function InvoicePage() {
             </tbody>
           </table>
         </div>
+
+        {/* Shipping Tracking per Merchant Group */}
+        {order.merchant_groups?.some(g => g.tracking_number) && (
+          <div className="mb-8">
+            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4 border-b border-blue-100 pb-2">
+              🚚 Informasi Pengiriman
+            </h3>
+            <div className="flex flex-col gap-3">
+              {order.merchant_groups?.filter(g => g.tracking_number).map((group, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-violet-50/60 border border-violet-100 rounded-2xl px-5 py-4">
+                  <div>
+                    <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest mb-1">Nomor Resi</p>
+                    <p className="font-black text-violet-700 text-sm tracking-widest font-mono">{group.tracking_number}</p>
+                    {group.courier_code && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-violet-700 text-white text-[9px] font-black uppercase rounded-full tracking-widest">
+                        {group.courier_code}
+                      </span>
+                    )}
+                  </div>
+                  {group.shipped_at && (
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Dikirim</p>
+                      <p className="text-xs font-black text-gray-700">
+                        {new Date(group.shipped_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Footer Summary */}
         <div className="flex flex-col md:flex-row justify-between gap-10">

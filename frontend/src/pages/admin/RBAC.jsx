@@ -614,16 +614,8 @@ const AdminRBAC = () => {
             {/* --- PERMISSIONS TAB --- */}
             {activeTab === 'permissions' && (
                 <div style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ 
-                        background: 'linear-gradient(135deg, #0f172a, #1e293b)', 
-                        padding: '40px', 
-                        borderRadius: 32, 
-                        marginBottom: 32, 
-                        color: '#fff', 
-                        position: 'relative', 
-                        overflow: 'hidden',
-                        boxShadow: '0 20px 40px rgba(15,23,42,0.15)'
-                    }}>
+                    {/* Hero Header */}
+                    <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', padding: '40px', borderRadius: 32, marginBottom: 32, color: '#fff', position: 'relative', overflow: 'hidden', boxShadow: '0 20px 40px rgba(15,23,42,0.15)' }}>
                         <div style={{ position: 'absolute', right: -20, bottom: -20, fontSize: 200, color: 'rgba(255,255,255,0.03)', transform: 'rotate(-15deg)' }}>
                             <i className="bx bx-key" />
                         </div>
@@ -633,101 +625,215 @@ const AdminRBAC = () => {
                                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#6366f1' }} />
                                     <span style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Registry Otoritas</span>
                                 </div>
-                                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>Capability Registry</h2>
+                                <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>Permission Matrix</h2>
                                 <p style={{ margin: '12px 0 0 0', fontSize: 15, color: '#94a3b8', maxWidth: 600, lineHeight: 1.6 }}>
-                                    Daftar lengkap seluruh kapabilitas atomik dalam ekosistem AkuGlow. 
-                                    Gunakan registry ini untuk memetakan fungsi teknis ke dalam kebijakan akses bisnis.
+                                    Daftar izin akses per fitur sidebar — baris = fitur, kolom = aksi CRUD.
                                 </p>
                             </div>
                             <div style={{ ...A.searchWrap, width: 300 }}>
                                 <i className="bx bx-search" style={{ ...A.searchIcon, color: '#fff' }} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Cari kapabilitas..." 
-                                    style={{ ...A.searchInput, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', width: '100%' }}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                                <input type="text" placeholder="Cari fitur atau modul..." style={{ ...A.searchInput, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', width: '100%' }} onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                     </div>
-                    
-                    <div className="rbac-perm-cols">
-                        {Object.entries(
-                            permissions
-                                .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.code.toLowerCase().includes(searchTerm.toLowerCase()) || p.group.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})
-                        ).map(([group, perms]) => {
-                            const groupIcons = {
-                                'Dashboard': 'bx-grid-alt',
-                                'Catalog': 'bx-layer',
-                                'Sales': 'bx-cart',
-                                'Inventory': 'bx-package',
-                                'Users': 'bx-user',
-                                'Merchants': 'bx-store-alt',
-                                'Affiliate': 'bx-group',
-                                'Finance': 'bx-wallet',
-                                'Marketing': 'bx-megaphone',
-                                'Settings': 'bx-cog',
-                                'IAM': 'bx-shield-quarter',
-                                'Reports': 'bx-bar-chart-alt-2'
-                            };
-                            const icon = groupIcons[group] || 'bx-cube';
 
-                            return (
-                                <div key={group} style={{ 
-                                    ...A.card, 
-                                    breakInside: 'avoid', 
-                                    marginBottom: 24, 
-                                    display: 'flex', 
-                                    flexDirection: 'column',
-                                    border: '1px solid #f1f5f9'
-                                }}>
-                                    <div className="rbac-card-head" style={{ padding: '24px 30px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                                            <div style={{ width: 44, height: 44, borderRadius: 14, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
-                                                <i className={`bx ${icon}`} style={{ color: '#6366f1', fontSize: 22 }} />
-                                            </div>
-                                            <div>
-                                                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#1e293b' }}>{group}</h3>
-                                                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{perms.length} Kapabilitas Aktif</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{ padding: 30 }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                            {perms.map(p => (
-                                                <div key={p.id} style={{ 
-                                                    display: 'flex', 
-                                                    alignItems: 'flex-start', 
-                                                    gap: 16, 
-                                                    padding: '16px', 
-                                                    background: '#fff', 
-                                                    borderRadius: 16, 
-                                                    border: '1px solid #f1f5f9', 
-                                                    transition: '0.2s cubic-bezier(0.16, 1, 0.3, 1)' 
-                                                }} onMouseEnter={e=>{e.currentTarget.style.borderColor='#6366f1'; e.currentTarget.style.transform='translateX(4px)';}} onMouseLeave={e=>{e.currentTarget.style.borderColor='#f1f5f9'; e.currentTarget.style.transform='none';}}>
-                                                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                                                        <i className="bx bx-check" style={{ color: '#059669', fontSize: 16 }} />
-                                                    </div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                                            <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{p.name}</div>
-                                                            <div style={{ fontSize: 9, color: '#6366f1', fontWeight: 900, background: '#e0e7ff', padding: '2px 6px', borderRadius: 6, textTransform: 'uppercase' }}>{p.code}</div>
-                                                        </div>
-                                                        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
-                                                            {p.description || `Memberikan akses untuk mengelola fungsi ${p.name.toLowerCase()} dalam sistem.`}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                    {/* CRUD MATRIX TABLE */}
+                    {(() => {
+                        const SIDEBAR_MATRIX = [
+                            { section: 'DASHBOARD', features: [
+                                { label: 'Dashboard & Analitik', icon: 'bx-grid-alt', color: '#6366f1', view: 'view_dashboard', create: null, update: 'view_analytics', delete: 'view_notifications' },
+                            ]},
+                            { section: 'PRODUK & KATALOG', features: [
+                                { label: 'Produk', icon: 'bx-package', color: '#8b5cf6', view: 'product_view', create: 'product_create', update: 'product_update', delete: 'product_delete' },
+                                { label: 'Kategori', icon: 'bx-category', color: '#7c3aed', view: 'category_view', create: 'category_create', update: 'category_update', delete: 'category_delete' },
+                                { label: 'Varian & Harga', icon: 'bx-git-branch', color: '#a855f7', view: 'product_view', create: 'product_manage_variant', update: 'product_manage_pricing', delete: 'product_bulk_action' },
+                            ]},
+                            { section: 'PENJUALAN', features: [
+                                { label: 'Pesanan', icon: 'bx-cart', color: '#10b981', view: 'order_view', create: null, update: 'order_update_status', delete: 'order_cancel' },
+                                { label: 'Keuangan Pesanan', icon: 'bx-receipt', color: '#059669', view: 'order_view_financial', create: null, update: null, delete: 'order_export' },
+                                { label: 'Refund & Dispute', icon: 'bx-undo', color: '#34d399', view: 'order_view', create: 'order_refund', update: null, delete: null },
+                            ]},
+                            { section: 'INVENTARIS', features: [
+                                { label: 'Stok Gudang', icon: 'bx-building-house', color: '#f59e0b', view: 'inventory_view', create: 'inventory_inbound', update: 'inventory_update', delete: null },
+                                { label: 'Mutasi & Restock', icon: 'bx-transfer', color: '#d97706', view: 'inventory_mutation', create: 'inventory_restock', update: null, delete: 'inventory_report' },
+                            ]},
+                            { section: 'PENGGUNA', features: [
+                                { label: 'Pengguna', icon: 'bx-user', color: '#3b82f6', view: 'user_view', create: 'user_create', update: 'user_update', delete: 'user_delete' },
+                                { label: 'Suspend & Wallet', icon: 'bx-wallet', color: '#2563eb', view: 'user_view_wallet', create: null, update: 'user_suspend', delete: null },
+                            ]},
+                            { section: 'MERCHANT / TOKO', features: [
+                                { label: 'Merchant', icon: 'bx-store-alt', color: '#ec4899', view: 'merchant_view', create: 'merchant_create', update: 'merchant_update', delete: 'merchant_suspend' },
+                                { label: 'Verifikasi & Payout', icon: 'bx-check-shield', color: '#db2777', view: 'merchant_view_payout', create: null, update: 'merchant_verify', delete: null },
+                            ]},
+                            { section: 'AFILIASI', features: [
+                                { label: 'Mitra Afiliasi', icon: 'bx-group', color: '#06b6d4', view: 'affiliate_view', create: null, update: 'affiliate_update_tier', delete: null },
+                                { label: 'Tier & Komisi', icon: 'bx-trophy', color: '#0891b2', view: 'affiliate_view_commission', create: 'affiliate_manage_tiers', update: 'affiliate_manage_materials', delete: 'affiliate_approve_withdrawal' },
+                            ]},
+                            { section: 'KEUANGAN', features: [
+                                { label: 'Laporan Keuangan', icon: 'bx-bar-chart-alt-2', color: '#14b8a6', view: 'finance_view_summary', create: null, update: 'finance_view_reports', delete: 'finance_export_reports' },
+                                { label: 'Payout & Transaksi', icon: 'bx-transfer-alt', color: '#0d9488', view: 'finance_view_transactions', create: 'finance_process_payout', update: null, delete: null },
+                            ]},
+                            { section: 'KONTEN & MARKETING', features: [
+                                { label: 'Voucher Promo', icon: 'bx-purchase-tag', color: '#f97316', view: 'marketing_view_voucher', create: 'marketing_create_voucher', update: 'marketing_update_voucher', delete: 'marketing_delete_voucher' },
+                                { label: 'Banner & Promo', icon: 'bx-image', color: '#ea580c', view: 'marketing_view_banner', create: 'marketing_manage_banner', update: null, delete: null },
+                                { label: 'Blog & Edukasi', icon: 'bx-news', color: '#dc2626', view: null, create: 'content_blog', update: 'content_education', delete: 'content_event' },
+                                { label: 'Bahan Promosi', icon: 'bx-brush', color: '#b91c1c', view: null, create: 'content_promo_material', update: null, delete: null },
+                            ]},
+                            { section: 'SISTEM & KEAMANAN', features: [
+                                { label: 'Hak Akses / RBAC', icon: 'bx-shield-quarter', color: '#8b5cf6', view: 'rbac_view', create: 'rbac_manage_staff', update: 'rbac_manage_roles', delete: 'rbac_assign_role' },
+                                { label: 'Pengaturan Platform', icon: 'bx-cog', color: '#6d28d9', view: 'settings_view', create: null, update: 'settings_update', delete: null },
+                                { label: 'Payment & SMTP', icon: 'bx-credit-card', color: '#5b21b6', view: 'settings_view', create: null, update: 'settings_manage_payment', delete: 'settings_manage_smtp' },
+                            ]},
+                            { section: 'LAPORAN', features: [
+                                { label: 'Laporan Penjualan', icon: 'bx-file', color: '#64748b', view: 'report_sales', create: null, update: 'report_users', delete: 'report_export_all' },
+                                { label: 'Laporan Inventaris', icon: 'bx-spreadsheet', color: '#475569', view: 'report_inventory', create: null, update: null, delete: null },
+                            ]},
+                        ];
+
+                        const permByCode = {};
+                        permissions.forEach(p => { permByCode[p.code] = p; });
+
+                        const CRUD_COLS = [
+                            { key: 'view',   label: 'VIEW',   icon: 'bx-show',       color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
+                            { key: 'create', label: 'CREATE', icon: 'bx-plus-circle', color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0' },
+                            { key: 'update', label: 'UPDATE', icon: 'bx-edit',        color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+                            { key: 'delete', label: 'DELETE', icon: 'bx-trash',       color: '#ef4444', bg: '#fff1f2', border: '#fecdd3' },
+                        ];
+
+                        const filtered = SIDEBAR_MATRIX.map(s => ({
+                            ...s,
+                            features: s.features.filter(f =>
+                                !searchTerm || f.label.toLowerCase().includes(searchTerm.toLowerCase()) || s.section.toLowerCase().includes(searchTerm.toLowerCase())
+                            )
+                        })).filter(s => s.features.length > 0);
+
+                        const CrudCell = ({ code }) => {
+                            if (!code) return (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={{ width: 26, height: 26, borderRadius: 7, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <i className="bx bx-minus" style={{ color: '#cbd5e1', fontSize: 14 }} />
                                     </div>
                                 </div>
                             );
-                        })}
-                    </div>
+                            const perm = permByCode[code];
+                            return (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div
+                                        title={perm ? `${perm.name}\n(${perm.code})` : code}
+                                        style={{ width: 30, height: 30, borderRadius: 9, background: perm ? '#d1fae5' : '#fef3c7', border: `1.5px solid ${perm ? '#6ee7b7' : '#fde68a'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default', transition: '0.15s ease' }}
+                                        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.18)'; e.currentTarget.style.boxShadow = `0 4px 12px ${perm ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`; }}
+                                        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                    >
+                                        <i className={`bx ${perm ? 'bx-check' : 'bx-question-mark'}`} style={{ color: perm ? '#059669' : '#d97706', fontSize: 15, fontWeight: 900 }} />
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div style={{ ...A.card, padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 660 }}>
+                                        <thead>
+                                            <tr style={{ background: 'linear-gradient(90deg, #1e1b4b 0%, #312e81 100%)' }}>
+                                                <th style={{ padding: '20px 24px', textAlign: 'left', color: '#e0e7ff', fontSize: 11, fontWeight: 900, letterSpacing: '0.09em', textTransform: 'uppercase', width: '36%', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                                                        <i className="bx bx-sidebar" style={{ fontSize: 17 }} /> FITUR / MODUL SIDEBAR
+                                                    </div>
+                                                </th>
+                                                {CRUD_COLS.map(col => (
+                                                    <th key={col.key} style={{ padding: '16px 10px', textAlign: 'center', width: '14%', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                                        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                                                            <div style={{ width: 36, height: 36, borderRadius: 11, background: col.bg, border: `1.5px solid ${col.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                <i className={`bx ${col.icon}`} style={{ color: col.color, fontSize: 18 }} />
+                                                            </div>
+                                                            <span style={{ fontSize: 10.5, fontWeight: 900, color: col.color, letterSpacing: '0.07em' }}>{col.label}</span>
+                                                        </div>
+                                                    </th>
+                                                ))}
+                                                <th style={{ padding: '16px 10px', textAlign: 'center', width: '22%' }}>
+                                                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                                                        <div style={{ width: 36, height: 36, borderRadius: 11, background: '#1e293b', border: '1.5px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <i className="bx bx-code-alt" style={{ color: '#94a3b8', fontSize: 18 }} />
+                                                        </div>
+                                                        <span style={{ fontSize: 10.5, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.07em' }}>KODE PERMISSION</span>
+                                                    </div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filtered.map((section, si) => (
+                                                <React.Fragment key={section.section}>
+                                                    <tr style={{ background: 'linear-gradient(90deg, #f8fafc, #f1f5f9)' }}>
+                                                        <td colSpan={6} style={{ padding: '9px 24px', borderTop: si > 0 ? '2px solid #e2e8f0' : 'none', borderBottom: '1px solid #e2e8f0' }}>
+                                                            <div style={{ fontSize: 10, fontWeight: 900, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.13em', display: 'flex', alignItems: 'center', gap: 9 }}>
+                                                                <div style={{ width: 3, height: 14, background: '#6366f1', borderRadius: 2 }} />
+                                                                {section.section}
+                                                                <span style={{ fontSize: 10, background: '#e0e7ff', color: '#6366f1', padding: '1px 8px', borderRadius: 20, fontWeight: 800 }}>{section.features.length} fitur</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {section.features.map((feat) => (
+                                                        <tr key={feat.label} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s' }}
+                                                            onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
+                                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                            <td style={{ padding: '13px 24px', borderRight: '1px solid #f1f5f9' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                                    <div style={{ width: 38, height: 38, borderRadius: 11, background: `${feat.color}15`, border: `1px solid ${feat.color}28`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                                        <i className={`bx ${feat.icon}`} style={{ color: feat.color, fontSize: 18 }} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1e293b' }}>{feat.label}</div>
+                                                                        <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>
+                                                                            {[feat.view, feat.create, feat.update, feat.delete].filter(Boolean).length} permission aktif
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            {CRUD_COLS.map(col => (
+                                                                <td key={col.key} style={{ padding: '13px 10px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                                                                    <CrudCell code={feat[col.key]} />
+                                                                </td>
+                                                            ))}
+                                                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+                                                                    {[feat.view, feat.create, feat.update, feat.delete].filter(Boolean).map(code => (
+                                                                        <span key={code} style={{ fontSize: 9, fontFamily: 'monospace', color: '#6366f1', background: '#eef2ff', padding: '2px 7px', borderRadius: 5, fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>{code}</span>
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </React.Fragment>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {/* Legend Footer */}
+                                <div style={{ padding: '14px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Keterangan:</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                                        <div style={{ width: 22, height: 22, borderRadius: 7, background: '#d1fae5', border: '1.5px solid #6ee7b7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bx bx-check" style={{ color: '#059669', fontSize: 13 }} />
+                                        </div>
+                                        <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>Permission aktif di sistem</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                                        <div style={{ width: 22, height: 22, borderRadius: 7, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bx bx-minus" style={{ color: '#cbd5e1', fontSize: 13 }} />
+                                        </div>
+                                        <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>Tidak berlaku / N/A</span>
+                                    </div>
+                                    <div style={{ marginLeft: 'auto', fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
+                                        Total: <strong style={{ color: '#6366f1' }}>{permissions.length}</strong> permission aktif dalam sistem
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
+
 
             {/* --- MODALS --- */}
             
@@ -817,114 +923,188 @@ const AdminRBAC = () => {
                             
                             <div className="rbac-modal-right">
                                 <div className="rbac-tab-header" style={{ marginBottom: 16 }}>
-                                    <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.3px' }}>Matrix Kapabilitas</h4>
+                                    <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.3px' }}>Matrix CRUD Permission</h4>
                                     <div style={{ fontSize: 11.5, color: '#4f46e5', background: '#eef2ff', padding: '6px 14px', borderRadius: 20, fontWeight: 800 }}>
-                                        Batasi kapabilitas operasional profil
+                                        Klik sel untuk aktifkan / nonaktifkan permission
                                     </div>
                                 </div>
-                                
-                                <div style={{ background: '#f8fafc', padding: '20px', borderRadius: 24, border: '1px solid #e2e8f0', maxHeight: '52vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                                    {Object.entries(permissions.reduce((acc, p) => { (acc[p.group] = acc[p.group] || []).push(p); return acc; }, {})).map(([g, ps]) => {
-                                        const groupIcons = {
-                                            'Dashboard': 'bx-grid-alt',
-                                            'Catalog': 'bx-layer',
-                                            'Sales': 'bx-cart',
-                                            'Inventory': 'bx-package',
-                                            'Users': 'bx-user',
-                                            'Merchants': 'bx-store-alt',
-                                            'Affiliate': 'bx-group',
-                                            'Finance': 'bx-wallet',
-                                            'Marketing': 'bx-megaphone',
-                                            'Settings': 'bx-cog',
-                                            'IAM': 'bx-shield-quarter',
-                                            'Reports': 'bx-bar-chart-alt-2'
-                                        };
-                                        const icon = groupIcons[g] || 'bx-cube';
-                                        const isExpanded = !!expandedGroups[g];
-                                        const selectedCount = ps.filter(p => (selectedRole.permission_ids || []).includes(p.id)).length;
-                                        
-                                        return (
-                                            <div key={g} style={{ flexShrink: 0, background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)', transition: 'all 0.3s ease' }}>
-                                                {/* Header Trigger */}
-                                                <div 
-                                                    style={{ 
-                                                        display: 'flex', 
-                                                        justifyContent: 'space-between', 
-                                                        alignItems: 'center', 
-                                                        padding: '14px 20px', 
-                                                        background: 'linear-gradient(90deg, #f8fafc 0%, #fff 100%)', 
-                                                        borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none',
-                                                        cursor: 'pointer',
-                                                        userSelect: 'none'
-                                                    }}
-                                                    onClick={() => toggleGroupExpand(g)}
-                                                >
-                                                    <div style={{ fontSize: 12, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '0.05em' }}>
-                                                        <div style={{ width: 28, height: 28, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                            <i className={`bx ${icon}`} style={{ color: '#6366f1', fontSize: 16 }}/>
-                                                        </div>
-                                                        <span style={{ display: 'flex', alignItems: 'center' }}>
-                                                            {g.toUpperCase()} MODULE
-                                                            {selectedCount > 0 && (
-                                                                <span style={{ fontSize: 10, background: '#e0e7ff', color: '#4f46e5', padding: '2px 8px', borderRadius: 8, fontWeight: 800, marginLeft: 8 }}>
-                                                                    {selectedCount} / {ps.length} SELECTED
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }} onClick={e => e.stopPropagation()}>
-                                                        <div style={{ display: 'flex', gap: 8 }}>
-                                                            <button type="button" style={{ border: 'none', background: '#eef2ff', borderRadius: 20, padding: '6px 14px', fontSize: 10, fontWeight: 800, color: '#4f46e5', cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.background='#c7d2fe'} onMouseLeave={e=>e.currentTarget.style.background='#eef2ff'} onClick={() => toggleGroup(g, true)}>SELECT ALL</button>
-                                                            <button type="button" style={{ border: 'none', background: '#f1f5f9', borderRadius: 20, padding: '6px 14px', fontSize: 10, fontWeight: 800, color: '#64748b', cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.background='#cbd5e1'} onMouseLeave={e=>e.currentTarget.style.background='#f1f5f9'} onClick={() => toggleGroup(g, false)}>CLEAR</button>
-                                                        </div>
-                                                        <div 
-                                                            onClick={() => toggleGroupExpand(g)}
-                                                            style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isExpanded ? '#f1f5f9' : 'transparent', cursor: 'pointer', transition: '0.2s' }}
-                                                        >
-                                                            <i className="bx bx-chevron-down" style={{ fontSize: 18, color: '#64748b', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }} />
-                                                        </div>
-                                                    </div>
+
+                                {/* CRUD Matrix Interactive Table */}
+                                {(() => {
+                                    const MODAL_MATRIX = [
+                                        { section: 'Dashboard', features: [
+                                            { label: 'Dashboard', icon: 'bx-grid-alt', color: '#6366f1', view: 'view_dashboard', create: null, update: 'view_analytics', delete: 'view_notifications' },
+                                        ]},
+                                        { section: 'Produk & Katalog', features: [
+                                            { label: 'Produk', icon: 'bx-package', color: '#8b5cf6', view: 'product_view', create: 'product_create', update: 'product_update', delete: 'product_delete' },
+                                            { label: 'Kategori', icon: 'bx-category', color: '#7c3aed', view: 'category_view', create: 'category_create', update: 'category_update', delete: 'category_delete' },
+                                            { label: 'Varian & Harga', icon: 'bx-git-branch', color: '#a855f7', view: 'product_view', create: 'product_manage_variant', update: 'product_manage_pricing', delete: 'product_bulk_action' },
+                                        ]},
+                                        { section: 'Penjualan', features: [
+                                            { label: 'Pesanan', icon: 'bx-cart', color: '#10b981', view: 'order_view', create: null, update: 'order_update_status', delete: 'order_cancel' },
+                                            { label: 'Keuangan Pesanan', icon: 'bx-receipt', color: '#059669', view: 'order_view_financial', create: null, update: null, delete: 'order_export' },
+                                            { label: 'Refund & Dispute', icon: 'bx-undo', color: '#34d399', view: 'order_view', create: 'order_refund', update: null, delete: null },
+                                        ]},
+                                        { section: 'Inventaris', features: [
+                                            { label: 'Stok Gudang', icon: 'bx-building-house', color: '#f59e0b', view: 'inventory_view', create: 'inventory_inbound', update: 'inventory_update', delete: null },
+                                            { label: 'Mutasi & Restock', icon: 'bx-transfer', color: '#d97706', view: 'inventory_mutation', create: 'inventory_restock', update: null, delete: 'inventory_report' },
+                                        ]},
+                                        { section: 'Pengguna', features: [
+                                            { label: 'Pengguna', icon: 'bx-user', color: '#3b82f6', view: 'user_view', create: 'user_create', update: 'user_update', delete: 'user_delete' },
+                                            { label: 'Suspend & Wallet', icon: 'bx-wallet', color: '#2563eb', view: 'user_view_wallet', create: null, update: 'user_suspend', delete: null },
+                                        ]},
+                                        { section: 'Merchant / Toko', features: [
+                                            { label: 'Merchant', icon: 'bx-store-alt', color: '#ec4899', view: 'merchant_view', create: 'merchant_create', update: 'merchant_update', delete: 'merchant_suspend' },
+                                            { label: 'Verifikasi & Payout', icon: 'bx-check-shield', color: '#db2777', view: 'merchant_view_payout', create: null, update: 'merchant_verify', delete: null },
+                                        ]},
+                                        { section: 'Afiliasi', features: [
+                                            { label: 'Mitra Afiliasi', icon: 'bx-group', color: '#06b6d4', view: 'affiliate_view', create: null, update: 'affiliate_update_tier', delete: null },
+                                            { label: 'Tier & Komisi', icon: 'bx-trophy', color: '#0891b2', view: 'affiliate_view_commission', create: 'affiliate_manage_tiers', update: 'affiliate_manage_materials', delete: 'affiliate_approve_withdrawal' },
+                                        ]},
+                                        { section: 'Keuangan', features: [
+                                            { label: 'Laporan Keuangan', icon: 'bx-bar-chart-alt-2', color: '#14b8a6', view: 'finance_view_summary', create: null, update: 'finance_view_reports', delete: 'finance_export_reports' },
+                                            { label: 'Payout & Transaksi', icon: 'bx-transfer-alt', color: '#0d9488', view: 'finance_view_transactions', create: 'finance_process_payout', update: null, delete: null },
+                                        ]},
+                                        { section: 'Konten & Marketing', features: [
+                                            { label: 'Voucher Promo', icon: 'bx-purchase-tag', color: '#f97316', view: 'marketing_view_voucher', create: 'marketing_create_voucher', update: 'marketing_update_voucher', delete: 'marketing_delete_voucher' },
+                                            { label: 'Banner & Promo', icon: 'bx-image', color: '#ea580c', view: 'marketing_view_banner', create: 'marketing_manage_banner', update: null, delete: null },
+                                            { label: 'Blog & Edukasi', icon: 'bx-news', color: '#dc2626', view: null, create: 'content_blog', update: 'content_education', delete: 'content_event' },
+                                            { label: 'Bahan Promosi', icon: 'bx-brush', color: '#b91c1c', view: null, create: 'content_promo_material', update: null, delete: null },
+                                        ]},
+                                        { section: 'Sistem & Keamanan', features: [
+                                            { label: 'Hak Akses / RBAC', icon: 'bx-shield-quarter', color: '#8b5cf6', view: 'rbac_view', create: 'rbac_manage_staff', update: 'rbac_manage_roles', delete: 'rbac_assign_role' },
+                                            { label: 'Pengaturan Platform', icon: 'bx-cog', color: '#6d28d9', view: 'settings_view', create: null, update: 'settings_update', delete: null },
+                                            { label: 'Payment & SMTP', icon: 'bx-credit-card', color: '#5b21b6', view: 'settings_view', create: null, update: 'settings_manage_payment', delete: 'settings_manage_smtp' },
+                                        ]},
+                                        { section: 'Laporan', features: [
+                                            { label: 'Laporan Penjualan', icon: 'bx-file', color: '#64748b', view: 'report_sales', create: null, update: 'report_users', delete: 'report_export_all' },
+                                            { label: 'Laporan Inventaris', icon: 'bx-spreadsheet', color: '#475569', view: 'report_inventory', create: null, update: null, delete: null },
+                                        ]},
+                                    ];
+
+                                    const permByCode = {};
+                                    permissions.forEach(p => { permByCode[p.code] = p; });
+
+                                    const CRUD_COLS = [
+                                        { key: 'view',   label: 'VIEW',   icon: 'bx-show',        color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
+                                        { key: 'create', label: 'CREATE', icon: 'bx-plus-circle',  color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0' },
+                                        { key: 'update', label: 'UPDATE', icon: 'bx-edit',         color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+                                        { key: 'delete', label: 'DELETE', icon: 'bx-trash',        color: '#ef4444', bg: '#fff1f2', border: '#fecdd3' },
+                                    ];
+
+                                    const toggleByCode = (code) => {
+                                        const perm = permByCode[code];
+                                        if (!perm) return;
+                                        togglePermission(perm.id);
+                                    };
+
+                                    const isCheckedByCode = (code) => {
+                                        const perm = permByCode[code];
+                                        if (!perm) return false;
+                                        return (selectedRole.permission_ids || []).includes(perm.id);
+                                    };
+
+                                    const InteractiveCell = ({ code, colColor, colBg, colBorder }) => {
+                                        if (!code) return (
+                                            <td style={{ padding: '10px 6px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                                                <div style={{ width: 28, height: 28, borderRadius: 8, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 'auto' }}>
+                                                    <i className="bx bx-minus" style={{ color: '#e2e8f0', fontSize: 14 }} />
                                                 </div>
-                                                
-                                                {/* Content Dropdown */}
-                                                {isExpanded && (
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, padding: 20, background: '#fff', animation: 'slideDown 0.25s ease-out' }}>
-                                                        {ps.map(p => {
-                                                            const isChecked = (selectedRole.permission_ids || []).includes(p.id);
-                                                            return (
-                                                                <div key={p.id} style={{ 
-                                                                    display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px', 
-                                                                    background: isChecked ? '#f5f7ff' : '#fff', 
-                                                                    border: `2.5px solid ${isChecked ? '#6366f1' : '#f1f5f9'}`, 
-                                                                    borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s',
-                                                                    boxShadow: isChecked ? '0 4px 12px rgba(99,102,241,0.08)' : 'none'
-                                                                }}
-                                                                onClick={() => togglePermission(p.id)}
-                                                                onMouseEnter={e => { if(!isChecked) e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                                                                onMouseLeave={e => { if(!isChecked) e.currentTarget.style.borderColor = '#f1f5f9'; }}
-                                                                >
-                                                                    <div style={{ 
-                                                                        width: 18, height: 18, borderRadius: 6, 
-                                                                        border: `2px solid ${isChecked ? '#6366f1' : '#cbd5e1'}`, 
-                                                                        background: isChecked ? '#6366f1' : '#fff', 
-                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                        flexShrink: 0, marginTop: 2, transition: 'all 0.2s'
-                                                                    }}>
-                                                                        {isChecked && <i className="bx bx-check" style={{ color: '#fff', fontSize: 14 }} />}
-                                                                    </div>
-                                                                    <div style={{ minWidth: 0 }}>
-                                                                        <div style={{ fontSize: 12.5, fontWeight: 800, color: isChecked ? '#1e1b4b' : '#334155' }}>{p.name}</div>
-                                                                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, fontFamily: 'monospace' }}>{p.code}</div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            </td>
                                         );
-                                    })}
-                                </div>
+                                        const checked = isCheckedByCode(code);
+                                        const perm = permByCode[code];
+                                        return (
+                                            <td style={{ padding: '10px 6px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                                                <div
+                                                    title={perm ? perm.name : code}
+                                                    onClick={() => toggleByCode(code)}
+                                                    style={{
+                                                        width: 32, height: 32, borderRadius: 9, margin: 'auto',
+                                                        background: checked ? colBg : '#f8fafc',
+                                                        border: `2px solid ${checked ? colColor : '#e2e8f0'}`,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        cursor: 'pointer', transition: 'all 0.18s ease',
+                                                        boxShadow: checked ? `0 4px 10px ${colColor}33` : 'none',
+                                                    }}
+                                                    onMouseEnter={e => { if (!checked) { e.currentTarget.style.borderColor = colColor; e.currentTarget.style.background = colBg; } e.currentTarget.style.transform = 'scale(1.14)'; }}
+                                                    onMouseLeave={e => { if (!checked) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; } e.currentTarget.style.transform = 'scale(1)'; }}
+                                                >
+                                                    {checked
+                                                        ? <i className="bx bx-check" style={{ color: colColor, fontSize: 18, fontWeight: 900 }} />
+                                                        : <i className="bx bx-plus" style={{ color: '#cbd5e1', fontSize: 15 }} />
+                                                    }
+                                                </div>
+                                            </td>
+                                        );
+                                    };
+
+                                    return (
+                                        <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid #e2e8f0', maxHeight: '52vh', overflowY: 'auto', background: '#fff' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+                                                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                                                    <tr style={{ background: 'linear-gradient(90deg, #1e1b4b 0%, #312e81 100%)' }}>
+                                                        <th style={{ padding: '14px 18px', textAlign: 'left', color: '#e0e7ff', fontSize: 10.5, fontWeight: 900, letterSpacing: '0.09em', textTransform: 'uppercase', width: '36%', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                <i className="bx bx-sidebar" style={{ fontSize: 16 }} /> FITUR SIDEBAR
+                                                            </div>
+                                                        </th>
+                                                        {CRUD_COLS.map(col => (
+                                                            <th key={col.key} style={{ padding: '12px 6px', textAlign: 'center', width: '14%', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                                                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                                                                    <div style={{ width: 30, height: 30, borderRadius: 9, background: col.bg, border: `1.5px solid ${col.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                        <i className={`bx ${col.icon}`} style={{ color: col.color, fontSize: 16 }} />
+                                                                    </div>
+                                                                    <span style={{ fontSize: 9.5, fontWeight: 900, color: col.color, letterSpacing: '0.06em' }}>{col.label}</span>
+                                                                </div>
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {MODAL_MATRIX.map((section, si) => (
+                                                        <React.Fragment key={section.section}>
+                                                            <tr style={{ background: 'linear-gradient(90deg, #f8fafc, #f1f5f9)' }}>
+                                                                <td colSpan={5} style={{ padding: '7px 18px', borderTop: si > 0 ? '2px solid #e2e8f0' : 'none', borderBottom: '1px solid #e2e8f0' }}>
+                                                                    <div style={{ fontSize: 9.5, fontWeight: 900, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                        <div style={{ width: 3, height: 12, background: '#6366f1', borderRadius: 2 }} />
+                                                                        {section.section}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                            {section.features.map(feat => {
+                                                                const activeCount = [feat.view, feat.create, feat.update, feat.delete].filter(c => c && isCheckedByCode(c)).length;
+                                                                const totalCount  = [feat.view, feat.create, feat.update, feat.delete].filter(Boolean).length;
+                                                                return (
+                                                                    <tr key={feat.label} style={{ borderBottom: '1px solid #f8fafc', transition: 'background 0.1s' }}
+                                                                        onMouseEnter={e => e.currentTarget.style.background = '#fafbff'}
+                                                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                                        <td style={{ padding: '10px 18px', borderRight: '1px solid #f1f5f9' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                                                <div style={{ width: 32, height: 32, borderRadius: 9, background: `${feat.color}18`, border: `1px solid ${feat.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                                                    <i className={`bx ${feat.icon}`} style={{ color: feat.color, fontSize: 16 }} />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1e293b' }}>{feat.label}</div>
+                                                                                    <div style={{ fontSize: 10, color: activeCount > 0 ? '#10b981' : '#94a3b8', marginTop: 1, fontWeight: 700 }}>
+                                                                                        {activeCount > 0 ? `${activeCount}/${totalCount} aktif` : 'belum dipilih'}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                        {CRUD_COLS.map(col => (
+                                                                            <InteractiveCell key={col.key} code={feat[col.key]} colColor={col.color} colBg={col.bg} colBorder={col.border} />
+                                                                        ))}
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </form>

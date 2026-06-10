@@ -1,8 +1,8 @@
 package services
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"errors"
 	"fmt"
 	"gorm.io/gorm"
@@ -45,7 +45,9 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 		}
 
 		if inventory.Stock < quantity {
-			return errors.New("stok di merchant ini tidak mencukupi")
+			if product.Backorders == "no" || product.Backorders == "" {
+				return errors.New("stok di merchant ini tidak mencukupi")
+			}
 		}
 
 		// 4. Get or Create Cart
@@ -78,7 +80,9 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 				return err
 			}
 			if item.Quantity > inventory.Stock {
-				return errors.New("total pesanan melebihi stok merchant yang tersedia")
+				if product.Backorders == "no" || product.Backorders == "" {
+					return errors.New("total pesanan melebihi stok merchant yang tersedia")
+				}
 			}
 			err := tx.Save(&item).Error
 			if err == nil {

@@ -1,7 +1,7 @@
 package seeder
 
 import (
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"fmt"
 	"strings"
 
@@ -15,7 +15,7 @@ func SeedAkuglowProducts(db *gorm.DB) {
 	// 1. Get Categories & Supplier Mapping
 	var cats []models.Category
 	db.Find(&cats)
-	
+
 	var supplier models.Supplier
 	db.First(&supplier)
 	supplierID := supplier.ID
@@ -200,17 +200,20 @@ func SeedAkuglowProducts(db *gorm.DB) {
 
 	for _, p := range products {
 		var existing models.Product
-		db.Where("slug = ?", p.Slug).First(&existing)
-		
+		db.Where("sku = ?", p.SKU).First(&existing)
+
 		if existing.ID == "" {
 			p.ID = uuid.New().String()
 			db.Create(&p)
 			existing = p
 		} else {
-			// Update gambar & COGS agar sinkron
+			// Update slug, name, gambar, COGS & price agar sinkron
 			db.Model(&existing).Updates(map[string]interface{}{
+				"name":  p.Name,
+				"slug":  p.Slug,
 				"image": p.Image,
 				"cogs":  p.COGS,
+				"price": p.Price,
 			})
 		}
 
@@ -244,6 +247,20 @@ func SeedAkuglowProducts(db *gorm.DB) {
 		db.Where(models.Inventory{MerchantID: models.PusatID, ProductID: existing.ID, ProductVariantID: &v.ID}).
 			Assign(models.Inventory{Stock: 1000}).
 			FirstOrCreate(&models.Inventory{})
+
+		// Ensure Inventory for other merchants
+		var merchants []models.Merchant
+		if err := db.Where("id != ?", models.PusatID).Find(&merchants).Error; err == nil {
+			for _, m := range merchants {
+				db.Where(models.Inventory{MerchantID: m.ID, ProductID: existing.ID, ProductVariantID: nil}).
+					Assign(models.Inventory{Stock: 0}).
+					FirstOrCreate(&models.Inventory{})
+
+				db.Where(models.Inventory{MerchantID: m.ID, ProductID: existing.ID, ProductVariantID: &v.ID}).
+					Assign(models.Inventory{Stock: 1000}).
+					FirstOrCreate(&models.Inventory{})
+			}
+		}
 	}
 
 	fmt.Println("✅ Akuglow Products Seeded Successfully!")

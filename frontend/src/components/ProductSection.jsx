@@ -130,7 +130,14 @@ export function ProductCard({ product }) {
 
         <div className="mt-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex flex-col">
-            <span className="font-black text-gray-900 text-sm sm:text-lg">Rp{(product.price || 0).toLocaleString('id-ID')}</span>
+            <div className="flex flex-wrap items-baseline gap-1 sm:gap-2">
+              <span className="font-black text-gray-900 text-sm sm:text-lg">Rp{(product.price || 0).toLocaleString('id-ID')}</span>
+              {product.old_price > product.price && (
+                <span className="text-[10px] sm:text-xs text-gray-400 line-through font-medium">
+                  Rp{product.old_price.toLocaleString('id-ID')}
+                </span>
+              )}
+            </div>
           </div>
           <button 
             onClick={addToCart}

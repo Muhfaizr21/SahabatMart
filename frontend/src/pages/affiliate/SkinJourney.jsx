@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { toPng } from 'html-to-image';
 
 export default function SkinJourney() {
-  const user = getStoredUser();
+  // const user = getStoredUser(); // Not used directly in rendering where user is not implicitly accessed
   const certificateRef = useRef(null);
   const [journeyData, setJourneyData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,8 +35,8 @@ export default function SkinJourney() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Filter states for Skin Journey chart
-  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
-  const [filterMonth, setFilterMonth] = useState(null);
+  // const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  // const [filterMonth, setFilterMonth] = useState(null);
 
   const currentWeekNumber = (() => {
     // Priority: Use started_at from the active program, fallback to pretest created_at
@@ -305,7 +305,7 @@ export default function SkinJourney() {
     // Phase 1: AI Analysis
     if (skinPhoto && !aiAnalysis) {
       setAnalyzing(true);
-      const tid = toast.loading('Memproses & Mengoptimalkan Foto...', { id: 'ai-analyze' });
+      toast.loading('Memproses & Mengoptimalkan Foto...', { id: 'ai-analyze' });
       
       try {
         let processedBlob;
@@ -893,7 +893,7 @@ export default function SkinJourney() {
                     try {
                       const profile = JSON.parse(journeyData?.skin_profile_json || '{}');
                       initialScore = profile.skin_score || 0;
-                    } catch(e) {}
+                    } catch(_e) {}
 
                     const logs = [...(journeyData?.progress_logs || [])].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
                     const startScore = initialScore || (logs.length > 0 ? logs[0].skin_score : 0);
@@ -920,7 +920,7 @@ export default function SkinJourney() {
                   try {
                     const profile = JSON.parse(journeyData?.skin_profile_json || '{}');
                     initialScore = profile.skin_score || 0;
-                  } catch(e) {}
+                  } catch(_e) {}
 
                   const logs = [...(journeyData?.progress_logs || [])].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
                   
@@ -1618,7 +1618,7 @@ export default function SkinJourney() {
                     </div>
                   </div>
                   <button 
-                    onClick={() => window.location.href=`/product/${selectedRoutine.product_id}`}
+                    onClick={() => window.location.href=`/product/${selectedRoutine.product?.slug || selectedRoutine.product_id}`}
                     className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-amber-500/20 active:scale-95"
                   >
                     BELI SEKARANG

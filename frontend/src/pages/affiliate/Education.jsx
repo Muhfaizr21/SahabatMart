@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
+import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
 
 const EducationModal = ({ item, onClose }) => {
   if (!item) return null;
@@ -19,11 +19,20 @@ const EducationModal = ({ item, onClose }) => {
           {/* Media Section */}
           <div className="lg:w-3/5 bg-black flex items-center justify-center aspect-video lg:aspect-auto min-h-[300px]">
              {item.video_url ? (
-               <iframe 
-                 src={item.video_url.replace('watch?v=', 'embed/')}
-                 className="w-full h-full border-none"
-                 allowFullScreen
-               />
+               item.video_url.includes('youtube.com') || item.video_url.includes('youtu.be') ? (
+                 <iframe 
+                   src={item.video_url.replace('watch?v=', 'embed/')}
+                   className="w-full h-full border-none"
+                   allowFullScreen
+                 />
+               ) : (
+                 <video 
+                   src={formatImage(item.video_url)}
+                   className="w-full h-full object-contain"
+                   controls
+                   playsInline
+                 />
+               )
              ) : item.image_url ? (
                <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
              ) : (

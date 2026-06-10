@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 
 	"gorm.io/gorm"
 )
@@ -111,6 +111,21 @@ func (pc *ProductController) TrackInteraction(w http.ResponseWriter, r *http.Req
 
 // GET /api/public/products/recommended
 func (pc *ProductController) GetRecommendations(w http.ResponseWriter, r *http.Request) {
+	productID := r.URL.Query().Get("product_id")
+	if productID != "" {
+		var product models.Product
+		if err := pc.DB.Where("id = ? OR slug = ?", productID, productID).First(&product).Error; err == nil && product.Upsells != "" {
+			var upsellIDs []string
+			if err := json.Unmarshal([]byte(product.Upsells), &upsellIDs); err == nil && len(upsellIDs) > 0 {
+				var upsells []models.Product
+				if err := pc.DB.Where("id IN ? AND status = ?", upsellIDs, "active").Find(&upsells).Error; err == nil && len(upsells) > 0 {
+					utils.JSONResponse(w, http.StatusOK, upsells)
+					return
+				}
+			}
+		}
+	}
+
 	userID := ""
 	if val := r.Context().Value("user_id"); val != nil {
 		userID = val.(string)

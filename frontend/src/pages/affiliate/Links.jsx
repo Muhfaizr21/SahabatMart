@@ -77,7 +77,7 @@ export default function AffiliateLinks() {
       if (form.product_id) {
         const prod = products.find((p) => p.id === form.product_id);
         if (prod) {
-          targetURL = `${window.location.origin}/product/${prod.id}`;
+          targetURL = `${window.location.origin}/product/${prod.slug || prod.id}`;
         }
       }
 
@@ -117,6 +117,172 @@ export default function AffiliateLinks() {
   const copyURL = (url) => {
     navigator.clipboard.writeText(url);
     toast('URL disalin ke clipboard!');
+  };
+
+  const downloadQRCard = () => {
+    toast('Sedang mempersiapkan Kartu Referral...');
+    // Create an off-screen canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 1000;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Draw Background Gradient
+    const gradient = ctx.createLinearGradient(0, 0, 800, 1000);
+    gradient.addColorStop(0, '#0c0a0f');
+    gradient.addColorStop(0.5, '#0f172a');
+    gradient.addColorStop(1, '#020617');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 800, 1000);
+
+    // Draw ambient glows
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+    ctx.beginPath();
+    ctx.arc(150, 150, 250, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.12)';
+    ctx.beginPath();
+    ctx.arc(650, 850, 300, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Draw Decorative Border / Card Frame
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(40, 40, 720, 920, 40);
+    } else {
+      ctx.rect(40, 40, 720, 920);
+    }
+    ctx.stroke();
+
+    // Corner highlights
+    ctx.strokeStyle = '#818cf8';
+    ctx.lineWidth = 8;
+    // Top-Left Corner
+    ctx.beginPath();
+    ctx.moveTo(100, 40);
+    if (ctx.roundRect) {
+      ctx.arcTo(40, 40, 40, 100, 40);
+    } else {
+      ctx.lineTo(40, 40);
+      ctx.lineTo(40, 100);
+    }
+    ctx.lineTo(40, 120);
+    ctx.stroke();
+
+    // Top-Right Corner
+    ctx.beginPath();
+    ctx.moveTo(700, 40);
+    if (ctx.roundRect) {
+      ctx.arcTo(760, 40, 760, 100, 40);
+    } else {
+      ctx.lineTo(760, 40);
+      ctx.lineTo(760, 100);
+    }
+    ctx.lineTo(760, 120);
+    ctx.stroke();
+
+    // Bottom-Left Corner
+    ctx.beginPath();
+    ctx.moveTo(40, 880);
+    if (ctx.roundRect) {
+      ctx.arcTo(40, 960, 100, 960, 40);
+    } else {
+      ctx.lineTo(40, 960);
+      ctx.lineTo(100, 960);
+    }
+    ctx.lineTo(120, 960);
+    ctx.stroke();
+
+    // Bottom-Right Corner
+    ctx.beginPath();
+    ctx.moveTo(760, 880);
+    if (ctx.roundRect) {
+      ctx.arcTo(760, 960, 700, 960, 40);
+    } else {
+      ctx.lineTo(760, 960);
+      ctx.lineTo(700, 960);
+    }
+    ctx.lineTo(680, 960);
+    ctx.stroke();
+
+    // 3. Draw Branding Logo or Title
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 36px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('AKUGLOW', 400, 130);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 20px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('MITRA AFILIASI RESMI', 400, 170);
+
+    // 4. Draw QR Code Container Box
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(175, 235, 450, 450, 30);
+    } else {
+      ctx.rect(175, 235, 450, 450);
+    }
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Load QR image
+    const qrImg = new Image();
+    qrImg.crossOrigin = 'anonymous';
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.origin + '/register?ref=' + refCode)}`;
+    qrImg.src = qrUrl;
+
+    qrImg.onload = () => {
+      // Draw QR Image
+      ctx.drawImage(qrImg, 200, 260, 400, 400);
+
+      // Draw QR Corner Accents
+      ctx.strokeStyle = '#818cf8';
+      ctx.lineWidth = 4;
+      // top-left
+      ctx.beginPath(); ctx.moveTo(215, 260); ctx.lineTo(200, 260); ctx.lineTo(200, 275); ctx.stroke();
+      // top-right
+      ctx.beginPath(); ctx.moveTo(585, 260); ctx.lineTo(600, 260); ctx.lineTo(600, 275); ctx.stroke();
+      // bottom-left
+      ctx.beginPath(); ctx.moveTo(215, 660); ctx.lineTo(200, 660); ctx.lineTo(200, 645); ctx.stroke();
+      // bottom-right
+      ctx.beginPath(); ctx.moveTo(585, 660); ctx.lineTo(600, 660); ctx.lineTo(600, 645); ctx.stroke();
+
+      // 5. Draw Referral Info
+      ctx.fillStyle = '#818cf8';
+      ctx.font = 'bold 22px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('KODE REFERRAL ANDA', 400, 760);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 64px "Plus Jakarta Sans", sans-serif';
+      const spacedCode = refCode.split('').join(' ');
+      ctx.fillText(spacedCode, 400, 840);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 18px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Scan QR Code untuk bergabung sebagai Mitra', 400, 900);
+
+      // Trigger Download
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `Referral-Card-${refCode}.png`;
+        link.href = dataUrl;
+        link.click();
+        toast('Kartu Referral berhasil diunduh!');
+      } catch (err) {
+        console.error(err);
+        toast('Gagal mengunduh gambar: Cross-Origin restriction', 'error');
+      }
+    };
+    qrImg.onerror = () => {
+      toast('Gagal memuat QR Code', 'error');
+    };
   };
 
   const baseStyle = {
@@ -230,20 +396,27 @@ export default function AffiliateLinks() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-lg">
               <button 
                 onClick={() => copyURL(refCode)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs uppercase tracking-wider transition-all border border-white/10 hover:border-white/20 active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs uppercase tracking-wider transition-all border border-white/10 hover:border-white/20 active:scale-[0.98]"
               >
                 <span className="material-symbols-outlined text-lg">content_copy</span>
                 Salin Kode
               </button>
               <button 
                 onClick={() => copyURL(`${window.location.origin}/register?ref=${refCode}`)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs uppercase tracking-wider transition-all border border-white/10 hover:border-white/20 active:scale-[0.98]"
               >
-                <span className="material-symbols-outlined text-lg">share</span>
-                Salin Link Daftar
+                <span className="material-symbols-outlined text-lg">link</span>
+                Salin Link
+              </button>
+              <button 
+                onClick={downloadQRCard}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-lg">download</span>
+                Unduh Kartu
               </button>
             </div>
           </div>
@@ -304,61 +477,65 @@ export default function AffiliateLinks() {
       ) : (
         <>
           {/* Quick Links per user request */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all group flex flex-col justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Card 1 */}
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-300 group flex flex-col justify-between">
                   <div>
-                    <span className="material-symbols-outlined text-purple-400 mb-2">home</span>
-                    <h4 className="text-white font-bold text-sm">Link Utama Website</h4>
-                    <p className="text-slate-500 text-[10px] mt-1">Arahkan calon mitra ke halaman beranda AkuGlow.</p>
+                    <span className="material-symbols-outlined text-indigo-400 mb-2">home</span>
+                    <h4 className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">Link Utama Website</h4>
+                    <p className="text-slate-400 text-[11px] mt-2 leading-relaxed font-medium">Arahkan calon mitra ke halaman beranda AkuGlow.</p>
                   </div>
                   <button 
                     onClick={() => copyURL(`${window.location.origin}?ref=${refCode}`)}
-                    className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-purple-600 transition-all"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold uppercase tracking-wider group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 hover:scale-[1.02]"
                   >
                     Salin Link Utama
                   </button>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-green-500/50 transition-all group flex flex-col justify-between shadow-lg shadow-green-500/5 border-green-500/20">
+              {/* Card 2 */}
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/5 transition-all duration-300 group flex flex-col justify-between">
                   <div>
-                    <span className="material-symbols-outlined text-green-400 mb-2">group_add</span>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-white font-bold text-sm">Link Rekrutmen</h4>
-                      <span className="text-[8px] bg-green-500 text-white px-1 rounded-sm animate-pulse">NEW</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="material-symbols-outlined text-emerald-400">group_add</span>
+                      <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">NEW</span>
                     </div>
-                    <p className="text-slate-500 text-[10px] mt-1">Link khusus pendaftaran mitra baru (Otomatis isi Referral).</p>
+                    <h4 className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">Link Rekrutmen</h4>
+                    <p className="text-slate-400 text-[11px] mt-2 leading-relaxed font-medium">Link khusus pendaftaran mitra baru (Otomatis isi Referral).</p>
                   </div>
                   <button 
                     onClick={() => copyURL(`${window.location.origin}/register?ref=${refCode}`)}
-                    className="mt-4 w-full py-2 rounded-lg bg-green-600/20 text-green-400 text-[10px] font-bold uppercase tracking-wider group-hover:bg-green-600 group-hover:text-white transition-all border border-green-500/30"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold uppercase tracking-wider group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 hover:scale-[1.02]"
                   >
                     Salin Link Daftar
                   </button>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 transition-all group flex flex-col justify-between">
+              {/* Card 3 */}
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/40 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300 group flex flex-col justify-between">
                   <div>
                     <span className="material-symbols-outlined text-blue-400 mb-2">shopping_bag</span>
-                    <h4 className="text-white font-bold text-sm">Link Langsung Produk</h4>
-                    <p className="text-slate-500 text-[10px] mt-1">Arahkan langsung ke halaman detail produk tertentu.</p>
+                    <h4 className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">Link Langsung Produk</h4>
+                    <p className="text-slate-400 text-[11px] mt-2 leading-relaxed font-medium">Arahkan langsung ke halaman detail produk tertentu.</p>
                   </div>
                   <button 
                      onClick={() => { setShowForm(true); setForm({ ...form, product_id: products[0]?.id || '' })}}
-                     className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-blue-600 transition-all"
+                     className="mt-5 w-full py-2.5 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold uppercase tracking-wider group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 hover:scale-[1.02]"
                   >
                     Pilih Produk
                   </button>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-pink-500/50 transition-all group flex flex-col justify-between">
+              {/* Card 4 */}
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-pink-500/40 hover:shadow-lg hover:shadow-pink-500/5 transition-all duration-300 group flex flex-col justify-between">
                   <div>
                     <span className="material-symbols-outlined text-pink-400 mb-2">campaign</span>
-                    <h4 className="text-white font-bold text-sm">Link Promo Khusus</h4>
-                    <p className="text-slate-500 text-[10px] mt-1">Link untuk kampanye marketing atau landing page event.</p>
+                    <h4 className="text-white font-bold text-sm font-['Plus_Jakarta_Sans']">Link Promo Khusus</h4>
+                    <p className="text-slate-400 text-[11px] mt-2 leading-relaxed font-medium">Link untuk kampanye marketing atau landing page event.</p>
                   </div>
                   <button 
                     onClick={() => copyURL(`${window.location.origin}/promo/special?ref=${refCode}`)}
-                    className="mt-4 w-full py-2 rounded-lg bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider group-hover:bg-pink-600 transition-all"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold uppercase tracking-wider group-hover:bg-pink-600 group-hover:text-white transition-all duration-300 hover:scale-[1.02]"
                   >
                     Salin Link Promo
                   </button>

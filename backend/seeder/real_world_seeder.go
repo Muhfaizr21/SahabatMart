@@ -1,7 +1,7 @@
 package seeder
 
 import (
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"fmt"
 
 	"gorm.io/gorm"

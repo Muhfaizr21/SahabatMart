@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getStoredUser, isAuthenticated, logout, isAdminUser } from '../lib/auth';
-import { BUYER_API_BASE, PUBLIC_API_BASE, fetchJson } from '../lib/api';
+import { BUYER_API_BASE, PUBLIC_API_BASE, API_BASE, fetchJson } from '../lib/api';
 
 const SearchIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
 const CartIcon = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>;
@@ -33,10 +33,15 @@ export default function Navbar() {
   const [wishCount, setWishCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);
+  const [notifs, setNotifs] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [openNotif, setOpenNotif] = useState(false);
+  const notifRef = useRef(null);
 
   const loggedIn = isAuthenticated();
   const user = getStoredUser();
   const isAdmin = isAdminUser(user);
+  const isBuyer = loggedIn && user?.role !== 'superadmin' && user?.role !== 'admin' && user?.role !== 'merchant' && user?.role !== 'affiliate';
 
   const fetchCounts = async () => {
     if (!localStorage.getItem('token')) return;
@@ -57,15 +62,29 @@ export default function Navbar() {
     }
   };
 
+  const fetchNotifs = async () => {
+    if (!localStorage.getItem('token')) return;
+    try {
+      const data = await fetchJson(`${API_BASE}/api/buyer/notifications`);
+      if (Array.isArray(data)) {
+        setNotifs(data);
+        setUnreadCount(data.filter(n => !n.is_read).length);
+      }
+    } catch (_err) {
+      // silent
+    }
+  };
+
   useEffect(() => {
     
     fetchCounts();
     
     // Real-time Sync via SSE (Server-Sent Events)
     let eventSource = null;
-    if (localStorage.getItem('token') && user?.id) {
+    const token = localStorage.getItem('token');
+    if (token && user?.id) {
        // Melalui SSE, perubahan di keranjang/wishlist/notif akan langsung terdeteksi
-       eventSource = new EventSource(`${PUBLIC_API_BASE.replace('/public', '')}/notifications/stream?user_id=${user.id}`);
+       eventSource = new EventSource(`${PUBLIC_API_BASE.replace('/public', '')}/notifications/stream?t=${token}`);
        
        eventSource.onmessage = (event) => {
          if (!event.data || event.data.trim() === "") return;
@@ -73,6 +92,9 @@ export default function Navbar() {
            const payload = JSON.parse(event.data);
            if (payload.type === 'cart_update' || payload.type === 'wishlist_update' || payload.type === 'notification') {
              fetchCounts(); // Auto sync state navbar
+             if (payload.type === 'notification') {
+               fetchNotifs();
+             }
            }
          } catch (_err) {
            console.error('SSE Error:', _err);
@@ -102,6 +124,14 @@ export default function Navbar() {
       clearInterval(interval);
     };
   }, [location.pathname, user?.id]);
+
+  // Notification polling for buyer
+  useEffect(() => {
+    if (!isBuyer) return;
+    fetchNotifs();
+    const timer = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(timer);
+  }, [isBuyer]);
 
   // List of Searchable Pages
   const searchablePages = [
@@ -287,6 +317,73 @@ export default function Navbar() {
               )}
             </div>
 
+            {isBuyer && (
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setOpenNotif(!openNotif)}
+                  className="relative p-2.5 text-white hover:text-primary transition-colors"
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                  {unreadCount > 0 && <span className="absolute top-0 right-0 bg-primary text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-black">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                </button>
+
+                {openNotif && (
+                  <div className="absolute top-full right-0 mt-3 w-80 bg-black border border-white/10 shadow-2xl rounded-2xl py-0 z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                      <span className="text-xs font-black text-white">Notifikasi</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={async () => {
+                            try { await fetchJson(`${API_BASE}/api/buyer/notifications/read`, { method: 'PUT', body: JSON.stringify({}) }); fetchNotifs(); } catch(e) {}
+                          }}
+                          className="text-[10px] font-bold text-primary"
+                        >
+                          Tandai dibaca
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifs.length === 0 ? (
+                        <div className="py-10 text-center text-gray-500">
+                          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="mx-auto mb-2 opacity-50"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                          <p className="text-xs font-bold">Tidak ada notifikasi</p>
+                        </div>
+                      ) : (
+                        notifs.map(n => (
+                          <div
+                            key={n.id}
+                            onClick={async () => {
+                              setOpenNotif(false);
+                              if (!n.is_read) {
+                                try { await fetchJson(`${API_BASE}/api/buyer/notifications/read`, { method: 'PUT', body: JSON.stringify({ id: n.id }) }); } catch(e) {}
+                              }
+                              if (n.link) navigate(n.link);
+                            }}
+                            className={`px-4 py-3 border-b border-white/5 cursor-pointer transition-colors ${n.is_read ? '' : 'bg-white/5'}`}
+                          >
+                            <p className="text-xs font-bold text-white mb-0.5">{n.title}</p>
+                            <p className="text-[11px] text-gray-400 leading-relaxed">{n.message}</p>
+                            <div className="flex items-center justify-between mt-1.5">
+                              <span className="text-[9px] text-gray-600 font-semibold">{new Date(n.created_at).toLocaleString()}</span>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try { await fetchJson(`${API_BASE}/api/buyer/notifications/delete?id=${n.id}`, { method: 'DELETE' }); fetchNotifs(); } catch(e) {}
+                                }}
+                                className="text-gray-600 hover:text-red-400 text-xs"
+                              >
+                                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {loggedIn && (
               <Link to="/wishlist" className="hidden sm:flex relative p-2.5 text-white hover:text-red-500 transition-colors">
                 <HeartIcon />
@@ -445,33 +542,41 @@ export default function Navbar() {
 
         {/* Mobile Menu Overlay (Navigation) */}
         {menuOpen && (
-          <div className="lg:hidden fixed inset-0 top-[60px] z-[55] bg-black animate-in fade-in slide-in-from-right duration-300 overflow-y-auto pb-20 text-white">
-            <div className="px-6 py-8 space-y-8">
-              <div className="grid grid-cols-1 gap-3">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2">Menu Utama</p>
-                {navLinks.map(link => (
-                  <Link 
-                    key={link.label} 
-                    to={link.href} 
-                    className={`flex items-center justify-between p-4 rounded-2xl transition-all border ${location.pathname === link.href ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`} 
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <span className="font-bold">{link.label}</span>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-                  </Link>
-                ))}
+          <div className="lg:hidden fixed inset-0 top-[60px] z-[55] flex items-start justify-center">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+              onClick={() => setMenuOpen(false)}
+            />
+            
+            {/* Top Dropdown Panel (Connected to Header) */}
+            <div className="relative w-full bg-zinc-950 border-b border-white/10 px-5 py-4 rounded-b-[1.75rem] flex flex-col gap-4 text-white animate-in slide-in-from-top-5 duration-200 shadow-2xl">
+              <div className="space-y-3.5">
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] text-center">Menu Utama</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {navLinks.map(link => (
+                    <Link 
+                      key={link.label} 
+                      to={link.href} 
+                      className={`flex items-center justify-center py-2 px-3 rounded-xl transition-all ${location.pathname === link.href ? 'text-primary bg-primary/10 font-black' : 'text-gray-300 hover:text-white hover:bg-white/5'}`} 
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <span className="font-bold text-xs tracking-wider truncate">{link.label}</span>
+                    </Link>
+                  ))}
+                </div>
+
+                {!loggedIn && (
+                  <div className="grid grid-cols-2 gap-2 pt-1.5">
+                    <Link to="/login" className="bg-primary text-white text-center py-2 rounded-xl font-black text-xs shadow-xl shadow-primary/20" onClick={() => setMenuOpen(false)}>Masuk</Link>
+                    <Link to="/register" className="bg-white/10 text-white text-center py-2 rounded-xl font-black text-xs border border-white/10" onClick={() => setMenuOpen(false)}>Daftar</Link>
+                  </div>
+                )}
               </div>
 
-              {!loggedIn && (
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <Link to="/login" className="bg-primary text-white text-center py-4 rounded-2xl font-black text-sm shadow-xl shadow-primary/20" onClick={() => setMenuOpen(false)}>Masuk</Link>
-                  <Link to="/register" className="bg-white/10 text-white text-center py-4 rounded-2xl font-black text-sm border border-white/10" onClick={() => setMenuOpen(false)}>Daftar</Link>
-                </div>
-              )}
-
-              <div className="pt-8 border-t border-white/5 text-center">
-                <p className="text-xs text-gray-500 font-medium">Butuh bantuan?</p>
-                <Link to="/contact" className="text-primary font-black text-sm mt-1 inline-block" onClick={() => setMenuOpen(false)}>Hubungi AkuGlow Care</Link>
+              <div className="pt-3 border-t border-white/5 text-center flex items-center justify-center gap-1.5 text-[11px]">
+                <span className="text-gray-500">Butuh bantuan?</span>
+                <Link to="/contact" className="text-primary font-black" onClick={() => setMenuOpen(false)}>Hubungi AkuGlow Care</Link>
               </div>
             </div>
           </div>

@@ -7,15 +7,30 @@
  * Untuk ganti URL di server: edit file /config.js di folder dist, TIDAK perlu rebuild!
  */
 function resolveApiBase() {
+  let base = '';
   // Runtime config — highest priority (editable on server without rebuild)
   if (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.API_BASE) {
-    const url = window.APP_CONFIG.API_BASE.replace(/\/+$/, '');
-    if (url && url !== '/') return url;
+    base = window.APP_CONFIG.API_BASE.replace(/\/+$/, '');
+  } else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
+    base = import.meta.env.VITE_API_BASE.replace(/\/+$/, '');
   }
-  // Build-time Vite env — second priority
-  const viteBase = import.meta.env.VITE_API_BASE;
-  if (viteBase && viteBase !== '/') return viteBase.replace(/\/+$/, '');
-  // Final fallback
+
+  // Localhost Optimization: If page is loaded on localhost/127.0.0.1 and API base is an ngrok URL,
+  // use http://localhost:8080 directly to bypass ngrok restrictions, HTML warnings, and range limits.
+  if (typeof window !== 'undefined' && window.location) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal && base.includes('ngrok-free.dev')) {
+      if (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://api.akuglow.com';
+  }
+  return 'http://localhost:8080';
+    }
+  }
+
+  if (base && base !== '/') return base;
+  if (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://api.akuglow.com';
+  }
   return 'http://localhost:8080';
 }
 
@@ -45,6 +60,10 @@ export async function fetchJson(url, options = {}) {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (options.body instanceof FormData) {
+    delete headers['Content-Type'];
   }
 
   try {
@@ -143,23 +162,28 @@ export async function uploadFile(url, file, fieldName = 'image') {
 
 // Fungsi yang hilang dan menyebabkan error
 export function formatImage(path) {
-  const fallback = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80";
-  if (!path) return fallback;
-  
-  // 1. If it's already a full URL (external, blob, or data), return as is
-  if (path.startsWith('blob:') || path.startsWith('data:')) return path;
-  if (path.startsWith('http') && !path.includes('localhost') && !path.includes('127.0.0.1')) return path;
-
-  // 2. Clean the path: remove domain if it accidentally exists, and leading slashes
-  let cleanPath = path.replace(/^https?:\/\/[^\/]+/, ''); // Remove protocol and domain
-  cleanPath = cleanPath.replace(/^\/+/, ''); // Remove leading slashes
-  
-  // 3. Handle Unsplash shorthand
-  if (cleanPath.startsWith('photo-')) {
-    return `https://images.unsplash.com/${cleanPath}?auto=format&fit=crop&q=80&w=800`;
+  let finalPath = path;
+  if (!finalPath) {
+    finalPath = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80";
   }
 
-  // 4. Prepend API_BASE
+  // Handle Unsplash shorthand first to allow proxying it
+  let cleanPath = finalPath.replace(/^https?:\/\/[^\/]+/, ''); // Remove protocol and domain
+  cleanPath = cleanPath.replace(/^\/+/, ''); // Remove leading slashes
+  if (cleanPath.startsWith('photo-')) {
+    finalPath = `https://images.unsplash.com/${cleanPath}?auto=format&fit=crop&q=80&w=800`;
+  }
+  
+  // If it is an Unsplash URL, proxy it to bypass Indonesia DNS blocking (Internet Positif)
+  if (finalPath.includes('images.unsplash.com')) {
+    return `https://images.weserv.nl/?url=${encodeURIComponent(finalPath)}`;
+  }
+  
+  // 1. If it's already a full URL (external, blob, or data), return as is
+  if (finalPath.startsWith('blob:') || finalPath.startsWith('data:')) return finalPath;
+  if (finalPath.startsWith('http') && !finalPath.includes('localhost') && !finalPath.includes('127.0.0.1')) return finalPath;
+
+  // 2. Prepend API_BASE for local uploaded files
   const base = API_BASE.replace(/\/+$/, '');
   return `${base}/${cleanPath}`;
 }
@@ -218,3 +242,24 @@ export function subscribeToNotifications(userId, onMessage) {
 
   return eventSource;
 }
+
+export function formatPaymentMethod(method) {
+  if (!method) return '-';
+  const mapping = {
+    'virtual_account': 'Virtual Account',
+    'bank_transfer': 'Transfer Bank',
+    'credit_card': 'Kartu Kredit',
+    'cod': 'COD (Bayar di Tempat)',
+    'e_wallet': 'E-Wallet',
+    'qris': 'QRIS',
+    'gopay': 'GoPay',
+    'ovo': 'OVO',
+    'dana': 'DANA'
+  };
+  const normalized = method.toLowerCase();
+  if (mapping[normalized]) {
+    return mapping[normalized];
+  }
+  return method.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+

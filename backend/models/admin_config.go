@@ -142,8 +142,11 @@ type RestockRequest struct {
 	Items       []RestockItem `gorm:"foreignKey:RestockID" json:"items"`
 	Merchant    Merchant      `gorm:"foreignKey:MerchantID;references:ID" json:"merchant"`
 	TrackingNumber string    `gorm:"type:varchar(100)" json:"tracking_number"` // Resi pengiriman B2B ke merchant
+	CourierCode    string    `gorm:"type:varchar(50)" json:"courier_code"`     // JNE, Sicepat, dll
 	PaymentMethod  string    `gorm:"type:varchar(50);default:'transfer'" json:"payment_method"` // wallet, transfer
 	IsPaid         bool      `gorm:"default:false" json:"is_paid"`
+	BiteshipOrderID  string  `gorm:"type:varchar(100)" json:"biteship_order_id"`
+	ShippingLabelURL string  `gorm:"type:text" json:"shipping_label_url"`
 }
 
 // Supplier pabrik/penyedia barang ke pusat
@@ -228,6 +231,7 @@ type Category struct {
 	Name        string    `gorm:"type:varchar(100);not null" json:"name"`
 	Slug        string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"slug"`
 	Description string    `gorm:"type:text" json:"description"`
+	Image       string    `gorm:"type:text" json:"image"`
 	ParentID    *uint     `json:"parent_id"`
 	Order       int       `gorm:"default:0" json:"order"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -252,6 +256,18 @@ type Attribute struct {
 	Values    string    `gorm:"type:text" json:"values"`                // JSON string: ["S","M","XL"]
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// ShippingClass untuk grouping produk berdasarkan kelas pengiriman (WooCommerce parity)
+type ShippingClass struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"type:varchar(100);not null" json:"name"`
+	Slug        string    `gorm:"type:varchar(100);uniqueIndex" json:"slug"`
+	Description string    `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (ShippingClass) TableName() string { return "shipping_classes" }
 
 // Voucher diskon platform atau merchant
 // VoucherType:
@@ -303,6 +319,8 @@ type LogisticChannel struct {
 	Code     string `gorm:"type:varchar(20);uniqueIndex" json:"code"` // JNE, SICEPAT
 	Name     string `gorm:"type:varchar(100)" json:"name"`
 	IsActive bool   `gorm:"default:true" json:"is_active"`
+	LogoURL  string `gorm:"type:text" json:"logo_url"`
+	Services string `gorm:"type:text" json:"services"`
 }
 
 // AffiliateClick log untuk tracking click (model utama ada di affiliate.go)
@@ -350,8 +368,19 @@ type BlogPost struct {
 	Content   string    `gorm:"type:text" json:"content"`
 	Author    string    `gorm:"type:varchar(100)" json:"author"`
 	Category  string    `gorm:"type:varchar(100)" json:"category"`
+	Tags      string    `gorm:"type:text" json:"tags"` // comma-separated
 	Image     string    `gorm:"type:text" json:"image"`
 	Status    string    `gorm:"type:varchar(20);default:'published'" json:"status"` // published, draft
+
+	// SEO Fields (Yoast Standard)
+	MetaTitle       string `gorm:"type:varchar(70)" json:"meta_title"`
+	MetaDescription string `gorm:"type:varchar(160)" json:"meta_description"`
+	FocusKeyword    string `gorm:"type:varchar(100)" json:"focus_keyword"`
+	OgImage         string `gorm:"type:text" json:"og_image"`       // Open Graph image
+	CanonicalURL    string `gorm:"type:text" json:"canonical_url"`  // Canonical tag
+	ReadingTime     int    `gorm:"default:0" json:"reading_time"`   // in minutes
+	NoIndex         bool   `gorm:"default:false" json:"no_index"`   // robots noindex
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -363,11 +392,29 @@ type Product struct {
 	Slug        string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"slug"`
 	SKU         string    `gorm:"type:varchar(100);unique;index" json:"sku"`
 	Description string    `gorm:"type:text" json:"description"`
+	ShortDescription string `gorm:"type:text" json:"short_description"` // WooCommerce-style short desc
 	Price       float64   `gorm:"type:decimal(15,2);not null" json:"price"`
 	WholesalePrice float64 `gorm:"type:decimal(15,2);default:0" json:"wholesale_price"` // Harga khusus merchant
 	OldPrice    float64   `gorm:"type:decimal(15,2)" json:"old_price"`
 	COGS        float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
 	
+	// WooCommerce Product Type
+	ProductType     string `gorm:"type:varchar(50);default:'simple'" json:"product_type"` // simple, variable, digital, grouped, external
+	IsVirtual       bool   `gorm:"default:false" json:"is_virtual"`       // Virtual product: no shipping needed
+	IsDownloadable  bool   `gorm:"default:false" json:"is_downloadable"`  // Downloadable product
+	DownloadLimit      int    `gorm:"default:-1" json:"download_limit"`       // Max downloads (-1/0 for unlimited)
+	DownloadExpiry     int    `gorm:"default:-1" json:"download_expiry"`      // Expiry in days (-1/0 for never)
+	DownloadableFiles  string `gorm:"type:text" json:"downloadable_files"`    // JSON array: [{"name": "...", "file_url": "..."}]
+	Visibility      string `gorm:"type:varchar(20);default:'public'" json:"visibility"` // public, catalog, search, hidden
+
+	// SEO Fields
+	SEOTitle       string `gorm:"type:varchar(255)" json:"seo_title"`
+	SEODescription string `gorm:"type:text" json:"seo_description"`
+	SEOKeywords    string `gorm:"type:varchar(500)" json:"seo_keywords"`
+
+	// Internal Note
+	Note string `gorm:"type:text" json:"note"`
+
 	// Master Config
 	IsMaster    bool      `gorm:"default:false" json:"is_master"`
 	SupplierID  string    `gorm:"type:uuid;index" json:"supplier_id"`
@@ -387,6 +434,7 @@ type Product struct {
 	
 	// Merchant/Distributor Cut (Req 3)
 	MerchantCommissionPercent float64  `gorm:"type:decimal(5,2);default:0" json:"merchant_commission_percent"` // Bagi hasil merchant per produk
+	CommissionRate            float64  `gorm:"type:decimal(5,4);default:0.05" json:"commission_rate"` // Affiliate commission rate
 
 	// Multi-Level Commission Preset (Req 4)
 	// Assign preset ini untuk mendistribusikan komisi ke seluruh jaringan upline secara otomatis.
@@ -403,6 +451,7 @@ type Product struct {
 	TotalReviews  int     `gorm:"default:0" json:"total_reviews"`               // Satisfy legacy triggers
 	Reviews     int       `gorm:"default:0" json:"reviews"`
 	SoldCount   int64     `gorm:"-" json:"sold"`
+	MaxPrice    float64   `gorm:"-" json:"max_price,omitempty"`
 	Badge       string    `gorm:"type:varchar(50)" json:"badge"`
 	BadgeClass  string    `gorm:"type:varchar(50)" json:"badge_class"`
 	Status      string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, taken_down, draft
@@ -410,9 +459,44 @@ type Product struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
+	// WooCommerce Parity Fields
+	TaxStatus        string `gorm:"type:varchar(50);default:'taxable'" json:"tax_status"`
+	TaxClass         string `gorm:"type:varchar(50);default:'standard'" json:"tax_class"`
+	ProductURL       string `gorm:"type:text" json:"product_url"`
+	ButtonText       string `gorm:"type:varchar(100);default:'Beli Sekarang'" json:"button_text"`
+	Backorders       string `gorm:"type:varchar(20);default:'no'" json:"backorders"`
+	SoldIndividually bool   `gorm:"default:false" json:"sold_individually"`
+	Length           int    `gorm:"default:0" json:"length"`
+	Width            int    `gorm:"default:0" json:"width"`
+	Height           int    `gorm:"default:0" json:"height"`
+	PurchaseNote     string `gorm:"type:text" json:"purchase_note"`
+	MenuOrder        int    `gorm:"default:0" json:"menu_order"`
+	EnableReviews    bool   `gorm:"default:true" json:"enable_reviews"`
+
+	// Sale Schedule (WooCommerce-style date range)
+	SaleStart string `gorm:"type:varchar(50)" json:"sale_start"` // ISO date: "2024-01-01"
+	SaleEnd   string `gorm:"type:varchar(50)" json:"sale_end"`   // ISO date: "2024-01-31"
+
+	// WooCommerce Missing Fields - FULL PARITY
+	IsFeatured         bool   `gorm:"default:false" json:"is_featured"`           // Star icon for featured
+	LowStockThreshold  int    `gorm:"default:5" json:"low_stock_threshold"`       // Alert threshold
+	ShippingClassID    *uint  `gorm:"index" json:"shipping_class_id"`             // Shipping class grouping
+	DefaultVariantID   *string `gorm:"type:uuid" json:"default_variant_id"`      // Default variation for variable products
+	Upsells            string `gorm:"type:text" json:"upsells"`             // JSON array of UUIDs
+	CrossSells         string `gorm:"type:text;column:crosssells" json:"crosssells"`          // JSON array of UUIDs
+
+	// SEO Enhancement (Yoast-style)
+	CanonicalURL string `gorm:"type:text" json:"canonical_url"` // Canonical URL
+	OGImage      string `gorm:"type:text" json:"og_image"`      // Open Graph image for social
+	NoIndex      bool   `gorm:"default:false" json:"no_index"`  // robots noindex
+
+	// Review Summary (denormalized for performance)
+	ReviewCount int `gorm:"default:0" json:"review_count"`
+
 	Variants    []ProductVariant `gorm:"foreignKey:ProductID" json:"variants"`
 	Inventories []Inventory      `gorm:"foreignKey:ProductID" json:"inventories"`
 }
+
 
 // ProductVariant untuk variasi produk (warna, ukuran, dsb)
 type ProductVariant struct {
@@ -425,11 +509,29 @@ type ProductVariant struct {
 	COGS           float64   `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Modal Awal
 	Stock          int       `gorm:"default:0" json:"stock"`
 	Weight    int       `gorm:"default:0" json:"weight"` // Weight in grams (overrides product weight if > 0)
+	Length    int       `gorm:"default:0" json:"length"`
+	Width     int       `gorm:"default:0" json:"width"`
+	Height    int       `gorm:"default:0" json:"height"`
 	Image     string    `gorm:"type:text" json:"image"`
 	
 	// Commission Overrides (Optional)
 	CommissionPresetID         *string `gorm:"type:uuid;index" json:"commission_preset_id"`
 	MerchantCommissionPresetID *string `gorm:"type:uuid;index" json:"merchant_commission_preset_id"`
+
+	// WooCommerce Parity Fields per Variant
+	Status             string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, inactive
+	OldPrice           float64   `gorm:"type:decimal(15,2);default:0" json:"old_price"`   // Sale Price / Harga Coret
+	IsVirtual          bool      `gorm:"default:false" json:"is_virtual"`
+	IsDownloadable     bool      `gorm:"default:false" json:"is_downloadable"`
+	DownloadLimit      int       `gorm:"default:-1" json:"download_limit"`
+	DownloadExpiry     int       `gorm:"default:-1" json:"download_expiry"`
+	DownloadableFiles  string    `gorm:"type:text" json:"downloadable_files"` // JSON array: [{"name": "...", "file_url": "..."}]
+	Description        string    `gorm:"type:text" json:"description"`
+	SaleStart          string    `gorm:"type:varchar(50)" json:"sale_start"`
+	SaleEnd            string    `gorm:"type:varchar(50)" json:"sale_end"`
+	TaxStatus          string    `gorm:"type:varchar(50);default:'taxable'" json:"tax_status"`
+	TaxClass           string    `gorm:"type:varchar(50);default:'standard'" json:"tax_class"`
+	ManageStock        bool      `gorm:"default:true" json:"manage_stock"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

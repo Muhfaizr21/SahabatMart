@@ -1,17 +1,17 @@
 package routes
 
 import (
-	"SahabatMart/backend/controllers"
+	"akuglow/backend/controllers"
 	"context"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 
-	"SahabatMart/backend/middleware"
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/services"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/middleware"
+	"akuglow/backend/models"
+	"akuglow/backend/services"
+	"akuglow/backend/utils"
 	"time"
 
 	"gorm.io/gorm"
@@ -40,6 +40,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	warehouseCtrl := controllers.NewWarehouseController(db)
 	tierCtrl := controllers.NewMembershipTierController(db)
 	mediaCtrl := controllers.NewMediaController(db)
+	demoCtrl := controllers.NewDemographicsController(db)
 
 	// Middleware
 	cors := CorsMiddleware
@@ -221,6 +222,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
 	mux.HandleFunc("/api/buyer/orders/detail", buyerOnly(buyerCtrl.GetOrderDetail))
 	mux.HandleFunc("/api/buyer/orders/cancel", buyerOnly(buyerCtrl.CancelOrder))
+	mux.HandleFunc("/api/buyer/orders/dispute", buyerOnly(buyerCtrl.SubmitDispute))
 	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
 	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
 	mux.HandleFunc("/api/buyer/profile/update", buyerOnly(buyerCtrl.UpdateProfile))
@@ -232,6 +234,12 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/products/can-review", buyerOnly(productCtrl.CheckCanReview))
 	mux.HandleFunc("/api/buyer/products/review", buyerOnly(productCtrl.SubmitReview))
 	mux.HandleFunc("/api/buyer/upload", buyerOnly(adminCtrl.UploadImage))
+
+	// Buyer Notifications
+	mux.HandleFunc("/api/buyer/notifications", buyerOnly(buyerCtrl.GetNotifications))
+	mux.HandleFunc("/api/buyer/notifications/read", buyerOnly(buyerCtrl.MarkNotificationRead))
+	mux.HandleFunc("/api/buyer/notifications/delete", buyerOnly(buyerCtrl.DeleteNotification))
+	mux.HandleFunc("/api/buyer/notifications/all", buyerOnly(buyerCtrl.DeleteAllNotifications))
 
 	// --- Shipping Routes (Biteship) ---
 	mux.HandleFunc("/api/shipping/areas", buyerOnly(buyerCtrl.GetShippingAreas))
@@ -246,13 +254,18 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/restock", merchantOnly(merchantCtrl.GetRestockRequests))
 	mux.HandleFunc("/api/merchant/restock/request", merchantOnly(merchantCtrl.RequestRestock))
 	mux.HandleFunc("/api/merchant/restock/receive", merchantOnly(merchantCtrl.ReceiveRestock))
+	mux.HandleFunc("/api/merchant/restock/", merchantOnly(merchantCtrl.TrackRestock)) // handles /track
 
 	// Orders
 	mux.HandleFunc("/api/merchant/orders", merchantOnly(merchantCtrl.GetOrders))
 	mux.HandleFunc("/api/merchant/orders/status", merchantOnly(merchantCtrl.UpdateOrderStatus))
+	mux.HandleFunc("/api/merchant/orders/generate-label", merchantOnly(merchantCtrl.GenerateShippingLabel))
+	mux.HandleFunc("/api/merchant/orders/manual-tracking", merchantOnly(merchantCtrl.SetManualTracking))
+	mux.HandleFunc("/api/merchant/orders/packing-slip", merchantOnly(merchantCtrl.GetPackingSlipData))
 	mux.HandleFunc("/api/merchant/pos/products", merchantOnly(merchantCtrl.POSGetProducts))
 	mux.HandleFunc("/api/merchant/pos/checkout", merchantOnly(checkoutLimit(merchantCtrl.POSCheckout)))
 	mux.HandleFunc("/api/merchant/pos/member/", merchantOnly(lookupLimit(merchantCtrl.GetMemberByCode)))
+
 
 	// Finance
 	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
@@ -279,6 +292,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/notifications/delete", merchantOnly(merchantCtrl.DeleteNotification))
 	mux.HandleFunc("/api/merchant/notifications/all", merchantOnly(merchantCtrl.DeleteAllNotifications))
 	mux.HandleFunc("/api/merchant/affiliate-stats", merchantOnly(merchantCtrl.GetAffiliateStats))
+	mux.HandleFunc("/api/merchant/upload", merchantOnly(adminCtrl.UploadImage))
 
 	// --- Affiliate Routes ---
 	// Per spec: Merchant = Mitra + Merchant, so merchant role MUST also access Mitra Area routes
@@ -410,6 +424,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/users/reset-password", adminOnly(adminCtrl.ResetUserPassword))
 	mux.HandleFunc("/api/admin/users/downlines", can("manage_users")(adminCtrl.GetUserDownlines))
 	mux.HandleFunc("/api/admin/users/bulk-notify", can("manage_users")(adminCtrl.BulkNotifyUsers))
+	mux.HandleFunc("/api/admin/users/eligible-uplines", can("manage_users")(adminCtrl.GetEligibleUplines))
 
 	// Merchant Management
 	mux.HandleFunc("/api/admin/merchants", adminOnly(adminCtrl.GetMerchants))
@@ -418,10 +433,13 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/merchants/verify", adminOnly(adminCtrl.VerifyMerchant))
 	mux.HandleFunc("/api/admin/merchants/restock", adminOnly(adminCtrl.GetRestockRequests))
 	mux.HandleFunc("/api/admin/merchants/restock/moderate", adminOnly(adminCtrl.ModerateRestockRequest))
+	mux.HandleFunc("/api/admin/merchants/stock-overview", adminOnly(adminCtrl.GetMerchantStockOverview))
 
 	// Product Catalog
 	mux.HandleFunc("/api/admin/products", can("manage_products")(adminCtrl.GetProducts))
+	mux.HandleFunc("/api/admin/products/barcodes", can("manage_products")(adminCtrl.GetAllBarcodes))
 	mux.HandleFunc("/api/admin/products/moderate", can("manage_products")(adminCtrl.ModerateProduct))
+	mux.HandleFunc("/api/admin/products/toggle-featured", can("manage_products")(adminCtrl.ToggleProductFeatured))
 	mux.HandleFunc("/api/admin/products/delete", can("manage_products")(adminCtrl.DeleteProduct))
 	mux.HandleFunc("/api/admin/products/bulk-delete", can("manage_products")(adminCtrl.BulkDeleteProducts))
 	mux.HandleFunc("/api/admin/products/add", can("manage_products")(adminCtrl.AddProduct))
@@ -431,6 +449,8 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/products/tier-commissions/update", adminOnly(adminCtrl.UpdateProductTierCommission))
 	mux.HandleFunc("/api/admin/reviews", adminOnly(adminCtrl.GetAllReviews))
 	mux.HandleFunc("/api/admin/reviews/delete", adminOnly(adminCtrl.DeleteReview))
+	mux.HandleFunc("/api/admin/reviews/fake", adminOnly(adminCtrl.AddFakeReview))
+	mux.HandleFunc("/api/admin/reviews/update", adminOnly(adminCtrl.UpdateReview))
 	mux.HandleFunc("/api/admin/categories", adminOnly(adminCtrl.GetCategories))
 	mux.HandleFunc("/api/admin/categories/add", adminOnly(adminCtrl.AddCategory))
 	mux.HandleFunc("/api/admin/categories/delete", adminOnly(adminCtrl.DeleteCategory))
@@ -444,9 +464,19 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// Order & Transactions
 	mux.HandleFunc("/api/admin/orders", adminOnly(adminCtrl.GetAllOrders))
+
+	// WooCommerce-style Shipping Classes
+	mux.HandleFunc("/api/admin/shipping-classes", adminOnly(adminCtrl.GetShippingClasses))
+	mux.HandleFunc("/api/admin/shipping-classes/upsert", adminOnly(adminCtrl.UpsertShippingClass))
+	mux.HandleFunc("/api/admin/shipping-classes/delete", adminOnly(adminCtrl.DeleteShippingClass))
 	mux.HandleFunc("/api/admin/orders/", adminOnly(adminCtrl.GetOrderDetail))
 	mux.HandleFunc("/api/admin/orders/status", adminOnly(adminCtrl.UpdateOrderStatus))
 	mux.HandleFunc("/api/admin/orders/freeze", adminOnly(adminCtrl.FreezeOrder))
+	mux.HandleFunc("/api/admin/orders/confirm-payment", adminOnly(adminCtrl.ConfirmManualPayment))
+	// Shipping label & packing slip — accessible by admin/superadmin as well as merchant
+	mux.HandleFunc("/api/admin/orders/generate-label", adminOnly(merchantCtrl.GenerateShippingLabel))
+	mux.HandleFunc("/api/admin/orders/manual-tracking", adminOnly(merchantCtrl.SetManualTracking))
+	mux.HandleFunc("/api/admin/orders/packing-slip", adminOnly(merchantCtrl.GetPackingSlipData))
 	mux.HandleFunc("/api/admin/disputes", adminOnly(adminCtrl.GetDisputes))
 	mux.HandleFunc("/api/admin/disputes/arbitrate", adminOnly(adminCtrl.ArbitrateDispute))
 
@@ -458,6 +488,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 
 	// Analysis & Reports
 	mux.HandleFunc("/api/admin/wishlist/stats", adminOnly(adminCtrl.GetWishlistStats))
+	mux.HandleFunc("/api/admin/wishlist/notify", adminOnly(adminCtrl.NotifyWishlistUsers))
 
 	// Affiliate & Marketing
 	mux.HandleFunc("/api/admin/affiliates", adminOnly(adminCtrl.GetAffiliates))
@@ -571,12 +602,27 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/configs/test-email", adminOnly(adminCtrl.TestEmailSettings))
 	mux.HandleFunc("/api/admin/logistics", adminOnly(adminCtrl.GetLogistics))
 	mux.HandleFunc("/api/admin/logistics/toggle", adminOnly(adminCtrl.ToggleLogistic))
+	mux.HandleFunc("/api/admin/logistics/bulk-toggle", adminOnly(adminCtrl.BulkToggleLogistics))
 	mux.HandleFunc("/api/admin/logistics/sync", adminOnly(adminCtrl.SyncCouriers))
+	mux.HandleFunc("/api/admin/logistics/update", adminOnly(adminCtrl.UpdateLogistic))
 	mux.HandleFunc("/api/admin/regions", adminOnly(adminCtrl.GetRegions))
 	mux.HandleFunc("/api/admin/regions/upsert", adminOnly(adminCtrl.UpsertRegion))
 	mux.HandleFunc("/api/admin/audit-logs", adminOnly(adminCtrl.GetAuditLogs))
 	mux.HandleFunc("/api/admin/affiliate-clicks", adminOnly(adminCtrl.GetAffiliateClicks))
 	mux.HandleFunc("/api/admin/upload", adminOnly(adminCtrl.UploadImage))
+
+	// Demographics Analytics
+	mux.HandleFunc("/api/admin/demographics/stats", adminOnly(demoCtrl.GetDemographicsStats))
+	mux.HandleFunc("/api/admin/demographics/logs", adminOnly(demoCtrl.GetDemographicsLogs))
+	mux.HandleFunc("/api/admin/demographics/geography-list", adminOnly(demoCtrl.GetGeographyList))
+	mux.HandleFunc("/api/admin/demographics/broadcast", superAdminOnly(demoCtrl.BroadcastGeoNotification))
+	mux.HandleFunc("/api/admin/demographics/settings", adminOnly(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			demoCtrl.SaveDemographicsSettings(w, r)
+		} else {
+			demoCtrl.GetDemographicsSettings(w, r)
+		}
+	}))
 
 	// [New SuperAdmin Features] System & Control
 	mux.HandleFunc("/api/admin/system/maintenance", superAdminOnly(adminCtrl.ToggleMaintenanceMode))
@@ -600,7 +646,10 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/warehouse/suppliers/create", adminOnly(warehouseCtrl.CreateSupplier))
 	mux.HandleFunc("/api/admin/warehouse/suppliers/update/", adminOnly(warehouseCtrl.UpdateSupplier))
 	mux.HandleFunc("/api/admin/warehouse/suppliers/delete/", adminOnly(warehouseCtrl.DeleteSupplier))
+	mux.HandleFunc("/api/admin/warehouse/suppliers/bulk-delete", adminOnly(warehouseCtrl.BulkDeleteSuppliers))
 	mux.HandleFunc("/api/admin/warehouse/inbound", adminOnly(warehouseCtrl.CreateInbound))
+	mux.HandleFunc("/api/admin/warehouse/inbounds", adminOnly(warehouseCtrl.GetInbounds))
+	mux.HandleFunc("/api/admin/warehouse/inbounds/bulk-delete", adminOnly(warehouseCtrl.BulkDeleteInbounds))
 	mux.HandleFunc("/api/admin/warehouse/stock-history", adminOnly(warehouseCtrl.GetStockHistory))
 	mux.HandleFunc("/api/admin/warehouse/restock/approve/", adminOnly(warehouseCtrl.ApproveRestock))
 	mux.HandleFunc("/api/admin/warehouse/restock/ship/", adminOnly(warehouseCtrl.ShipRestock))
@@ -624,6 +673,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/public/products/recommended", productCtrl.GetRecommendations)
 	mux.HandleFunc("/api/public/membership-tiers", tierCtrl.GetPublicTiers)
 	mux.HandleFunc("/api/public/sitemap.xml", adminCtrl.GenerateSitemap)
+	mux.HandleFunc("/api/public/location/log", demoCtrl.TrackLocation)
 
 	// Real-time Notifications
 	mux.HandleFunc("/api/notifications/stream", utils.SSEHandler)

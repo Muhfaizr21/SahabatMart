@@ -1,300 +1,268 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { fetchJson, MERCHANT_API_BASE } from '../../lib/api';
-import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, A, statusBadge, idr, fmtDate } from '../../lib/adminStyles.jsx';
-import toast from 'react-hot-toast';
+import { PageHeader, StatRow, TablePanel, A, idr, fmtDate } from '../../lib/adminStyles.jsx';
+
+const TX_TYPES = {
+  commission_earned: { label: 'Komisi Diterima', color: '#10b981', bg: '#ecfdf5', icon: 'bx-trending-up' },
+  commission_reversed: { label: 'Komisi Dibatalkan', color: '#ef4444', bg: '#fef2f2', icon: 'bx-trending-down' },
+  sale_revenue: { label: 'Pendapatan Penjualan', color: '#10b981', bg: '#ecfdf5', icon: 'bx-plus-circle' },
+  sale_revenue_reversed: { label: 'Penjualan Dibatalkan', color: '#ef4444', bg: '#fef2f2', icon: 'bx-minus-circle' },
+  withdrawal_request: { label: 'Pengajuan Payout', color: '#f59e0b', bg: '#fffbeb', icon: 'bx-time-five' },
+  withdrawal_completed: { label: 'Payout Selesai', color: '#10b981', bg: '#ecfdf5', icon: 'bx-check-circle' },
+  withdrawal_rejected: { label: 'Payout Ditolak', color: '#ef4444', bg: '#fef2f2', icon: 'bx-x-circle' },
+  platform_fee: { label: 'Biaya Layanan', color: '#64748b', bg: '#f8fafc', icon: 'bx-cog' },
+  refund_deduction: { label: 'Potongan Refund', color: '#ef4444', bg: '#fef2f2', icon: 'bx-subdirectory-left' },
+  bonus: { label: 'Bonus / Reward', color: '#a855f7', bg: '#faf5ff', icon: 'bx-gift' },
+  restock_payment: { label: 'Pembayaran Restok', color: '#ef4444', bg: '#fef2f2', icon: 'bx-cart' }
+};
+
+const PAYOUT_STATUS = {
+  requested: { label: 'Menunggu', color: '#f59e0b', bg: '#fffbeb' },
+  reserved: { label: 'Diproses', color: '#3b82f6', bg: '#eff6ff' },
+  approved: { label: 'Disetujui', color: '#10b981', bg: '#ecfdf5' },
+  processing: { label: 'Mentransfer', color: '#3b82f6', bg: '#eff6ff' },
+  paid: { label: 'Selesai', color: '#10b981', bg: '#ecfdf5' },
+  rejected: { label: 'Ditolak', color: '#ef4444', bg: '#fef2f2' }
+};
 
 export default function MerchantWallet() {
   const [wallet, setWallet] = useState(null);
-  const [history, setHistory] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showPayoutModal, setShowPayoutModal] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawNote, setWithdrawNote] = useState('');
-  const [requesting, setRequesting] = useState(false);
-  const [activeTab, setActiveTab] = useState('mutations'); // 'mutations' or 'payouts'
+  const [activeTab, setActiveTab] = useState('transactions'); // transactions, payouts
 
-  const loadData = () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
-    Promise.all([
-      fetchJson(`${MERCHANT_API_BASE}/wallet`),
-      fetchJson(`${MERCHANT_API_BASE}/wallet/history`),
-      fetchJson(`${MERCHANT_API_BASE}/wallet/transactions?limit=20`)
-    ]).then(([w, h, t]) => {
-      setWallet(w?.data || w);
-      setHistory(Array.isArray(h?.data) ? h.data : (Array.isArray(h) ? h : []));
-      setTransactions(Array.isArray(t?.data) ? t.data : (Array.isArray(t) ? t : []));
-    }).catch(() => toast.error("Gagal memuat data wallet")).finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadData(); }, []);
-
-  const handleWithdraw = async () => {
-    if (Number(withdrawAmount) > wallet?.available_balance) {
-      toast.error("Saldo tidak mencukupi untuk nominal penarikan ini.");
-      return;
-    }
-    setRequesting(true);
     try {
-      // [BUG-M2 Fix] Ambil data bank dari wallet/store profile, jangan dari form.
-      // Backend akan pakai data bank yang sudah tersimpan di profile merchant.
-      await fetchJson(`${MERCHANT_API_BASE}/wallet/withdraw`, {
-        method: 'POST',
-        body: JSON.stringify({ amount: Number(withdrawAmount), note: withdrawNote })
-      });
-      setShowPayoutModal(false);
-      setWithdrawAmount('');
-      setWithdrawNote('');
-      toast.success("Penarikan berhasil diajukan!");
-      loadData();
-    } catch (_err) {
-      toast.error("Gagal melakukan penarikan: " + _err.message);
+      const [wData, txData, payData] = await Promise.all([
+        fetchJson(`${MERCHANT_API_BASE}/wallet`),
+        fetchJson(`${MERCHANT_API_BASE}/wallet/transactions`),
+        fetchJson(`${MERCHANT_API_BASE}/wallet/history`)
+      ]);
+      setWallet(wData);
+      setTransactions(Array.isArray(txData) ? txData : []);
+      setPayouts(Array.isArray(payData) ? payData : []);
+    } catch (err) {
+      console.error('Failed to load wallet data:', err);
     } finally {
-      setRequesting(false);
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   return (
     <div style={A.page} className="fade-in">
-      <PageHeader title="Corporate Finance & Wallet" subtitle="Sistem kendali aset liquid dan escrow. Pencairan real-time ke rekening master.">
-        <button style={A.btnPrimary} onClick={() => setShowPayoutModal(true)}>
-          <i className="bx bx-money-withdraw" /> Ajukan Penarikan
+      <PageHeader 
+        title="Buku Kas & Riwayat Keuangan" 
+        subtitle="Pantau neraca saldo, histori mutasi kas, dan riwayat payout toko Anda."
+      >
+        <button style={A.btnGhost} onClick={loadData}>
+          <i className="bx bx-refresh" style={{ fontSize: 18 }} /> Perbarui Data
         </button>
       </PageHeader>
 
-      {/* KPI Cards */}
+      {/* WALLET METRICS */}
       <StatRow stats={[
-        { label: 'SALDO KOMISI (CAIR)', val: loading ? '...' : idr(wallet?.available_balance), icon: 'bx-wallet-alt', color: '#10b981' },
-        { label: 'KOMISI PENDING (ESCROW)', val: loading ? '...' : idr(wallet?.pending_balance), icon: 'bxs-lock-alt', color: '#f59e0b' },
-        { label: 'TOTAL KOMISI MERCHANT', val: loading ? '...' : idr(wallet?.total_sales), icon: 'bxs-bank', color: '#6366f1' },
+        { label: 'Saldo Tersedia (Siap Payout)', val: idr(wallet?.balance || 0), icon: 'bxs-wallet', color: '#6366f1' },
+        { label: 'Pendapatan Tertunda', val: idr(wallet?.pending_balance || 0), icon: 'bxs-hourglass', color: '#f59e0b' },
+        { label: 'Total Penjualan Kotor', val: idr(wallet?.total_earned || 0), icon: 'bxs-badge-dollar', color: '#10b981' }
       ]} />
 
-      {/* Helper Banner */}
-      <div style={{ display:'flex', alignItems:'center', gap:16, padding:'16px 20px', background:'#f8fafc', borderRadius:14, border:'1px solid #f1f5f9' }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:'#eef2ff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-           <i className="bx bxs-shield-check" style={{ fontSize:20, color:'#6366f1' }} />
+      {/* HEADQUARTERS PAYOUT NOTICE */}
+      <div style={{
+        padding: '16px 20px',
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(79, 70, 229, 0.05) 100%)',
+        border: '1px solid rgba(99, 102, 241, 0.15)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 16,
+        boxShadow: '0 4px 20px -2px rgba(99, 102, 241, 0.05)'
+      }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, background: 'rgba(99, 102, 241, 0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+        }}>
+          <i className="bx bxs-info-circle" style={{ fontSize: 22, color: '#4f46e5' }} />
         </div>
         <div>
-           <div style={{ fontWeight:800, color:'#0f172a', fontSize:13 }}>Atomic Ledger Integration aktif</div>
-           <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>Escrow dana dilepaskan ke dompet cair secara seketika saat pesanan selesai. Dana Anda terlindungi oleh sistem enkripsi tingkat militer.</div>
+          <h4 style={{ margin: '0 0 4px 0', fontSize: 14, fontWeight: 800, color: '#1e1b4b', letterSpacing: '-0.01em' }}>
+            Kebijakan Pencairan Dana Otomatis (Automatic Payout Hub)
+          </h4>
+          <p style={{ margin: 0, fontSize: 13, color: '#4338ca', lineHeight: 1.5, fontWeight: 500 }}>
+            Saldo Anda akan dicairkan secara berkala oleh <strong>Gudang Pusat AkuGlow</strong> langsung ke rekening terdaftar Anda. Anda tidak perlu mengajukan penarikan manual. Hubungi administrator pusat untuk mengubah detail rekening bank atau info transfer Anda.
+          </p>
         </div>
       </div>
 
-      <div style={{ display:'flex', gap:10, marginBottom:20, marginTop:30 }}>
+      {/* TAB SELECTOR */}
+      <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid #e2e8f0', paddingBottom: 1 }}>
         <button 
-          onClick={() => setActiveTab('mutations')}
-          style={{ 
-            padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 800,
-            background: activeTab === 'mutations' ? '#0f172a' : 'white',
-            color: activeTab === 'mutations' ? 'white' : '#64748b',
-            border: '1px solid ' + (activeTab === 'mutations' ? '#0f172a' : '#e2e8f0'),
-            cursor: 'pointer', transition: '0.2s'
+          onClick={() => setActiveTab('transactions')} 
+          style={{
+            padding: '12px 16px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'transactions' ? '2.5px solid #6366f1' : '2.5px solid transparent',
+            color: activeTab === 'transactions' ? '#6366f1' : '#64748b',
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            outline: 'none'
           }}
         >
-          <i className="bx bx-list-ul" style={{ marginRight:8 }} /> Mutasi Saldo
+          Riwayat Mutasi Kas
         </button>
         <button 
-          onClick={() => setActiveTab('payouts')}
-          style={{ 
-            padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 800,
-            background: activeTab === 'payouts' ? '#0f172a' : 'white',
-            color: activeTab === 'payouts' ? 'white' : '#64748b',
-            border: '1px solid ' + (activeTab === 'payouts' ? '#0f172a' : '#e2e8f0'),
-            cursor: 'pointer', transition: '0.2s'
+          onClick={() => setActiveTab('payouts')} 
+          style={{
+            padding: '12px 16px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'payouts' ? '2.5px solid #6366f1' : '2.5px solid transparent',
+            color: activeTab === 'payouts' ? '#6366f1' : '#64748b',
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            outline: 'none'
           }}
         >
-          <i className="bx bx-history" style={{ marginRight:8 }} /> Riwayat Penarikan
+          Riwayat Payout
         </button>
       </div>
 
-      <div style={{ ...A.card, padding: '24px' }}>
-        {activeTab === 'mutations' ? (
-           <>
-             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-               <div style={{ fontSize:15, fontWeight:800, color:'#0f172a' }}>Log Mutasi Keuangan (Real-time)</div>
-               <button style={A.btnGhost} onClick={loadData}>
-                 <i className="bx bx-refresh" /> Refresh
-               </button>
-             </div>
-             <TablePanel loading={loading}>
-               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-                 <thead>
-                   <tr>
-                     <th style={{ ...A.th, paddingLeft: 24, textAlign: 'left' }}>DATE & TIME</th>
-                     <th style={{ ...A.th, textAlign: 'left' }}>TYPE</th>
-                     <th style={{ ...A.th, textAlign: 'left' }}>DESCRIPTION</th>
-                     <th style={{ ...A.th, textAlign: 'right' }}>AMOUNT</th>
-                     <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>BALANCE</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {transactions.length === 0 ? (
-                     <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Belum ada mutasi saldo tercatat.</td></tr>
-                   ) : transactions.map((t, i) => (
-                     <tr key={t.id} style={{ borderBottom: i === transactions.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
-                       <td style={{ ...A.td, paddingLeft: 24 }}>
-                         <div style={{ fontWeight: 800, color: '#0f172a' }}>{fmtDate(t.created_at)}</div>
-                         <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{new Date(t.created_at).toLocaleTimeString('id-ID')}</div>
-                       </td>
-                       <td style={A.td}>
-                         <span style={{ 
-                           fontSize: 10, fontWeight: 900, textTransform: 'uppercase', padding: '4px 10px', borderRadius: 6,
-                           ...(() => {
-                             if (t.type === 'withdrawal') return { background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }; // Purple
-                             if (t.type === 'withdrawal_rejected') return { background: '#eff6ff', color: '#3b82f6', border: '1px solid #dbeafe' }; // Blue
-                             if (t.type === 'withdrawal_paid') return { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }; // Grey
-                             return t.amount > 0 
-                               ? { background: '#ecfdf5', color: '#10b981', border: '1px solid #d1fae5' } 
-                               : { background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' };
-                           })()
-                         }}>
-                           {t.type.replace('_', ' ')}
-                         </span>
-                       </td>
-                       <td style={A.td}>
-                         <div style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>{t.description}</div>
-                         <div style={{ fontSize: 11, color: '#94a3b8' }}>Ref: {t.reference_id?.split('-')[0].toUpperCase()}</div>
-                       </td>
-                       <td style={{ 
-                         ...A.td, textAlign: 'right', fontWeight: 800, 
-                         color: t.type === 'withdrawal' ? '#7c3aed' : (t.type === 'withdrawal_rejected' ? '#3b82f6' : (t.amount > 0 ? '#10b981' : '#ef4444'))
-                       }}>
-                         {t.amount > 0 ? '+' : ''}{idr(t.amount)}
-                       </td>
-                       <td style={{ ...A.td, paddingRight: 24, textAlign: 'right', fontWeight: 900, color: '#0f172a' }}>
-                         {idr(t.balance_after)}
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-             </TablePanel>
-           </>
-        ) : (
-           <>
-             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-               <div style={{ fontSize:15, fontWeight:800, color:'#0f172a' }}>Riwayat Penarikan Dana</div>
-               <button style={A.btnGhost} onClick={loadData}>
-                 <i className="bx bx-refresh" /> Refresh
-               </button>
-             </div>
-             <TablePanel loading={loading}>
-               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-                 <thead>
-                    <tr>
-                      <th style={{ ...A.th, paddingLeft: 24, textAlign: 'left' }}>TANGGAL PENGAJUAN</th>
-                      <th style={{ ...A.th, textAlign: 'left' }}>ID REFERENSI</th>
-                      <th style={{ ...A.th, textAlign: 'left' }}>NOMINAL</th>
-                      <th style={{ ...A.th, textAlign: 'left' }}>STATUS</th>
-                      <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>CATATAN</th>
-                    </tr>
-                 </thead>
-                 <tbody>
-                   {history.length === 0 ? (
-                     <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Belum ada log pencairan dana.</td></tr>
-                   ) : history.map((h, i) => (
-                     <tr key={h?.id || i} style={{ borderBottom: i === history.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
-                       <td style={{ ...A.td, paddingLeft: 24 }}>
-                         <div style={{ fontWeight: 800, color: '#0f172a' }}>{h?.requested_at ? fmtDate(h.requested_at) : '—'}</div>
-                         <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{h?.requested_at ? new Date(h.requested_at).toLocaleTimeString('id-ID') : '—'}</div>
-                       </td>
-                       <td style={A.td}>
-                         <code style={{ fontSize:11, fontFamily:'monospace', color:'#64748b', background:'#f8fafc', padding:'3px 8px', borderRadius:6 }}>
-                           {h?.id ? h.id.split('-')[0].toUpperCase() : 'TRX-ERR'}
-                         </code>
-                       </td>
-                       <td style={A.td}>
-                         <span style={{ fontWeight: 800, color: h?.status === 'rejected' ? '#ef4444' : '#10b981' }}>{idr(h?.amount)}</span>
-                       </td>
-                        <td style={A.td}>
-                          {h?.status === 'paid' ? (
-                             <span style={{ display:'inline-flex', padding:'4px 12px', borderRadius:20, background:'#ecfdf4', color:'#10b981', fontSize:11, fontWeight:800 }}>SELESAI</span>
-                          ) : h?.status === 'approved' ? (
-                             <span style={{ display:'inline-flex', padding:'4px 12px', borderRadius:20, background:'#eff6ff', color:'#3b82f6', fontSize:11, fontWeight:800 }}>DISETUJUI</span>
-                          ) : h?.status === 'rejected' ? (
-                             <span style={{ display:'inline-flex', padding:'4px 12px', borderRadius:20, background:'#fef2f2', color:'#ef4444', fontSize:11, fontWeight:800 }}>DITOLAK</span>
-                          ) : (
-                             <span style={{ display:'inline-flex', padding:'4px 12px', borderRadius:20, background:'#fff7ed', color:'#f59e0b', fontSize:11, fontWeight:800 }}>MENUNGGU</span>
-                          )}
-                        </td>
-                       <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                         <div style={{ fontSize: 12, color: '#64748b', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
-                           {h?.note || '-'}
-                         </div>
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-             </TablePanel>
-           </>
-        )}
-      </div>
+      {activeTab === 'transactions' && (
+        <TablePanel loading={loading}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            <thead>
+              <tr>
+                <th style={{ ...A.th, paddingLeft: 24, width: '22%' }}>Waktu</th>
+                <th style={A.th}>Jenis Transaksi</th>
+                <th style={{ ...A.th, textAlign: 'right' }}>Jumlah (IDR)</th>
+                <th style={A.th}>Deskripsi / Catatan</th>
+                <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>Saldo Akhir</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.length === 0 && !loading ? (
+                <tr>
+                  <td colSpan={5} style={{ ...A.empty, padding: 48 }}>
+                    <i className="bx bx-receipt" style={{ fontSize: 48, color: '#94a3b8', opacity: 0.5 }} />
+                    <div style={{ fontWeight: 700, color: '#475569', fontSize: 14 }}>Belum ada riwayat transaksi kas</div>
+                    <div style={{ color: '#94a3b8', fontSize: 12 }}>Setiap penjualan atau pemotongan dana akan tampil di sini.</div>
+                  </td>
+                </tr>
+              ) : transactions.map((t, idx) => {
+                const conf = TX_TYPES[t.type] || { label: t.type, color: '#475569', bg: '#f1f5f9', icon: 'bx-receipt' };
+                const isPositive = t.amount >= 0;
+                
+                return (
+                  <tr key={t.id} style={{ borderBottom: idx === transactions.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
+                    <td style={{ ...A.td, paddingLeft: 24, color: '#64748b', fontSize: 12.5 }}>
+                      {fmtDate(t.created_at)}
+                    </td>
+                    <td style={A.td}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        background: conf.bg,
+                        color: conf.color,
+                        fontSize: 11.5,
+                        fontWeight: 800
+                      }}>
+                        <i className={`bx ${conf.icon}`} />
+                        {conf.label}
+                      </span>
+                    </td>
+                    <td style={{ ...A.td, textAlign: 'right', fontWeight: 800, color: isPositive ? '#16a34a' : '#dc2626' }}>
+                      {isPositive ? `+${idr(t.amount)}` : idr(t.amount)}
+                    </td>
+                    <td style={{ ...A.td, fontSize: 13, color: '#64748b' }}>
+                      {t.description || '—'}
+                    </td>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                      {idr(t.balance_after)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </TablePanel>
+      )}
 
-      {showPayoutModal && (
-        <Modal title="Formulir Penarikan Agresif" onClose={() => setShowPayoutModal(false)}>
-           <div style={{ padding: '0 24px 24px' }}>
-              <div style={{ background:'#f8fafc', padding:16, borderRadius:12, marginBottom:20, border:'1px solid #f1f5f9' }}>
-                 <div style={{ fontSize:11, color:'#64748b', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>Saldo Maksimal Bisa Ditarik</div>
-                 <div style={{ fontSize:24, fontWeight:800, color:'#10b981' }}>{wallet ? idr(wallet.available_balance) : '...'}</div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                 <div>
-                    <FieldLabel>Nominal Penarikan (IDR)</FieldLabel>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#94a3b8', fontSize: 14 }}>Rp</span>
-                      <input 
-                        type="text" 
-                        style={{ 
-                          ...A.input, 
-                          paddingLeft: 45,
-                          borderColor: Number(withdrawAmount) > wallet?.available_balance ? '#ef4444' : '#e2e8f0',
-                          color: Number(withdrawAmount) > wallet?.available_balance ? '#ef4444' : '#0f172a',
-                          fontWeight: 800,
-                          fontSize: 16
-                        }} 
-                        placeholder="0"
-                        value={withdrawAmount ? Number(withdrawAmount).toLocaleString('id-ID') : ''}
-                        onChange={e => {
-                          const val = e.target.value.replace(/\D/g, '');
-                          setWithdrawAmount(val);
-                        }}
-                      />
-                    </div>
-                    {Number(withdrawAmount) > wallet?.available_balance && (
-                      <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, marginTop: 6 }}>
-                        <i className="bx bx-error-circle" /> Saldo Anda tidak mencukupi untuk penarikan ini.
+      {activeTab === 'payouts' && (
+        <TablePanel loading={loading}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            <thead>
+              <tr>
+                <th style={{ ...A.th, paddingLeft: 24, width: '22%' }}>Tanggal Pengajuan</th>
+                <th style={A.th}>Detail Transfer</th>
+                <th style={{ ...A.th, textAlign: 'right' }}>Jumlah Bersih</th>
+                <th style={A.th}>Catatan / Catatan Transfer</th>
+                <th style={{ ...A.th, paddingRight: 24, textAlign: 'right' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payouts.length === 0 && !loading ? (
+                <tr>
+                  <td colSpan={5} style={{ ...A.empty, padding: 48 }}>
+                    <i className="bx bx-transfer-alt" style={{ fontSize: 48, color: '#94a3b8', opacity: 0.5 }} />
+                    <div style={{ fontWeight: 700, color: '#475569', fontSize: 14 }}>Belum ada riwayat payout</div>
+                    <div style={{ color: '#94a3b8', fontSize: 12 }}>Dana yang ditransfer oleh pusat akan otomatis tercatat di sini.</div>
+                  </td>
+                </tr>
+              ) : payouts.map((p, idx) => {
+                const badge = PAYOUT_STATUS[p.status] || { label: p.status, color: '#64748b', bg: '#f1f5f9' };
+                
+                return (
+                  <tr key={p.id} style={{ borderBottom: idx === payouts.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
+                    <td style={{ ...A.td, paddingLeft: 24, color: '#64748b', fontSize: 12.5 }}>
+                      {fmtDate(p.requested_at)}
+                    </td>
+                    <td style={A.td}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <strong style={{ color: '#0f172a', fontSize: 13 }}>{p.bank_name}</strong>
+                        <span style={{ fontSize: 11.5, color: '#64748b', fontFamily: 'monospace' }}>
+                          Rek. {p.bank_account_number} a/n {p.bank_account_name}
+                        </span>
                       </div>
-                    )}
-                 </div>
-                 <div>
-                    <FieldLabel>Catatan (Opsional)</FieldLabel>
-                    <textarea 
-                      style={{ ...A.input, minHeight: 80, resize: 'none' }} 
-                      placeholder="Nomor rekening tujuan, nama bank, dsb..."
-                      value={withdrawNote}
-                      onChange={e => setWithdrawNote(e.target.value)}
-                    />
-                 </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 30 }}>
-                 <button style={A.btnGhost} onClick={() => setShowPayoutModal(false)}>Batal</button>
-                 <button 
-                   style={{ 
-                     ...A.btnPrimary, 
-                     opacity: (requesting || !withdrawAmount || Number(withdrawAmount) > wallet?.available_balance) ? 0.5 : 1,
-                     cursor: (requesting || !withdrawAmount || Number(withdrawAmount) > wallet?.available_balance) ? 'not-allowed' : 'pointer'
-                   }} 
-                   onClick={handleWithdraw} 
-                   disabled={requesting || !withdrawAmount || Number(withdrawAmount) > wallet?.available_balance}
-                 >
-                    {requesting ? 'Memproses...' : 'Tarik Dana Sekarang'}
-                 </button>
-              </div>
-           </div>
-        </Modal>
+                    </td>
+                    <td style={{ ...A.td, textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
+                      {idr(p.amount)}
+                    </td>
+                    <td style={{ ...A.td, fontSize: 13, color: '#64748b' }}>
+                      {p.note || '—'}
+                    </td>
+                    <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        padding: '4px 10px',
+                        borderRadius: 20,
+                        background: badge.bg,
+                        color: badge.color,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        textTransform: 'uppercase'
+                      }}>
+                        {badge.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </TablePanel>
       )}
     </div>
   );

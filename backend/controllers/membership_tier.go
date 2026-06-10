@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"SahabatMart/backend/models"
-	"SahabatMart/backend/utils"
+	"akuglow/backend/models"
+	"akuglow/backend/utils"
 	"encoding/json"
 	"net/http"
 	"strconv"

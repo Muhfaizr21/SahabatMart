@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchJson, API_BASE, MERCHANT_API_BASE, formatImage } from '../../lib/api';
-import { PageHeader, A, FieldLabel, idr } from '../../lib/adminStyles.jsx';
+import { PageHeader, A, FieldLabel } from '../../lib/adminStyles.jsx';
 
 const MerchantSettings = () => {
     const [store, setStore] = useState(null);
@@ -30,7 +30,7 @@ const MerchantSettings = () => {
                 body: JSON.stringify(store)
             });
             setStore(res.data || res);
-            setToast('Profil identitas berhasil diperbarui.');
+            setToast(activeTab === 'branding' ? 'Profil identitas berhasil diperbarui.' : 'Lokasi gudang pengiriman berhasil diperbarui.');
             setTimeout(() => setToast(''), 4000);
         } catch (_err) {
             alert('Update failed: ' + _err.message);
@@ -56,15 +56,32 @@ const MerchantSettings = () => {
         }
     };
 
-    const handleSelectArea = (area) => {
-        setStore({ 
+    const handleSelectArea = async (area) => {
+        const updatedStore = { 
             ...store, 
             biteship_area_id: area.id,
             area_name: area.name,
             city: area.administrative_division_level_2_name || area.city_name || '',
             province: area.administrative_division_level_1_name || area.province_name || '',
-        });
+        };
+        setStore(updatedStore);
         setAreas([]);
+
+        // Auto-save the new location to the backend immediately
+        setSaving(true);
+        try {
+            const res = await fetchJson(`${MERCHANT_API_BASE}/store/update`, {
+                method: 'POST',
+                body: JSON.stringify(updatedStore)
+            });
+            setStore(res.data || res);
+            setToast('Lokasi gudang pengiriman berhasil diperbarui.');
+            setTimeout(() => setToast(''), 4000);
+        } catch (_err) {
+            alert('Gagal menyimpan lokasi gudang: ' + _err.message);
+        } finally {
+            setSaving(false);
+        }
     };
 
     if (loading) return (
@@ -333,33 +350,8 @@ const MerchantSettings = () => {
                         </div>
                     </div>
 
-                    {/* Stats & Verification side card */}
+                    {/* Info side card */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                        <div style={{ background: 'linear-gradient(135deg, #1e1b4b, #311042)', color: '#fff', borderRadius: 24, padding: 32, boxShadow: '0 20px 30px rgba(79, 70, 229, 0.15)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', top: -30, right: -30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.03)' }} />
-                            
-                            <h3 style={{ fontSize: 16, fontWeight: 900, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <i className="bx bxs-badge-check" style={{ color: '#818cf8', fontSize: 22 }} /> Skema Layanan
-                            </h3>
-                            
-                            <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 16 }}>
-                                <span style={{ fontSize: 12.5, color: '#a5b4fc', fontWeight: 600 }}>Biaya Layanan Platform</span>
-                                <span style={{ fontSize: 14, fontWeight: 900, color: '#38bdf8' }}>{store?.service_fee || 5}%</span>
-                            </div>
-
-                            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 16 }}>
-                                <span style={{ fontSize: 12.5, color: '#a5b4fc', fontWeight: 600 }}>Masa Kemitraan</span>
-                                <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
-                                    {store?.joined_at ? new Date(store.joined_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' }) : '-'}
-                                </span>
-                            </div>
-
-                            <div style={{ marginTop: 24 }}>
-                                <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Penjualan Kotor</div>
-                                <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', marginTop: 6, letterSpacing: '-0.02em' }}>{idr(store?.total_sales)}</div>
-                            </div>
-                        </div>
-
                         {/* Store Statistics Widget */}
                         <div style={{ ...A.card, padding: 28, borderRadius: 24, border: '1px solid #f1f5f9' }}>
                             <h4 style={{ fontSize: 13, fontWeight: 950, color: '#0f172a', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Informasi Tambahan</h4>
@@ -484,6 +476,35 @@ const MerchantSettings = () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Dedicated Save Button for Logistics Tab */}
+                        <div style={{ marginTop: 32, borderTop: '1px solid #f1f5f9', paddingTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={saving}
+                                style={{
+                                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                                    color: '#ffffff',
+                                    padding: '12px 28px',
+                                    borderRadius: 16,
+                                    fontWeight: 800,
+                                    fontSize: 13.5,
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
+                                    transition: 'all 0.2s ease-in-out',
+                                    opacity: saving ? 0.7 : 1
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                            >
+                                {saving ? <i className="bx bx-loader-alt bx-spin" style={{ fontSize: 18 }} /> : <i className="bx bx-save" style={{ fontSize: 18 }} />}
+                                {saving ? 'Menyimpan...' : 'Simpan Lokasi Gudang'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

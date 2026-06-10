@@ -24,7 +24,7 @@ const AdminAttributes = () => {
         }));
         setAttrs(processed);
       })
-      .catch(err => console.error("Error loading attributes:", _err))
+      .catch(err => console.error("Error loading attributes:", err))
       .finally(() => setLoading(false));
   };
 
@@ -67,7 +67,7 @@ const AdminAttributes = () => {
     }).then(() => {
       loadAttrs();
       setShowModal(false);
-    }).catch(err => alert("Gagal: " + _err.message))
+    }).catch(err => alert("Gagal: " + err.message))
       .finally(() => setSaving(false));
   };
 
@@ -75,7 +75,7 @@ const AdminAttributes = () => {
     if (!window.confirm("Hapus atribut ini secara permanen?")) return;
     fetchJson(`${API}/attributes/delete?id=${id}`, { method: 'DELETE' })
       .then(() => loadAttrs())
-      .catch(err => alert("Gagal: " + _err.message));
+      .catch(err => alert("Gagal: " + err.message));
   };
 
   const getTypeIcon = (type) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
-import { A, PageHeader, Modal, FieldLabel, idr } from '../../lib/adminStyles.jsx';
+import { A, PageHeader, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
 export default function AdminBanners() {
@@ -49,7 +49,7 @@ export default function AdminBanners() {
       toast.success('Config banner berhasil disimpan');
       setShowModal(false);
       load();
-    }).catch(err => toast.error(_err.message));
+    }).catch(err => toast.error(err.message));
   };
 
   const deleteBanner = (id) => {

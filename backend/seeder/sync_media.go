@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"SahabatMart/backend/models"
+	"akuglow/backend/models"
 	"gorm.io/gorm"
 )
 

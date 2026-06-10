@@ -1,24 +1,112 @@
-import React, { useState, useEffect } from 'react';
-import { ADMIN_API_BASE, AFFILIATE_API_BASE, fetchJson, formatImage } from '../../lib/api';
-import { A, PageHeader, Modal, TablePanel, statusBadge, FieldLabel } from '../../lib/adminStyles.jsx';
+import React, { useState, useEffect, useRef } from 'react';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { A, PageHeader, TablePanel, statusBadge } from '../../lib/adminStyles.jsx';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+
+const CustomSelect = ({ label, value, options, onChange, icon }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 16px', borderRadius: 12,
+          border: '1px solid #e2e8f0', background: '#fff',
+          fontSize: 13, fontWeight: 600, color: '#334155',
+          cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+        onClick={() => setOpen(!open)}
+      >
+        {icon && <i className={`bx ${icon}`} style={{ fontSize: 16, color: '#6366f1' }} />}
+        <span>{label}: <strong>{selectedOption ? selectedOption.label : 'Semua'}</strong></span>
+        <i className="bx bx-chevron-down" style={{ fontSize: 14, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 150,
+          background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+          minWidth: 180, overflow: 'hidden', padding: 4,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: 'none', background: String(value) === String(opt.value) ? '#f5f3ff' : 'transparent',
+                color: String(value) === String(opt.value) ? '#6366f1' : '#475569',
+                fontSize: 12.5, fontWeight: String(value) === String(opt.value) ? 700 : 500,
+                textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#0f172a';
+                }
+              }}
+              onMouseLeave={e => {
+                if (String(value) !== String(opt.value)) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#475569';
+                }
+              }}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function AdminPromo() {
   const [promos, setPromos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ id: 0, title: '', description: '', type: 'image', category: 'Instagram', file_url: '', caption: '', is_active: true });
-  const [showModal, setShowModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const navigate = useNavigate();
 
-  // Search & Filter States
+  // Search & Filter & Sort States
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const [sort, setSort] = useState('created_at');
+  const [order, setOrder] = useState('desc');
+  const [itemsPerPage, setItemsPerPage] = useState(20); // Default to 20 per user request
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadData = () => {
     setLoading(true);
@@ -49,7 +137,7 @@ export default function AdminPromo() {
     setLoading(true);
     fetchJson(`${ADMIN_API_BASE}/promo/bulk-delete`, {
       method: 'POST',
-      body: JSON.stringify({ ids: selectedIds })
+      body: JSON.stringify({ ids: selectedIds.map(String) }) // FIXED: converted to string payload
     })
       .then(() => {
         toast.success('Materi promo terpilih dihapus');
@@ -59,41 +147,6 @@ export default function AdminPromo() {
         toast.error(err.message || 'Gagal menghapus materi promo');
         setLoading(false);
       });
-  };
-
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setUploading(true);
-    const fd = new FormData();
-    fd.append('image', file);
-
-    try {
-      const resp = await fetch(`${ADMIN_API_BASE}/upload`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'ngrok-skip-browser-warning': 'true'
-        },
-        body: fd
-      });
-      if (!resp.ok) throw new Error('Upload gagal');
-      
-      const responseData = await resp.json();
-      const uploadedUrl = responseData?.data?.url || responseData?.url;
-      
-      if (uploadedUrl) {
-        setFormData(prev => ({ ...prev, file_url: uploadedUrl }));
-        toast.success('Gambar berhasil diunggah');
-      } else {
-        throw new Error('Format response tidak valid');
-      }
-    } catch (_err) {
-      toast.error(_err.message);
-    } finally {
-      setUploading(false);
-    }
   };
 
   const handleDelete = (id) => {
@@ -108,55 +161,84 @@ export default function AdminPromo() {
       .catch(err => toast.error(err.message || 'Gagal menghapus materi promo'));
   };
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    setSaving(true);
-    fetchJson(`${ADMIN_API_BASE}/promo/upsert`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    }).then(() => {
-      toast.success('Materi promo disimpan');
-      setShowModal(false);
-      loadData();
-    }).catch(err => toast.error(err.message || 'Gagal menyimpan materi promo'))
-    .finally(() => setSaving(false));
+  const handleSort = (col) => {
+    if (sort === col) {
+      setOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSort(col);
+      setOrder('asc');
+    }
+    setCurrentPage(1);
   };
 
   // Get dynamic categories list from current promos
   const categoriesList = ['all', ...new Set(promos.map(p => p.category).filter(Boolean))];
 
-  // Filtering Logic
-  const filteredPromos = promos.filter(p => {
-    const matchesSearch = !search || 
-      p.title?.toLowerCase().includes(search.toLowerCase()) || 
-      p.caption?.toLowerCase().includes(search.toLowerCase()) ||
-      p.description?.toLowerCase().includes(search.toLowerCase());
+  // Filtering & Sorting Logic
+  const filteredAndSortedPromos = React.useMemo(() => {
+    const filtered = promos.filter(p => {
+      const matchesSearch = !debouncedSearch || 
+        p.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+        p.caption?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        p.description?.toLowerCase().includes(debouncedSearch.toLowerCase());
 
-    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
-    const matchesType = selectedType === 'all' || p.type === selectedType;
-    const matchesStatus = selectedStatus === 'all' || 
-      (selectedStatus === 'visible' && p.is_active) || 
-      (selectedStatus === 'hidden' && !p.is_active);
+      const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
+      const matchesType = selectedType === 'all' || p.type === selectedType;
+      const matchesStatus = selectedStatus === 'all' || 
+        (selectedStatus === 'visible' && p.is_active) || 
+        (selectedStatus === 'hidden' && !p.is_active);
 
-    return matchesSearch && matchesCategory && matchesType && matchesStatus;
-  });
+      return matchesSearch && matchesCategory && matchesType && matchesStatus;
+    });
+
+    return [...filtered].sort((a, b) => {
+      let valA = a[sort];
+      let valB = b[sort];
+
+      if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB || '').toLowerCase();
+      }
+      if (valA === undefined || valA === null) return order === 'asc' ? -1 : 1;
+      if (valB === undefined || valB === null) return order === 'asc' ? 1 : -1;
+
+      if (valA < valB) return order === 'asc' ? -1 : 1;
+      if (valA > valB) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [promos, debouncedSearch, selectedCategory, selectedType, selectedStatus, sort, order]);
 
   // Pagination Logic
-  const totalItems = filteredPromos.length;
+  const totalItems = filteredAndSortedPromos.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [filteredPromos, totalPages, currentPage]);
+  }, [filteredAndSortedPromos, totalPages, currentPage]);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredPromos.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = filteredAndSortedPromos.slice(indexOfFirstItem, indexOfLastItem);
 
-  // Tabs for Content Type
+  const SortHeader = ({ col, label, style = {} }) => {
+    const isSorted = sort === col;
+    return (
+      <th 
+        style={{ ...A.th, cursor: 'pointer', userSelect: 'none', ...style }} 
+        onClick={() => handleSort(col)}
+      >
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span>{label}</span>
+          <span style={{ fontSize: 14, color: isSorted ? '#6366f1' : '#94a3b8' }}>
+            {isSorted ? (order === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   const tabs = (
     <div style={{ display: 'flex', gap: 4 }}>
       <button style={A.tab(selectedType === 'all')} onClick={() => { setSelectedType('all'); setCurrentPage(1); }}>Semua Tipe</button>
@@ -166,46 +248,9 @@ export default function AdminPromo() {
     </div>
   );
 
-  // Search & Filters Toolbar
   const toolbar = (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between' }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* Search Input */}
-        <div style={A.searchWrap}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input 
-            style={A.searchInput} 
-            placeholder="Cari materi promo..." 
-            value={search} 
-            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} 
-          />
-        </div>
-
-        {/* Category Dropdown */}
-        <select 
-          style={A.select} 
-          value={selectedCategory} 
-          onChange={e => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
-        >
-          <option value="all">Semua Kategori</option>
-          {categoriesList.filter(c => c !== 'all').map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-
-        {/* Status Dropdown */}
-        <select 
-          style={A.select} 
-          value={selectedStatus} 
-          onChange={e => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-        >
-          <option value="all">Semua Status</option>
-          <option value="visible">Visible</option>
-          <option value="hidden">Hidden</option>
-        </select>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: '100%', justifyContent: 'space-between' }}>
+      <div>
         {selectedIds.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 12px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fee2e2' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
@@ -217,20 +262,65 @@ export default function AdminPromo() {
             </button>
           </div>
         )}
-        <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-          {loading ? 'Memuat...' : `${totalItems} asset`}
-        </span>
       </div>
+      <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
+        {loading ? 'Memuat...' : `${totalItems} asset`}
+      </span>
     </div>
   );
 
   return (
     <div style={A.page}>
       <PageHeader title="Promo Materials" subtitle="Content assets for affiliate marketing">
-        <button onClick={() => { setFormData({ id: 0, title: '', description: '', type: 'image', category: 'Instagram', file_url: '', caption: '', is_active: true }); setShowModal(true); }} style={A.btnPrimary}>
+        <button onClick={() => navigate('/admin/promo/new')} style={A.btnPrimary}>
            <i className="bx bx-plus-circle" /> Tambah Asset
         </button>
       </PageHeader>
+
+      {/* FILTER & SEARCH BAR */}
+      <div style={{ ...A.card, overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
+        <div style={{ flex: 1, minWidth: 260, position: 'relative' }}>
+          <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
+          <input
+            style={{ ...A.input, paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
+            placeholder="Cari materi promo..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        <CustomSelect
+          label="Kategori"
+          value={selectedCategory}
+          options={[
+            { label: 'Semua Kategori', value: 'all' },
+            ...categoriesList.filter(c => c !== 'all').map(c => ({ label: c, value: c }))
+          ]}
+          onChange={val => { setSelectedCategory(val); setCurrentPage(1); }}
+          icon="bx-folder"
+        />
+
+        <CustomSelect
+          label="Status"
+          value={selectedStatus}
+          options={[
+            { label: 'Semua Status', value: 'all' },
+            { label: 'Visible', value: 'visible' },
+            { label: 'Hidden', value: 'hidden' }
+          ]}
+          onChange={val => { setSelectedStatus(val); setCurrentPage(1); }}
+          icon="bx-show"
+        />
+
+        {(search || selectedCategory !== 'all' || selectedStatus !== 'all') && (
+          <button
+            onClick={() => { setSearch(''); setSelectedCategory('all'); setSelectedStatus('all'); setCurrentPage(1); }}
+            style={{ ...A.btnGhost, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <i className="bx bx-x" /> Reset Filter
+          </button>
+        )}
+      </div>
 
       <TablePanel loading={loading} tabs={tabs} toolbar={toolbar}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -244,10 +334,10 @@ export default function AdminPromo() {
                   style={{ width: 18, height: 18, cursor: 'pointer' }}
                 />
               </th>
-              <th style={A.th}>Asset</th>
-              <th style={A.th}>Tipe</th>
-              <th style={A.th}>Kategori</th>
-              <th style={A.th}>Status</th>
+              <SortHeader col="title" label="Asset" />
+              <SortHeader col="type" label="Tipe" />
+              <SortHeader col="category" label="Kategori" />
+              <SortHeader col="is_active" label="Status" />
               <th style={{ ...A.th, textAlign: 'right', paddingRight: 24 }}>Aksi</th>
             </tr>
           </thead>
@@ -282,11 +372,13 @@ export default function AdminPromo() {
                     <td style={A.td}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                             {p.type === 'copywriting' ? (
-                               <i className="bx bx-file-blank" style={{ fontSize: 22, color: '#6366f1' }} />
-                             ) : (
-                               <img src={formatImage(p.file_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }} />
-                             )}
+                              {p.type === 'copywriting' ? (
+                                <i className="bx bx-file-blank" style={{ fontSize: 22, color: '#6366f1' }} />
+                              ) : p.type === 'video' ? (
+                                <video src={formatImage(p.file_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+                              ) : (
+                                <img src={formatImage(p.file_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }} />
+                              )}
                           </div>
                           <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.title}</div>
                        </div>
@@ -296,7 +388,7 @@ export default function AdminPromo() {
                     <td style={A.td}><span style={statusBadge(p.is_active ? 'active' : 'inactive')}>{p.is_active ? 'Visible' : 'Hidden'}</span></td>
                     <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
                        <div style={{ display: 'inline-flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <button onClick={() => { setFormData(p); setShowModal(true); }} style={A.iconBtn()} title="Edit"><i className="bx bx-edit-alt" /></button>
+                          <button onClick={() => navigate(`/admin/promo/edit/${p.id}`)} style={A.iconBtn()} title="Edit"><i className="bx bx-edit-alt" /></button>
                           <button onClick={() => handleDelete(p.id)} style={A.iconBtn('#dc2626', 'rgba(220, 38, 38, 0.08)')} title="Hapus"><i className="bx bx-trash" /></button>
                        </div>
                     </td>
@@ -308,20 +400,51 @@ export default function AdminPromo() {
         </table>
 
         {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px 24px',
-            background: '#fff',
-            borderTop: '1px solid #f1f5f9',
-            fontSize: 13,
-            color: '#64748b',
-          }}>
-            <div>
-              Menampilkan <strong>{indexOfFirstItem + 1}</strong> - <strong>{Math.min(indexOfLastItem, totalItems)}</strong> dari <strong>{totalItems}</strong> asset
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '16px 24px',
+          background: '#fff',
+          borderTop: '1px solid #f1f5f9',
+          fontSize: 13,
+          color: '#64748b',
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span>
+              Menampilkan <strong>{totalItems > 0 ? indexOfFirstItem + 1 : 0}</strong> - <strong>{Math.min(indexOfLastItem, totalItems)}</strong> dari <strong>{totalItems}</strong> asset
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>Tampilkan:</span>
+              <select
+                value={itemsPerPage}
+                onChange={e => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 8,
+                  border: '1.5px solid #e2e8f0',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#475569',
+                  background: '#fff',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
             </div>
+          </div>
+
+          {totalPages > 1 && (
             <div style={{ display: 'flex', gap: 6 }}>
               <button 
                 disabled={currentPage === 1} 
@@ -403,66 +526,9 @@ export default function AdminPromo() {
                 Selanjutnya
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </TablePanel>
-
-      {showModal && (
-        <Modal title={formData.id ? 'Edit Promo' : 'New Promo Asset'} onClose={() => setShowModal(false)}>
-           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <FieldLabel>Judul Materi</FieldLabel>
-              <input style={A.input} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <FieldLabel>Tipe Konten</FieldLabel>
-                  <select style={A.select} value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
-                     <option value="image">🖼️ Image</option>
-                     <option value="video">📽️ Video</option>
-                     <option value="copywriting">✍️ Copywriting Text</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <FieldLabel>Kategori Media</FieldLabel>
-                  <select style={A.select} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
-                     <option value="Instagram">Instagram</option>
-                     <option value="Facebook">Facebook</option>
-                     <option value="TikTok">TikTok</option>
-                     <option value="WhatsApp">WhatsApp</option>
-                  </select>
-                </div>
-              </div>
-
-              {formData.type !== 'copywriting' && (
-                <>
-                  <FieldLabel>{formData.type === 'video' ? 'URL Video YouTube / Upload MP4' : 'URL Gambar / Upload Image'}</FieldLabel>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input style={{ ...A.input, flex: 1 }} placeholder="https://..." value={formData.file_url} onChange={e => setFormData({ ...formData, file_url: e.target.value })} required />
-                    <label style={{ ...A.btnLight, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, margin: 0, padding: '0 16px', height: 42, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                      {uploading ? <i className="bx bx-loader-alt bx-spin" /> : <i className="bx bx-upload" />}
-                      {uploading ? 'Upload...' : 'Pilih File'}
-                      <input type="file" accept={formData.type === 'video' ? "video/*" : "image/*"} onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
-                    </label>
-                  </div>
-                </>
-              )}
-
-              <FieldLabel>{formData.type === 'copywriting' ? 'Isi Teks Copywriting' : 'Caption Tambahan (Opsional)'}</FieldLabel>
-              <textarea style={{ ...A.textarea, height: 120 }} value={formData.caption} onChange={e => setFormData({ ...formData, caption: e.target.value })} required={formData.type === 'copywriting'} />
-
-              <div>
-                <FieldLabel>Status Tampilkan</FieldLabel>
-                <select style={A.select} value={formData.is_active ? "true" : "false"} onChange={e => setFormData({ ...formData, is_active: e.target.value === "true" })}>
-                   <option value="true">✅ Visible (Tampilkan ke Mitra)</option>
-                   <option value="false">❌ Hidden (Sembunyikan)</option>
-                </select>
-              </div>
-
-              <button type="submit" disabled={saving} style={A.btnPrimary}>{saving ? 'Saving...' : 'Simpan Promo'}</button>
-           </form>
-        </Modal>
-      )}
     </div>
   );
 }

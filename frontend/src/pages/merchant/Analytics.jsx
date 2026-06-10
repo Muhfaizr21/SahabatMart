@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchJson, MERCHANT_API_BASE } from '../../lib/api';
-import { PageHeader, StatRow, A, idr } from '../../lib/adminStyles.jsx';
+import { PageHeader, StatRow, A } from '../../lib/adminStyles.jsx';
 
 export default function MerchantAnalytics() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -35,18 +35,15 @@ export default function MerchantAnalytics() {
       />
 
       <StatRow stats={[
-        { label: 'Total Omzet (Gross)', val: loading ? '...' : idr(stats?.total_sales || 0), icon: 'bx-stats', color: '#1e293b' },
-        { label: 'Pendapatan Bersih', val: loading ? '...' : idr(stats?.total_net_sales || 0), icon: 'bx-wallet', color: '#10b981' },
-        { label: 'Total Pesanan', val: loading ? '...' : `${stats?.total_orders || 0} Trx`, icon: 'bx-shopping-bag', color: '#334155' },
-        { label: 'Konversi Afiliasi', val: loading ? '...' : `${stats?.affiliate_orders || 0} Pesanan`, icon: 'bx-network-chart', color: '#6366f1' },
-        { label: 'Komisi Jaringan', val: loading ? '...' : idr(stats?.affiliate_commissions || 0), icon: 'bx-transfer', color: '#f59e0b' },
+        { label: 'Total Pesanan Masuk', val: loading ? '...' : `${stats?.total_orders || 0} Pesanan`, icon: 'bx-shopping-bag', color: '#6366f1' },
+        { label: 'Pesanan lewat Afiliasi', val: loading ? '...' : `${stats?.affiliate_orders || 0} Pesanan`, icon: 'bx-network-chart', color: '#10b981' },
       ]} />
 
       <div style={{ ...A.card, padding: 32 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
           <div>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>Trajektori Penjualan ({year})</h3>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, margin: 0 }}>Volume interaksi konversi bulanan.</p>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>Volume Pesanan Bulanan ({year})</h3>
+            <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, margin: 0 }}>Grafik total transaksi yang diproses per bulan.</p>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <select 

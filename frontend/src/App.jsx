@@ -59,6 +59,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CouponPage from './pages/CouponPage';
 import InvoicePage from './pages/InvoicePage';
+import PackingSlipPage from './pages/PackingSlipPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
 import BusinessOpportunity from './pages/BusinessOpportunity';
@@ -80,7 +81,6 @@ import AdminUsers from './pages/admin/Users';
 import AdminCategories from './pages/admin/Categories';
 import AdminMerchants from './pages/admin/Merchants';
 import AdminAffiliates from './pages/admin/Affiliates';
-import AdminModeration from './pages/admin/Moderation';
 import AdminFinance from './pages/admin/Finance';
 import AdminDataSavingDetail from './pages/admin/DataSavingDetail';
 import AdminProfitShareDetail from './pages/admin/ProfitShareDetail';
@@ -89,20 +89,24 @@ import AdminSettings from './pages/admin/Settings';
 import AdminAuditLog from './pages/admin/AuditLog';
 import AdminBrands from './pages/admin/Brands';
 import AdminAttributes from './pages/admin/Attributes';
-import AdminDisputes from './pages/admin/Disputes';
+
 import AdminVouchers from './pages/admin/Vouchers';
 import AdminLogistics from './pages/admin/Logistics';
 import AdminSecurity from './pages/admin/Security';
 import AdminRegions from './pages/admin/Regions';
 import AdminBlogs from './pages/admin/Blogs';
+import BlogEditor from './pages/admin/BlogEditor';
 import AdminBanners from './pages/admin/Banners';
 import AdminEducation from './pages/admin/Education';
+import EducationEditor from './pages/admin/EducationEditor';
 import AdminEvents from './pages/admin/Events';
 import AdminPromo from './pages/admin/Promo';
+import PromoEditor from './pages/admin/PromoEditor';
 import AdminInbox from './pages/admin/Inbox';
 import AdminPOS from './pages/admin/POS';
 import AdminRBAC from './pages/admin/RBAC';
 import AdminRestock from './pages/admin/RestockModeration';
+import MerchantStock from './pages/admin/MerchantStock';
 import WishlistStats from './pages/admin/WishlistStats';
 import SkinPreTest from './pages/affiliate/SkinPreTest';
 import AdminMediaLibrary from './pages/admin/Media';
@@ -115,6 +119,7 @@ import SkinCommunityAdmin from './pages/admin/SkinCommunityAdmin';
 import MembershipTiers from './pages/admin/MembershipTiers';
 import AdminReviews from './pages/admin/AdminReviews';
 import CommissionPresets from './pages/admin/CommissionPresets';
+import AdminDemographics from './pages/admin/Demographics';
 import HomePage from './pages/HomePage';
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -123,7 +128,7 @@ import { ThemeProvider } from './context/ThemeContext';
 function NavbarManager({ maintenanceActive }) {
   const location = useLocation();
   if (maintenanceActive) return null;
-  const hidePaths = ['/admin', '/merchant', '/affiliate'];
+  const hidePaths = ['/admin', '/merchant', '/affiliate', '/invoice', '/packing-slip'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return (
     <>
@@ -137,7 +142,7 @@ function NavbarManager({ maintenanceActive }) {
 function FooterManager({ maintenanceActive }) {
   const location = useLocation();
   if (maintenanceActive) return null;
-  const hidePaths = ['/admin', '/merchant', '/affiliate'];
+  const hidePaths = ['/admin', '/merchant', '/affiliate', '/invoice', '/packing-slip'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return <Footer />;
 }
@@ -170,10 +175,10 @@ import MerchantDashboard from './pages/merchant/Dashboard';
 import MerchantProducts from './pages/merchant/ProductList';
 import MerchantRestock from './pages/merchant/RestockRequest';
 import MerchantOrders from './pages/merchant/OrderList';
-import MerchantWallet from './pages/merchant/Wallet';
 import MerchantSettings from './pages/merchant/Settings';
 import MerchantAnalytics from './pages/merchant/Analytics';
 import MerchantPOS from './pages/merchant/POS';
+import MerchantWallet from './pages/merchant/Wallet';
 
 // Affiliate Portal
 import AffiliateLayout from './components/affiliate/AffiliateLayout';
@@ -226,6 +231,31 @@ function AppContent() {
   const location = useLocation();
   const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
   const [maintenance, setMaintenance] = useState({ active: false, message: '' });
+
+  // Automatic page tracking for user locations
+  useEffect(() => {
+    const isPanelPath = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
+    if (isPanelPath) return;
+
+    const base = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.API_BASE)
+      ? window.APP_CONFIG.API_BASE.replace(/\/+$/, '')
+      : (import.meta.env.VITE_API_BASE || '');
+    
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch(`${base}/api/public/location/log`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ visited_url: location.pathname + location.search }),
+    }).catch(() => {});
+  }, [location.pathname, location.search]);
 
   // Check maintenance mode on mount + interval
   useEffect(() => {
@@ -315,6 +345,7 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/coupons" element={<CouponPage />} />
           <Route path="/invoice/:id" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
+          <Route path="/packing-slip/:groupId" element={<ProtectedRoute><PackingSlipPage /></ProtectedRoute>} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-conditions" element={<TermsConditions />} />
           <Route path="/peluang-bisnis" element={<BusinessOpportunity />} />
@@ -329,6 +360,7 @@ function AppContent() {
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="pos" element={<AdminPOS />} />
+            <Route path="demographics" element={<AdminDemographics />} />
             <Route path="wishlist" element={<WishlistStats />} />
             <Route path="inventory/pusat" element={<PusatInventory />} />
             <Route path="products" element={<AdminProductList />} />
@@ -341,14 +373,14 @@ function AppContent() {
             <Route path="affiliates" element={<AdminAffiliates />} />
             <Route path="merchants" element={<AdminMerchants />} />
             <Route path="merchants/restock" element={<AdminRestock />} />
-            <Route path="moderation" element={<AdminModeration />} />
+            <Route path="merchants/stock" element={<MerchantStock />} />
             <Route path="finance" element={<AdminFinance />} />
             <Route path="finance/data-saving" element={<AdminDataSavingDetail />} />
             <Route path="finance/profit-share" element={<AdminProfitShareDetail />} />
             <Route path="payouts" element={<AdminPayouts />} />
             <Route path="brands" element={<AdminBrands />} />
             <Route path="attributes" element={<AdminAttributes />} />
-            <Route path="disputes" element={<AdminDisputes />} />
+
             <Route path="vouchers" element={<AdminVouchers />} />
             <Route path="reviews" element={<AdminReviews />} />
             <Route path="logistics" element={<AdminLogistics />} />
@@ -357,11 +389,17 @@ function AppContent() {
             <Route path="audit" element={<AdminAuditLog />} />
             <Route path="media" element={<AdminMediaLibrary />} />
             <Route path="blogs" element={<AdminBlogs />} />
+            <Route path="blogs/new" element={<BlogEditor />} />
+            <Route path="blogs/edit/:id" element={<BlogEditor />} />
             <Route path="banners" element={<AdminBanners />} />
-            <Route path="education" element={<AdminEducation />} />
-            <Route path="events" element={<AdminEvents />} />
-            <Route path="promo" element={<AdminPromo />} />
-            <Route path="skin-journey" element={<SkinJourneyAdmin />} />
+             <Route path="education" element={<AdminEducation />} />
+             <Route path="education/new" element={<EducationEditor />} />
+             <Route path="education/edit/:id" element={<EducationEditor />} />
+             <Route path="events" element={<AdminEvents />} />
+             <Route path="promo" element={<AdminPromo />} />
+             <Route path="promo/new" element={<PromoEditor />} />
+             <Route path="promo/edit/:id" element={<PromoEditor />} />
+             <Route path="skin-journey" element={<SkinJourneyAdmin />} />
             <Route path="skin-community" element={<SkinCommunityAdmin />} />
             <Route path="inbox" element={<AdminInbox />} />
             <Route path="rbac" element={<AdminRBAC />} />
@@ -378,10 +416,10 @@ function AppContent() {
              <Route path="products" element={<MerchantProducts />} />
              <Route path="restock" element={<MerchantRestock />} />
              <Route path="orders" element={<MerchantOrders />} />
-             <Route path="wallet" element={<MerchantWallet />} />
              <Route path="settings" element={<MerchantSettings />} />
              <Route path="analytics" element={<MerchantAnalytics />} />
              <Route path="pos" element={<MerchantPOS />} />
+             <Route path="wallet" element={<MerchantWallet />} />
           </Route>
 
           {/* Affiliate Routes */}

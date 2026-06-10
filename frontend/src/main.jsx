@@ -20,9 +20,10 @@ import '@fontsource/plus-jakarta-sans/500.css'
 import '@fontsource/plus-jakarta-sans/600.css'
 import '@fontsource/plus-jakarta-sans/700.css'
 import '@fontsource/plus-jakarta-sans/800.css'
-import { setupAuthFetchInterceptor } from './lib/auth.js'
+import { setupAuthFetchInterceptor, setupIdleTimeout } from './lib/auth.js'
 
 setupAuthFetchInterceptor()
+setupIdleTimeout()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />
