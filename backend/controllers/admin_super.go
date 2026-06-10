@@ -3910,7 +3910,8 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 		var topMerchants []MerchantStat
 		ac.DB.Table("order_merchant_groups").
 			Joins("JOIN merchants ON merchants.id = order_merchant_groups.merchant_id").
-			Where("order_merchant_groups.status != 'cancelled'").
+			Joins("JOIN orders ON orders.id = order_merchant_groups.order_id").
+			Where("orders.status NOT IN ?", []string{string(models.OrderCancelled), string(models.OrderRefunded)}).
 			Select("merchants.id as id, merchants.store_name as name, COALESCE(SUM(order_merchant_groups.subtotal), 0) as revenue, COUNT(order_merchant_groups.id) as orders").
 			Group("merchants.id, merchants.store_name").
 			Order("revenue DESC").Limit(5).Scan(&topMerchants)

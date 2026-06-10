@@ -126,7 +126,7 @@ func (ac *AdminController) GetSystemStats(w http.ResponseWriter, r *http.Request
 	var topMerchants []TopMerchant
 	ac.DB.Table("merchants").
 		Select("merchants.id, merchants.store_name, merchants.total_sales, COUNT(orders.id) as order_count").
-		Joins("LEFT JOIN orders ON orders.merchant_id = merchants.id").
+		Joins("LEFT JOIN orders ON orders.merchant_id = merchants.id AND orders.status NOT IN ('cancelled', 'refunded')").
 		Group("merchants.id, merchants.store_name, merchants.total_sales").
 		Order("merchants.total_sales DESC").
 		Limit(10).
