@@ -87,28 +87,28 @@ func AutoSeedCriticalData(db *gorm.DB) {
 	seedDefaultRoles(db)
 
 	// [AkuGlow Products] Auto-seed products from official store
-	SeedAkuglowProducts(db)
+	// SeedAkuglowProducts(db)
 
 	// [Skin Journey] Auto-seed COMPLETE programs, steps, and flow configurations
-	SeedSkinJourneyComplete(db)
+	// SeedSkinJourneyComplete(db)
 
 	// [Blog Posts] Auto-seed news
-	seedBlogs(db)
+	// seedBlogs(db)
 
 	// [Home Banners] Auto-seed slider
-	seedBanners(db)
+	// seedBanners(db)
 
 	// [Merchants] Auto-seed at least 1 merchant for testing
-	SeedMerchants(db)
+	// SeedMerchants(db)
 
 	// Sync existing images to Media Library
-	SyncExistingImagesToMediaLibrary(db)
+	// SyncExistingImagesToMediaLibrary(db)
 
 	// [Auto-Heal] Audit and repair roles, slugs, and wallets
 	HealAndSyncDatabase(db)
 
 	// [Demographics] Auto-seed mock demographics data if table is empty
-	SeedDemographics(db)
+	// SeedDemographics(db)
 
 	// [Finance] We no longer auto-seed high-fidelity finance data here to avoid startup lag.
 	// Use 'go run cmd/seeder/main.go' for that.
