@@ -19,7 +19,77 @@ func HealAndSyncDatabase(db *gorm.DB) {
 	HealAndSyncMerchantWallets(db)
 	HealAndSyncMissingProfiles(db)
 
+	HealAndSyncLegacyData(db)
+
 	log.Println("✅ [AUTO-HEAL] Audit sinkronisasi selesai.")
+}
+
+// HealAndSyncLegacyData runs one-time or recurring patches for legacy database states.
+func HealAndSyncLegacyData(db *gorm.DB) {
+	log.Println("🩹 [AUTO-HEAL] Memulai perbaikan data legacy (Stock, Images, Hold Days, Biteship)...")
+
+	// [Stock Sync Heal] Sync GORM products/variants stock with actual Central Warehouse Inventory
+	if err := db.Exec(`
+		UPDATE product_variants pv
+		SET stock = COALESCE(
+			(SELECT inv.stock FROM inventories inv
+			 WHERE inv.product_id = pv.product_id 
+			   AND inv.product_variant_id = pv.id 
+			   AND inv.merchant_id = '00000000-0000-0000-0000-000000000000'), 0)
+	`).Error; err != nil {
+		log.Printf("⚠️ Failed to heal product_variants stock: %v", err)
+	}
+	if err := db.Exec(`
+		UPDATE products p
+		SET stock = COALESCE(
+			(SELECT SUM(pv.stock) FROM product_variants pv WHERE pv.product_id = p.id), 0)
+		WHERE (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) > 0
+	`).Error; err != nil {
+		log.Printf("⚠️ Failed to heal aggregated products stock: %v", err)
+	}
+	if err := db.Exec(`
+		UPDATE products p
+		SET stock = COALESCE(
+			(SELECT inv.stock FROM inventories inv
+			 WHERE inv.product_id = p.id 
+			   AND inv.product_variant_id IS NULL 
+			   AND inv.merchant_id = '00000000-0000-0000-0000-000000000000'), 0)
+		WHERE (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id) = 0
+	`).Error; err != nil {
+		log.Printf("⚠️ Failed to heal base products stock: %v", err)
+	}
+
+	// Patch existing order items to populate product_image_url from products table
+	if err := db.Exec("UPDATE order_items SET product_image_url = (SELECT image FROM products WHERE products.id = order_items.product_id) WHERE product_image_url = '' OR product_image_url IS NULL").Error; err != nil {
+		log.Printf("⚠️ Failed to patch product_image_url: %v", err)
+	}
+
+	// [Financial Sync] Force set all existing membership tiers hold days to 0
+	if err := db.Exec("UPDATE membership_tiers SET commission_hold_days = 0 WHERE commission_hold_days > 0").Error; err != nil {
+		log.Printf("⚠️ Failed to patch membership_tiers commission_hold_days: %v", err)
+	}
+
+	// [Referral Code Sync] Force uppercase all existing referral codes & references
+	if err := db.Exec("UPDATE affiliate_members SET ref_code = UPPER(ref_code), upline_code = UPPER(upline_code)").Error; err != nil {
+		log.Printf("⚠️ Failed to patch affiliate_members ref_code uppercase: %v", err)
+	}
+	if err := db.Exec("UPDATE orders SET affiliate_ref_code = UPPER(affiliate_ref_code) WHERE affiliate_ref_code IS NOT NULL").Error; err != nil {
+		log.Printf("⚠️ Failed to patch orders affiliate_ref_code uppercase: %v", err)
+	}
+
+	// Patch standard Biteship Area IDs to fully-qualified ones (with IDZ suffix)
+	if err := db.Exec("UPDATE merchants SET biteship_area_id = 'IDNP6IDNC147IDND829IDZ10110' WHERE biteship_area_id = 'IDNP6IDNC147IDND829'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch merchant area id: %v", err)
+	}
+	if err := db.Exec("UPDATE platform_configs SET value = 'IDNP6IDNC147IDND829IDZ10110' WHERE key = 'default_biteship_area_id' AND value = 'IDNP6IDNC147IDND829'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch default platform config area id: %v", err)
+	}
+	if err := db.Exec("UPDATE user_profiles SET area_id = 'IDNP6IDNC147IDND829IDZ10110' WHERE area_id = 'IDNP6IDNC147IDND829'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch user profile Gambir area id: %v", err)
+	}
+	if err := db.Exec("UPDATE user_profiles SET area_id = 'IDNP9IDNC105IDND171IDZ45171' WHERE area_id = 'IDNP9IDNC105IDND171'").Error; err != nil {
+		log.Printf("⚠️ Failed to patch user profile Cirebon area id: %v", err)
+	}
 }
 
 // HealAndSyncMerchantSlugs checks and ensures every merchant has a valid unique slug.
