@@ -4164,12 +4164,51 @@ func (ac *AdminController) ExportReport(w http.ResponseWriter, r *http.Request) 
 func (ac *AdminController) GetBlogs(w http.ResponseWriter, r *http.Request) {
 	var blogs []models.BlogPost
 	status := r.URL.Query().Get("status")
-	query := ac.DB.Order("created_at DESC")
+	search := r.URL.Query().Get("search")
+	category := r.URL.Query().Get("category")
+	
+	page := utils.QueryInt(r, "page", 1)
+	limit := utils.QueryInt(r, "limit", 10)
+	offset := (page - 1) * limit
+
+	query := ac.DB.Model(&models.BlogPost{})
+	
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-	query.Find(&blogs)
-	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"data": blogs})
+	if category != "" {
+		query = query.Where("category = ?", category)
+	}
+	if search != "" {
+		likeSearch := "%" + search + "%"
+		query = query.Where("title ILIKE ? OR summary ILIKE ? OR content ILIKE ?", likeSearch, likeSearch, likeSearch)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	sortField := r.URL.Query().Get("sort")
+	order := r.URL.Query().Get("order")
+	if sortField != "" {
+		if order == "" {
+			order = "asc"
+		}
+		// Basic sanitization
+		sortField = strings.ReplaceAll(sortField, ";", "")
+		order = strings.ReplaceAll(order, ";", "")
+		query = query.Order(sortField + " " + order)
+	} else {
+		query = query.Order("created_at DESC")
+	}
+
+	query.Limit(limit).Offset(offset).Find(&blogs)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"data":  blogs,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 func (ac *AdminController) GetPublicBlogDetail(w http.ResponseWriter, r *http.Request) {

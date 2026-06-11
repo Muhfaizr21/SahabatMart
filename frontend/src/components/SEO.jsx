@@ -10,7 +10,7 @@ const SEO = ({
   description, 
   name = "AkuGlow", 
   type = "website", 
-  image = "/akuglow.jpg", 
+  image = "/akuglow.webp", 
   url = window.location.href,
   schema = null,
   noindex = false

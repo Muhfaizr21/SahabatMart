@@ -59,7 +59,7 @@ export default function BlogDetailPage() {
       "name": "AkuGlow",
       "logo": {
         "@type": "ImageObject",
-        "url": `${window.location.origin}/akuglow.jpg`
+        "url": `${window.location.origin}/akuglow.webp`
       }
     },
     "datePublished": blog.created_at,

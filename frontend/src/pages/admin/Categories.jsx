@@ -399,7 +399,7 @@ export default function AdminCategories() {
                     <FieldLabel>Atau masukkan URL Foto</FieldLabel>
                     <input 
                       style={{ ...A.select, width: '100%' }} 
-                      placeholder="https://example.com/kategori.jpg" 
+                      placeholder="https://example.com/kategori.webp" 
                       value={modal.image || ''} 
                       onChange={e => setModal(p => ({ ...p, image: e.target.value }))} 
                     />

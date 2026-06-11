@@ -233,8 +233,8 @@ export default function AdminBrands() {
                 <input style={{ ...A.select, width: '100%' }} placeholder="Misal: Apple, Samsung" value={modal.name} onChange={e => setModal(p => ({ ...p, name: e.target.value }))} required />
               </div>
               <div>
-                <FieldLabel>URL Logo (.png/.webp)</FieldLabel>
-                <input style={{ ...A.select, width: '100%' }} placeholder="https://link-logo.com/image.png" value={modal.logo_url} onChange={e => setModal(p => ({ ...p, logo_url: e.target.value }))} />
+                <FieldLabel>URL Logo (.webp/.webp)</FieldLabel>
+                <input style={{ ...A.select, width: '100%' }} placeholder="https://link-logo.com/image.webp" value={modal.logo_url} onChange={e => setModal(p => ({ ...p, logo_url: e.target.value }))} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f8fafc', borderRadius: 11 }}>
                 <input type="checkbox" id="featuredBrand" checked={modal.is_featured} onChange={e => setModal(p => ({ ...p, is_featured: e.target.checked }))} style={{ width: 16, height: 16 }} />

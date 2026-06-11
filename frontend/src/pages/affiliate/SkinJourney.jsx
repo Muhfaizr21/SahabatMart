@@ -319,7 +319,7 @@ export default function SkinJourney() {
 
         toast.loading('Menganalisis dengan AI AkuGlow...', { id: 'ai-analyze' });
         const formData = new FormData();
-        formData.append('photo', processedBlob, 'processed_selfie.jpg');
+        formData.append('photo', processedBlob, 'processed_selfie.webp');
         
         const token = localStorage.getItem('token');
         const aiRes = await fetch(`${API_BASE}/api/skin/analyze`, {
@@ -456,8 +456,8 @@ export default function SkinJourney() {
       
       const link = document.createElement('a');
       const fileName = activeCertificate 
-        ? `Sertifikat-${activeCertificate.program_name}-${new Date().getTime()}.png`
-        : `Sertifikat-SkinJourney-${new Date().getTime()}.png`;
+        ? `Sertifikat-${activeCertificate.program_name}-${new Date().getTime()}.webp`
+        : `Sertifikat-SkinJourney-${new Date().getTime()}.webp`;
         
       link.download = fileName;
       link.href = dataUrl;

@@ -9,7 +9,7 @@ export default function DiagnosticCTA() {
       
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="bg-gradient-to-br from-rose-600 via-rose-700 to-black rounded-[3rem] p-8 md:p-16 overflow-hidden relative border border-white/10 shadow-2xl">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.webp')] opacity-10"></div>
           
           <div className="flex flex-col lg:flex-row items-center justify-between gap-12 relative z-10">
             <div className="flex-1 text-center lg:text-left">
@@ -35,7 +35,7 @@ export default function DiagnosticCTA() {
             <div className="flex-1 relative hidden lg:block">
               <div className="relative z-10 rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/20">
                 <img 
-                  src="/skincare_diagnostic.png" 
+                  src="/skincare_diagnostic.webp" 
                   alt="Skin Care Diagnostic" 
                   className="w-full h-auto"
                 />

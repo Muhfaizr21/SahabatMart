@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"akuglow/backend/models"
 	"akuglow/backend/routes"
@@ -27,7 +28,9 @@ func ConnectDB() {
 		log.Fatal("❌ Gagal terhubung ke database:", err)
 	}
 
-	DB.AutoMigrate(
+	if getEnv("APP_ENV", "development") != "production" {
+		log.Println("🛠️  Running database AutoMigrate...")
+		DB.AutoMigrate(
 		&models.User{}, &models.UserProfile{}, &models.Media{},
 		&models.Merchant{}, &models.AffiliateMember{}, &models.MembershipTier{},
 		&models.Category{}, &models.Product{}, &models.ProductVariant{}, &models.ProductTierCommission{},
@@ -68,8 +71,10 @@ func ConnectDB() {
 		&models.FinanceRevenueAllocation{}, &models.FinancialLocation{}, &models.MoneyMutation{},
 		// Demographics models
 		&models.UserLocationLog{}, &models.IPLocationCache{},
-	)
-	
+		)
+	} else {
+		log.Println("⚡ Production mode: AutoMigrate disabled")
+	}
 }
 
 func buildDSN() string {
@@ -127,7 +132,16 @@ func main() {
 	mux.Handle("/", handler)
 
 	port := getEnv("PORT", "8080")
+
+	srv := &http.Server{
+		Addr:         ":" + port,
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
 	log.Printf("🚀 Server running on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(srv.ListenAndServe())
 }
 

@@ -27,17 +27,17 @@ const CourierLogo = ({ code, name, customLogo }) => {
   const config = brandConfigs[codeLower] || { bg: 'bg-gray-100', text: 'text-gray-700 font-bold', label: name?.substring(0, 3).toUpperCase() };
 
   const logoUrls = {
-    jne: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254395932-EPH35E5BOM3KKP4T5JEX/JNE.png',
-    sicepat: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255745749-V7618DUMF5V4QZ754F8E/Sicepat.png',
-    jnt: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254580340-VCPW4U4JURCOQ416S4L3/J%26T.png',
-    anteraja: 'https://seeklogo.com/images/A/anteraja-logo-E9D58E2E10-seeklogo.com.png',
-    pos: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256334547-0639I72O4A81X941V8W8/Pos+Indonesia.png',
-    tiki: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256247348-QO1O633519Y2K9G67LCH/Tiki.png',
-    lion: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255956749-C14Y4J3L9X29N9P1T8W8/Lion+Parcel.png',
-    sap: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256087547-4W2N3639O4169P1T8W8/SAP+Express.png',
-    idexpress: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256447547-4W2N3639O4169P1T8W8/ID+Express.png',
-    sentral: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256157547-4W2N3639O4169P1T8W8/Sentral+Cargo.png',
-    rpx: 'https://seeklogo.com/images/R/rpx-holding-logo-2CC70A5E04-seeklogo.com.png',
+    jne: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254395932-EPH35E5BOM3KKP4T5JEX/JNE.webp',
+    sicepat: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255745749-V7618DUMF5V4QZ754F8E/Sicepat.webp',
+    jnt: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254580340-VCPW4U4JURCOQ416S4L3/J%26T.webp',
+    anteraja: 'https://seeklogo.com/images/A/anteraja-logo-E9D58E2E10-seeklogo.com.webp',
+    pos: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256334547-0639I72O4A81X941V8W8/Pos+Indonesia.webp',
+    tiki: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256247348-QO1O633519Y2K9G67LCH/Tiki.webp',
+    lion: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255956749-C14Y4J3L9X29N9P1T8W8/Lion+Parcel.webp',
+    sap: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256087547-4W2N3639O4169P1T8W8/SAP+Express.webp',
+    idexpress: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256447547-4W2N3639O4169P1T8W8/ID+Express.webp',
+    sentral: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256157547-4W2N3639O4169P1T8W8/Sentral+Cargo.webp',
+    rpx: 'https://seeklogo.com/images/R/rpx-holding-logo-2CC70A5E04-seeklogo.com.webp',
   };
 
   const imageUrl = customLogo ? formatImage(customLogo) : logoUrls[codeLower];

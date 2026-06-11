@@ -1336,9 +1336,9 @@ export default function AdminEditProduct() {
               {variants.map(v => (
                 <tr key={v.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '14px 8px 14px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <img src={v.image || '/placeholder-product.png'} alt={v.name}
+                    <img src={v.image || '/placeholder-product.webp'} alt={v.name}
                       style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', background: '#f1f5f9' }}
-                      onError={e => e.target.src = '/placeholder-product.png'} />
+                      onError={e => e.target.src = '/placeholder-product.webp'} />
                     <div>
                       <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>{v.name}</div>
                       <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -1905,9 +1905,9 @@ export default function AdminEditProduct() {
             <div className="ep-modal-grid">
               {/* Image Selector */}
               <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', padding: 12, borderRadius: 12 }}>
-                <img src={newVariant.image || '/placeholder-product.png'} alt="Preview"
+                <img src={newVariant.image || '/placeholder-product.webp'} alt="Preview"
                   style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover', background: '#fff', border: '1.5px solid #e2e8f0' }}
-                  onError={e => e.target.src = '/placeholder-product.png'} />
+                  onError={e => e.target.src = '/placeholder-product.webp'} />
                 <div>
                   <button type="button" onClick={() => { setMediaType('variant_image_new'); setMediaOpen(true); }}
                     style={{ padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginBottom: 4 }}>
@@ -2092,9 +2092,9 @@ export default function AdminEditProduct() {
             <div className="ep-modal-grid">
               {/* Image Selector */}
               <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', padding: 12, borderRadius: 12 }}>
-                <img src={editingVariant.image || '/placeholder-product.png'} alt="Preview"
+                <img src={editingVariant.image || '/placeholder-product.webp'} alt="Preview"
                   style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover', background: '#fff', border: '1.5px solid #e2e8f0' }}
-                  onError={e => e.target.src = '/placeholder-product.png'} />
+                  onError={e => e.target.src = '/placeholder-product.webp'} />
                 <div>
                   <button type="button" onClick={() => { setMediaType('variant_image_edit'); setMediaOpen(true); }}
                     style={{ padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginBottom: 4 }}>

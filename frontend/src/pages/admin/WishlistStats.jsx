@@ -79,6 +79,7 @@ export default function WishlistStats() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState({});
   const [modal, setModal] = useState(null);
+  const [search, setSearch] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -90,13 +91,18 @@ export default function WishlistStats() {
 
   useEffect(() => { load(); }, []);
 
+  const filteredStats = stats.filter(s => 
+    s.product_name?.toLowerCase().includes(search.toLowerCase()) || 
+    s.store_name?.toLowerCase().includes(search.toLowerCase())
+  );
+
   const selCount = Object.values(selected).filter(Boolean).length;
-  const allSel = selCount === stats.length && stats.length > 0;
+  const allSel = selCount === filteredStats.length && filteredStats.length > 0;
 
   const toggleSel = (id) => setSelected(p => ({ ...p, [id]: !p[id] }));
   const toggleAll = () => {
     if (allSel) return setSelected({});
-    const o = {}; stats.forEach(s => { o[s.product_id] = true }); setSelected(o);
+    const o = {}; filteredStats.forEach(s => { o[s.product_id] = true }); setSelected(o);
   };
 
   const fmtUsers = (names) => {
@@ -166,9 +172,22 @@ export default function WishlistStats() {
       <TablePanel
         loading={loading}
         toolbar={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', width: '100%' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 300 }}>
+              <i className="bx bx-search" style={{ position: 'absolute', left: 12, top: 10, color: '#94a3b8' }} />
+              <input 
+                type="text" 
+                placeholder="Cari produk atau merchant..." 
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px 12px 8px 36px', borderRadius: 8,
+                  border: '1px solid #e2e8f0', fontSize: 13, outline: 'none'
+                }}
+              />
+            </div>
             <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
-              {stats.length} produk
+              {filteredStats.length} produk
             </span>
             {selCount > 0 && (
               <>
@@ -213,12 +232,12 @@ export default function WishlistStats() {
               </tr>
             </thead>
             <tbody>
-              {stats.length === 0 ? (
+              {filteredStats.length === 0 ? (
                 <tr><td colSpan={8} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
                   <i className="bx bx-heart" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.3 }} />
-                  Belum ada data wishlist
+                  Belum ada data wishlist sesuai pencarian
                 </td></tr>
-              ) : stats.map((s, i) => {
+              ) : filteredStats.map((s, i) => {
                 const pct = Math.min(100, (s.count / maxC) * 100);
                 const barBg = pct > 70 ? 'linear-gradient(90deg, #ec4899, #db2777)' : pct > 30 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #94a3b8, #64748b)';
                 return (

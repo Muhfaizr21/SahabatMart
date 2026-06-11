@@ -62,7 +62,7 @@ export default function InvoicePage() {
         <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-10 border-b-4 border-gray-50 pb-8">
           <div className="w-full sm:w-auto">
             <div className="flex items-center gap-3 mb-4">
-              <img src="/akuglow.jpg" alt="AkuGlow" className="h-12 w-auto object-contain" />
+              <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
             </div>
             <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Diterbitkan Oleh</p>
             <p className="font-black text-gray-900 text-sm sm:text-base">PT AkuGlow Mart Indonesia</p>

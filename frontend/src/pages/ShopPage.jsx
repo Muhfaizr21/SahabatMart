@@ -196,39 +196,23 @@ export default function ShopPage() {
         type="website"
       />
       {/* Mobile Sticky Filter & Search Bar */}
-      <div className="lg:hidden sticky top-[104px] z-40 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
+      <div className="lg:hidden relative bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
         <div className="flex flex-col">
-          {/* Category Pills Slider */}
-          <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto no-scrollbar scroll-smooth border-b border-gray-50">
-            {allCategories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-5 py-2 rounded-full text-[11px] font-extrabold whitespace-nowrap transition-all border ${activeCategory === cat
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
-                    : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300'
-                  }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
           {/* Search & Filter Controls */}
-          <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-3 px-4 pt-4 pb-2">
             <div className="relative flex-1 group">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg font-bold group-focus-within:text-blue-500 transition-colors">search</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg group-focus-within:text-gray-900 transition-colors">search</span>
               <input
                 type="text"
                 placeholder="Cari produk..."
-                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:bg-white focus:border-blue-500 transition-all text-xs font-bold"
+                className="w-full pl-11 pr-10 py-2.5 bg-gray-100/80 border-none rounded-2xl outline-none focus:bg-gray-100 focus:ring-2 focus:ring-gray-200 transition-all text-sm font-medium text-gray-900 placeholder-gray-500"
                 value={searchTerm}
                 onChange={(e) => handleLocalSearch(e.target.value)}
               />
               {searchTerm && (
                 <button
                   onClick={() => handleLocalSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-900 p-1"
                 >
                   <span className="material-symbols-outlined text-sm font-bold">close</span>
                 </button>
@@ -236,11 +220,27 @@ export default function ShopPage() {
             </div>
             <button
               onClick={() => setIsMobileFilterOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 shadow-sm active:scale-95 transition-all"
+              className="flex items-center justify-center w-[44px] h-[44px] rounded-2xl bg-gray-900 text-white shadow-md active:scale-95 transition-all flex-shrink-0"
+              aria-label="Filter"
             >
-              <span className="material-symbols-outlined text-sm">tune</span>
-              Filter
+              <span className="material-symbols-outlined text-[20px]">tune</span>
             </button>
+          </div>
+
+          {/* Category Pills Slider */}
+          <div className="flex items-center gap-2.5 px-4 py-3 overflow-x-auto no-scrollbar scroll-smooth">
+            {allCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-5 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition-all ${activeCategory === cat
+                    ? 'bg-gray-900 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900'
+                  }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
       </div>

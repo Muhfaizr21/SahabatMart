@@ -251,7 +251,7 @@ const AffiliateLayout = () => {
       {/* Logo */}
       <div className={`px-6 py-8 flex items-center ${(!sidebarOpen && !isMobile) ? 'justify-center' : 'justify-between'} sticky top-0 bg-[#0c1324] z-10 whitespace-nowrap overflow-hidden transition-all duration-300 border-b border-white/5`}>
         {(sidebarOpen || isMobile) ? (
-          <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain brightness-110" />
+          <img src="/akuglow.webp" alt="AkuGlow" className="h-10 w-auto object-contain brightness-110" />
         ) : (
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
              <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />

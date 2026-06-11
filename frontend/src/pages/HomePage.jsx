@@ -29,7 +29,7 @@ const HomePage = () => {
     "name": "AkuGlow",
     "alternateName": "AkuGlow Premium",
     "url": siteUrl,
-    "logo": `${siteUrl}/akuglow.jpg`,
+    "logo": `${siteUrl}/akuglow.webp`,
     "sameAs": [
       "https://facebook.com/akuglow",
       "https://instagram.com/akuglow"

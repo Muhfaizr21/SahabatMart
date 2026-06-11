@@ -102,7 +102,7 @@ export default function RegisterPage() {
           {/* Middle Row - Slogan & Logo */}
           <div className="relative z-10 my-10 lg:my-auto">
             <div className="mb-8">
-              <img src="/akuglow.jpg" alt="AkuGlow" className="h-12 w-auto object-contain" />
+              <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
             </div>
 
             <div className="space-y-4">

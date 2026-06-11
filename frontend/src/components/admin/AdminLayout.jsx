@@ -297,7 +297,7 @@ const AdminLayout = () => {
           display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
         }}>
           {!collapsed ? (
-            <img src="/akuglow.jpg" alt="AkuGlow" style={{ height: 36, width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            <img src="/akuglow.webp" alt="AkuGlow" style={{ height: 36, width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
           ) : (
             <div style={{
               width: 36, height: 36, borderRadius: 10, flexShrink: 0,

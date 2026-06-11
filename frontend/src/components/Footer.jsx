@@ -11,7 +11,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <img src="/akuglow.jpg" alt="AkuGlow" className="h-10 w-auto object-contain brightness-200" />
+              <img src="/akuglow.webp" alt="AkuGlow" className="h-10 w-auto object-contain brightness-200" />
             </div>
             <p className="text-sm leading-relaxed mb-6 max-w-xs">
               Toko kecantikan dan kesehatan terpercaya dengan produk berkualitas dan harga bersahabat untuk semua kebutuhan kamu.

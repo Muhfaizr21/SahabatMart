@@ -2,12 +2,17 @@ package services
 
 import (
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/chai2010/webp"
 )
 
 type StorageService struct {
@@ -54,7 +59,15 @@ func (s *StorageService) SaveImage(file multipart.File, header *multipart.FileHe
 	if !allowed[ext] {
 		return "", fmt.Errorf("ekstensi file tidak diizinkan: %s", ext)
 	}
-	filename := fmt.Sprintf("%d-%s%s", time.Now().Unix(), strings.TrimSuffix(strings.ReplaceAll(header.Filename, " ", "_"), ext), ext)
+
+	isImageToConvert := ext == ".jpg" || ext == ".jpeg" || ext == ".png"
+	finalExt := ext
+	if isImageToConvert {
+		finalExt = ".webp"
+	}
+
+	baseName := strings.TrimSuffix(strings.ReplaceAll(header.Filename, " ", "_"), ext)
+	filename := fmt.Sprintf("%d-%s%s", time.Now().Unix(), baseName, finalExt)
 	filePath := filepath.Join(s.UploadDir, filename)
 
 	out, err := os.Create(filePath)
@@ -63,8 +76,24 @@ func (s *StorageService) SaveImage(file multipart.File, header *multipart.FileHe
 	}
 	defer out.Close()
 
-	if _, err = io.Copy(out, file); err != nil {
-		return "", err
+	if isImageToConvert {
+		// Reset file pointer to beginning
+		file.Seek(0, 0)
+		img, _, err := image.Decode(file)
+		if err != nil {
+			return "", fmt.Errorf("gagal membaca gambar: %v", err)
+		}
+		// Encode to webp
+		err = webp.Encode(out, img, &webp.Options{Lossless: false, Quality: 85})
+		if err != nil {
+			return "", fmt.Errorf("gagal mengkonversi ke webp: %v", err)
+		}
+	} else {
+		// Reset file pointer to beginning just in case
+		file.Seek(0, 0)
+		if _, err = io.Copy(out, file); err != nil {
+			return "", err
+		}
 	}
 
 	// Clean base URL to prevent double slashes

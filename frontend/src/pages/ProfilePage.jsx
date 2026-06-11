@@ -21,7 +21,7 @@ export default function ProfilePage() {
         backgroundColor: '#ffffff',
       });
       const link = document.createElement('a');
-      link.download = `AkuGlow-Member-${userData.id.substring(0, 8)}.png`;
+      link.download = `AkuGlow-Member-${userData.id.substring(0, 8)}.webp`;
       link.href = dataUrl;
       link.click();
     } catch (_err) {

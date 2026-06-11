@@ -271,7 +271,7 @@ export default function AffiliateLinks() {
       try {
         const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
-        link.download = `Referral-Card-${refCode}.png`;
+        link.download = `Referral-Card-${refCode}.webp`;
         link.href = dataUrl;
         link.click();
         toast('Kartu Referral berhasil diunduh!');
@@ -367,7 +367,7 @@ export default function AffiliateLinks() {
 
             {/* AkuGlow Brand Logo */}
             <img 
-              src="/akuglow.jpg" 
+              src="/akuglow.webp" 
               alt="AkuGlow Logo" 
               className="h-10 w-auto object-contain brightness-110 mb-6 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]" 
             />

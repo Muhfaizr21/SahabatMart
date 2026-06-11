@@ -129,7 +129,7 @@ const MerchantLayout = () => {
       {/* Sidebar Navigation */}
       <aside className={`h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-50 border-r border-slate-200/60 flex flex-col py-8 px-6 space-y-2 z-50 transition-all duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="mb-10 px-2 flex items-center justify-between">
-            <img src="/akuglow.jpg" alt="AkuGlow" className="h-12 w-auto object-contain" />
+            <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
           </div>
 
         <nav className="flex-1 space-y-1">

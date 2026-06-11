@@ -67,7 +67,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
           {/* Top-Left: AkuGlow Logo Badge */}
           <div className="bg-transparent flex items-center justify-center">
             <img 
-              src="/akuglow.jpg" 
+              src="/akuglow.webp" 
               alt="AkuGlow" 
               className="w-auto object-contain"
               style={{

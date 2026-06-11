@@ -44,7 +44,7 @@ export default function AboutMission() {
             
             <div className="relative z-10 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-rose-600/10 border-8 border-white">
               <img 
-                src="/skincare_ingredients.png" 
+                src="/skincare_ingredients.webp" 
                 alt="AkuGlow Ingredients" 
                 className="w-full h-auto object-cover"
               />
