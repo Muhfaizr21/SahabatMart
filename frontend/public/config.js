@@ -12,10 +12,11 @@
  *
  * CARA PAKAI DI SERVER:
  * 1. Buka file ini di server: nano /var/www/akuglow/config.js
- * 2. Ganti nilai API_BASE ke URL backend production kamu
+ * 2. Ganti API_BASE & SITE_URL sesuai domain production kamu
  * 3. Simpan — perubahan langsung aktif tanpa rebuild!
  */
 window.APP_CONFIG = {
   API_BASE: 'http://localhost:8080',
+  SITE_URL: 'http://localhost:5173',
 };
 

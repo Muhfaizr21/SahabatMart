@@ -2,12 +2,13 @@
  * Priority chain for API base URL:
  * 1. window.APP_CONFIG.API_BASE  ← dari /public/config.js (bisa diedit di server tanpa rebuild!)
  * 2. import.meta.env.VITE_API_BASE ← dari .env / .env.production (baked saat build)
- * 3. 'http://localhost:8080'     ← fallback development
+ * 3. window.location.origin       ← fallback: same-origin (cocok utk production deployment barengan)
  *
  * Untuk ganti URL di server: edit file /config.js di folder dist, TIDAK perlu rebuild!
  */
 function resolveApiBase() {
   let base = '';
+
   // Runtime config — highest priority (editable on server without rebuild)
   if (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.API_BASE) {
     base = window.APP_CONFIG.API_BASE.replace(/\/+$/, '');
@@ -15,21 +16,19 @@ function resolveApiBase() {
     base = import.meta.env.VITE_API_BASE.replace(/\/+$/, '');
   }
 
-  // Localhost Optimization: If page is loaded on localhost/127.0.0.1 and API base is an ngrok URL,
-  // use http://localhost:8080 directly to bypass ngrok restrictions, HTML warnings, and range limits.
+  // Localhost Optimization: If page is loaded on localhost and API base is an ngrok URL,
+  // override to http://localhost:8080 for speed (no ngrok latency).
   if (typeof window !== 'undefined' && window.location) {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocal && base.includes('ngrok-free.dev')) {
-      if (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://api.akuglow.com';
-  }
-  return 'http://localhost:8080';
+    if (isLocal && (!base || base.includes('ngrok-free.dev'))) {
+      base = 'http://localhost:8080';
     }
   }
 
-  if (base && base !== '/') return base;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://api.akuglow.com';
+  // Fallback: same-origin (FE & BE behind same domain/port)
+  if (base) return base;
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.origin;
   }
   return 'http://localhost:8080';
 }
@@ -38,6 +37,16 @@ function resolveApiBase() {
 // bukan saat module load. Ini memastikan window.APP_CONFIG sudah ter-set.
 export function getApiBase() {
   return resolveApiBase();
+}
+
+export function getSiteUrl() {
+  if (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.SITE_URL) {
+    return window.APP_CONFIG.SITE_URL.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.origin;
+  }
+  return 'http://localhost:5173';
 }
 const RAW_API_BASE = resolveApiBase();
 export const API_BASE = RAW_API_BASE;

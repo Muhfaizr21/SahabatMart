@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchJson, ADMIN_API_BASE } from '../../lib/api';
+import { fetchJson, ADMIN_API_BASE, getSiteUrl } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 const API = ADMIN_API_BASE;
@@ -237,7 +237,7 @@ export default function WebsiteDisplay() {
                 </div>
                 <div className="flex-1 max-w-lg mx-auto h-8 bg-slate-900/80 rounded-xl flex items-center px-4 gap-3">
                   <i className='bx bx-globe text-slate-600'></i>
-                  <span className="text-[11px] text-slate-500 font-bold truncate tracking-tight">https://akuglow.com/id/live-designer</span>
+                  <span className="text-[11px] text-slate-500 font-bold truncate tracking-tight">{getSiteUrl()}/id/live-designer</span>
                 </div>
               </div>
 

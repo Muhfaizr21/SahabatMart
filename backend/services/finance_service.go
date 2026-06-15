@@ -3,6 +3,7 @@ package services
 import (
 	"akuglow/backend/models"
 	"akuglow/backend/repositories"
+	"akuglow/backend/utils"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -194,6 +195,9 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 		isPending = true
 	}
 
+	// [BUG-M3 Fix] Round all money values to prevent float64 accumulation error
+	amount = utils.RoundMoney(amount)
+
 	if txType == models.TxShoppingPayment {
 		wallet.ShoppingBalance += amount // amount should be negative for payments
 	} else if isPending {
@@ -205,6 +209,12 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 	if amount > 0 {
 		wallet.TotalEarned += amount
 	}
+
+	// Round wallet balances
+	wallet.Balance = utils.RoundMoney(wallet.Balance)
+	wallet.PendingBalance = utils.RoundMoney(wallet.PendingBalance)
+	wallet.ShoppingBalance = utils.RoundMoney(wallet.ShoppingBalance)
+	wallet.TotalEarned = utils.RoundMoney(wallet.TotalEarned)
 
 	if err := tx.Save(&wallet).Error; err != nil {
 		return err
@@ -305,8 +315,8 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 				withdrawPct := configSvc.GetFloat("affiliate_withdraw_pct", 70) / 100.0
 				shoppingPct := configSvc.GetFloat("affiliate_shopping_pct", 30) / 100.0
 
-				withdrawableAmt := txn.Amount * withdrawPct
-				shoppingAmt := txn.Amount * shoppingPct
+				withdrawableAmt := utils.RoundMoney(txn.Amount * withdrawPct)
+				shoppingAmt := utils.RoundMoney(txn.Amount * shoppingPct)
 
 				wallet.PendingBalance -= txn.Amount
 				wallet.Balance += withdrawableAmt
@@ -413,17 +423,50 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 				withdrawPct := configSvc.GetFloat("affiliate_withdraw_pct", 70) / 100.0
 				shoppingPct := configSvc.GetFloat("affiliate_shopping_pct", 30) / 100.0
 
-				wallet.Balance -= txn.Amount * withdrawPct
-				wallet.ShoppingBalance -= txn.Amount * shoppingPct
+				deductBalance := utils.RoundMoney(txn.Amount * withdrawPct)
+				deductShopping := txn.Amount * shoppingPct
+
+				// [BUG-H2 Fix] Guard negative balance — jangan sampai wallet minus
+				if wallet.Balance < deductBalance {
+					deductBalance = wallet.Balance
+				}
+				if wallet.ShoppingBalance < deductShopping {
+					deductShopping = wallet.ShoppingBalance
+				}
+				// Catat selisih yang tidak bisa dipulihkan sebagai kerugian
+				shortfall := (txn.Amount * withdrawPct) - deductBalance + (txn.Amount * shoppingPct) - deductShopping
+				if shortfall > 0 {
+					log.Printf("⚠️ [REVERSE-SHORTFALL] Wallet %s (%s) shortfall Rp %.2f — dana sudah ditarik affiliate", wallet.ID, wallet.OwnerID, shortfall)
+				}
+
+				wallet.Balance -= deductBalance
+				wallet.ShoppingBalance -= deductShopping
 			} else {
-				wallet.Balance -= txn.Amount
+				deductAmount := txn.Amount
+				if wallet.Balance < deductAmount {
+					deductAmount = wallet.Balance
+					log.Printf("⚠️ [REVERSE-SHORTFALL] Wallet %s (%s) balance insufficient — partial reversal Rp %.2f dari Rp %.2f", wallet.ID, wallet.OwnerID, wallet.Balance, txn.Amount)
+				}
+				wallet.Balance -= deductAmount
 			}
 		} else {
-			wallet.PendingBalance -= txn.Amount
+			deductPending := txn.Amount
+			if wallet.PendingBalance < deductPending {
+				deductPending = wallet.PendingBalance
+				log.Printf("⚠️ [REVERSE-SHORTFALL] Wallet %s pending balance insufficient — partial reversal Rp %.2f dari Rp %.2f", wallet.ID, txn.Amount, deductPending)
+			}
+			wallet.PendingBalance -= deductPending
 		}
 		
 		if txn.Amount > 0 {
+			prevEarned := wallet.TotalEarned
 			wallet.TotalEarned -= txn.Amount
+			if wallet.TotalEarned < 0 {
+				wallet.TotalEarned = 0
+			}
+			if wallet.TotalEarned != prevEarned-txn.Amount {
+				log.Printf("⚠️ [REVERSE-TOTAL-EARNED] Wallet %s total_earned clamped: %.2f → %.2f (expected reduction: %.2f)", wallet.ID, prevEarned, wallet.TotalEarned, txn.Amount)
+			}
 		}
 
 		if err := tx.Save(&wallet).Error; err != nil {

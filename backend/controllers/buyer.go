@@ -111,7 +111,7 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 	for _, item := range req.Items {
 		mID := item.MerchantID
 		if mID == "" || mID == "pusat" {
-			mID = "00000000-0000-0000-0000-000000000000"
+			mID = models.PusatID
 		}
 		w := item.Weight
 		if w <= 0 {
@@ -247,7 +247,7 @@ func (bc *BuyerController) AddToCart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.MerchantID == "" || req.MerchantID == "pusat" {
-		req.MerchantID = "00000000-0000-0000-0000-000000000000"
+		req.MerchantID = models.PusatID
 	}
 	if req.ProductVariantID == "" {
 		req.ProductVariantID = req.ProductID // Fallback if no variant provided

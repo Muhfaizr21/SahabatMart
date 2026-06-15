@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
 import { A, PageHeader, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
+import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState([]);
@@ -9,6 +10,7 @@ export default function AdminBanners() {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ id: 0, title: '', subtitle: '', badge: '', offer: '', image: '', bg_color: '#3b82f6', link: '/', order: 0, is_active: true });
   const [uploading, setUploading] = useState(false);
+  const [showMediaLib, setShowMediaLib] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -145,23 +147,20 @@ export default function AdminBanners() {
 
                  <div className="col-span-2">
                     <FieldLabel>Asset Image</FieldLabel>
-                    <div style={{ 
+                    <div 
+                        onClick={() => setShowMediaLib(true)}
+                        style={{ 
                         height: 180, borderRadius: 16, border: '2px dashed #e2e8f0', 
                         background: '#f8fafc', display: 'flex', alignItems: 'center', 
-                        justifyContent: 'center', position: 'relative', overflow: 'hidden' 
+                        justifyContent: 'center', position: 'relative', overflow: 'hidden',
+                        cursor: 'pointer'
                     }}>
                        {formData.image ? (
                          <img src={formatImage(formData.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                        ) : (
                          <div style={{ textAlign: 'center', color: '#94a3b8' }}>
                             <i className="bx bx-image-add" style={{ fontSize: 32 }} />
-                            <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>UPLOAD HERO IMAGE</div>
-                         </div>
-                       )}
-                       <input type="file" onChange={handleUpload} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} accept="image/*" />
-                       {uploading && (
-                         <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div className="spinner-border text-primary" />
+                            <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>PILIH / UPLOAD GAMBAR</div>
                          </div>
                        )}
                     </div>
@@ -200,6 +199,16 @@ export default function AdminBanners() {
            </form>
         </Modal>
       )}
+
+      <MediaLibraryModal
+         isOpen={showMediaLib}
+         onClose={() => setShowMediaLib(false)}
+         onSelect={(img) => {
+            setFormData({ ...formData, image: img });
+            setShowMediaLib(false);
+         }}
+         multiple={false}
+      />
 
       <style>{`
         .grid { display: grid; }

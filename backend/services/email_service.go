@@ -1,6 +1,7 @@
 package services
 
 import (
+	"akuglow/backend/models"
 	"fmt"
 	"net/smtp"
 	"os"
@@ -49,13 +50,9 @@ func (s *EmailService) SendEmail(to, subject, body string) error {
 	return nil
 }
 func (s *EmailService) getBaseFrontendURL() string {
-	configSvc := NewConfigService(s.DB)
-	url := configSvc.Get("app_frontend_url", "")
+	url := os.Getenv("FRONTEND_URL")
 	if url == "" {
-		url = os.Getenv("FRONTEND_URL")
-	}
-	if url == "" {
-		url = "https://akuglow.com" // Vite default
+		url = models.FrontendURL
 	}
 	return url
 }

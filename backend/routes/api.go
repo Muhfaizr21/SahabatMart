@@ -506,8 +506,6 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/commissions/category", adminOnly(adminCtrl.ManageCommissions))
 	mux.HandleFunc("/api/admin/commissions/merchant", adminOnly(adminCtrl.ManageMerchantCommissions))
 	mux.HandleFunc("/api/admin/commissions/product", adminOnly(adminCtrl.ManageProductCommissions))
-	mux.HandleFunc("/api/admin/commissions/presets", adminOnly(adminCtrl.ManageCommissionPresets))
-
 	// Product Variants
 	mux.HandleFunc("/api/admin/products/variants", adminOnly(adminCtrl.GetProductVariants))
 	mux.HandleFunc("/api/admin/products/variants/add", adminOnly(adminCtrl.AddProductVariant))
@@ -615,6 +613,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/demographics/stats", adminOnly(demoCtrl.GetDemographicsStats))
 	mux.HandleFunc("/api/admin/demographics/logs", adminOnly(demoCtrl.GetDemographicsLogs))
 	mux.HandleFunc("/api/admin/demographics/geography-list", adminOnly(demoCtrl.GetGeographyList))
+	mux.HandleFunc("/api/admin/demographics/user-distribution", adminOnly(demoCtrl.GetUserDistribution))
 	mux.HandleFunc("/api/admin/demographics/broadcast", superAdminOnly(demoCtrl.BroadcastGeoNotification))
 	mux.HandleFunc("/api/admin/demographics/settings", adminOnly(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {

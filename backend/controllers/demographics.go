@@ -149,9 +149,9 @@ func applyFilters(db *gorm.DB, r *http.Request) *gorm.DB {
 
 	userType := r.URL.Query().Get("user_type")
 	if userType == "guest" {
-		q = q.Where("user_id IS NULL")
+		q = q.Where("user_location_logs.user_id IS NULL")
 	} else if userType == "member" {
-		q = q.Where("user_id IS NOT NULL")
+		q = q.Where("user_location_logs.user_id IS NOT NULL")
 	}
 
 	purchaseStatus := r.URL.Query().Get("purchase_status")
@@ -838,6 +838,9 @@ func (dc *DemographicsController) BroadcastGeoNotification(w http.ResponseWriter
 	// Filter by Role if specified
 	if req.TargetRole != "all" && req.TargetRole != "" {
 		query = query.Where("users.role = ?", req.TargetRole)
+	} else {
+		// Default: Do not send broadcasts to admin/superadmin unless explicitly selected (which they can't anymore)
+		query = query.Where("users.role NOT IN ('admin', 'superadmin')")
 	}
 
 	// Filter by Geography if targets are specified
@@ -888,7 +891,7 @@ func (dc *DemographicsController) BroadcastGeoNotification(w http.ResponseWriter
 	// Send notifications in background using the Notif service dependency
 	go func(users []UserDetail, title, message string) {
 		for _, u := range users {
-			dc.Notif.Push(u.ID, "buyer", "broadcast_geo", title, message, "/notifications")
+			dc.Notif.Push(u.ID, "user", "broadcast_geo", title, message, "")
 		}
 	}(targetUsers, req.Title, req.Message)
 
@@ -902,3 +905,86 @@ func (dc *DemographicsController) BroadcastGeoNotification(w http.ResponseWriter
 	})
 }
 
+// GET /api/admin/demographics/user-distribution
+// Returns distribution of registered users by city and province from their profiles
+func (dc *DemographicsController) GetUserDistribution(w http.ResponseWriter, r *http.Request) {
+	roleFilter := r.URL.Query().Get("role") // e.g. "affiliate", "merchant", "all"
+
+	baseQ := dc.DB.Table("user_profiles").
+		Joins("JOIN users ON users.id = user_profiles.user_id").
+		Where("users.deleted_at IS NULL AND users.status = 'active'")
+
+	if roleFilter != "" && roleFilter != "all" {
+		baseQ = baseQ.Where("users.role = ?", roleFilter)
+	}
+
+	// Total registered users
+	var totalUsers int64
+	baseQ.Count(&totalUsers)
+
+	// By Province
+	type ProvRow struct {
+		Province string `json:"province"`
+		Count    int64  `json:"count"`
+	}
+	var byProvince []ProvRow
+	baseQ.Session(&gorm.Session{}).
+		Select("user_profiles.province, COUNT(*) as count").
+		Where("user_profiles.province IS NOT NULL AND user_profiles.province != ''").
+		Group("user_profiles.province").
+		Order("count DESC").
+		Scan(&byProvince)
+
+	// By City (top 20)
+	type CityRow struct {
+		City     string `json:"city"`
+		Province string `json:"province"`
+		Count    int64  `json:"count"`
+	}
+	var byCity []CityRow
+	baseQ.Session(&gorm.Session{}).
+		Select("user_profiles.city, user_profiles.province, COUNT(*) as count").
+		Where("user_profiles.city IS NOT NULL AND user_profiles.city != ''").
+		Group("user_profiles.city, user_profiles.province").
+		Order("count DESC").
+		Limit(20).
+		Scan(&byCity)
+
+	// Users with no location data
+	var noLocation int64
+	baseQ.Session(&gorm.Session{}).Where("(user_profiles.city IS NULL OR user_profiles.city = '') AND (user_profiles.province IS NULL OR user_profiles.province = '')").Count(&noLocation)
+
+	// List of Users
+	type UserDetail struct {
+		ID       string `json:"id"`
+		FullName string `json:"full_name"`
+		Email    string `json:"email"`
+		Role     string `json:"role"`
+		Province string `json:"province"`
+		City     string `json:"city"`
+	}
+	var usersList []UserDetail
+	// Create a new query for the list to avoid modifying the baseQ state with Where condition
+	listQ := dc.DB.Table("user_profiles").
+		Joins("JOIN users ON users.id = user_profiles.user_id").
+		Where("users.deleted_at IS NULL AND users.status = 'active'")
+		
+	if roleFilter != "" && roleFilter != "all" {
+		listQ = listQ.Where("users.role = ?", roleFilter)
+	}
+	
+	listQ.Select("users.id, user_profiles.full_name, users.email, users.role, user_profiles.province, user_profiles.city").
+		Order("users.created_at DESC").
+		Scan(&usersList)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"data": map[string]interface{}{
+			"total_users":  totalUsers,
+			"by_province":  byProvince,
+			"by_city":      byCity,
+			"no_location":  noLocation,
+			"users_list":   usersList,
+		},
+	})
+}

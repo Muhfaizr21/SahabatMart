@@ -27,18 +27,19 @@ const rawMenu = [
   { type: 'item', name: 'Kasir / POS', icon: 'bxs-calculator', path: '/admin/pos', perm: 'order_view' },
 
   { type: 'label', text: 'ANGGOTA & PENGGUNA' },
+  { type: 'item', name: 'Semua Pengguna', icon: 'bxs-user-account', path: '/admin/users', perm: 'user_view' },
+
+  { type: 'label', text: 'KEMITRAAN & JARINGAN' },
   {
-    type: 'item', name: 'Manajemen User', icon: 'bxs-user-account',
+    type: 'item', name: 'Manajemen Afiliasi', icon: 'bxs-network-chart',
     children: [
-      { name: 'Semua Pengguna', path: '/admin/users', perm: 'user_view' },
-      { name: 'Daftar Afiliasi', path: '/admin/affiliates', perm: 'affiliate_view' },
+      { name: 'Daftar Afiliator', path: '/admin/affiliates', perm: 'affiliate_view' },
+      { name: 'Pencairan Komisi', path: '/admin/payouts', perm: 'finance_process_payout' },
       { name: 'Level Keanggotaan', path: '/admin/membership-tiers', perm: 'affiliate_manage_tiers' },
     ]
   },
-
-  { type: 'label', text: 'MERCHANT' },
   {
-    type: 'item', name: 'Toko / Merchant', icon: 'bxs-store-alt',
+    type: 'item', name: 'Manajemen Merchant', icon: 'bxs-store-alt',
     children: [
       { name: 'Semua Toko', path: '/admin/merchants', perm: 'merchant_view' },
       { name: 'Permintaan Stok', path: '/admin/merchants/restock', perm: 'inventory_restock' },
@@ -62,7 +63,6 @@ const rawMenu = [
   { type: 'label', text: 'KEUANGAN' },
   { type: 'item', name: 'Buku Besar / Ledger', icon: 'bxs-bank', path: '/admin/finance', perm: 'finance_view_summary' },
   { type: 'item', name: 'Preset Komisi', icon: 'bxs-badge-dollar', path: '/admin/commission-presets', perm: 'finance_view_summary' },
-  { type: 'item', name: 'Pencairan Dana', icon: 'bxs-credit-card-front', path: '/admin/payouts', perm: 'finance_process_payout' },
 
   { type: 'label', text: 'KONTEN & TAMPILAN' },
   { type: 'item', name: 'Pustaka Media', icon: 'bxs-photo-album', path: '/admin/media', perm: 'content_blog' },

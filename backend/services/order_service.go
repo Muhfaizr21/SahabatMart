@@ -3,6 +3,7 @@ package services
 import (
 	"akuglow/backend/models"
 	"akuglow/backend/repositories"
+	"akuglow/backend/utils"
 	"fmt"
 	"log"
 	"time"
@@ -85,7 +86,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 		// Standardize MerchantID
 		if items[i].MerchantID == "" || items[i].MerchantID == "pusat" {
-			items[i].MerchantID = "00000000-0000-0000-0000-000000000000"
+			items[i].MerchantID = models.PusatID
 		}
 
 		items[i].UnitPrice = actualPrice
@@ -221,8 +222,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 
 				if err := invQuery.First(&inventory).Error; err != nil {
 					// 2. Pusat Fallback (Variant-aware)
-					pusatFallback := "00000000-0000-0000-0000-000000000000"
-					invQueryPusat := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID)
+					invQueryPusat := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", models.PusatID, item.ProductID)
 					if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 						invQueryPusat = invQueryPusat.Where("product_variant_id = ?", *item.ProductVariantID)
 					} else {
@@ -232,7 +232,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 					if err2 := invQueryPusat.First(&inventory).Error; err2 != nil {
 						return fmt.Errorf("stok produk '%s' (%s) tidak tersedia", item.ProductName, item.VariantName)
 					}
-					inventoryMerchantID = pusatFallback
+					inventoryMerchantID = models.PusatID
 				}
 
 				var product models.Product
@@ -240,10 +240,8 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				allowBackorder := product.Backorders == "allow" || product.Backorders == "notify"
 
 				if inventory.Stock < item.Quantity && !allowBackorder {
-					// Attempt to find stock in Pusat if Merchant stock insufficient
-					pusatFallback := "00000000-0000-0000-0000-000000000000"
-					if inventoryMerchantID != pusatFallback {
-						invQueryPusat := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", pusatFallback, item.ProductID)
+					if inventoryMerchantID != models.PusatID {
+						invQueryPusat := tx.Set("gorm:query_option", "FOR UPDATE").Where("merchant_id = ? AND product_id = ?", models.PusatID, item.ProductID)
 						if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 							invQueryPusat = invQueryPusat.Where("product_variant_id = ?", *item.ProductVariantID)
 						} else {
@@ -251,7 +249,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 						}
 
 						if err2 := invQueryPusat.First(&inventory).Error; err2 == nil && inventory.Stock >= item.Quantity {
-							inventoryMerchantID = pusatFallback
+							inventoryMerchantID = models.PusatID
 						} else {
 							return fmt.Errorf("stok produk '%s' (%s) tidak mencukupi", item.ProductName, item.VariantName)
 						}
@@ -266,7 +264,7 @@ func (s *OrderService) CreateOrder(buyerID string, items []models.OrderItem, aff
 				}
 
 				// Update Master Catalog Stock (Variant vs Product) ONLY if fulfilled by Pusat
-				if inventoryMerchantID == "00000000-0000-0000-0000-000000000000" {
+				if inventoryMerchantID == models.PusatID {
 					if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 						if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
 							UpdateColumn("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
@@ -541,7 +539,7 @@ func (s *OrderService) CalculateCommissions(db *gorm.DB, item models.OrderItem, 
 					// [Double Commission Fix] We MUST set affAmt here because item.CommissionAmount 
 					// will be populated using this value, which acts as the snapshot source of truth 
 					// for DistributePresetCommissions later.
-					affAmt = subtotal * (affRate / 100.0)
+					affAmt = utils.RoundMoney(subtotal * (affRate / 100.0))
 				}
 			} else {
 				// Fallback ke logika lama (no preset)
@@ -658,7 +656,7 @@ func (s *OrderService) DistributePresetCommissions(tx *gorm.DB, order models.Ord
 
 		var commAmt float64
 		if totalPresetRate > 0 {
-			commAmt = snapshotTotal * (pl.Rate / totalPresetRate)
+			commAmt = utils.RoundMoney(snapshotTotal * (pl.Rate / totalPresetRate))
 		} else {
 			commAmt = 0
 		}
@@ -767,7 +765,7 @@ func (s *OrderService) CancelOrder(orderID string, reason string, cancelledBy st
 			}
 
 			// 2. Restock Master Catalog (Variant-Aware) ONLY if returned to Pusat
-			if item.MerchantID == "00000000-0000-0000-0000-000000000000" {
+			if item.MerchantID == models.PusatID {
 				if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 					if err := tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).
 						UpdateColumn("stock", gorm.Expr("stock + ?", item.Quantity)).Error; err != nil {

@@ -495,7 +495,15 @@ func (mc *MerchantController) GetNotifications(w http.ResponseWriter, r *http.Re
 		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
 		return
 	}
-	notifs, err := mc.Notif.GetNotifications(merchantID, "merchant", 20)
+	userID, _ := r.Context().Value("user_id").(string)
+
+	var notifs []models.Notification
+	err := mc.DB.Where("(receiver_id = ? AND receiver_type = ?) OR (receiver_id = ? AND receiver_type = ?)", 
+		merchantID, "merchant", userID, "user").
+		Order("created_at desc").
+		Limit(20).
+		Find(&notifs).Error
+
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
 		return

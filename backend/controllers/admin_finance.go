@@ -316,101 +316,52 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 		"created_at", period,
 	).Scan(&saleRevenue)
 
-	// IN 2: Refund masuk (positive refund tx)
-	var refundIn float64
-	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(amount),0)").
-			Where("type = 'refund' AND amount > 0"),
-		"created_at", period,
-	).Scan(&refundIn)
-
-	// IN 3: Manual income mutations
+	// IN 2: Manual income mutations (bukan Auto-Sync/Auto-Reverse)
 	var manualIncomeIn float64
 	periodWhere(
 		fc.DB.Table("money_mutations").Select("COALESCE(SUM(amount),0)").
-			Where("type = 'income' AND (description LIKE 'Auto-Sync:%' OR description = '' OR description IS NULL) = false"),
+			Where("type = 'income' AND (description NOT LIKE 'Auto-Sync:%' AND description NOT LIKE 'Auto-Reverse:%' OR description IS NULL)"),
 		"created_at", period,
 	).Scan(&manualIncomeIn)
 
-	// IN 4: Deposit / topup ke platform wallet
-	var depositIn float64
-	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(amount),0)").
-			Where("type = 'deposit' AND amount > 0"),
-		"created_at", period,
-	).Scan(&depositIn)
-
-	// IN 5: Other positive tx (bonus, adjustment positive)
+	// IN 3: Other positive tx to Admin wallet (bonus, adjustment, withdrawal reversal)
 	var otherIn float64
 	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(amount),0)").
-			Where("amount > 0 AND type NOT IN (?, ?, ?, ?, ?, ?, ?)",
-				models.TxSaleRevenue, models.TxCommissionEarned, models.TxRefundDeduction,
-				models.TxPlatformFee, models.TxPayoutOutflow, "deposit", "refund"),
+		fc.DB.Table("wallet_transactions wt").
+			Select("COALESCE(SUM(wt.amount),0)").
+			Joins("JOIN wallets w ON w.id = wt.wallet_id").
+			Where("w.owner_type = 'admin' AND wt.amount > 0 AND wt.type NOT IN (?, ?)",
+				models.TxSaleRevenue, models.TxPayoutOutflow),
 		"created_at", period,
 	).Scan(&otherIn)
 
-	totalCashIn := saleRevenue + refundIn + manualIncomeIn + depositIn + otherIn
+	totalCashIn := saleRevenue + manualIncomeIn + otherIn
 
 	// ── CASH FLOW OUT → ITEMIZED ───────────────────────────
 	// OUT 1: COGS (modal barang)
 	outCOGS := capitalCost
 
-	// OUT 2: Affiliate commissions paid
-	var affCommissionOut float64
-	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
-			Where("type = 'commission_earned' AND amount > 0"),
-		"created_at", period,
-	).Scan(&affCommissionOut)
-
-	// OUT 3: Merchant payouts (sale_revenue to merchant wallets)
-	var merchantPayoutOut float64
-	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
-			Where("type = 'sale_revenue' AND amount > 0 AND wallet_id IN (SELECT id FROM wallets WHERE owner_type = 'merchant')"),
-		"created_at", period,
-	).Scan(&merchantPayoutOut)
-
-	// OUT 4: Platform fees paid out (platform keeps fee = outflow from customer perspective)
-	var platformFeeOut float64
-	periodWhere(
-		fc.DB.Table("orders").Select("COALESCE(SUM(total_platform_fee),0)").
-			Where("status IN ?", activeStatuses),
-		"created_at", period,
-	).Scan(&platformFeeOut)
-
-	// OUT 5: Refund ke customer (negative)
-	var refundOut float64
-	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
-			Where("type = 'refund_deduction' AND amount < 0"),
-		"created_at", period,
-	).Scan(&refundOut)
-
-	// OUT 6: Payout outflow (platform pays out to users)
+	// OUT 2: Payout outflow (Admin wallet — mencakup komisi affiliate, payout merchant, penarikan)
+	// Ini adalah DEBIT dari Admin wallet. Tidak perlu ditambah affCommissionOut/merchantPayoutOut
+	// karena payoutOutflow SUDAH mencakup semua itu (double-counting guard).
 	var payoutOutflow float64
 	periodWhere(
-		fc.DB.Table("wallet_transactions").Select("COALESCE(SUM(ABS(amount)),0)").
-			Where("type = 'payout_outflow' AND amount < 0"),
+		fc.DB.Table("wallet_transactions wt").
+			Select("COALESCE(SUM(ABS(wt.amount)),0)").
+			Joins("JOIN wallets w ON w.id = wt.wallet_id").
+			Where("w.owner_type = 'admin' AND wt.type = 'payout_outflow' AND wt.amount < 0"),
 		"created_at", period,
 	).Scan(&payoutOutflow)
 
-	// OUT 7: Manual expense mutations
+	// OUT 3: Manual expense mutations (non-Auto-Sync)
 	var manualExpenseOut float64
 	periodWhere(
 		fc.DB.Table("money_mutations").Select("COALESCE(SUM(amount),0)").
-			Where("type = 'expense' AND (description LIKE 'Auto-Sync:%' OR description = '' OR description IS NULL) = false"),
+			Where("type = 'expense' AND (description NOT LIKE 'Auto-Sync:%' AND description NOT LIKE 'Auto-Reverse:%' OR description IS NULL)"),
 		"created_at", period,
 	).Scan(&manualExpenseOut)
 
-	// OUT 8: Data saving allocation (computed, not actual outflow yet)
-	outDataSaving := totalSaving
-
-	// OUT 9: Profit share distribution
-	outProfitShare := totalPSValue
-
-	totalCashOut := outCOGS + affCommissionOut + merchantPayoutOut + platformFeeOut + refundOut + payoutOutflow + manualExpenseOut + outDataSaving + outProfitShare
+	totalCashOut := outCOGS + payoutOutflow + manualExpenseOut
 
 	// ── CASH BALANCE → LOKASI KAS ─────────────────────────
 	var locations []models.FinancialLocation
@@ -512,21 +463,13 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	// ── BUILD CASH FLOW LINE ITEMS ─────────────────────
 	cashFlowItems := []CashFlowItem{
 		{Label: "Penjualan (Orders)", Type: "in", Amount: saleRevenue, Description: "Pendapatan dari pesanan pelanggan"},
-		{Label: "Refund Masuk", Type: "in", Amount: refundIn, Description: "Pengembalian dana ke platform"},
 		{Label: "Pemasukan Manual", Type: "in", Amount: manualIncomeIn, Description: "Pencatatan kas masuk manual"},
-		{Label: "Deposit / Topup", Type: "in", Amount: depositIn, Description: "Isi saldo / deposit ke platform"},
-		{Label: "Lain-lain (Masuk)", Type: "in", Amount: otherIn, Description: "Bonus, adjustment, dll"},
+		{Label: "Lain-lain (Masuk)", Type: "in", Amount: otherIn, Description: "Bonus, adjustment, reversal masuk"},
 	}
 	outItems := []CashFlowItem{
 		{Label: "Harga Modal (COGS)", Type: "out", Amount: outCOGS, Description: "Biaya modal barang terjual"},
-		{Label: "Komisi Affiliate", Type: "out", Amount: affCommissionOut, Description: "Komisi yang dibayarkan ke affiliate"},
-		{Label: "Pembagian Hasil ke Merchant", Type: "out", Amount: merchantPayoutOut, Description: "Payout ke rekening merchant"},
-		{Label: "Biaya Layanan Platform", Type: "out", Amount: platformFeeOut, Description: "Fee platform dari setiap transaksi"},
-		{Label: "Refund ke Customer", Type: "out", Amount: refundOut, Description: "Pengembalian dana ke pelanggan"},
-		{Label: "Payout ke User (Affiliate/Merchant)", Type: "out", Amount: payoutOutflow, Description: "Pencairan dana ke wallet user"},
+		{Label: "Payout ke Merchant & Affiliate", Type: "out", Amount: payoutOutflow, Description: "Komisi affiliate + payout merchant + penarikan user"},
 		{Label: "Pengeluaran Manual", Type: "out", Amount: manualExpenseOut, Description: "Pencatatan kas keluar manual"},
-		{Label: "Alokasi Data Saving", Type: "out", Amount: outDataSaving, Description: "Alokasi dari gross profit ke pos biaya"},
-		{Label: "Bagi Hasil Profit Share", Type: "out", Amount: outProfitShare, Description: "Distribusi bagi hasil ke stakeholder"},
 	}
 
 	netCashFlow := totalCashIn - totalCashOut

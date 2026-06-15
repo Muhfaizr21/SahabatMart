@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchJson, API_BASE, MERCHANT_API_BASE, formatImage } from '../../lib/api';
+import { fetchJson, API_BASE, MERCHANT_API_BASE, formatImage, uploadFile, getSiteUrl } from '../../lib/api';
 import { PageHeader, A, FieldLabel } from '../../lib/adminStyles.jsx';
 
 const MerchantSettings = () => {
@@ -10,6 +10,8 @@ const MerchantSettings = () => {
     const [searchingArea, setSearchingArea] = useState(false);
     const [areas, setAreas] = useState([]);
     const [activeTab, setActiveTab] = useState('branding'); // 'branding' | 'logistics'
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [uploadingBanner, setUploadingBanner] = useState(false);
 
     useEffect(() => {
         fetchJson(`${MERCHANT_API_BASE}/store`)
@@ -19,6 +21,26 @@ const MerchantSettings = () => {
 
     const handleChange = (e) => {
         setStore({ ...store, [e.target.name]: e.target.value });
+    };
+
+    const handleUpload = async (e, field) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        if (field === 'logo_url') setUploadingLogo(true);
+        else setUploadingBanner(true);
+
+        try {
+            const res = await uploadFile(`${MERCHANT_API_BASE}/upload`, file);
+            setStore({ ...store, [field]: res.url });
+            setToast('Gambar berhasil diupload.');
+            setTimeout(() => setToast(''), 4000);
+        } catch (err) {
+            alert('Upload gagal: ' + err.message);
+        } finally {
+            if (field === 'logo_url') setUploadingLogo(false);
+            else setUploadingBanner(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -94,7 +116,7 @@ const MerchantSettings = () => {
     );
 
     // Placeholder if no image provided
-    const bannerPreview = store?.banner_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
+    const bannerPreview = formatImage(store?.banner_url) || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
     const logoPreview = formatImage(store?.logo_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(store?.store_name || 'Store')}&size=200&background=6366f1&color=ffffff&bold=true`;
 
     return (
@@ -156,7 +178,7 @@ const MerchantSettings = () => {
                                 {store?.store_name || 'Nama Toko Anda'}
                             </h2>
                             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 4, fontFamily: 'monospace', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                                akuglow.com/{store?.slug || 'slug-toko'}
+                                {getSiteUrl()}/{store?.slug || 'slug-toko'}
                             </p>
                         </div>
                         <div style={{ display: 'flex', gap: 10 }}>
@@ -284,7 +306,7 @@ const MerchantSettings = () => {
                                     <FieldLabel>Slug Toko Digital (URL Toko Pelanggan)</FieldLabel>
                                     <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0', transition: 'border-color 0.2s' }}>
                                         <span style={{ padding: '0 16px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f1f5f9', alignSelf: 'stretch', display: 'flex', alignItems: 'center', borderRight: '1px solid #e2e8f0' }}>
-                                            akuglow.com/
+                                            {getSiteUrl().replace(/^https?:\/\//, '')}/
                                         </span>
                                         <input 
                                             name="slug" 
@@ -308,30 +330,44 @@ const MerchantSettings = () => {
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                                 <div>
-                                    <FieldLabel>URL Logo Brand (Rasio 1:1)</FieldLabel>
-                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                                        <i className="bx bx-link-alt" style={{ position: 'absolute', left: 16, color: '#94a3b8', fontSize: 18 }} />
-                                        <input 
-                                            name="logo_url" 
-                                            value={store?.logo_url || ''} 
-                                            onChange={handleChange} 
-                                            style={{ ...A.input, paddingLeft: 46 }} 
-                                            placeholder="Masukkan URL Logo Anda..." 
-                                        />
+                                    <FieldLabel>Logo Brand (Rasio 1:1)</FieldLabel>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+                                            <i className="bx bx-link-alt" style={{ position: 'absolute', left: 16, color: '#94a3b8', fontSize: 18 }} />
+                                            <input 
+                                                name="logo_url" 
+                                                value={store?.logo_url || ''} 
+                                                onChange={handleChange} 
+                                                style={{ ...A.input, paddingLeft: 46 }} 
+                                                placeholder="Masukkan URL Logo Anda..." 
+                                            />
+                                        </div>
+                                        <label style={{ ...A.btnGhost, background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                                            {uploadingLogo ? <i className="bx bx-loader-alt bx-spin" /> : <i className="bx bx-upload" />}
+                                            {uploadingLogo ? 'Mengupload...' : 'Upload Lokal'}
+                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleUpload(e, 'logo_url')} disabled={uploadingLogo} />
+                                        </label>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <FieldLabel>URL Banner Toko (Rasio 16:9)</FieldLabel>
-                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                                        <i className="bx bx-image-add" style={{ position: 'absolute', left: 16, color: '#94a3b8', fontSize: 18 }} />
-                                        <input 
-                                            name="banner_url" 
-                                            value={store?.banner_url || ''} 
-                                            onChange={handleChange} 
-                                            style={{ ...A.input, paddingLeft: 46 }} 
-                                            placeholder="Masukkan URL Banner Anda..." 
-                                        />
+                                    <FieldLabel>Banner Toko (Rasio 16:9)</FieldLabel>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+                                            <i className="bx bx-image-add" style={{ position: 'absolute', left: 16, color: '#94a3b8', fontSize: 18 }} />
+                                            <input 
+                                                name="banner_url" 
+                                                value={store?.banner_url || ''} 
+                                                onChange={handleChange} 
+                                                style={{ ...A.input, paddingLeft: 46 }} 
+                                                placeholder="Masukkan URL Banner Anda..." 
+                                            />
+                                        </div>
+                                        <label style={{ ...A.btnGhost, background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                                            {uploadingBanner ? <i className="bx bx-loader-alt bx-spin" /> : <i className="bx bx-upload" />}
+                                            {uploadingBanner ? 'Mengupload...' : 'Upload Lokal'}
+                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleUpload(e, 'banner_url')} disabled={uploadingBanner} />
+                                        </label>
                                     </div>
                                 </div>
 

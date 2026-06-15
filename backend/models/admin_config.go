@@ -1,15 +1,27 @@
 package models
 
 import (
+	"os"
 	"time"
 
 	"gorm.io/gorm"
 )
 
-const (
-	AdminID = "00000000-0000-0000-0000-000000000001"
-	PusatID = "00000000-0000-0000-0000-000000000000"
+var (
+	// AdminID — UUID superadmin. Set env ADMIN_USER_ID jika berbeda di tiap deployment.
+	AdminID = getEnvDefault("ADMIN_USER_ID", "00000000-0000-0000-0000-000000000001")
+	// PusatID — UUID merchant pusat. Set env PUSAT_MERCHANT_ID jika berbeda.
+	PusatID = getEnvDefault("PUSAT_MERCHANT_ID", "00000000-0000-0000-0000-000000000000")
+	// FrontendURL — base URL untuk email/redirect. Wajib set di production!
+	FrontendURL = getEnvDefault("FRONTEND_URL", "http://localhost:5173")
 )
+
+func getEnvDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
 
 // ProductTierCommission mengatur komisi spesifik per produk per jenjang (Req 1 & 2)
 type ProductTierCommission struct {

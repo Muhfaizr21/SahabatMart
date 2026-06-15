@@ -97,7 +97,7 @@ func (ac *AdminController) UploadImage(w http.ResponseWriter, r *http.Request) {
 		ac.Audit.Log(adminID, "upload_media_auto", "media", media.ID, media.Filename, r.RemoteAddr)
 	}
 
-	utils.JSONResponse(w, http.StatusOK, map[string]string{
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"url":      url,
 		"imageUrl": url, // Alias for frontend compatibility
 	})
@@ -1192,29 +1192,46 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 	}
 
 	now := time.Now()
-	newStatus := map[string]string{"approve": "completed", "reject": "rejected"}[req.Action]
+	financeSvc := services.NewFinanceService(ac.DB)
 
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
 		var wd models.AffiliateWithdrawal
-		if err := tx.First(&wd, "id = ?", req.ID).Error; err != nil {
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&wd, "id = ?", req.ID).Error; err != nil {
 			return fmt.Errorf("withdrawal tidak ditemukan")
 		}
-		if wd.Status != "pending" && wd.Status != "processed" {
+		if wd.Status != "pending" {
 			return fmt.Errorf("withdrawal sudah diproses sebelumnya")
 		}
-		wd.Status = newStatus
+
+		if req.Action == "approve" {
+			wd.Status = "processed"
+			wd.Note = req.Note
+			wd.ProcessedAt = &now
+			if err := tx.Save(&wd).Error; err != nil {
+				return err
+			}
+			// total_withdrawn hanya ditambahkan di ProcessPayout (saat "paid"/settled)
+			return nil
+		}
+
+		// Reject: refund wallet
+		var member models.AffiliateMember
+		if err := tx.First(&member, "id = ?", wd.AffiliateID).Error; err != nil {
+			return fmt.Errorf("affiliate member not found")
+		}
+
+		wd.Status = "rejected"
 		wd.Note = req.Note
 		wd.ProcessedAt = &now
 		if err := tx.Save(&wd).Error; err != nil {
 			return err
 		}
-		// Update total_withdrawn only on approval
-		if newStatus == "completed" {
-			tx.Model(&models.AffiliateMember{}).Where("id = ?", wd.AffiliateID).
-				Updates(map[string]interface{}{
-					"total_withdrawn": gorm.Expr("total_withdrawn + ?", wd.Amount),
-				})
+
+		desc := fmt.Sprintf("Penarikan Komisi Ditolak (Refund): %s", req.Note)
+		if err := financeSvc.ProcessTransaction(tx, member.UserID, models.WalletAffiliate, models.TxWithdrawalRejected, wd.Amount, wd.ID, "affiliate_withdrawal", desc, nil); err != nil {
+			return err
 		}
+
 		return nil
 	})
 
@@ -1225,22 +1242,21 @@ func (ac *AdminController) ProcessAffiliateWithdrawal(w http.ResponseWriter, r *
 
 	// Push notification to affiliate
 	if wdID := req.ID; wdID != "" {
-		// Re-fetch withdrawal to get AffiliateID (or use from closure if safe)
 		var wd models.AffiliateWithdrawal
 		ac.DB.First(&wd, "id = ?", req.ID)
 
 		msgMap := map[string]string{
-			"completed": "disetujui dan sedang diproses ke rekening Anda",
+			"processed": "disetujui dan sedang menunggu proses pencairan",
 			"rejected":  "ditolak oleh Admin",
 		}
-		msg := fmt.Sprintf("Permintaan penarikan komisi Anda telah %s. %s", msgMap[newStatus], req.Note)
-		ac.Notif.Push(wd.AffiliateID, "affiliate", "withdrawal_"+newStatus,
+		msg := fmt.Sprintf("Permintaan penarikan komisi Anda telah %s. %s", msgMap[wd.Status], req.Note)
+		ac.Notif.Push(wd.AffiliateID, "affiliate", "withdrawal_"+wd.Status,
 			"Update Penarikan Komisi", msg, "/affiliate/withdrawals")
 	}
 
 	ac.Audit.Log(r.Context().Value("user_id").(string), "process_affiliate_withdrawal", "affiliate_withdrawal",
-		req.ID, newStatus, r.RemoteAddr)
-	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success", "result": newStatus})
+		req.ID, "processed/rejected", r.RemoteAddr)
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success", "result": "processed"})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2550,7 +2566,7 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Audit Trail (Req 9) - Fix: Split host from port for inet type
-	adminID := "00000000-0000-0000-0000-000000000001"
+	adminID := models.AdminID
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if ip == "" {
 		ip = r.RemoteAddr
@@ -2778,40 +2794,6 @@ func (ac *AdminController) ManageProductCommissions(w http.ResponseWriter, r *ht
 // GET  /api/admin/commissions/presets
 // POST /api/admin/commissions/presets
 // DELETE /api/admin/commissions/presets
-func (ac *AdminController) ManageCommissionPresets(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		presets := []models.CommissionPreset{}
-		ac.DB.Order("name asc").Find(&presets)
-		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-			"status": "success",
-			"data":   presets,
-		})
-		return
-	}
-	if r.Method == http.MethodPost || r.Method == http.MethodPut {
-		var preset models.CommissionPreset
-		json.NewDecoder(r.Body).Decode(&preset)
-		ac.DB.Save(&preset)
-		ac.Audit.Log(r.Context().Value("user_id").(string), "upsert_commission_preset", "commission_preset",
-			preset.ID, preset.Name, r.RemoteAddr)
-		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-			"status": "success",
-			"data":   preset,
-		})
-		return
-	}
-	if r.Method == http.MethodDelete {
-		id := r.URL.Query().Get("id")
-		if id == "" {
-			utils.JSONError(w, http.StatusBadRequest, "ID is required")
-			return
-		}
-		ac.DB.Delete(&models.CommissionPreset{}, id)
-		ac.Audit.Log(r.Context().Value("user_id").(string), "delete_commission_preset", "commission_preset", id, "", r.RemoteAddr)
-		utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success"})
-	}
-}
-
 // POST /api/admin/commissions/bulk
 func (ac *AdminController) BulkUpdateCommissions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -2930,7 +2912,7 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 
 		if req.Type == "affiliate" {
 			var wd models.AffiliateWithdrawal
-			if err := tx.First(&wd, "id = ?", req.PayoutID).Error; err != nil {
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&wd, "id = ?", req.PayoutID).Error; err != nil {
 				return fmt.Errorf("affiliate withdrawal not found")
 			}
 
@@ -2945,6 +2927,25 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 				newStatus = "completed"
 			} else if newStatus == "approved" {
 				newStatus = "processed"
+			}
+
+			// [BUG-C1 Fix] Idempotency — skip jika status sudah sama
+			if wd.Status == newStatus {
+				return nil
+			}
+
+			// Validasi transisi status
+			valid := false
+			switch newStatus {
+			case "processed":
+				valid = wd.Status == "pending"
+			case "completed":
+				valid = wd.Status == "pending" || wd.Status == "processed"
+			case "rejected":
+				valid = wd.Status == "pending" || wd.Status == "processed"
+			}
+			if !valid {
+				return fmt.Errorf("transisi status tidak valid: %s → %s", wd.Status, newStatus)
 			}
 
 			wd.Status = newStatus
@@ -2977,8 +2978,13 @@ func (ac *AdminController) ProcessPayout(w http.ResponseWriter, r *http.Request)
 			}
 		} else {
 			var payout models.PayoutRequest
-			if err := tx.First(&payout, "id = ?", req.PayoutID).Error; err != nil {
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&payout, "id = ?", req.PayoutID).Error; err != nil {
 				return fmt.Errorf("payout request not found")
+			}
+
+			// [BUG-C1 Fix] Idempotency — skip jika status sudah sama
+			if payout.Status == req.Status {
+				return nil
 			}
 
 			// [CRITICAL FIX] Get UserID from Merchant
@@ -4413,7 +4419,15 @@ func (ac *AdminController) GetPublicProductDetail(w http.ResponseWriter, r *http
 
 // GET /api/admin/notifications
 func (ac *AdminController) GetNotifications(w http.ResponseWriter, r *http.Request) {
-	notifs, err := ac.Notif.GetNotifications("", "admin", 20)
+	userID, _ := r.Context().Value("user_id").(string)
+
+	var notifs []models.Notification
+	err := ac.DB.Where("receiver_type = ? OR (receiver_id = ? AND receiver_type = ?)", 
+		"admin", userID, "user").
+		Order("created_at desc").
+		Limit(20).
+		Find(&notifs).Error
+
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal mengambil notifikasi")
 		return
@@ -4661,7 +4675,7 @@ func (ac *AdminController) POSCheckout(w http.ResponseWriter, r *http.Request) {
 			totalPlatformFee += itemFee
 
 			// POS order from super admin uses models.PusatID as merchant
-			const targetMerchantID = models.PusatID
+			var targetMerchantID = models.PusatID
 
 			if _, ok := merchantGroups[targetMerchantID]; !ok {
 				merchantGroups[targetMerchantID] = &models.OrderMerchantGroup{
@@ -4779,7 +4793,7 @@ func (ac *AdminController) GetWishlistStats(w http.ResponseWriter, r *http.Reque
 		Select("products.id as product_id, products.name as product_name, products.slug as product_slug, products.image, products.price, inventories.merchant_id as merchant_id, merchants.store_name, count(wishlists.id) as count, string_agg(user_profiles.full_name, ', ') as user_names").
 		Joins("join products on products.id = wishlists.product_id").
 		Joins("join user_profiles on user_profiles.user_id = wishlists.buyer_id").
-		Joins("left join inventories on inventories.product_id = products.id AND inventories.merchant_id = '00000000-0000-0000-0000-000000000000'").
+		Joins("left join inventories on inventories.product_id = products.id AND inventories.merchant_id = '" + models.PusatID + "'").
 		Joins("left join merchants on merchants.id = inventories.merchant_id").
 		Group("products.id, inventories.merchant_id, products.name, products.slug, products.image, products.price, merchants.store_name").
 		Order("count DESC").
@@ -5266,6 +5280,18 @@ func (ac *AdminController) UpsertCommissionPreset(w http.ResponseWriter, r *http
 		return
 	}
 
+	// [BUG-CP3 Fix] Cek duplicate nama sebelum simpan — hindari raw SQL error dari unique index
+	var dupCount int64
+	dupQuery := ac.DB.Model(&models.CommissionPreset{}).Where("name = ?", req.Name)
+	if req.ID != "" {
+		dupQuery = dupQuery.Where("id != ?", req.ID)
+	}
+	dupQuery.Count(&dupCount)
+	if dupCount > 0 {
+		utils.JSONError(w, http.StatusConflict, fmt.Sprintf("Nama preset '%s' sudah digunakan", req.Name))
+		return
+	}
+
 	presetID := req.ID
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
 		if presetID != "" {
@@ -5534,7 +5560,7 @@ func (ac *AdminController) GetMerchantStockOverview(w http.ResponseWriter, r *ht
 	filter := r.URL.Query().Get("filter")
 
 	var merchants []models.Merchant
-	query := ac.DB.Model(&models.Merchant{}).Where("id <> ?", "00000000-0000-0000-0000-000000000000")
+	query := ac.DB.Model(&models.Merchant{}).Where("id <> ?", models.PusatID)
 	if search != "" {
 		like := "%" + strings.ToLower(search) + "%"
 		query = query.Where("store_name ILIKE ?", like)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage, getSiteUrl } from '../../lib/api';
 import toast from 'react-hot-toast';
 import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
@@ -470,6 +470,9 @@ export default function AdminAddProduct() {
   // Variations Handlers
   const handleAddVariant = () => {
     if (!newVariant.name.trim()) { toast.error('Nama varian wajib diisi!'); return; }
+    if (parseFloat(newVariant.old_price) > 0 && parseFloat(newVariant.old_price) >= parseFloat(newVariant.price)) {
+      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    }
     const tempId = 'temp_' + Math.random().toString(36).substr(2, 9);
     const item = {
       ...newVariant,
@@ -500,6 +503,9 @@ export default function AdminAddProduct() {
   };
 
   const handleUpdateVariant = () => {
+    if (parseFloat(editingVariant.old_price) > 0 && parseFloat(editingVariant.old_price) >= parseFloat(editingVariant.price)) {
+      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    }
     const item = {
       ...editingVariant,
       price: parseFloat(editingVariant.price) || 0,
@@ -631,7 +637,7 @@ export default function AdminAddProduct() {
     if (p.product_type !== 'grouped' && p.product_type !== 'variable' && (!p.price || parseFloat(p.price) <= 0)) {
       toast.error('Harga jual wajib diisi!'); return; }
     // Sale price validation
-    if (parseFloat(p.old_price) > 0 && parseFloat(p.old_price) <= parseFloat(p.price)) {
+    if (parseFloat(p.old_price) > 0 && parseFloat(p.old_price) >= parseFloat(p.price)) {
       toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
     }
     setSaving(true);
@@ -1473,7 +1479,7 @@ export default function AdminAddProduct() {
             {p.seo_title || p.name || '— Judul Produk Anda —'}
           </div>
           <div style={{ fontSize: 11.5, color: '#006621', marginBottom: 4 }}>
-            https://akuglow.com/product/{p.slug || 'slug-produk-anda'}
+            {getSiteUrl()}/product/{p.slug || 'slug-produk-anda'}
           </div>
           <div style={{ fontSize: 12.5, color: '#545454', lineHeight: 1.5 }}>
             {p.meta_description || p.short_description || 'Meta deskripsi Anda akan muncul di sini...'}

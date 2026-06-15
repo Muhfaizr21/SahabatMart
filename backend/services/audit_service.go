@@ -22,7 +22,7 @@ func (s *AuditService) Log(adminID, action, targetType, targetID, detail, ip str
 	if len(adminID) < 32 {
 		// In a real clean architecture, we'd find the admin properly
 		// but we'll stick to a valid placeholder if not provided
-		adminID = "00000000-0000-0000-0000-000000000000"
+		adminID = models.PusatID
 	}
 
 	s.Repo.Create(&models.AuditLog{

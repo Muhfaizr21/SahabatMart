@@ -154,14 +154,15 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		Where("affiliate_id = ? AND status IN ?", affiliateMemberID, []string{"approved", "paid"}).
 		Select("COALESCE(SUM(amount), 0)").Scan(&totalApproved)
 
-	// 2. Hitung 'Mitra Aktif' (Total Joined - Seluruh Jaringan)
+	// 2. Hitung 'Mitra Aktif' (Total Joined - Seluruh Jaringan) — [BUG-M2 Fix] depth limit 15
 	var totalJoined int64
 	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
-			SELECT id FROM affiliate_members WHERE upline_id = ?
+			SELECT id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
-			SELECT a.id FROM affiliate_members a
+			SELECT a.id, s.depth + 1, s.path || a.id::text FROM affiliate_members a
 			INNER JOIN subordinates s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
 		SELECT COUNT(*) FROM subordinates
 	`, affiliateMemberID).Scan(&totalJoined)
@@ -175,14 +176,15 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		WHERE am.upline_id = ?
 	`, affiliateMemberID).Scan(&qualifiedMitraCount)
 
-	// 4. Hitung omset tim bulan ini (recursive downline)
+	// 4. Hitung omset tim bulan ini (recursive downline) — [BUG-M2 Fix] depth limit 15
 	startTime := time.Now().AddDate(0, -1, 0)
 	var allDescIDs []string
 	s.DB.Raw(`
 		WITH RECURSIVE sub AS (
-			SELECT id FROM affiliate_members WHERE upline_id = ?
+			SELECT id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
-			SELECT a.id FROM affiliate_members a INNER JOIN sub s ON a.upline_id = s.id
+			SELECT a.id, s.depth + 1, s.path || a.id::text FROM affiliate_members a INNER JOIN sub s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		) SELECT id FROM sub
 	`, affiliateMemberID).Scan(&allDescIDs)
 
@@ -347,12 +349,13 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 func (s *AffiliateService) GetFullEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64, qualifiedMitra int64, directMitra int64, totalTransactions int, performancePoints int, nextTier *models.MembershipTier) {
 	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
 
-	// 1. Total jaringan (semua level)
+	// 1. Total jaringan (semua level) — [BUG-M2 Fix] depth limit 15
 	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
-			SELECT id FROM affiliate_members WHERE upline_id = ?
+			SELECT id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
-			SELECT a.id FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
+			SELECT a.id, s.depth + 1, s.path || a.id::text FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
 		SELECT COUNT(*) FROM subordinates
 	`, affiliateID).Scan(&activeMitra)
@@ -577,13 +580,6 @@ func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err err
 		// [Dokumen Bisnis] Jika tidak memenuhi syarat → notifikasi peringatan
 		// Downgrade hanya dilakukan oleh Admin secara manual setelah 3 bulan berturut-turut
 		// (tracking downgrade_warning_count ada di PlatformConfig, bukan auto-downgrade)
-		if qualifiedMitraCount < int64(minActiveMitra) || teamTurnover < minTurnover {
-			if s.Notif != nil {
-				msg := fmt.Sprintf("Peringatan: Toko '%s' tidak memenuhi syarat Merchant bulan ini (Mitra Qualified: %d/%d, Omset: Rp %.0f/%.0f). Harap tingkatkan performa tim Anda.",
-					m.StoreName, qualifiedMitraCount, minActiveMitra, teamTurnover, minTurnover)
-				s.Notif.Push(m.MerchantID, "merchant", "merchant_warning", "⚠️ Peringatan Syarat Merchant", msg, "/merchant/dashboard")
-			}
-		}
 	}
 
 	return downgraded, nil
@@ -769,28 +765,19 @@ func (s *AffiliateService) RequestWithdrawal(affiliateID string, amount float64)
 		return nil, errors.New("affiliate tidak ditemukan")
 	}
 
-	// 2. Prevent withdrawal spam
-	var existingPending int64
-	s.DB.Model(&models.AffiliateWithdrawal{}).
-		Where("affiliate_id = ? AND status = 'pending'", affiliateID).
-		Count(&existingPending)
-	if existingPending > 0 {
-		return nil, errors.New("anda masih memiliki pengajuan penarikan yang sedang diproses")
-	}
-
-	// 3. Validate bank info
+	// 2. Validate bank info (diluar transaction, tidak perlu lock)
 	if affiliate.BankName == "" || affiliate.BankAccountNumber == "" {
 		return nil, errors.New("harap lengkapi informasi rekening bank di pengaturan terlebih dahulu")
 	}
 
-	// 4. Payday Restriction
+	// 3. Payday Restriction
 	configSvc := NewConfigService(s.DB)
 	isPayday, allowedDates := configSvc.IsPayday()
 	if !isPayday {
 		return nil, fmt.Errorf("penarikan komisi hanya dapat dilakukan pada: %s", allowedDates)
 	}
 
-	// 5. Minimum withdrawal amount
+	// 4. Minimum withdrawal amount
 	minWithdrawal := configSvc.GetFloat("payout_min_amount", 50000.0)
 	if affiliate.Tier != nil && affiliate.Tier.MinWithdrawalAmount > 0 {
 		if affiliate.Tier.MinWithdrawalAmount > minWithdrawal {
@@ -802,11 +789,20 @@ func (s *AffiliateService) RequestWithdrawal(affiliateID string, amount float64)
 		return nil, fmt.Errorf("minimum penarikan adalah Rp %.0f", minWithdrawal)
 	}
 
-	// 6. Use Wallet for balance check & deduction
 	financeSvc := NewFinanceService(s.DB)
 	var wd models.AffiliateWithdrawal
 	
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		// [BUG-H1 Fix] Pengecekan pending withdrawal di DALAM transaction dengan FOR UPDATE
+		var existingPending int64
+		tx.Set("gorm:query_option", "FOR UPDATE").
+			Model(&models.AffiliateWithdrawal{}).
+			Where("affiliate_id = ? AND status = 'pending'", affiliateID).
+			Count(&existingPending)
+		if existingPending > 0 {
+			return errors.New("anda masih memiliki pengajuan penarikan yang sedang diproses")
+		}
+
 		// 1. Get Wallet with Lock (Must be inside transaction)
 		repo := &repositories.FinanceRepository{DB: tx}
 		wallet, err := repo.GetWalletWithLock(affiliate.UserID, models.WalletAffiliate)

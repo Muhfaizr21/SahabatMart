@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { PageHeader, StatRow, TablePanel, Modal, FieldLabel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
@@ -432,7 +432,7 @@ export default function AdminMerchants() {
                 >
                   <td style={{ ...A.td, paddingLeft: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 12, background: m.logo_url ? `url(${m.logo_url})` : 'linear-gradient(135deg, #4f46e5, #7c3aed)', backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 12, background: m.logo_url ? `url(${formatImage(m.logo_url)})` : 'linear-gradient(135deg, #4f46e5, #7c3aed)', backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
                         {!m.logo_url && <i className="bx bxs-store-alt" style={{ color: '#fff', fontSize: 20 }} />}
                       </div>
                       <div>
@@ -480,7 +480,7 @@ export default function AdminMerchants() {
               <div key={m.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: m.logo_url ? `url(${m.logo_url})` : 'linear-gradient(135deg, #4f46e5, #7c3aed)', backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: m.logo_url ? `url(${formatImage(m.logo_url)})` : 'linear-gradient(135deg, #4f46e5, #7c3aed)', backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
                     {!m.logo_url && <i className="bx bxs-store-alt" style={{ color: '#fff', fontSize: 20 }} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -538,7 +538,7 @@ export default function AdminMerchants() {
           <div style={{ display: 'flex', marginTop: 12, alignItems: 'center', gap: 20, marginBottom: 24, padding: 20, background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9', position: 'relative' }}>
             <div style={{ 
               width: 60, height: 60, borderRadius: 14, flexShrink: 0,
-              background: modal.logo_url ? `url(${modal.logo_url})` : 'linear-gradient(135deg, #4f46e5, #7c3aed)', 
+              background: modal.logo_url ? `url(${formatImage(modal.logo_url)})` : 'linear-gradient(135deg, #4f46e5, #7c3aed)', 
               backgroundSize: 'cover', backgroundPosition: 'center',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: '2px solid #fff', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
@@ -688,7 +688,7 @@ export default function AdminMerchants() {
 
           {/* Banner (Optional) */}
           {modal.banner_url && (
-            <div style={{ marginBottom: 24, height: 100, borderRadius: 16, background: `url(${modal.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.8 }} />
+            <div style={{ marginBottom: 24, height: 100, borderRadius: 16, background: `url(${formatImage(modal.banner_url)})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.8 }} />
           )}
 
           {/* Modal Footer Actions (User-style) */}

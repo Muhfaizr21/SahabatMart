@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage, getSiteUrl } from '../../lib/api';
 import toast from 'react-hot-toast';
 import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
@@ -548,6 +548,11 @@ export default function AdminEditProduct() {
 
   const handleSubmit = (statusOverride) => {
     if (!p.name.trim()) { toast.error('Nama produk wajib diisi!'); return; }
+    if (p.product_type !== 'grouped' && p.product_type !== 'variable' && (!p.price || parseFloat(p.price) <= 0)) {
+      toast.error('Harga jual wajib diisi!'); return; }
+    if (parseFloat(p.old_price) > 0 && parseFloat(p.old_price) >= parseFloat(p.price)) {
+      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    }
     setSaving(true);
     const payload = {
       ...p,
@@ -612,6 +617,10 @@ export default function AdminEditProduct() {
 
   // Variant handlers
   const handleAddVariant = () => {
+    if (!newVariant.name.trim()) { toast.error('Nama varian wajib diisi!'); return; }
+    if (parseFloat(newVariant.old_price) > 0 && parseFloat(newVariant.old_price) >= parseFloat(newVariant.price)) {
+      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    }
     const payload = {
       ...newVariant,
       product_id: productId,
@@ -647,6 +656,10 @@ export default function AdminEditProduct() {
   };
 
   const handleUpdateVariant = () => {
+    if (!editingVariant.name.trim()) { toast.error('Nama varian wajib diisi!'); return; }
+    if (parseFloat(editingVariant.old_price) > 0 && parseFloat(editingVariant.old_price) >= parseFloat(editingVariant.price)) {
+      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    }
     const payload = {
       ...editingVariant,
       price: parseFloat(editingVariant.price) || 0,
@@ -1435,7 +1448,7 @@ export default function AdminEditProduct() {
             {p.seo_title || p.name || '— Judul Produk Anda —'}
           </div>
           <div style={{ fontSize: 11.5, color: '#006621', marginBottom: 4 }}>
-            https://akuglow.com/product/{p.slug || 'slug-produk-anda'}
+            {getSiteUrl()}/product/{p.slug || 'slug-produk-anda'}
           </div>
           <div style={{ fontSize: 12.5, color: '#545454', lineHeight: 1.5 }}>
             {p.meta_description || p.short_description || 'Meta deskripsi Anda akan muncul di sini...'}

@@ -3,8 +3,13 @@ import { fetchJson, ADMIN_API_BASE } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 export default function AdminDemographics() {
-  // Tabs: 'dashboard' | 'advanced' | 'settings'
+  // Tabs: 'dashboard' | 'advanced' | 'users' | 'settings'
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // User Distribution state
+  const [userDist, setUserDist] = useState(null);
+  const [userDistLoading, setUserDistLoading] = useState(false);
+  const [userDistRole, setUserDistRole] = useState('all');
   
   // Stats & logs data
   const [stats, setStats] = useState(null);
@@ -487,6 +492,16 @@ export default function AdminDemographics() {
             }`}
           >
             Pengaturan & Privasi
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            📍 Asal User
           </button>
           <button
             onClick={() => setActiveTab('broadcast')}
@@ -1271,11 +1286,9 @@ export default function AdminDemographics() {
                         onChange={(e) => setBroadcastTargetRole(e.target.value)}
                         className="w-full bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       >
-                        <option value="all">Semua Pengguna (Warga, Petugas, Superadmin, dll)</option>
-                        <option value="affiliate">Warga / Mitra Dasar</option>
+                        <option value="all">Semua Pengguna (Mitra & Merchant)</option>
+                        <option value="affiliate">Mitra (Affiliate)</option>
                         <option value="merchant">Petugas / Merchant</option>
-                        <option value="admin">Staf Admin</option>
-                        <option value="superadmin">Superadmin</option>
                       </select>
                     </div>
 
@@ -1487,9 +1500,220 @@ export default function AdminDemographics() {
               </div>
             </div>
           )}
+
+          {/* TAB: ASAL USER */}
+          {activeTab === 'users' && (
+            <UserDistributionTab
+              apiBase={ADMIN_API_BASE}
+              userDist={userDist}
+              setUserDist={setUserDist}
+              userDistLoading={userDistLoading}
+              setUserDistLoading={setUserDistLoading}
+              userDistRole={userDistRole}
+              setUserDistRole={setUserDistRole}
+            />
+          )}
         </>
       )}
 
+    </div>
+  );
+}
+
+// ── Sub-component: User Distribution Tab ─────────────────────────────
+function UserDistributionTab({ apiBase, userDist, setUserDist, userDistLoading, setUserDistLoading, userDistRole, setUserDistRole }) {
+  useEffect(() => {
+    const fetchDist = async () => {
+      setUserDistLoading(true);
+      try {
+        const res = await fetchJson(`${apiBase}/demographics/user-distribution?role=${userDistRole}`);
+        setUserDist(res || null);
+      } catch (err) {
+        console.error('UserDist error:', err);
+      } finally {
+        setUserDistLoading(false);
+      }
+    };
+    fetchDist();
+  }, [userDistRole]);
+
+  const maxProvCount = userDist?.by_province?.[0]?.count || 1;
+  const maxCityCount = userDist?.by_city?.[0]?.count || 1;
+
+  return (
+    <div className="space-y-8">
+      {/* Header & Filter */}
+      <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
+        <div>
+          <h2 className="text-lg font-extrabold text-slate-800">📍 Distribusi Asal User Terdaftar</h2>
+          <p className="text-xs text-slate-400 mt-1">Berdasarkan data kota &amp; provinsi dari profil user aktif</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Filter Role</label>
+          <select
+            value={userDistRole}
+            onChange={e => setUserDistRole(e.target.value)}
+            className="bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          >
+            <option value="all">Semua Role</option>
+            <option value="affiliate">Mitra / Affiliate</option>
+            <option value="merchant">Merchant</option>
+          </select>
+        </div>
+      </div>
+
+      {userDistLoading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-500 text-sm mt-4">Memuat data distribusi user...</p>
+        </div>
+      ) : (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+              <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Total User Aktif</div>
+              <div className="text-3xl font-extrabold text-indigo-600">{(userDist?.total_users || 0).toLocaleString('id-ID')}</div>
+            </div>
+            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+              <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Jumlah Provinsi</div>
+              <div className="text-3xl font-extrabold text-purple-600">{(userDist?.by_province?.length || 0)}</div>
+            </div>
+            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+              <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Tanpa Data Lokasi</div>
+              <div className="text-3xl font-extrabold text-rose-500">{(userDist?.no_location || 0).toLocaleString('id-ID')}</div>
+              <div className="text-[10px] text-slate-400 mt-1">user belum isi alamat</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* By Province */}
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
+              <h3 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2">
+                <i className="bx bx-map-alt text-lg text-indigo-500" />
+                Distribusi per Provinsi
+              </h3>
+              {userDist?.by_province?.length === 0 ? (
+                <p className="text-slate-400 text-xs text-center py-10">Belum ada data provinsi</p>
+              ) : (
+                <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                  {userDist?.by_province?.map((row, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs font-semibold mb-1">
+                        <span className="text-slate-700 truncate max-w-[60%]">{row.province || 'Tidak Diketahui'}</span>
+                        <span className="text-indigo-600 font-bold">{row.count.toLocaleString('id-ID')} user</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                        <div
+                          style={{ width: `${Math.round((row.count / maxProvCount) * 100)}%` }}
+                          className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* By City (Top 20) */}
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
+              <h3 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2">
+                <i className="bx bx-buildings text-lg text-emerald-500" />
+                Top 20 Kota Terbanyak
+              </h3>
+              {userDist?.by_city?.length === 0 ? (
+                <p className="text-slate-400 text-xs text-center py-10">Belum ada data kota</p>
+              ) : (
+                <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+                  {userDist?.by_city?.map((row, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-[10px] font-black text-slate-300 w-5 text-right flex-shrink-0">#{i+1}</span>
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs font-semibold mb-1">
+                          <span className="text-slate-700 truncate max-w-[55%]">{row.city}</span>
+                          <span className="text-emerald-600 font-bold">{row.count.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            style={{ width: `${Math.round((row.count / maxCityCount) * 100)}%` }}
+                            className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all duration-500"
+                          />
+                        </div>
+                        {row.province && (
+                          <div className="text-[9px] text-slate-400 mt-0.5">{row.province}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tabel Daftar User */}
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden mt-8">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i className="bx bx-user-pin text-lg text-blue-500" />
+                Data Profil User
+              </h3>
+              <div className="text-xs font-bold text-slate-400">
+                {userDist?.users_list?.length || 0} user
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto max-h-[600px]">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
+                  <tr className="text-[10px] uppercase tracking-widest text-slate-400">
+                    <th className="py-4 px-6 font-bold">Informasi User</th>
+                    <th className="py-4 px-6 font-bold">Role</th>
+                    <th className="py-4 px-6 font-bold">Provinsi</th>
+                    <th className="py-4 px-6 font-bold">Kota/Kabupaten</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {userDist?.users_list?.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="font-bold text-slate-800">{user.full_name || 'Tanpa Nama'}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{user.email}</div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                          user.role === 'merchant' ? 'bg-orange-100 text-orange-600' :
+                          user.role === 'affiliate' ? 'bg-purple-100 text-purple-600' :
+                          user.role === 'admin' ? 'bg-blue-100 text-blue-600' :
+                          user.role === 'superadmin' ? 'bg-rose-100 text-rose-600' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-slate-600 font-medium">
+                        {user.province || '-'}
+                      </td>
+                      <td className="py-4 px-6 text-slate-600 font-medium">
+                        {user.city || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                  {(!userDist?.users_list || userDist.users_list.length === 0) && (
+                    <tr>
+                      <td colSpan="4" className="py-16 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center">
+                          <i className="bx bx-user-x text-4xl mb-3 text-slate-300"></i>
+                          <p>Tidak ada data user terdaftar</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

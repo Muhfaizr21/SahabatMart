@@ -509,7 +509,7 @@ export default function ProductDetailPage() {
               <Link to="/shop" className="hover:text-blue-600 transition-colors">{product.category}</Link>
             </nav>
             
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-[1.1] mb-5">{product.name}</h1>
+            <h1 className="text-[22px] font-extrabold text-gray-900 tracking-tight leading-[1.2] mb-5">{product.name}</h1>
             
             <div className="flex items-center gap-4 mb-6 sm:mb-8 text-sm">
               {product.enable_reviews !== false && (

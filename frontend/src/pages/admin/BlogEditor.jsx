@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage, getSiteUrl } from '../../lib/api';
 import toast from 'react-hot-toast';
 
 /* ─── WebP converter (client-side via Canvas) ──────────────── */
@@ -1171,7 +1171,7 @@ export default function BlogEditor() {
               <div className="meta-preview">
                 {/* URL */}
                 <div style={{ fontSize: 12, color: '#1a6b1a', marginBottom: 2 }}>
-                  akuglow.com › blog › <span style={{ fontWeight: 600 }}>{form.slug || 'url-artikel'}</span>
+                  {getSiteUrl().replace('http://','').replace('https://','')} › blog › <span style={{ fontWeight: 600 }}>{form.slug || 'url-artikel'}</span>
                 </div>
                 {/* Title */}
                 <div style={{ fontSize: 17, color: '#1a0dab', fontWeight: 400, marginBottom: 4, lineHeight: 1.3 }}>

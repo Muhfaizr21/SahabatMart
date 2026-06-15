@@ -94,6 +94,90 @@ const CustomSelect = ({ label, value, options, onChange, icon }) => {
   );
 };
 
+const FormSelect = ({ value, options, onChange, placeholder }) => {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef();
+
+  useEffect(() => {
+    const clickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 16px', borderRadius: 12,
+          border: open ? '1px solid #6366f1' : '1px solid #e2e8f0',
+          background: '#fff', fontSize: 13.5, color: selectedOption ? '#0f172a' : '#94a3b8',
+          fontWeight: selectedOption ? 600 : 400,
+          cursor: 'pointer', outline: 'none', transition: 'all 0.2s',
+          boxShadow: open ? '0 0 0 4px rgba(99, 102, 241, 0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+          textAlign: 'left'
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <i className="bx bx-chevron-down" style={{ fontSize: 18, color: '#94a3b8', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 9999,
+          background: '#fff', border: '1px solid #f1f5f9', borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+          maxHeight: 220, overflowY: 'auto', padding: 6,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          {options.map(opt => {
+            const isSelected = String(value) === String(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 8,
+                  border: 'none', background: isSelected ? '#f5f3ff' : 'transparent',
+                  color: isSelected ? '#6366f1' : '#475569',
+                  fontSize: 13, fontWeight: isSelected ? 700 : 500,
+                  textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }}
+                onMouseEnter={e => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.color = '#0f172a';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#475569';
+                  }
+                }}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+              >
+                {opt.label}
+                {isSelected && <i className="bx bx-check" style={{ fontSize: 18, color: '#6366f1' }} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminAffiliates() {
   const [affiliates, setAffiliates] = useState([]);
   const [total, setTotal]           = useState(0);
@@ -392,7 +476,7 @@ export default function AdminAffiliates() {
                           <button 
                             style={A.iconBtn('#6366f1', '#eef2ff')} 
                             title="Ubah Status/Tier/Bank"
-                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '', new_status: a.affiliate_status || '', new_bank_name: a.bank_name || '', new_bank_account_number: a.bank_account_number || '', new_bank_account_name: a.bank_account_name || '' })}
+                            onClick={() => setEditMemberTier({ ...a, new_tier_id: a.membership_tier_id || '', new_status: a.affiliate_status || '', new_bank_name: a.bank_name || '', new_bank_account_number: a.bank_account_number || '', new_bank_account_name: a.bank_account_name || '', new_full_name: a.full_name || '', new_email: a.email || '' })}
                           >
                             <i className="bx bx-edit-alt" />
                           </button>
@@ -567,16 +651,12 @@ export default function AdminAffiliates() {
 
             <div>
               <FieldLabel>Pilih Tier Baru</FieldLabel>
-              <select 
-                style={{ ...A.select, width: '100%' }}
+              <FormSelect
+                placeholder="-- Pilih Tier --"
                 value={editMemberTier.new_tier_id}
-                onChange={e => setEditMemberTier(p => ({ ...p, new_tier_id: e.target.value }))}
-              >
-                <option value="">-- Pilih Tier --</option>
-                {tiers.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} (Level {t.level})</option>
-                ))}
-              </select>
+                onChange={val => setEditMemberTier(p => ({ ...p, new_tier_id: val }))}
+                options={tiers.map(t => ({ value: String(t.id), label: `${t.name} (Level ${t.level})` }))}
+              />
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
                 * Perubahan tier akan langsung mempengaruhi rate komisi member ini pada transaksi berikutnya.
               </div>
@@ -584,16 +664,17 @@ export default function AdminAffiliates() {
 
             <div>
               <FieldLabel>Status Member</FieldLabel>
-              <select 
-                style={{ ...A.select, width: '100%' }}
+              <FormSelect
+                placeholder="-- Pilih Status --"
                 value={editMemberTier.new_status}
-                onChange={e => setEditMemberTier(p => ({ ...p, new_status: e.target.value }))}
-              >
-                <option value="active">Active (Telah Valid)</option>
-                <option value="pending_verification">Pending Verification (Blm Valid)</option>
-                <option value="suspended">Suspended (Ditangguhkan)</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                onChange={val => setEditMemberTier(p => ({ ...p, new_status: val }))}
+                options={[
+                  { value: 'active', label: 'Active (Telah Valid)' },
+                  { value: 'pending_verification', label: 'Pending Verification (Blm Valid)' },
+                  { value: 'suspended', label: 'Suspended (Ditangguhkan)' },
+                  { value: 'inactive', label: 'Inactive' }
+                ]}
+              />
             </div>
           </div>
 

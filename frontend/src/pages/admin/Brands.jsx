@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
 
 const API = ADMIN_API_BASE;
@@ -165,7 +165,7 @@ export default function AdminBrands() {
                 <td style={{ ...A.td, paddingLeft: 24 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <img
-                      src={b.logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(b.name)}&background=eef2ff&color=6366f1&size=80`}
+                      src={b.logo_url ? formatImage(b.logo_url) : `https://ui-avatars.com/api/?name=${encodeURIComponent(b.name)}&background=eef2ff&color=6366f1&size=80`}
                       alt={b.name}
                       style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'contain', border: '1px solid #f1f5f9', background: '#fff', padding: 4, flexShrink: 0 }}
                     />

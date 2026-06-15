@@ -25,10 +25,9 @@ type URLSet struct {
 
 // GenerateSitemap generates an XML sitemap for SEO
 func (ac *AdminController) GenerateSitemap(w http.ResponseWriter, r *http.Request) {
-	// Base URL of the frontend (should be configured in env, falling back to default)
 	baseURL := os.Getenv("FRONTEND_URL")
 	if baseURL == "" {
-		baseURL = "https://akuglow.id"
+		baseURL = models.FrontendURL
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
