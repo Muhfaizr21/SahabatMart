@@ -224,13 +224,13 @@ func (fc *AdminFinanceController) ensureAllocations(period string) {
 			newMap, _ := buildAllocMap(grossProfit, dsList, psList)
 			b, _ := json.Marshal(newMap)
 			newAlloc := models.FinanceRevenueAllocation{
-				Period:     period,
-				SourceType: "period_summary",
-				SourceID:   "initial",
-				SourceHash: "summary_" + period,
+				Period:      period,
+				SourceType:  "period_summary",
+				SourceID:    "initial",
+				SourceHash:  "summary_" + period,
 				GrossAmount: grossProfit,
-				Allocation: string(b),
-				CreatedAt:  time.Now(),
+				Allocation:  string(b),
+				CreatedAt:   time.Now(),
 			}
 			tx.Create(&newAlloc)
 			return nil
@@ -445,10 +445,10 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 
 	// ── DAILY CASH FLOW TREND (last 30 days) ──────────
 	type DailyFlow struct {
-		Date       string  `json:"date"`
-		CashIn     float64 `json:"cash_in"`
-		CashOut    float64 `json:"cash_out"`
-		NetFlow    float64 `json:"net_flow"`
+		Date    string  `json:"date"`
+		CashIn  float64 `json:"cash_in"`
+		CashOut float64 `json:"cash_out"`
+		NetFlow float64 `json:"net_flow"`
 	}
 	var dailyFlow []DailyFlow
 	fc.DB.Table("orders").Select(`
@@ -475,28 +475,28 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 	netCashFlow := totalCashIn - totalCashOut
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"period":              period,
-		"gross_revenue":        gross,
-		"capital_cost":         capitalCost,
-		"gross_profit":         grossProfit,
-		"net_profit":           netProfit,
-		"data_saving":          dataSaving,
-		"profit_shares":        profitShares,
+		"period":        period,
+		"gross_revenue": gross,
+		"capital_cost":  capitalCost,
+		"gross_profit":  grossProfit,
+		"net_profit":    netProfit,
+		"data_saving":   dataSaving,
+		"profit_shares": profitShares,
 
 		// ── CASH FLOW SUMMARY ────────────────────────────
 		"cash_flow": map[string]interface{}{
-			"total_cash_in":   totalCashIn,
-			"total_cash_out":   totalCashOut,
-			"net_cash_flow":    netCashFlow,
-			"cash_in_items":    cashFlowItems,
-			"cash_out_items":   outItems,
+			"total_cash_in":  totalCashIn,
+			"total_cash_out": totalCashOut,
+			"net_cash_flow":  netCashFlow,
+			"cash_in_items":  cashFlowItems,
+			"cash_out_items": outItems,
 		},
 
 		// ── BALANCE ───────────────────────────────────
 		"balance": map[string]interface{}{
-			"total_location_balance":   totalLocationBalance,
-			"platform_wallet_balance":  platformWalletBalance,
-			"pending_payout":           pendingPayout,
+			"total_location_balance":  totalLocationBalance,
+			"platform_wallet_balance": platformWalletBalance,
+			"pending_payout":          pendingPayout,
 			"net_available":           totalLocationBalance - pendingPayout,
 		},
 
@@ -510,19 +510,19 @@ func (fc *AdminFinanceController) GetRevenueDetail(w http.ResponseWriter, r *htt
 		"daily_flow": dailyFlow,
 
 		// ── DETAIL DATA ─────────────────────────────
-		"mutations":      mutations,
+		"mutations":       mutations,
 		"recent_orders":   recentOrders,
 		"wallet_activity": walletActivity,
 
 		// ── CONFIG ───────────────────────────────────
 		"config": map[string]interface{}{
-			"data_saving_list":        dsList,
-			"profit_share_list":        psList,
-			"income_source_list":      isList,
-			"payout_payday_dates":     configSvc.Get("payout_payday_dates", "all"),
-			"payout_min_amount":       configSvc.GetFloat("payout_min_amount", 50000.0),
-			"settlement_delay_hours":   configSvc.GetInt("settlement_delay_hours", 24),
-			"platform_fee_percent":     configSvc.GetFloat("platform_fee_percent", 5.0),
+			"data_saving_list":       dsList,
+			"profit_share_list":      psList,
+			"income_source_list":     isList,
+			"payout_payday_dates":    configSvc.Get("payout_payday_dates", "all"),
+			"payout_min_amount":      configSvc.GetFloat("payout_min_amount", 50000.0),
+			"settlement_delay_hours": configSvc.GetInt("settlement_delay_hours", 24),
+			"platform_fee_percent":   configSvc.GetFloat("platform_fee_percent", 5.0),
 		},
 	})
 }

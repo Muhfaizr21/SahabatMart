@@ -18,11 +18,40 @@ import (
 )
 
 type SkinAIService struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	client *http.Client
 }
 
 func NewSkinAIService(db *gorm.DB) *SkinAIService {
-	return &SkinAIService{DB: db}
+	return &SkinAIService{
+		DB: db,
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+		},
+	}
+}
+
+// doRequest performs HTTP requests with automatic retries for transient errors
+func (s *SkinAIService) doRequest(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, err = s.client.Do(req)
+		if err == nil && resp.StatusCode < 500 {
+			return resp, nil
+		}
+		
+		if resp != nil {
+			resp.Body.Close()
+		}
+		
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+	}
+	return nil, err
 }
 
 // getAPIKey retrieves OpenAI API key from DB config or environment fallback
@@ -205,8 +234,7 @@ func (s *SkinAIService) AnalyzeStage(stage string, params map[string]string, ima
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		log.Printf("⚠️ [SkinAI] HTTP error: %v. Falling back to smart mock.", err)
 		return s.smartMockAnalysis(imageData), nil
@@ -271,7 +299,7 @@ func (s *SkinAIService) smartMockAnalysis(imageData []byte) *models.SkinAnalysis
 	}
 	rng := rand.New(rand.NewSource(seed))
 
-	redness := 5 + rng.Intn(65)  // 5-70
+	redness := 5 + rng.Intn(65)   // 5-70
 	moisture := 25 + rng.Intn(60) // 25-85
 	acneCount := rng.Intn(15)     // 0-14
 

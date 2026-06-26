@@ -41,7 +41,7 @@ export default function DataSavingDetail() {
 
   if (!data || !data.summary) return (
     <div className="p-20 text-center">
-      <div className="text-6xl mb-4">⚠️</div>
+      <div className="mb-4"><i className="bx bx-error text-6xl text-amber-500" /></div>
       <h2 className="text-2xl font-black text-slate-900 mb-2">Gagal Memuat Data</h2>
       <p className="text-slate-400 mb-8">Pastikan backend server AkuGlow sudah berjalan di port 8080.</p>
       <button onClick={fetchData} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg shadow-indigo-200">Coba Lagi</button>

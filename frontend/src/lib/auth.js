@@ -31,6 +31,7 @@ export const isAdminUser = (user) => {
 
 export const logout = () => {
   localStorage.removeItem('token');
+  localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
   // [BUG-H7 Fix] Hapus affiliate_id saat logout — cegah misattribution lintas sesi
   localStorage.removeItem('affiliate_id');
@@ -104,18 +105,69 @@ export const setupIdleTimeout = () => {
   });
 };
 
-// ─── FETCH INTERCEPTOR ─────────────────────────────────────────
-let _originalFetch = null;
+// ─── PROPER API CLIENT (recommended over monkey-patch) ────────
 
 /**
- * setupAuthFetchInterceptor
- * Auto-attach Authorization token ke setiap request fetch.
+ * apiFetch — wrapper fetch dengan auto-auth + error handling.
+ * Gunakan ini di komponen baru. Tidak monkey-patch global fetch.
  */
+export async function apiFetch(input, init = {}) {
+  const token = localStorage.getItem('token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+    ...init.headers,
+  };
+
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (init.body instanceof FormData) {
+    delete headers['Content-Type'];
+  }
+
+  const response = await fetch(input, { ...init, headers });
+
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('affiliate_id');
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+  }
+
+  return response;
+}
+
+/**
+ * apiFetchJson — shorthand untuk GET JSON response
+ */
+export async function apiFetchJson(url, options = {}) {
+  const response = await apiFetch(url, options);
+  if (!response.ok) {
+    let message = `Error ${response.status}`;
+    try {
+      const data = await response.json();
+      message = data?.message || data?.error || message;
+    } catch (_e) {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+// ─── FETCH INTERCEPTOR (legacy) ─────────────────────────────────
+// Dipertahankan untuk kompatibilitas dengan kode lama yang panggil fetch() langsung.
+// Komponen baru harap gunakan apiFetch / apiFetchJson.
+let _originalFetch = null;
+
 export const setupAuthFetchInterceptor = () => {
   if (_originalFetch) return true;
+  if (!window.fetch) return false;
 
   _originalFetch = window.fetch;
-  window.fetch = function(input, init = {}) {
+  window.fetch = async function(input, init = {}) {
     const token = localStorage.getItem('token');
     if (token) {
       init.headers = {
@@ -123,6 +175,31 @@ export const setupAuthFetchInterceptor = () => {
         'Authorization': `Bearer ${token}`,
       };
     }
+    
+    // Auto-convert images to WebP globally without backend dependencies
+    if (init.body instanceof FormData) {
+      const newFormData = new FormData();
+      let hasImage = false;
+      for (const [key, value] of init.body.entries()) {
+        if (value instanceof File && value.type.startsWith('image/') && value.type !== 'image/webp') {
+          hasImage = true;
+          try {
+            const { convertToWebP } = await import('./imageOptimizer.js');
+            const webpFile = await convertToWebP(value, 0.8);
+            newFormData.append(key, webpFile);
+          } catch (err) {
+            console.warn("Failed to convert image to WebP", err);
+            newFormData.append(key, value);
+          }
+        } else {
+          newFormData.append(key, value);
+        }
+      }
+      if (hasImage) {
+        init.body = newFormData;
+      }
+    }
+
     return _originalFetch(input, init);
   };
 

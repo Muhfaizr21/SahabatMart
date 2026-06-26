@@ -1,9 +1,9 @@
 export const categories = [
-  { id: 1, name: 'Skincare', count: 20, bg: '#fdf2f8', emoji: '✨' },
-  { id: 2, name: 'Makeup', count: 25, bg: '#fff1f2', emoji: '💄' },
-  { id: 3, name: 'Body Care', count: 57, bg: '#f0fdf4', emoji: '🌿' },
-  { id: 4, name: 'Supplements', count: 44, bg: '#eff6ff', emoji: '💊' },
-  { id: 5, name: 'Fragrance', count: 81, bg: '#faf5ff', emoji: '🌸' },
+  { id: 1, name: 'Skincare', count: 20, bg: '#fdf2f8', emoji: '' },
+  { id: 2, name: 'Makeup', count: 25, bg: '#fff1f2', emoji: '' },
+  { id: 3, name: 'Body Care', count: 57, bg: '#f0fdf4', emoji: '' },
+  { id: 4, name: 'Supplements', count: 44, bg: '#eff6ff', emoji: '' },
+  { id: 5, name: 'Fragrance', count: 81, bg: '#faf5ff', emoji: '' },
 ];
 
 export const products = [
@@ -17,7 +17,7 @@ export const products = [
     reviews: 128,
     badge: 'Hot',
     badgeClass: 'hot',
-    image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 2,
@@ -29,7 +29,7 @@ export const products = [
     reviews: 45,
     badge: 'Trending',
     badgeClass: 'trending',
-    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 3,
@@ -41,7 +41,7 @@ export const products = [
     reviews: 89,
     badge: '-20%',
     badgeClass: 'offer',
-    image: 'https://images.unsplash.com/photo-1586776192181-452ca5856350?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 4,
@@ -53,7 +53,7 @@ export const products = [
     reviews: 230,
     badge: null,
     badgeClass: null,
-    image: 'https://images.unsplash.com/photo-1626019911752-09eabec18471?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 5,
@@ -65,7 +65,7 @@ export const products = [
     reviews: 67,
     badge: 'Trending',
     badgeClass: 'trending',
-    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 6,
@@ -77,7 +77,7 @@ export const products = [
     reviews: 34,
     badge: null,
     badgeClass: null,
-    image: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 7,
@@ -89,7 +89,7 @@ export const products = [
     reviews: 12,
     badge: 'Sale',
     badgeClass: 'sale',
-    image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300&h=300&fit=crop',
+    image: '',
   },
   {
     id: 8,
@@ -101,7 +101,7 @@ export const products = [
     reviews: 56,
     badge: 'Hot',
     badgeClass: 'hot',
-    image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=300&h=300&fit=crop',
+    image: '',
   },
 ];
 
@@ -111,7 +111,7 @@ export const sliders = [
     badge: 'Formula Korea Premium',
     title: 'Wujudkan Kulit Glowing Impian Anda',
     offer: 'Diskon Spesial',
-    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=500&fit=crop',
+    image: '',
     bg: '#E11D48', // Crimson
   },
   {
@@ -119,7 +119,7 @@ export const sliders = [
     badge: 'Best Seller 2026',
     title: 'Rahasia Kecantikan Alami Setiap Hari',
     offer: 'Hemat 15%',
-    image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=500&fit=crop',
+    image: '',
     bg: '#BE123C', // Primary Dark
   },
   {
@@ -127,7 +127,7 @@ export const sliders = [
     badge: 'Teruji Klinis',
     title: 'Sehat & Cantik dari Dalam ke Luar',
     offer: 'Gift Eksklusif',
-    image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=600&h=500&fit=crop',
+    image: '',
     bg: '#FB7185', // Primary Light
   },
 ];

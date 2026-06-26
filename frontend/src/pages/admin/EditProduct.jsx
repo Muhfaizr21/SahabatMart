@@ -4,6 +4,10 @@ import { ADMIN_API_BASE, fetchJson, formatImage, getSiteUrl } from '../../lib/ap
 import toast from 'react-hot-toast';
 import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+import JoditEditor from 'jodit-react';
+import { marked } from 'marked';
+
 const API = ADMIN_API_BASE;
 
 // ─── WooCommerce Tab Rules per Product Type ───────────────────────────────────
@@ -57,133 +61,6 @@ const S = {
 };
 
 // ─── Sub-Components ────────────────────────────────────────────────────────────
-
-const TOOLBAR_ACTIONS = [
-  { label: 'B', title: 'Bold', action: 'bold' },
-  { label: 'I', title: 'Italic', action: 'italic' },
-  { label: 'U', title: 'Underline', action: 'underline' },
-  null,
-  { label: 'H2', title: 'Heading 2', action: 'h2' },
-  { label: 'H3', title: 'Heading 3', action: 'h3' },
-  null,
-  { icon: 'bx-link', title: 'Link', action: 'link' },
-  { icon: 'bx-list-ul', title: 'Bullet List', action: 'ul' },
-  { icon: 'bx-list-ol', title: 'Ordered List', action: 'ol' },
-  null,
-  { icon: 'bxs-quote-left', title: 'Blockquote', action: 'quote' },
-  { icon: 'bx-code-block', title: 'Code', action: 'code' },
-  { icon: 'bx-horizontal-rule', title: 'Divider', action: 'divider' },
-];
-
-const ClassicEditor = ({ value, onChange, placeholder, minHeight = 200, rows = 8 }) => {
-  const contentRef = useRef(null);
-
-  const insertAtCursor = (ta, before, after = '') => {
-    const s = ta.selectionStart, e = ta.selectionEnd;
-    const sel = ta.value.slice(s, e);
-    const newVal = ta.value.slice(0, s) + before + sel + after + ta.value.slice(e);
-    onChange(newVal);
-    requestAnimationFrame(() => {
-      ta.setSelectionRange(s + before.length, s + before.length + sel.length);
-      ta.focus();
-    });
-  };
-
-  const handleAction = (actionType) => {
-    const ta = contentRef.current;
-    if (!ta) return;
-    switch (actionType) {
-      case 'bold': insertAtCursor(ta, '**', '**'); break;
-      case 'italic': insertAtCursor(ta, '*', '*'); break;
-      case 'underline': insertAtCursor(ta, '<u>', '</u>'); break;
-      case 'h2': insertAtCursor(ta, '\n## '); break;
-      case 'h3': insertAtCursor(ta, '\n### '); break;
-      case 'link': {
-        const u = prompt('URL:');
-        if (u) insertAtCursor(ta, '[', `](${u})`);
-        break;
-      }
-      case 'ul': insertAtCursor(ta, '\n- '); break;
-      case 'ol': insertAtCursor(ta, '\n1. '); break;
-      case 'quote': insertAtCursor(ta, '\n> '); break;
-      case 'code': insertAtCursor(ta, '\n```\n', '\n```\n'); break;
-      case 'divider': insertAtCursor(ta, '\n---\n'); break;
-      default: break;
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <style>{`
-        .ce-toolbar {
-          display: flex; gap: 4px; flex-wrap: wrap;
-          padding: 8px 12px; background: #f8fafc;
-          border: 1.5px solid #e2e8f0; border-bottom: none;
-          border-radius: 10px 10px 0 0;
-          align-items: center;
-        }
-        .ce-toolbar-btn {
-          width: 28px; height: 28px;
-          display: flex; align-items: center; justify-content: center;
-          border: none; background: transparent; border-radius: 6px;
-          cursor: pointer; color: #475569; font-size: 13px; font-weight: 700;
-          transition: all 0.15s;
-        }
-        .ce-toolbar-btn:hover { background: #e2e8f0; color: #0f172a; }
-        .ce-toolbar-sep { width: 1px; height: 16px; background: #e2e8f0; margin: 0 4px; }
-        .ce-content-area {
-          border-radius: 0 0 10px 10px !important;
-          border-top: none !important;
-        }
-        .ce-content-area:focus {
-          border-color: #6366f1 !important;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.1) !important;
-        }
-      `}</style>
-      <div className="ce-toolbar">
-        {TOOLBAR_ACTIONS.map((action, i) =>
-          action === null ? (
-            <div key={i} className="ce-toolbar-sep" />
-          ) : (
-            <button
-              key={i}
-              type="button"
-              className="ce-toolbar-btn"
-              onClick={() => handleAction(action.action)}
-              title={action.title}
-              style={{ fontFamily: 'sans-serif' }}
-            >
-              {action.icon ? (
-                <i className={`bx ${action.icon}`} style={{ fontSize: 15 }} />
-              ) : (
-                <span>{action.label}</span>
-              )}
-            </button>
-          )
-        )}
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', fontFamily: 'sans-serif' }}>
-          MARKDOWN SUPPORTED
-        </span>
-      </div>
-      <textarea
-        ref={contentRef}
-        className="wc-inp ce-content-area"
-        style={{
-          ...S.input,
-          minHeight,
-          resize: 'vertical',
-          lineHeight: 1.75,
-          fontSize: 13.5,
-        }}
-        placeholder={placeholder}
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        rows={rows}
-      />
-    </div>
-  );
-};
 
 const Toggle = ({ checked, onChange, label, desc }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
@@ -440,8 +317,8 @@ export default function AdminEditProduct() {
         setP({
           id: item.id,
           name: item.name || '',
-          short_description: item.short_description || '',
-          description: item.description || '',
+          short_description: item.short_description ? (/<[a-z][\s\S]*>/i.test(item.short_description) ? item.short_description : marked.parse(item.short_description, { breaks: true, async: false })) : '',
+          description: item.description ? (/<[a-z][\s\S]*>/i.test(item.description) ? item.description : marked.parse(item.description, { breaks: true, async: false })) : '',
           product_type: item.product_type || 'simple',
           price: item.price !== undefined && item.price !== null ? item.price : '',
           old_price: item.old_price ? item.old_price : '',
@@ -548,10 +425,55 @@ export default function AdminEditProduct() {
 
   const handleSubmit = (statusOverride) => {
     if (!p.name.trim()) { toast.error('Nama produk wajib diisi!'); return; }
+    
+    // External product check
+    if (p.product_type === 'external') {
+      if (!p.product_url.trim()) { toast.error('URL Produk Eksternal wajib diisi!'); return; }
+      if (!p.product_url.startsWith('http://') && !p.product_url.startsWith('https://')) {
+        toast.error('URL Produk Eksternal harus diawali dengan http:// atau https://'); return;
+      }
+    }
+
     if (p.product_type !== 'grouped' && p.product_type !== 'variable' && (!p.price || parseFloat(p.price) <= 0)) {
-      toast.error('Harga jual wajib diisi!'); return; }
-    if (parseFloat(p.old_price) > 0 && parseFloat(p.old_price) >= parseFloat(p.price)) {
-      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+      toast.error('Harga jual wajib diisi!'); return; 
+    }
+    
+    if (p.product_type !== 'grouped' && p.product_type !== 'variable') {
+      if (parseFloat(p.price) <= parseFloat(p.cogs)) { toast.error('Harga Jual harus lebih besar dari Harga Modal (COGS)!'); return; }
+      if (parseFloat(p.old_price) > 0 && parseFloat(p.old_price) <= parseFloat(p.price)) {
+        toast.error('Harga Coret (Normal) harus lebih besar dari Harga Jual (Sale)!'); return;
+      }
+    }
+
+
+    
+    if (p.manage_stock && parseInt(p.stock) < 0) {
+      toast.error('Stok produk tidak boleh negatif!'); return;
+    }
+    
+    if (parseInt(p.low_stock_threshold) < 0) {
+      toast.error('Batas stok rendah (Low Stock Threshold) tidak boleh negatif!'); return;
+    }
+
+    // Sale schedule logic
+    if (p.sale_start && p.sale_end) {
+      if (new Date(p.sale_start) > new Date(p.sale_end)) {
+        toast.error('Tanggal berakhir diskon (Sale End) harus setelah tanggal mulai (Sale Start)!'); return;
+      }
+    }
+
+    // Wholesale logic
+    if (parseFloat(p.wholesale_price) > 0) {
+      if (parseFloat(p.wholesale_price) >= parseFloat(p.price)) {
+        toast.error('Harga Grosir harus lebih kecil dari Harga Jual!'); return;
+      }
+      if (parseFloat(p.wholesale_price) <= parseFloat(p.cogs)) {
+        toast.error('Harga Grosir harus lebih besar dari Harga Modal (COGS)!'); return;
+      }
+    }
+
+    if (p.is_downloadable && downloadableFiles.filter(f => f.name.trim() || f.file_url.trim()).length === 0) {
+      toast.error('Produk downloadable wajib memiliki minimal satu file yang disertakan!'); return;
     }
     setSaving(true);
     const payload = {
@@ -618,8 +540,16 @@ export default function AdminEditProduct() {
   // Variant handlers
   const handleAddVariant = () => {
     if (!newVariant.name.trim()) { toast.error('Nama varian wajib diisi!'); return; }
-    if (parseFloat(newVariant.old_price) > 0 && parseFloat(newVariant.old_price) >= parseFloat(newVariant.price)) {
-      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    if (variants.some(v => v.name.toLowerCase() === newVariant.name.trim().toLowerCase())) { toast.error('Varian dengan nama tersebut sudah ada!'); return; }
+    if (parseFloat(newVariant.price) <= parseFloat(newVariant.cogs)) { toast.error('Harga Jual varian harus lebih besar dari Harga Modal (COGS)!'); return; }
+    if (parseFloat(newVariant.old_price) > 0 && parseFloat(newVariant.old_price) <= parseFloat(newVariant.price)) {
+      toast.error('Harga Coret (Normal) harus lebih besar dari Harga Jual (Sale)!'); return;
+    }
+    if (!newVariant.is_virtual && !newVariant.is_downloadable && parseInt(newVariant.weight) <= 0) {
+      toast.error('Berat varian fisik wajib diisi (> 0)!'); return;
+    }
+    if (newVariant.manage_stock && parseInt(newVariant.stock) < 0) {
+      toast.error('Stok varian tidak boleh negatif!'); return;
     }
     const payload = {
       ...newVariant,
@@ -657,8 +587,14 @@ export default function AdminEditProduct() {
 
   const handleUpdateVariant = () => {
     if (!editingVariant.name.trim()) { toast.error('Nama varian wajib diisi!'); return; }
-    if (parseFloat(editingVariant.old_price) > 0 && parseFloat(editingVariant.old_price) >= parseFloat(editingVariant.price)) {
-      toast.error('Harga sale harus lebih kecil dari harga normal!'); return;
+    if (variants.some(v => v.id !== editingVariant.id && v.name.toLowerCase() === editingVariant.name.trim().toLowerCase())) { toast.error('Varian dengan nama tersebut sudah ada!'); return; }
+    if (parseFloat(editingVariant.price) <= parseFloat(editingVariant.cogs)) { toast.error('Harga Jual varian harus lebih besar dari Harga Modal (COGS)!'); return; }
+    if (parseFloat(editingVariant.old_price) > 0 && parseFloat(editingVariant.old_price) <= parseFloat(editingVariant.price)) {
+      toast.error('Harga Coret (Normal) harus lebih besar dari Harga Jual (Sale)!'); return;
+    }
+
+    if (editingVariant.manage_stock && parseInt(editingVariant.stock) < 0) {
+      toast.error('Stok varian tidak boleh negatif!'); return;
     }
     const payload = {
       ...editingVariant,
@@ -839,7 +775,7 @@ export default function AdminEditProduct() {
   const renderPricingBlock = () => (
     <div style={{ background: '#f8fafc', borderRadius: 12, padding: 18, border: '1px solid #f1f5f9' }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>
-        💲 Penetapan Harga
+        Penetapan Harga
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div>
@@ -873,11 +809,11 @@ export default function AdminEditProduct() {
         </InfoBanner>
         <div>
           <label style={S.lbl}>Status Pajak</label>
-          <select className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
+          <AdminSelect className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
             <option value="taxable">Kena Pajak (Taxable)</option>
             <option value="reduced">Pajak Dikurangi (Reduced Rate)</option>
             <option value="none">Bebas Pajak (Zero Rate)</option>
-          </select>
+          </AdminSelect>
         </div>
       </div>
     );
@@ -888,11 +824,11 @@ export default function AdminEditProduct() {
         </InfoBanner>
         <div>
           <label style={S.lbl}>Status Pajak</label>
-          <select className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
+          <AdminSelect className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
             <option value="taxable">Kena Pajak (Taxable)</option>
             <option value="reduced">Pajak Dikurangi (Reduced Rate)</option>
             <option value="none">Bebas Pajak (Zero Rate)</option>
-          </select>
+          </AdminSelect>
         </div>
       </div>
     );
@@ -915,11 +851,11 @@ export default function AdminEditProduct() {
         {renderPricingBlock()}
         <div>
           <label style={S.lbl}>Status Pajak</label>
-          <select className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
+          <AdminSelect className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
             <option value="taxable">Kena Pajak (Taxable)</option>
             <option value="reduced">Pajak Dikurangi (Reduced Rate)</option>
             <option value="none">Bebas Pajak (Zero Rate)</option>
-          </select>
+          </AdminSelect>
         </div>
       </div>
     );
@@ -942,18 +878,18 @@ export default function AdminEditProduct() {
           </div>
           {p.price && p.cogs && parseFloat(p.price) > 0 && (
             <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', fontSize: 12, color: '#166534', fontWeight: 700, display: 'flex', gap: 16 }}>
-              <span>💰 Profit: Rp {(parseFloat(p.price) - parseFloat(p.cogs)).toLocaleString('id-ID')}</span>
-              <span>📊 Margin: {(((parseFloat(p.price) - parseFloat(p.cogs)) / parseFloat(p.price)) * 100).toFixed(1)}%</span>
+              <span>Profit: Rp {(parseFloat(p.price) - parseFloat(p.cogs)).toLocaleString('id-ID')}</span>
+              <span>Margin: {(((parseFloat(p.price) - parseFloat(p.cogs)) / parseFloat(p.price)) * 100).toFixed(1)}%</span>
             </div>
           )}
         </div>
         <div>
           <label style={S.lbl}>Status Pajak</label>
-          <select className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
+          <AdminSelect className="wc-inp" style={S.select} value={p.tax_status} onChange={e => set('tax_status', e.target.value)}>
             <option value="taxable">Kena Pajak (Taxable)</option>
             <option value="reduced">Pajak Dikurangi (Reduced Rate)</option>
             <option value="none">Bebas Pajak (Zero Rate)</option>
-          </select>
+          </AdminSelect>
         </div>
 
         {((p.is_downloadable || p.product_type === 'digital')) && (
@@ -961,7 +897,7 @@ export default function AdminEditProduct() {
             <div>
               <label style={{ ...S.lbl, display: 'flex', alignItems: 'center', gap: 6 }}>
                 File yang dapat diunduh (Downloadable files)
-                <span style={{ cursor: 'help', color: '#94a3b8' }} title="Pilih berkas dari Pustaka Media atau masukkan URL berkas eksternal.">❓</span>
+                <span style={{ cursor: 'help', color: '#94a3b8' }} title="Pilih berkas dari Pustaka Media atau masukkan URL berkas eksternal."><i className="bx bx-help-circle"/></span>
               </label>
               
               <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
@@ -1088,11 +1024,11 @@ export default function AdminEditProduct() {
         </div>
         <div>
           <label style={S.lbl}>Status Stok Default</label>
-          <select className="wc-inp" style={S.select} value={p.stock > 0 ? 'instock' : 'outofstock'}
+          <AdminSelect className="wc-inp" style={S.select} value={p.stock > 0 ? 'instock' : 'outofstock'}
             onChange={e => set('stock', e.target.value === 'instock' ? 100 : 0)}>
             <option value="instock">Tersedia (In Stock)</option>
             <option value="outofstock">Habis (Out of Stock)</option>
-          </select>
+          </AdminSelect>
         </div>
       </div>
     );
@@ -1126,9 +1062,9 @@ export default function AdminEditProduct() {
               <label style={S.lbl}>Backorder / Pre-order</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                 {[
-                  { value: 'no',     label: '🚫 Tidak Diizinkan', color: '#ef4444' },
-                  { value: 'yes',    label: '✅ Izinkan',          color: '#10b981' },
-                  { value: 'notify', label: '🔔 Izinkan + Notif',  color: '#f59e0b' },
+                  { value: 'no',     label: 'Tidak Diizinkan', color: '#ef4444' },
+                  { value: 'yes',    label: 'Izinkan',          color: '#10b981' },
+                  { value: 'notify', label: 'Izinkan + Notif',  color: '#f59e0b' },
                 ].map(opt => (
                   <button key={opt.value} type="button" onClick={() => set('backorders', opt.value)}
                     style={{
@@ -1203,7 +1139,7 @@ export default function AdminEditProduct() {
         {/* Upsells */}
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-            ⬆️ Upsell
+            Upsell
           </div>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
             Produk yang direkomendasikan di halaman produk ini sebagai pilihan yang lebih premium/mahal. Tampil di bagian "Produk yang Mungkin Kamu Suka".
@@ -1221,7 +1157,7 @@ export default function AdminEditProduct() {
         {/* Cross-sells */}
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-            🔄 Cross-sell
+            Cross-sell
           </div>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
             Produk pelengkap yang direkomendasikan di halaman keranjang belanja (cart). Contoh: jual tas → cross-sell tali tas.
@@ -1292,7 +1228,7 @@ export default function AdminEditProduct() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <select className="wc-inp" style={{ ...S.select, width: 220, margin: 0, height: 36, padding: '0 10px', fontSize: 12.5 }}
+          <AdminSelect className="wc-inp" style={{ ...S.select, width: 220, margin: 0, height: 36, padding: '0 10px', fontSize: 12.5 }}
             value={bulkAction} onChange={e => setBulkAction(e.target.value)}>
             <option value="">— Aksi Massal (Bulk Action) —</option>
             <option value="set_regular_price">Atur Harga Normal</option>
@@ -1306,7 +1242,7 @@ export default function AdminEditProduct() {
             <option value="toggle_virtual">Toggle Virtual</option>
             <option value="toggle_downloadable">Toggle Downloadable</option>
             <option value="delete_all">Hapus Semua Variasi</option>
-          </select>
+          </AdminSelect>
           <button type="button" onClick={handleBulkAction}
             style={{ padding: '8px 16px', background: '#475569', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 12.5, height: 36 }}>
             Terapkan
@@ -1441,7 +1377,7 @@ export default function AdminEditProduct() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          🔍 Pratinjau Google Search
+          Pratinjau Google Search
         </div>
         <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', fontFamily: 'Arial, sans-serif' }}>
           <div style={{ fontSize: 14, color: '#1a0dab', fontWeight: 600, marginBottom: 3 }}>
@@ -1494,18 +1430,18 @@ export default function AdminEditProduct() {
       </InfoBanner>
       <div>
         <label style={S.lbl}>Preset Komisi Afiliasi</label>
-        <select className="wc-inp" style={S.select}
+        <AdminSelect className="wc-inp" style={S.select}
           value={p.commission_preset_id || ''}
           onChange={e => set('commission_preset_id', e.target.value || null)}>
           <option value="">— Gunakan Hierarki Default —</option>
           {presets.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
-        </select>
+        </AdminSelect>
         <div style={S.hint}>Distribusi komisi ke upline mitra secara berjenjang.</div>
       </div>
       {/* Tier Commission Matrix */}
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: 18, border: '1px solid #e2e8f0' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>
-          📊 Matriks Komisi per Tier
+          Matriks Komisi per Tier
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -1670,7 +1606,7 @@ export default function AdminEditProduct() {
           <div className="wc-fade" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', background: '#f6f7f7', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#1d2327' }}>Data Produk —</span>
-              <select className="wc-inp"
+              <AdminSelect className="wc-inp"
                 style={{ padding: '4px 28px 4px 10px', borderRadius: 4, border: '1px solid #8c8f94', fontSize: 13, fontWeight: 600, color: '#1d2327', background: '#fff', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 9px center' }}
                 value={p.product_type}
                 onChange={e => {
@@ -1688,7 +1624,7 @@ export default function AdminEditProduct() {
                   });
                 }}>
                 {PRODUCT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+              </AdminSelect>
             </div>
 
             {/* Vertical tabs + content */}
@@ -1732,12 +1668,10 @@ export default function AdminEditProduct() {
               <span style={{ fontSize: 11.5, color: '#72777c', fontWeight: 400 }}>(tampil di halaman produk)</span>
             </div>
             <div style={{ padding: 18 }}>
-              <ClassicEditor
-                placeholder="Jelaskan produk secara detail..."
+              <JoditEditor
                 value={p.description}
-                onChange={val => set('description', val)}
-                minHeight={240}
-                rows={10}
+                config={{ placeholder: 'Jelaskan produk secara detail...', minHeight: 240 }}
+                onBlur={newContent => set('description', newContent)}
               />
             </div>
           </div>
@@ -1749,12 +1683,10 @@ export default function AdminEditProduct() {
               <span style={{ fontSize: 11.5, color: '#72777c', fontWeight: 400 }}>(tampil di listing & atas tombol Beli)</span>
             </div>
             <div style={{ padding: 18 }}>
-              <ClassicEditor
-                placeholder="Ringkasan menarik produk — ideal 1-2 kalimat..."
+              <JoditEditor
                 value={p.short_description}
-                onChange={val => set('short_description', val)}
-                minHeight={100}
-                rows={4}
+                config={{ placeholder: 'Ringkasan menarik produk — ideal 1-2 kalimat...', minHeight: 100 }}
+                onBlur={newContent => set('short_description', newContent)}
               />
             </div>
           </div>
@@ -1774,12 +1706,12 @@ export default function AdminEditProduct() {
               </div>
               <div>
                 <label style={{ ...S.lbl, fontSize: 12 }}>Visibilitas</label>
-                <select className="wc-inp" style={{ ...S.select, fontSize: 12.5 }} value={p.visibility} onChange={e => set('visibility', e.target.value)}>
+                <AdminSelect className="wc-inp" style={{ ...S.select, fontSize: 12.5 }} value={p.visibility} onChange={e => set('visibility', e.target.value)}>
                   <option value="public">Publik — Semua bisa lihat</option>
                   <option value="catalog">Katalog — Tidak di pencarian</option>
                   <option value="search">Pencarian — Tidak di listing</option>
                   <option value="hidden">Tersembunyi — Direct link saja</option>
-                </select>
+                </AdminSelect>
               </div>
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <button type="button" onClick={() => handleSubmit('active')} disabled={saving}
@@ -1858,10 +1790,10 @@ export default function AdminEditProduct() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ ...S.lbl, fontSize: 12 }}>Kategori <span style={{ color: '#ef4444' }}>*</span></label>
-                <select className="wc-inp" style={{ ...S.select, fontSize: 12.5 }} value={p.category} onChange={e => set('category', e.target.value)}>
+                <AdminSelect className="wc-inp" style={{ ...S.select, fontSize: 12.5 }} value={p.category} onChange={e => set('category', e.target.value)}>
                   <option value="">— Pilih Kategori —</option>
                   {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <label style={{ ...S.lbl, fontSize: 12 }}>Tag Produk</label>
@@ -1874,10 +1806,10 @@ export default function AdminEditProduct() {
 
           {/* Brand */}
           <SideCard title="Merek / Brand" icon="bx-store">
-            <select className="wc-inp" style={{ ...S.select, fontSize: 12.5 }} value={p.brand} onChange={e => set('brand', e.target.value)}>
+            <AdminSelect className="wc-inp" style={{ ...S.select, fontSize: 12.5 }} value={p.brand} onChange={e => set('brand', e.target.value)}>
               <option value="">— Tanpa Brand —</option>
               {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-            </select>
+            </AdminSelect>
           </SideCard>
         </div>
       </div>
@@ -1990,28 +1922,28 @@ export default function AdminEditProduct() {
 
               <div>
                 <label style={S.lbl}>Status Pajak</label>
-                <select className="wc-inp" style={S.select} value={newVariant.tax_status} onChange={e => setNewVariant({ ...newVariant, tax_status: e.target.value })}>
+                <AdminSelect className="wc-inp" style={S.select} value={newVariant.tax_status} onChange={e => setNewVariant({ ...newVariant, tax_status: e.target.value })}>
                   <option value="taxable">Kena Pajak (Taxable)</option>
                   <option value="reduced">Pajak Dikurangi (Reduced Rate)</option>
                   <option value="none">Bebas Pajak (Zero Rate)</option>
-                </select>
+                </AdminSelect>
               </div>
 
               <div>
                 <label style={S.lbl}>Kelas Pajak</label>
-                <select className="wc-inp" style={S.select} value={newVariant.tax_class} onChange={e => setNewVariant({ ...newVariant, tax_class: e.target.value })}>
+                <AdminSelect className="wc-inp" style={S.select} value={newVariant.tax_class} onChange={e => setNewVariant({ ...newVariant, tax_class: e.target.value })}>
                   <option value="standard">Standard</option>
                   <option value="reduced">Reduced Rate</option>
                   <option value="zero">Zero Rate</option>
-                </select>
+                </AdminSelect>
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={S.lbl}>Komisi Affiliate (Override)</label>
-                <select className="wc-inp" style={S.select} value={newVariant.commission_preset_id || ''} onChange={e => setNewVariant({ ...newVariant, commission_preset_id: e.target.value })}>
+                <AdminSelect className="wc-inp" style={S.select} value={newVariant.commission_preset_id || ''} onChange={e => setNewVariant({ ...newVariant, commission_preset_id: e.target.value })}>
                   <option value="">Gunakan Default Produk</option>
                   {presets.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
-                </select>
+                </AdminSelect>
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
@@ -2177,28 +2109,28 @@ export default function AdminEditProduct() {
 
               <div>
                 <label style={S.lbl}>Status Pajak</label>
-                <select className="wc-inp" style={S.select} value={editingVariant.tax_status} onChange={e => setEditingVariant({ ...editingVariant, tax_status: e.target.value })}>
+                <AdminSelect className="wc-inp" style={S.select} value={editingVariant.tax_status} onChange={e => setEditingVariant({ ...editingVariant, tax_status: e.target.value })}>
                   <option value="taxable">Kena Pajak (Taxable)</option>
                   <option value="reduced">Pajak Dikurangi (Reduced Rate)</option>
                   <option value="none">Bebas Pajak (Zero Rate)</option>
-                </select>
+                </AdminSelect>
               </div>
 
               <div>
                 <label style={S.lbl}>Kelas Pajak</label>
-                <select className="wc-inp" style={S.select} value={editingVariant.tax_class} onChange={e => setEditingVariant({ ...editingVariant, tax_class: e.target.value })}>
+                <AdminSelect className="wc-inp" style={S.select} value={editingVariant.tax_class} onChange={e => setEditingVariant({ ...editingVariant, tax_class: e.target.value })}>
                   <option value="standard">Standard</option>
                   <option value="reduced">Reduced Rate</option>
                   <option value="zero">Zero Rate</option>
-                </select>
+                </AdminSelect>
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={S.lbl}>Komisi Affiliate (Override)</label>
-                <select className="wc-inp" style={S.select} value={editingVariant.commission_preset_id || ''} onChange={e => setEditingVariant({ ...editingVariant, commission_preset_id: e.target.value })}>
+                <AdminSelect className="wc-inp" style={S.select} value={editingVariant.commission_preset_id || ''} onChange={e => setEditingVariant({ ...editingVariant, commission_preset_id: e.target.value })}>
                   <option value="">Gunakan Default Produk</option>
                   {presets.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
-                </select>
+                </AdminSelect>
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>

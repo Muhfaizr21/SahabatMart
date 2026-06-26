@@ -15,6 +15,7 @@ import (
 
 	"akuglow/backend/models"
 	"akuglow/backend/repositories"
+	"akuglow/backend/seeder"
 	"akuglow/backend/services"
 	"akuglow/backend/utils"
 
@@ -839,30 +840,30 @@ func (ac *AdminController) GetAffiliates(w http.ResponseWriter, r *http.Request)
 	offset := (page - 1) * limit
 
 	type AffRow struct {
-		ID               string    `json:"id"`
-		Email            string    `json:"email"`
-		FullName         string    `json:"full_name"`
-		Status           string    `json:"status"`
-		RefCode          string    `json:"ref_code"`
-		TierName         string    `json:"tier_name"`
-		TierColor        string    `json:"tier_color"`
-		TierLevel        int       `json:"tier_level"`
-		CommRate         float64   `json:"comm_rate"`
-		TotalEarned      float64   `json:"total_earned"`
-		TotalWithdrawn   float64   `json:"total_withdrawn"`
-		TotalClicks      int64     `json:"total_clicks"`
-		TotalConversions int       `json:"total_conversions"`
+		ID                string    `json:"id"`
+		Email             string    `json:"email"`
+		FullName          string    `json:"full_name"`
+		Status            string    `json:"status"`
+		RefCode           string    `json:"ref_code"`
+		TierName          string    `json:"tier_name"`
+		TierColor         string    `json:"tier_color"`
+		TierLevel         int       `json:"tier_level"`
+		CommRate          float64   `json:"comm_rate"`
+		TotalEarned       float64   `json:"total_earned"`
+		TotalWithdrawn    float64   `json:"total_withdrawn"`
+		TotalClicks       int64     `json:"total_clicks"`
+		TotalConversions  int       `json:"total_conversions"`
 		BankName          string    `gorm:"column:bank_name" json:"bank_name"`
 		BankAccountNumber string    `gorm:"column:bank_account_number" json:"bank_account_number"`
 		BankAccountName   string    `gorm:"column:bank_account_name" json:"bank_account_name"`
-		AffStatus        string    `json:"affiliate_status"`
-		JoinedAt         time.Time `json:"joined_at"`
-		Balance          float64   `json:"balance"`
-		TeamTurnover     float64   `json:"team_turnover"`
-		MonthlyTurnover  float64   `json:"monthly_turnover"`
-		TeamDownlines    int64     `json:"team_downlines"`
-		Role             string    `json:"role"`
-		MembershipTierID uint      `json:"membership_tier_id"`
+		AffStatus         string    `json:"affiliate_status"`
+		JoinedAt          time.Time `json:"joined_at"`
+		Balance           float64   `json:"balance"`
+		TeamTurnover      float64   `json:"team_turnover"`
+		MonthlyTurnover   float64   `json:"monthly_turnover"`
+		TeamDownlines     int64     `json:"team_downlines"`
+		Role              string    `json:"role"`
+		MembershipTierID  uint      `json:"membership_tier_id"`
 	}
 
 	whereClause := "u.role IN ('affiliate', 'merchant') AND am.id IS NOT NULL"
@@ -929,14 +930,14 @@ func (ac *AdminController) UpdateMemberInfo(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req struct {
-		UserID             string `json:"user_id"`
-		Email              string `json:"email"`
-		FullName           string `json:"full_name"`
-		MembershipTierID   uint   `json:"membership_tier_id"`
-		Status             string `json:"status"`
-		BankName           string `json:"bank_name"`
-		BankAccountNumber  string `json:"bank_account_number"`
-		BankAccountName    string `json:"bank_account_name"`
+		UserID            string `json:"user_id"`
+		Email             string `json:"email"`
+		FullName          string `json:"full_name"`
+		MembershipTierID  uint   `json:"membership_tier_id"`
+		Status            string `json:"status"`
+		BankName          string `json:"bank_name"`
+		BankAccountNumber string `json:"bank_account_number"`
+		BankAccountName   string `json:"bank_account_name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
@@ -1340,9 +1341,9 @@ func (ac *AdminController) GetProducts(w http.ResponseWriter, r *http.Request) {
 			var totalStock int64
 			var minPrice float64
 			ac.DB.Table("product_variants").Where("product_id = ?", rows[i].ID).Select("COALESCE(SUM(stock), 0)").Scan(&totalStock)
-			
+
 			rows[i].Stock = int(totalStock)
-			
+
 			if rows[i].ProductType == "variable" {
 				var maxPrice float64
 				ac.DB.Table("product_variants").Where("product_id = ? AND price > 0", rows[i].ID).Select("COALESCE(MIN(price), 0), COALESCE(MAX(price), 0)").Row().Scan(&minPrice, &maxPrice)
@@ -1761,13 +1762,13 @@ func (ac *AdminController) ToggleProductFeatured(w http.ResponseWriter, r *http.
 		utils.JSONError(w, http.StatusBadRequest, "Invalid request")
 		return
 	}
-	
+
 	var prod models.Product
 	if err := ac.DB.First(&prod, "id = ?", req.ID).Error; err != nil {
 		utils.JSONError(w, http.StatusNotFound, "Product not found")
 		return
 	}
-	
+
 	newStatus := !prod.IsFeatured
 	ac.DB.Model(&prod).Update("is_featured", newStatus)
 
@@ -1791,19 +1792,30 @@ func (ac *AdminController) DeleteProduct(w http.ResponseWriter, r *http.Request)
 
 	// HAPUS PERMANEN dengan pembersihan data terkait (Cascading Delete Manual)
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Hapus Varian
-		if err := tx.Unscoped().Where("product_id = ?", id).Delete(&models.ProductVariant{}).Error; err != nil {
-			return err
+		relations := []interface{}{
+			&models.CartItem{},
+			&models.RestockItem{},
+			&models.UserInteraction{},
+			&models.Review{},
+			&models.SkinJourneyProductMapping{},
+			&models.SkinJourneyProductStep{},
+			&models.SkinJourneyRoutine{},
+			&models.AffiliateCommission{},
+			&models.AffiliateLink{},
+			&models.AffiliateClickLog{},
+			&models.CommissionRule{},
+			&models.Inventory{},
+			&models.ProductTierCommission{},
+			&models.ProductVariant{},
 		}
-		// 2. Hapus Inventori/Stok
-		if err := tx.Unscoped().Where("product_id = ?", id).Delete(&models.Inventory{}).Error; err != nil {
-			return err
+
+		for _, rel := range relations {
+			if err := tx.Unscoped().Where("product_id = ?", id).Delete(rel).Error; err != nil {
+				return err
+			}
 		}
-		// 3. Hapus Komisi Tier
-		if err := tx.Unscoped().Where("product_id = ?", id).Delete(&models.ProductTierCommission{}).Error; err != nil {
-			return err
-		}
-		// 4. Hapus Produk Utama
+
+		// Hapus Produk Utama
 		if err := tx.Unscoped().Delete(&models.Product{}, "id = ?", id).Error; err != nil {
 			return err
 		}
@@ -1841,11 +1853,30 @@ func (ac *AdminController) BulkDeleteProducts(w http.ResponseWriter, r *http.Req
 	}
 
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		relations := []interface{}{
+			&models.CartItem{},
+			&models.RestockItem{},
+			&models.UserInteraction{},
+			&models.Review{},
+			&models.SkinJourneyProductMapping{},
+			&models.SkinJourneyProductStep{},
+			&models.SkinJourneyRoutine{},
+			&models.AffiliateCommission{},
+			&models.AffiliateLink{},
+			&models.AffiliateClickLog{},
+			&models.CommissionRule{},
+			&models.Inventory{},
+			&models.ProductTierCommission{},
+			&models.ProductVariant{},
+		}
+
 		for _, id := range req.IDs {
 			// Clean relations
-			tx.Unscoped().Where("product_id = ?", id).Delete(&models.ProductVariant{})
-			tx.Unscoped().Where("product_id = ?", id).Delete(&models.Inventory{})
-			tx.Unscoped().Where("product_id = ?", id).Delete(&models.ProductTierCommission{})
+			for _, rel := range relations {
+				if err := tx.Unscoped().Where("product_id = ?", id).Delete(rel).Error; err != nil {
+					return err
+				}
+			}
 			// Delete main product
 			if err := tx.Unscoped().Delete(&models.Product{}, "id = ?", id).Error; err != nil {
 				return err
@@ -2034,21 +2065,21 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		SaleEnd                    string  `json:"sale_end"`
 
 		// WooCommerce Full Parity - New Fields
-		IsFeatured         bool    `json:"is_featured"`          // Star icon for featured
-		LowStockThreshold  int     `json:"low_stock_threshold"`  // Alert threshold
-		ShippingClassID    *uint   `json:"shipping_class_id"`    // Shipping class grouping
-		DefaultVariantID   *string `json:"default_variant_id"`   // Default variation for variable products
-		CanonicalURL       string  `json:"canonical_url"`       // Canonical URL
-		OGImage            string  `json:"og_image"`            // Open Graph image for social
-		NoIndex            bool    `json:"no_index"`           // robots noindex
-		ProductType        string  `json:"product_type"`       // Product type
-		Visibility         string  `json:"visibility"`         // Visibility
-		SEODescription     string  `json:"seo_description"`    // SEO description
-		SEOKeywords        string  `json:"seo_keywords"`      // SEO keywords
-		SEOTitle           string  `json:"seo_title"`          // SEO title
-		WholesalePrice     float64 `json:"wholesale_price"`    // Wholesale price
-		Upsells            string  `json:"upsells"`            // Upsell product IDs in JSON
-		CrossSells         string  `json:"crosssells"`         // Cross-sell product IDs in JSON
+		IsFeatured        bool    `json:"is_featured"`         // Star icon for featured
+		LowStockThreshold int     `json:"low_stock_threshold"` // Alert threshold
+		ShippingClassID   *uint   `json:"shipping_class_id"`   // Shipping class grouping
+		DefaultVariantID  *string `json:"default_variant_id"`  // Default variation for variable products
+		CanonicalURL      string  `json:"canonical_url"`       // Canonical URL
+		OGImage           string  `json:"og_image"`            // Open Graph image for social
+		NoIndex           bool    `json:"no_index"`            // robots noindex
+		ProductType       string  `json:"product_type"`        // Product type
+		Visibility        string  `json:"visibility"`          // Visibility
+		SEODescription    string  `json:"seo_description"`     // SEO description
+		SEOKeywords       string  `json:"seo_keywords"`        // SEO keywords
+		SEOTitle          string  `json:"seo_title"`           // SEO title
+		WholesalePrice    float64 `json:"wholesale_price"`     // Wholesale price
+		Upsells           string  `json:"upsells"`             // Upsell product IDs in JSON
+		CrossSells        string  `json:"crosssells"`          // Cross-sell product IDs in JSON
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Invalid payload")
@@ -2110,21 +2141,21 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		"sale_end":                      req.SaleEnd,
 
 		// WooCommerce Full Parity - New Fields
-		"is_featured":          req.IsFeatured,
-		"low_stock_threshold":  req.LowStockThreshold,
-		"shipping_class_id":    req.ShippingClassID,
-		"default_variant_id":   req.DefaultVariantID,
-		"canonical_url":        req.CanonicalURL,
-		"og_image":             req.OGImage,
-		"no_index":             req.NoIndex,
-		"product_type":         req.ProductType,
-		"visibility":           req.Visibility,
+		"is_featured":         req.IsFeatured,
+		"low_stock_threshold": req.LowStockThreshold,
+		"shipping_class_id":   req.ShippingClassID,
+		"default_variant_id":  req.DefaultVariantID,
+		"canonical_url":       req.CanonicalURL,
+		"og_image":            req.OGImage,
+		"no_index":            req.NoIndex,
+		"product_type":        req.ProductType,
+		"visibility":          req.Visibility,
 		"seo_title":           req.SEOTitle,
 		"seo_description":     req.SEODescription,
 		"seo_keywords":        req.SEOKeywords,
-		"wholesale_price":      req.WholesalePrice,
-		"upsells":              req.Upsells,
-		"crosssells":           req.CrossSells,
+		"wholesale_price":     req.WholesalePrice,
+		"upsells":             req.Upsells,
+		"crosssells":          req.CrossSells,
 	}
 
 	// 1. Check SKU conflicts (Cross-table)
@@ -2151,48 +2182,50 @@ func (ac *AdminController) UpdateProduct(w http.ResponseWriter, r *http.Request)
 		}
 
 		// [Akuglow Sync] Sinkronkan ke Gudang Pusat (Inventory)
-		var inv models.Inventory
-		var variant models.ProductVariant
-		tx.Where("product_id = ? AND name = ?", req.ID, "Standard").First(&variant)
-		if variant.ID == "" {
-			tx.Where("product_id = ?", req.ID).First(&variant)
-		}
-
-		var err error
-		if variant.ID != "" {
-			err = tx.Where("merchant_id = ? AND product_id = ? AND product_variant_id = ?", models.PusatID, req.ID, variant.ID).First(&inv).Error
-		} else {
-			err = tx.Where("merchant_id = ? AND product_id = ? AND product_variant_id IS NULL", models.PusatID, req.ID).First(&inv).Error
-		}
-
-		if err != nil {
-			// Jika belum ada record di inventory, buat baru
-			inv = models.Inventory{
-				MerchantID: models.PusatID,
-				ProductID:  req.ID,
-				Stock:      req.Stock,
-				BasePrice:  req.COGS, // Sync Modal (COGS)
+		if req.ProductType != "variable" {
+			var inv models.Inventory
+			var variant models.ProductVariant
+			tx.Where("product_id = ? AND name = ?", req.ID, "Standard").First(&variant)
+			if variant.ID == "" {
+				tx.Where("product_id = ?", req.ID).First(&variant)
 			}
+
+			var err error
 			if variant.ID != "" {
-				inv.ProductVariantID = &variant.ID
+				err = tx.Where("merchant_id = ? AND product_id = ? AND product_variant_id = ?", models.PusatID, req.ID, variant.ID).First(&inv).Error
+			} else {
+				err = tx.Where("merchant_id = ? AND product_id = ? AND product_variant_id IS NULL", models.PusatID, req.ID).First(&inv).Error
 			}
-			if err := tx.Create(&inv).Error; err != nil {
-				return err
-			}
-		} else {
-			// Jika sudah ada, update Stok & COGS (BasePrice)
-			if err := tx.Model(&inv).Updates(map[string]interface{}{
-				"stock":      req.Stock,
-				"base_price": req.COGS,
-			}).Error; err != nil {
-				return err
-			}
-		}
 
-		// If product is simple/non-variable, also update its variant stock if exists
-		if req.ProductType != "variable" && variant.ID != "" {
-			if err := tx.Model(&models.ProductVariant{}).Where("id = ?", variant.ID).Update("stock", req.Stock).Error; err != nil {
-				return err
+			if err != nil {
+				// Jika belum ada record di inventory, buat baru
+				inv = models.Inventory{
+					MerchantID: models.PusatID,
+					ProductID:  req.ID,
+					Stock:      req.Stock,
+					BasePrice:  req.COGS, // Sync Modal (COGS)
+				}
+				if variant.ID != "" {
+					inv.ProductVariantID = &variant.ID
+				}
+				if err := tx.Create(&inv).Error; err != nil {
+					return err
+				}
+			} else {
+				// Jika sudah ada, update Stok & COGS (BasePrice)
+				if err := tx.Model(&inv).Updates(map[string]interface{}{
+					"stock":      req.Stock,
+					"base_price": req.COGS,
+				}).Error; err != nil {
+					return err
+				}
+			}
+
+			// If product is simple/non-variable, also update its variant stock if exists
+			if variant.ID != "" {
+				if err := tx.Model(&models.ProductVariant{}).Where("id = ?", variant.ID).Update("stock", req.Stock).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -2480,10 +2513,10 @@ func (ac *AdminController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 	`, order.ID, order.ID).Scan(&breakdown)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"data":   order,
+		"status":            "success",
+		"data":              order,
 		"finance_breakdown": breakdown,
-		"total": 1, // Prevent frontend fetchJson unwrapper from discarding finance_breakdown
+		"total":             1, // Prevent frontend fetchJson unwrapper from discarding finance_breakdown
 	})
 }
 
@@ -2513,7 +2546,7 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 
 	// Update Status
 	oldStatus := order.Status
-	
+
 	if req.Status == models.OrderPaid && oldStatus == models.OrderPendingPayment {
 		// Use OrderService.CompletePayment to trigger all ledger, merchant, and affiliate payouts!
 		orderSvc := services.OrderService{
@@ -2523,7 +2556,7 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 			Notification:   ac.Notif,
 			ConfigService:  services.NewConfigService(ac.DB),
 		}
-		
+
 		tx := ac.DB.Begin()
 		if err := orderSvc.CompletePayment(tx, order.ID); err != nil {
 			tx.Rollback()
@@ -2531,7 +2564,7 @@ func (ac *AdminController) UpdateOrderStatus(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		tx.Commit()
-		
+
 		// Reload order data to continue with updated status
 		ac.DB.First(&order, "id = ?", order.ID)
 	} else {
@@ -3459,14 +3492,18 @@ func (ac *AdminController) TestEmailSettings(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	from := configSvc.Get("notif_smtp_from", user)
 	auth := smtp.PlainAuth("", user, pass, host)
-	msg := []byte("To: " + req.To + "\r\n" +
+	msg := []byte("From: " + from + "\r\n" +
+		"To: " + req.To + "\r\n" +
 		"Subject: Test Koneksi SMTP AkuGlow\r\n" +
+		"MIME-version: 1.0\r\n" +
+		"Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
 		"\r\n" +
 		"Halo! Ini adalah email uji coba untuk memverifikasi bahwa konfigurasi SMTP Anda di AkuGlow sudah berjalan dengan sukses.\r\n")
 
 	addr := host + ":" + port
-	err := smtp.SendMail(addr, auth, user, []string{req.To}, msg)
+	err := smtp.SendMail(addr, auth, from, []string{req.To}, msg)
 	if err != nil {
 		utils.JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Gagal mengirim email: %v", err))
 		return
@@ -3778,8 +3815,8 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 		response["total_orders"] = totalOrders
 
 		activeStats := []string{
-			string(models.OrderCompleted), string(models.OrderDelivered), 
-			string(models.OrderShipped), string(models.OrderReadyToShip), 
+			string(models.OrderCompleted), string(models.OrderDelivered),
+			string(models.OrderShipped), string(models.OrderReadyToShip),
 			string(models.OrderPaid), string(models.OrderProcessing),
 		}
 
@@ -3930,10 +3967,10 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 
 		// 4. WHAT (Products & Inventory)
 		type ProductStat struct {
-			ID       string  `json:"id"`
-			Name     string  `json:"name"`
-			Qty      int64   `json:"qty"`
-			Revenue  float64 `json:"revenue"`
+			ID      string  `json:"id"`
+			Name    string  `json:"name"`
+			Qty     int64   `json:"qty"`
+			Revenue float64 `json:"revenue"`
 		}
 		var topProducts []ProductStat
 		ac.DB.Table("order_items").
@@ -3944,9 +3981,18 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 			Order("qty DESC").Limit(5).Scan(&topProducts)
 
 		var outOfStock, lowStock, healthyStock int64
-		ac.DB.Table("inventories").
-			Select("COUNT(CASE WHEN stock = 0 THEN 1 END) as out_of_stock, COUNT(CASE WHEN stock BETWEEN 1 AND 4 THEN 1 END) as low_stock, COUNT(CASE WHEN stock > 4 THEN 1 END) as healthy_stock").
-			Row().Scan(&outOfStock, &lowStock, &healthyStock)
+		ac.DB.Raw(`
+			SELECT 
+				COUNT(CASE WHEN total_stock = 0 THEN 1 END) as out_of_stock, 
+				COUNT(CASE WHEN total_stock BETWEEN 1 AND 4 THEN 1 END) as low_stock, 
+				COUNT(CASE WHEN total_stock > 4 THEN 1 END) as healthy_stock
+			FROM (
+				SELECT product_id, SUM(stock) as total_stock
+				FROM inventories
+				WHERE merchant_id = ?
+				GROUP BY product_id
+			) t
+		`, "SYSTEM_PUSAT").Row().Scan(&outOfStock, &lowStock, &healthyStock)
 
 		response["what"] = map[string]interface{}{
 			"products": topProducts,
@@ -3989,6 +4035,22 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 		response["pending_payouts"] = pendingPayouts
 	}
 
+	var pendingAffiliateWithdrawals int64
+	if ac.hasTable("affiliate_withdrawals") {
+		ac.DB.Table("affiliate_withdrawals").Where("status = 'pending'").Count(&pendingAffiliateWithdrawals)
+	}
+
+	var abnormalExpiredOrders int64
+	if ac.hasTable("orders") {
+		ac.DB.Table("orders").Where("status = 'expired' AND DATE(created_at) = CURRENT_DATE").Count(&abnormalExpiredOrders)
+	}
+
+	response["alerts"] = map[string]interface{}{
+		"pending_withdrawals": pendingAffiliateWithdrawals,
+		"pending_payouts":     pendingPayouts,
+		"abnormal_expired":    abnormalExpiredOrders,
+	}
+
 	var recentActivity []map[string]interface{}
 	if ac.hasTable("audit_logs") {
 		type Log struct {
@@ -4001,7 +4063,12 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 		for _, l := range logs {
 			status := "SUCCESS"
 			logType := "system"
-			if l.TargetType == "order" { logType = "order"; status = "UPDATED" } else if l.TargetType == "user" || l.TargetType == "merchant" { logType = "user" }
+			if l.TargetType == "order" {
+				logType = "order"
+				status = "UPDATED"
+			} else if l.TargetType == "user" || l.TargetType == "merchant" {
+				logType = "user"
+			}
 			recentActivity = append(recentActivity, map[string]interface{}{
 				"title":  l.Detail,
 				"type":   logType,
@@ -4015,7 +4082,6 @@ func (ac *AdminController) GetOverview(w http.ResponseWriter, r *http.Request) {
 	utils.JSONResponse(w, http.StatusOK, response)
 }
 
-
 func (ac *AdminController) ExportReport(w http.ResponseWriter, r *http.Request) {
 	var totalUsers, totalMerchants, totalAffiliates int64
 	var totalRevenue, totalFee float64
@@ -4027,8 +4093,8 @@ func (ac *AdminController) ExportReport(w http.ResponseWriter, r *http.Request) 
 
 	if ac.hasTable("orders") {
 		activeStats := []string{
-			string(models.OrderCompleted), string(models.OrderDelivered), 
-			string(models.OrderShipped), string(models.OrderReadyToShip), 
+			string(models.OrderCompleted), string(models.OrderDelivered),
+			string(models.OrderShipped), string(models.OrderReadyToShip),
 			string(models.OrderPaid), string(models.OrderProcessing),
 		}
 		ac.DB.Model(&models.Order{}).Where("status != ?", models.OrderCancelled).Count(&totalOrders)
@@ -4172,13 +4238,13 @@ func (ac *AdminController) GetBlogs(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	search := r.URL.Query().Get("search")
 	category := r.URL.Query().Get("category")
-	
+
 	page := utils.QueryInt(r, "page", 1)
 	limit := utils.QueryInt(r, "limit", 10)
 	offset := (page - 1) * limit
 
 	query := ac.DB.Model(&models.BlogPost{})
-	
+
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -4422,7 +4488,7 @@ func (ac *AdminController) GetNotifications(w http.ResponseWriter, r *http.Reque
 	userID, _ := r.Context().Value("user_id").(string)
 
 	var notifs []models.Notification
-	err := ac.DB.Where("receiver_type = ? OR (receiver_id = ? AND receiver_type = ?)", 
+	err := ac.DB.Where("receiver_type = ? OR (receiver_id = ? AND receiver_type = ?)",
 		"admin", userID, "user").
 		Order("created_at desc").
 		Limit(20).
@@ -5280,6 +5346,16 @@ func (ac *AdminController) UpsertCommissionPreset(w http.ResponseWriter, r *http
 		return
 	}
 
+	// [FIX #11] Validate total commission rate ≤ 100%
+	var totalRate float64
+	for _, lv := range req.Levels {
+		totalRate += lv.Rate
+	}
+	if totalRate > 100.0 {
+		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Total komisi %.2f%% melebihi 100%%", totalRate))
+		return
+	}
+
 	// [BUG-CP3 Fix] Cek duplicate nama sebelum simpan — hindari raw SQL error dari unique index
 	var dupCount int64
 	dupQuery := ac.DB.Model(&models.CommissionPreset{}).Where("name = ?", req.Name)
@@ -5390,22 +5466,24 @@ func (ac *AdminController) AddProductVariant(w http.ResponseWriter, r *http.Requ
 	}
 	// 1. Check Product table
 	// We allow a variant to have the same SKU as its OWN parent product
-	var parent models.Product
-	ac.DB.Where("id = ?", v.ProductID).First(&parent)
-	
-	var otherProduct models.Product
-	ac.DB.Where("sku = ? AND id <> ?", v.SKU, v.ProductID).First(&otherProduct)
-	if otherProduct.ID != "" {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", v.SKU, otherProduct.Name))
-		return
-	}
+	if v.SKU != "" {
+		var parent models.Product
+		ac.DB.Where("id = ?", v.ProductID).First(&parent)
 
-	// 2. Check Other Variants
-	var otherVariant models.ProductVariant
-	ac.DB.Where("sku = ?", v.SKU).First(&otherVariant)
-	if otherVariant.ID != "" {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian lain di produk ID: %s", v.SKU, otherVariant.ProductID))
-		return
+		var otherProduct models.Product
+		ac.DB.Where("sku = ? AND id <> ?", v.SKU, v.ProductID).First(&otherProduct)
+		if otherProduct.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", v.SKU, otherProduct.Name))
+			return
+		}
+
+		// 2. Check Other Variants
+		var otherVariant models.ProductVariant
+		ac.DB.Where("sku = ?", v.SKU).First(&otherVariant)
+		if otherVariant.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian lain di produk ID: %s", v.SKU, otherVariant.ProductID))
+			return
+		}
 	}
 
 	if v.CommissionPresetID != nil && *v.CommissionPresetID == "" {
@@ -5447,20 +5525,22 @@ func (ac *AdminController) UpdateProductVariant(w http.ResponseWriter, r *http.R
 
 	// 1. Check Products Table
 	// Allow sharing SKU with OWN parent product, but not others
-	var otherProduct models.Product
-	ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ProductID).First(&otherProduct)
-	if otherProduct.ID != "" {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", req.SKU, otherProduct.Name))
-		return
-	}
+	if req.SKU != "" {
+		var otherProduct models.Product
+		ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ProductID).First(&otherProduct)
+		if otherProduct.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh produk lain: %s", req.SKU, otherProduct.Name))
+			return
+		}
 
-	// 2. Check ProductVariants Table
-	// Exclude the record we are currently updating
-	var otherVariant models.ProductVariant
-	ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ID).First(&otherVariant)
-	if otherVariant.ID != "" {
-		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian lain di produk ID: %s", req.SKU, otherVariant.ProductID))
-		return
+		// 2. Check ProductVariants Table
+		// Exclude the record we are currently updating
+		var otherVariant models.ProductVariant
+		ac.DB.Where("sku = ? AND id <> ?", req.SKU, req.ID).First(&otherVariant)
+		if otherVariant.ID != "" {
+			utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("SKU '%s' sudah digunakan oleh varian lain di produk ID: %s", req.SKU, otherVariant.ProductID))
+			return
+		}
 	}
 
 	if req.CommissionPresetID != nil && *req.CommissionPresetID == "" {
@@ -5542,12 +5622,24 @@ func (ac *AdminController) DeleteProductVariant(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := ac.DB.Where("id = ?", id).Delete(&models.ProductVariant{}).Error; err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus varian")
+	err := ac.DB.Transaction(func(tx *gorm.DB) error {
+		// Hapus Inventori/Stok terkait varian ini terlebih dahulu
+		if err := tx.Unscoped().Where("product_variant_id = ?", id).Delete(&models.Inventory{}).Error; err != nil {
+			return err
+		}
+		// Hapus Varian
+		if err := tx.Unscoped().Where("id = ?", id).Delete(&models.ProductVariant{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus varian: "+err.Error())
 		return
 	}
 
-	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_variant", "product_variant", id, "", r.RemoteAddr)
+	ac.Audit.Log(r.Context().Value("user_id").(string), "delete_variant", "product_variant", id, "purged with inventory", r.RemoteAddr)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -5700,6 +5792,7 @@ func (ac *AdminController) GetMerchantStockOverview(w http.ResponseWriter, r *ht
 		"data":   data,
 	})
 }
+
 // AddFakeReview handles creating a fake review
 func (ac *AdminController) AddFakeReview(w http.ResponseWriter, r *http.Request) {
 	type FakeReviewRequest struct {
@@ -5911,4 +6004,52 @@ func (ac *AdminController) BulkToggleLogistics(w http.ResponseWriter, r *http.Re
 }
 func (ac *AdminController) UpdateLogistic(w http.ResponseWriter, r *http.Request) {
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+func (ac *AdminController) ResetSystemData(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Type string `json:"type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format invalid")
+		return
+	}
+
+	if req.Type != "hard" {
+		utils.JSONError(w, http.StatusBadRequest, "Hanya hard reset yang didukung untuk saat ini.")
+		return
+	}
+
+	var tables []string
+	ac.DB.Raw("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'").Scan(&tables)
+
+	excludedTables := map[string]bool{
+		"roles":            true,
+		"permissions":      true,
+		"role_permissions": true,
+		"platform_configs": true,
+		"theme_colors":     true,
+		"theme_typography": true,
+		"theme_spacing":    true,
+		"theme_logo":       true,
+		"site_themes":      true,
+		"site_sections":    true,
+		"site_menus":       true,
+		"menu_items":       true,
+		"site_assets":      true,
+		"public_cms_data":  true,
+	}
+
+	// Hapus semua data dari tabel (kecuali yang di-exclude)
+	for _, table := range tables {
+		if !excludedTables[table] {
+			ac.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+		}
+	}
+
+	// Restore akun admin & data fundamental
+	seeder.AutoSeedCriticalData(ac.DB)
+	seeder.AutoSeedLogisticChannels(ac.DB)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Sistem berhasil di-reset ke kondisi awal (Hard Reset)."})
 }

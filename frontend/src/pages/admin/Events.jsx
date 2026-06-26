@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { A, PageHeader, Modal, TablePanel, statusBadge, FieldLabel } from '../../lib/adminStyles.jsx';
+import { AdminSearch, AdminInput, AdminActionButtons, AdminEmptyState, AdminPagination } from '../../lib/adminComponents.jsx';
 import toast from 'react-hot-toast';
+
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const CustomSelect = ({ label, value, options, onChange, icon }) => {
   const [open, setOpen] = useState(false);
@@ -221,22 +224,18 @@ export default function AdminEvents() {
   return (
     <div style={A.page}>
       <PageHeader title="Events & Webinars" subtitle="Schedule gatherings for your affiliates">
-        <button onClick={() => { setFormData({ id: 0, title: '', description: '', type: 'online', location: '', start_time: '', end_time: '', image_url: '', status: 'upcoming', is_active: true }); setShowModal(true); }} style={A.btnPrimary}>
+        <button onClick={() => { setFormData({ id: 0, title: '', description: '', type: 'online', location: '', start_time: '', end_time: '', image_url: '', status: 'upcoming', is_active: true }); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
            <i className="bx bx-calendar-plus" /> Buat Event
         </button>
       </PageHeader>
 
       {/* FILTER & SEARCH BAR */}
-      <div style={{ ...A.card, overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
-        <div style={{ flex: 1, minWidth: 260, position: 'relative' }}>
-          <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-          <input
-            style={{ ...A.input, paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
-            placeholder="Cari judul, lokasi atau deskripsi event..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
+        <AdminSearch
+          placeholder="Cari judul, lokasi atau deskripsi event..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
 
         <CustomSelect
           label="Tipe Event"
@@ -267,7 +266,7 @@ export default function AdminEvents() {
         {(search || selectedType !== 'all' || selectedStatus !== 'all') && (
           <button
             onClick={() => { setSearch(''); setSelectedType('all'); setSelectedStatus('all'); setPage(1); }}
-            style={{ ...A.btnGhost, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
           >
             <i className="bx bx-x" /> Reset Filter
           </button>
@@ -294,7 +293,7 @@ export default function AdminEvents() {
           </thead>
           <tbody>
             {events.length === 0 && !loading ? (
-              <tr><td colSpan="5" style={{ padding: 60, textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>Tidak ada event yang ditemukan.</td></tr>
+              <AdminEmptyState colSpan={5} message="Tidak ada event yang ditemukan." />
             ) : (
               events.map((ev, idx) => (
                 <tr key={ev.id} style={{ borderBottom: idx === events.length - 1 ? 'none' : '1px solid #f8fafc' }}>
@@ -322,10 +321,7 @@ export default function AdminEvents() {
                   <td style={A.td}><span style={{ textTransform: 'uppercase', fontSize: 10, fontWeight: 900 }}>{ev.type}</span></td>
                   <td style={A.td}><span style={statusBadge(ev.status)}>{ev.status}</span></td>
                   <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
-                     <div style={{ display: 'inline-flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button onClick={() => { setFormData(ev); setShowModal(true); }} style={A.iconBtn()} title="Edit"><i className="bx bx-edit-alt" /></button>
-                        <button onClick={() => handleDelete(ev.id)} style={A.iconBtn('#dc2626', 'rgba(220, 38, 38, 0.08)')} title="Hapus"><i className="bx bx-trash" /></button>
-                     </div>
+                     <AdminActionButtons onEdit={() => { setFormData(ev); setShowModal(true); }} onDelete={() => handleDelete(ev.id)} />
                   </td>
                 </tr>
               ))
@@ -334,50 +330,7 @@ export default function AdminEvents() {
         </table>
       </TablePanel>
 
-      {/* PAGINATION CONTROLS */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 40, paddingBottom: 40 }}>
-          <button 
-            onClick={() => setPage(p => Math.max(1, p - 1))} 
-            disabled={page === 1}
-            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <i className="bx bx-chevron-left" /> Sebelumnya
-          </button>
-          
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setPage(i + 1)}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  transition: 'all 0.2s',
-                  background: page === i + 1 ? '#6366f1' : '#fff',
-                  color: page === i + 1 ? '#fff' : '#64748b',
-                  border: page === i + 1 ? 'none' : '1px solid #e2e8f0',
-                  cursor: 'pointer',
-                  boxShadow: page === i + 1 ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
-                }}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-
-          <button 
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
-            disabled={page === totalPages}
-            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            Berikutnya <i className="bx bx-chevron-right" />
-          </button>
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} totalItems={total} onChange={setPage} label="event" pageSize={limit} />
 
       {showModal && (
         <Modal title={formData.id ? 'Edit Event' : 'Create Event'} onClose={() => setShowModal(false)} wide>
@@ -386,27 +339,27 @@ export default function AdminEvents() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <FieldLabel>Judul Event</FieldLabel>
-                      <input style={A.input} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
+                      <AdminInput value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
                    </div>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <FieldLabel>Tipe</FieldLabel>
-                      <select style={A.select} value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
-                         <option value="online">🎥 Online (Webinar)</option>
-                         <option value="offline">📍 Offline (Kopdar)</option>
-                      </select>
+                      <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+                         <option value="online">Online (Webinar)</option>
+                         <option value="offline">Offline (Kopdar)</option>
+                      </AdminSelect>
                    </div>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <FieldLabel>Link / Lokasi</FieldLabel>
-                      <input style={A.input} value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} required />
+                      <AdminInput value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} required />
                    </div>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <FieldLabel>Status</FieldLabel>
-                      <select style={A.select} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                      <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
                          <option value="upcoming">Upcoming</option>
                          <option value="ongoing">Ongoing</option>
                          <option value="completed">Completed</option>
                          <option value="cancelled">Cancelled</option>
-                      </select>
+                      </AdminSelect>
                    </div>
                 </div>
 
@@ -429,20 +382,20 @@ export default function AdminEvents() {
                    </div>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <FieldLabel>Waktu Mulai</FieldLabel>
-                      <input type="datetime-local" style={A.input} value={formatDateTimeLocal(formData.start_time)} onChange={e => setFormData({ ...formData, start_time: e.target.value })} required />
+                      <AdminInput type="datetime-local" value={formatDateTimeLocal(formData.start_time)} onChange={e => setFormData({ ...formData, start_time: e.target.value })} required />
                    </div>
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <FieldLabel>Waktu Selesai</FieldLabel>
-                      <input type="datetime-local" style={A.input} value={formatDateTimeLocal(formData.end_time)} onChange={e => setFormData({ ...formData, end_time: e.target.value })} required />
+                      <AdminInput type="datetime-local" value={formatDateTimeLocal(formData.end_time)} onChange={e => setFormData({ ...formData, end_time: e.target.value })} required />
                    </div>
                 </div>
                 
                 <div className="md:col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                    <FieldLabel>Deskripsi</FieldLabel>
-                   <textarea style={{ ...A.textarea, height: 100 }} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required />
+                   <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 transition-all resize-y placeholder:text-slate-400" style={{ height: 100 }} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required />
                 </div>
              </div>
-             <button type="submit" disabled={saving || uploading} style={A.btnPrimary}>
+             <button type="submit" disabled={saving || uploading} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
                 {saving ? 'Menyimpan...' : 'Simpan Event'}
              </button>
            </form>

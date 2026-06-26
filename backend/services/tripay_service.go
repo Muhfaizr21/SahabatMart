@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -30,22 +31,22 @@ type TripayChannel struct {
 	FeeMerchant   TripayFeeDetail `json:"fee_merchant"`
 	FeeCustomer   TripayFeeDetail `json:"fee_customer"`
 	TotalFee      TripayFeeDetail `json:"total_fee"`
-	MinimumFee    interface{} `json:"minimum_fee"`
-	MaximumFee    interface{} `json:"maximum_fee"`
-	MinimumAmount interface{} `json:"minimum_amount"`
-	MaximumAmount interface{} `json:"maximum_amount"`
+	MinimumFee    interface{}     `json:"minimum_fee"`
+	MaximumFee    interface{}     `json:"maximum_fee"`
+	MinimumAmount interface{}     `json:"minimum_amount"`
+	MaximumAmount interface{}     `json:"maximum_amount"`
 	IconURL       string          `json:"icon_url"`
 	Active        bool            `json:"active"`
 }
 
 type TripayItem struct {
-	SKU        string `json:"sku"`
-	Name       string `json:"name"`
+	SKU        string      `json:"sku"`
+	Name       string      `json:"name"`
 	Price      interface{} `json:"price"`
 	Quantity   interface{} `json:"quantity"`
 	Subtotal   interface{} `json:"subtotal"`
-	ProductURL string `json:"product_url,omitempty"`
-	ImageURL   string `json:"image_url,omitempty"`
+	ProductURL string      `json:"product_url,omitempty"`
+	ImageURL   string      `json:"image_url,omitempty"`
 }
 
 type TripayRequest struct {
@@ -63,30 +64,30 @@ type TripayRequest struct {
 }
 
 type TripayTransactionData struct {
-	Reference    string      `json:"reference"`
-	MerchantRef  string      `json:"merchant_ref"`
-	PaymentMethod string     `json:"payment_method"`
-	PaymentName  string      `json:"payment_name"`
-	CustomerName string      `json:"customer_name"`
-	Amount       interface{} `json:"amount"`
-	FeeMerchant  interface{} `json:"fee_merchant"`
-	FeeCustomer  interface{} `json:"fee_customer"`
-	TotalFee     interface{} `json:"total_fee"`
+	Reference      string      `json:"reference"`
+	MerchantRef    string      `json:"merchant_ref"`
+	PaymentMethod  string      `json:"payment_method"`
+	PaymentName    string      `json:"payment_name"`
+	CustomerName   string      `json:"customer_name"`
+	Amount         interface{} `json:"amount"`
+	FeeMerchant    interface{} `json:"fee_merchant"`
+	FeeCustomer    interface{} `json:"fee_customer"`
+	TotalFee       interface{} `json:"total_fee"`
 	AmountReceived interface{} `json:"amount_received"`
-	PayCode      string      `json:"pay_code"`
-	PayURL       *string     `json:"pay_url"`
-	CheckoutURL  string      `json:"checkout_url"`
-	QRString     *string     `json:"qr_string"`
-	QRURL        *string     `json:"qr_url"`
-	Status       string      `json:"status"`
-	ExpiredTime  int64       `json:"expired_time"`
-	Instructions interface{} `json:"instructions"`
+	PayCode        string      `json:"pay_code"`
+	PayURL         *string     `json:"pay_url"`
+	CheckoutURL    string      `json:"checkout_url"`
+	QRString       *string     `json:"qr_string"`
+	QRURL          *string     `json:"qr_url"`
+	Status         string      `json:"status"`
+	ExpiredTime    int64       `json:"expired_time"`
+	Instructions   interface{} `json:"instructions"`
 }
 
 type TripayFeeCalculatorItem struct {
-	Code     string `json:"code"`
-	Name     string `json:"name"`
-	Fee      struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+	Fee  struct {
 		Flat    interface{} `json:"flat"`
 		Percent interface{} `json:"percent"`
 	} `json:"fee"`
@@ -103,6 +104,7 @@ type TripayService struct {
 	ApiKey       string
 	PrivateKey   string
 	BaseURL      string
+	client       *http.Client
 }
 
 func NewTripayService(db *gorm.DB) *TripayService {
@@ -112,12 +114,25 @@ func NewTripayService(db *gorm.DB) *TripayService {
 	apiKey := configSvc.Get("payment_tripay_key", os.Getenv("TRIPAY_API_KEY"))
 	privateKey := configSvc.Get("payment_tripay_private", os.Getenv("TRIPAY_PRIVATE_KEY"))
 	baseURL := configSvc.Get("payment_tripay_url", "")
+
+	appEnv := os.Getenv("APP_ENV")
+	isProduction := appEnv == "production"
+	isSandbox := configSvc.Get("payment_sandbox_mode", "true") == "true"
+
 	if baseURL == "" {
-		if configSvc.Get("payment_sandbox_mode", "true") == "true" {
-			baseURL = "https://tripay.co.id/api-sandbox"
-		} else {
+		if isProduction && !isSandbox {
 			baseURL = "https://tripay.co.id/api"
+		} else {
+			baseURL = "https://tripay.co.id/api-sandbox"
 		}
+	}
+
+	if isProduction && baseURL == "https://tripay.co.id/api-sandbox" {
+		log.Println("⚠️  WARNING: TriPay using SANDBOX in production mode! Set payment_sandbox_mode=false in platform config.")
+	}
+
+	if isProduction && (apiKey == "" || privateKey == "") {
+		log.Println("⚠️  WARNING: TriPay API keys not configured!")
 	}
 
 	return &TripayService{
@@ -125,6 +140,9 @@ func NewTripayService(db *gorm.DB) *TripayService {
 		ApiKey:       apiKey,
 		PrivateKey:   privateKey,
 		BaseURL:      baseURL,
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
 }
 
@@ -148,17 +166,36 @@ func (s *TripayService) GenerateCallbackSignature(rawBody string) string {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 func (s *TripayService) doGet(path string) ([]byte, error) {
-	req, err := http.NewRequest("GET", s.BaseURL+path, nil)
-	if err != nil {
-		return nil, err
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		req, errReq := http.NewRequest("GET", s.BaseURL+path, nil)
+		if errReq != nil {
+			return nil, errReq
+		}
+		req.Header.Add("Authorization", "Bearer "+s.ApiKey)
+		
+		resp, err = s.client.Do(req)
+		if err == nil && resp.StatusCode < 500 {
+			break // Success or non-retriable error
+		}
+		
+		if resp != nil {
+			resp.Body.Close()
+		}
+		
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
 	}
-	req.Header.Add("Authorization", "Bearer "+s.ApiKey)
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		var r map[string]interface{}
@@ -173,18 +210,38 @@ func (s *TripayService) doPost(path string, payload interface{}) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", s.BaseURL+path, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, err
+	
+	var resp *http.Response
+	var errDo error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		req, errReq := http.NewRequest("POST", s.BaseURL+path, bytes.NewBuffer(jsonData))
+		if errReq != nil {
+			return nil, errReq
+		}
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Authorization", "Bearer "+s.ApiKey)
+
+		resp, errDo = s.client.Do(req)
+		if errDo == nil && resp.StatusCode < 500 {
+			break // Success or non-retriable error
+		}
+		
+		if resp != nil {
+			resp.Body.Close()
+		}
+		
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
 	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+s.ApiKey)
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+
+	if errDo != nil {
+		return nil, errDo
 	}
 	defer resp.Body.Close()
+	
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		var r map[string]interface{}

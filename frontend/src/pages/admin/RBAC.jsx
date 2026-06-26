@@ -3,6 +3,8 @@ import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { A, PageHeader, TablePanel, Modal, FieldLabel, StatRow, roleBadge } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 // Helper for formatting
 const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -196,7 +198,7 @@ const AdminRBAC = () => {
     };
 
     return (
-        <div style={{ ...A.page, maxWidth: 1400, margin: '0 auto', paddingBottom: 60 }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 60 }}>
             <style>{`
                 .rbac-grid-main { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
                 .rbac-perm-cols { column-count: 2; column-gap: 24px; }
@@ -298,7 +300,7 @@ const AdminRBAC = () => {
                     <div className="rbac-grid-main">
                         {/* DISTRIBUTION CHARTS */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                            <div style={{ ...A.card, padding: 30 }}>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 30 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
                                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <i className="bx bx-buildings" style={{ color: '#6366f1', fontSize: 22 }} /> Personnel Allocation by Department
@@ -322,7 +324,7 @@ const AdminRBAC = () => {
                                 )}
                             </div>
 
-                            <div style={{ ...A.card, padding: 30 }}>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 30 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
                                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <i className="bx bx-shield-alt-2" style={{ color: '#10b981', fontSize: 22 }} /> Security Profile Distribution
@@ -351,7 +353,7 @@ const AdminRBAC = () => {
 
                         {/* RIGHT SIDE: RECENT ACTIVITY & QUICK ACTIONS */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                            <div style={{ ...A.card, padding: 30, background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 30, background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
                                 <h3 style={{ margin: '0 0 20px 0', fontSize: 15, fontWeight: 900, color: '#1e293b' }}>SECURITY QUICK ACTIONS</h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
                                     <button onClick={()=>toast.success('System Scan Initiated')} style={{ padding: '14px 20px', borderRadius: 16, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e=>e.currentTarget.style.borderColor='#6366f1'}>
@@ -378,7 +380,7 @@ const AdminRBAC = () => {
                                 </div>
                             </div>
 
-                            <div style={{ ...A.card, padding: 30 }}>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 30 }}>
                                 <h3 style={{ margin: '0 0 20px 0', fontSize: 15, fontWeight: 900, color: '#1e293b' }}>PLATFORM ADVISORY</h3>
                                 <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', padding: 20, borderRadius: 20 }}>
                                     <div style={{ display: 'flex', gap: 14 }}>
@@ -413,26 +415,26 @@ const AdminRBAC = () => {
                                 <div style={{ ...A.searchWrap, flex: 1 }}>
                                     <i className="bx bx-search" style={A.searchIcon} />
                                     <input 
-                                        style={{ ...A.searchInput, width: '100%' }} 
+                                        className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ width: '100%' }} 
                                         placeholder="Cari berdasarkan nama atau email..." 
                                         value={searchTerm}
                                         onChange={e => setSearchTerm(e.target.value)}
                                     />
                                 </div>
-                                <select style={A.select} value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)}>
+                                <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)}>
                                     <option value="">Semua Departemen</option>
                                     <option value="IT & SYSTEMS">IT & SYSTEMS</option>
                                     <option value="MARKETING">MARKETING</option>
                                     <option value="FINANCE">FINANCE</option>
                                     <option value="CUSTOMER SERVICE">CUSTOMER SERVICE</option>
                                     <option value="LOGISTICS">LOGISTICS</option>
-                                </select>
-                                <select style={A.select} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                                </AdminSelect>
+                                <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                                     <option value="">Semua Status</option>
                                     <option value="active">Active</option>
                                     <option value="suspended">Suspended</option>
-                                </select>
-                                <button style={A.btnPrimary} onClick={() => { setSelectedUser(null); setNewUser(initialUserState); setShowUserModal(true); }}>
+                                </AdminSelect>
+                                <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => { setSelectedUser(null); setNewUser(initialUserState); setShowUserModal(true); }}>
                                     <i className="bx bx-user-plus" /> Onboard Staff
                                 </button>
                             </div>
@@ -548,13 +550,13 @@ const AdminRBAC = () => {
                         <div style={{ fontSize: 14, color: '#64748b', fontWeight: 600 }}>
                             Manage security profiles and their associated capability matrices.
                         </div>
-                        <button style={A.btnPrimary} onClick={() => { setSelectedRole({ name: '', description: '', permission_ids: [] }); setShowRoleModal(true); }}>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => { setSelectedRole({ name: '', description: '', permission_ids: [] }); setShowRoleModal(true); }}>
                             <i className="bx bx-plus-circle" /> Create Security Profile
                         </button>
                     </div>
                     <div className="rbac-role-grid">
                         {roles.map(role => (
-                            <div key={role.id} style={{ ...A.card, borderTop: '4px solid #6366f1', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s', cursor: 'default' }} 
+                            <div key={role.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ borderTop: '4px solid #6366f1', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s', cursor: 'default' }} 
                                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                                  onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
                                 <div style={{ padding: 24, flex: 1 }}>
@@ -632,7 +634,7 @@ const AdminRBAC = () => {
                             </div>
                             <div style={{ ...A.searchWrap, width: 300 }}>
                                 <i className="bx bx-search" style={{ ...A.searchIcon, color: '#fff' }} />
-                                <input type="text" placeholder="Cari fitur atau modul..." style={{ ...A.searchInput, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', width: '100%' }} onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" placeholder="Cari fitur atau modul..." className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', width: '100%' }} onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                     </div>
@@ -731,7 +733,7 @@ const AdminRBAC = () => {
                         };
 
                         return (
-                            <div style={{ ...A.card, padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 660 }}>
                                         <thead>
@@ -894,12 +896,12 @@ const AdminRBAC = () => {
                                         
                                         <div style={{ marginBottom: 16 }}>
                                             <FieldLabel>Profile Name</FieldLabel>
-                                            <input style={{...A.input, background: '#fff', border: '1.5px solid #e2e8f0', fontWeight: 600}} placeholder="e.g. Senior CS Analyst" value={selectedRole.name} onChange={e=>setSelectedRole({...selectedRole, name: e.target.value})} required />
+                                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ background: '#fff', border: '1.5px solid #e2e8f0', fontWeight: 600 }} placeholder="e.g. Senior CS Analyst" value={selectedRole.name} onChange={e=>setSelectedRole({...selectedRole, name: e.target.value})} required />
                                         </div>
                                         
                                         <div style={{ marginBottom: 16 }}>
                                             <FieldLabel>Operational Context / Description</FieldLabel>
-                                            <textarea style={{...A.input, height: 140, background: '#fff', border: '1.5px solid #e2e8f0', resize: 'none', lineHeight: 1.5}} placeholder="Jelaskan ruang lingkup dan tanggung jawab dari profile ini..." value={selectedRole.description} onChange={e=>setSelectedRole({...selectedRole, description: e.target.value})} />
+                                            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 140, background: '#fff', border: '1.5px solid #e2e8f0', resize: 'none', lineHeight: 1.5 }} placeholder="Jelaskan ruang lingkup dan tanggung jawab dari profile ini..." value={selectedRole.description} onChange={e=>setSelectedRole({...selectedRole, description: e.target.value})} />
                                         </div>
                                     </div>
                                     
@@ -914,7 +916,7 @@ const AdminRBAC = () => {
                                             </div>
                                         </div>
 
-                                        <button style={{...A.btnPrimary, width: '100%', height: 48, fontSize: 13.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20}} type="submit">
+                                        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', height: 48, fontSize: 13.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20 }} type="submit">
                                             <i className="bx bx-save" style={{ fontSize: 18 }} /> SAVE PROFILE
                                         </button>
                                     </div>
@@ -1134,22 +1136,22 @@ const AdminRBAC = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                 <div>
                                     <FieldLabel>Full Name</FieldLabel>
-                                    <input style={A.input} placeholder="Nama Lengkap Staff" value={newUser.full_name} onChange={e=>setNewUser({...newUser, full_name: e.target.value})} required />
+                                    <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Nama Lengkap Staff" value={newUser.full_name} onChange={e=>setNewUser({...newUser, full_name: e.target.value})} required />
                                 </div>
                                 <div>
                                     <FieldLabel>Email Address</FieldLabel>
-                                    <input style={{...A.input, background: selectedUser ? '#f8fafc' : '#f8fafc'}} type="email" placeholder="email@perusahaan.com" value={newUser.email} onChange={e=>setNewUser({...newUser, email: e.target.value})} required={!selectedUser} disabled={!!selectedUser} />
+                                    <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ background: selectedUser ? '#f8fafc' : '#f8fafc' }} type="email" placeholder="email@perusahaan.com" value={newUser.email} onChange={e=>setNewUser({...newUser, email: e.target.value})} required={!selectedUser} disabled={!!selectedUser} />
                                     {selectedUser && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 6 }}>Email cannot be modified for existing personnel.</div>}
                                 </div>
                                 {!selectedUser && (
                                     <div>
                                         <FieldLabel>System Password</FieldLabel>
-                                        <input style={A.input} type="password" placeholder="Password minimal 8 karakter" value={newUser.password} onChange={e=>setNewUser({...newUser, password: e.target.value})} required />
+                                        <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" type="password" placeholder="Password minimal 8 karakter" value={newUser.password} onChange={e=>setNewUser({...newUser, password: e.target.value})} required />
                                     </div>
                                 )}
                                 <div>
                                     <FieldLabel>Corporate Department</FieldLabel>
-                                    <select style={A.select} value={newUser.department} onChange={e=>setNewUser({...newUser, department: e.target.value})}>
+                                    <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newUser.department} onChange={e=>setNewUser({...newUser, department: e.target.value})}>
                                         <option value="">No Department / General</option>
                                         <option value="IT & SYSTEMS">IT & SYSTEMS</option>
                                         <option value="MARKETING">MARKETING</option>
@@ -1157,7 +1159,7 @@ const AdminRBAC = () => {
                                         <option value="CUSTOMER SERVICE">CUSTOMER SERVICE</option>
                                         <option value="LOGISTICS">LOGISTICS</option>
                                         <option value="MANAGEMENT">MANAGEMENT</option>
-                                    </select>
+                                    </AdminSelect>
                                 </div>
                             </div>
                         </div>
@@ -1204,15 +1206,15 @@ const AdminRBAC = () => {
                                         </div>
                                     ) : (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                            <select 
-                                                style={{...A.select, width: '100%', height: 44}} 
+                                            <AdminSelect 
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%', height: 44 }} 
                                                 value={newUser.admin_role} 
                                                 onChange={e=>setNewUser({...newUser, admin_role: e.target.value})} 
                                                 required={newUser.role === 'admin'}
                                             >
                                                 <option value="">-- Choose a Security Profile --</option>
                                                 {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                                            </select>
+                                            </AdminSelect>
                                             
                                             {newUser.admin_role && (
                                                 <div style={{ padding: 12, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
@@ -1231,7 +1233,7 @@ const AdminRBAC = () => {
                                     )}
                                 </div>
 
-                                <button style={{ ...A.btnPrimary, width: '100%', height: 54, borderRadius: 16, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 10 }} type="submit">
+                                <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', height: 54, borderRadius: 16, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 10 }} type="submit">
                                     <i className="bx bx-check-shield" style={{ fontSize: 22 }} /> 
                                     {selectedUser ? 'SAVE ACCESS CHANGES' : 'AUTHORIZE PERSONNEL'}
                                 </button>

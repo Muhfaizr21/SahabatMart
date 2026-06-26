@@ -61,7 +61,7 @@ export default function PackingSlipPage() {
 
   if (error) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#FFF1F2', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontSize: 48 }}>⚠️</div>
+      <div style={{ fontSize: 48 }}></div>
       <div style={{ fontSize: 16, color: '#BE123C', fontWeight: 800 }}>Gagal memuat packing slip</div>
       <div style={{ fontSize: 14, color: '#9F1239' }}>{error}</div>
     </div>
@@ -140,19 +140,19 @@ export default function PackingSlipPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
           {/* Pengirim */}
           <div style={{ padding: '16px 24px', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }}>
-            <div style={{ fontSize: 9, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>📦 Dari (Pengirim)</div>
+            <div style={{ fontSize: 9, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}> Dari (Pengirim)</div>
             <div style={{ fontSize: 14, fontWeight: 900, color: '#0F172A', marginBottom: 4 }}>{merchant?.store_name || '-'}</div>
             <div style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
               {merchant?.store_address || merchant?.address || '-'}
             </div>
             {merchant?.phone && (
-              <div style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: 700 }}>📱 {merchant.phone}</div>
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: 700 }}> {merchant.phone}</div>
             )}
           </div>
 
           {/* Penerima */}
           <div style={{ padding: '16px 24px', borderBottom: '1px solid #E2E8F0' }}>
-            <div style={{ fontSize: 9, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>🏠 Kepada (Penerima)</div>
+            <div style={{ fontSize: 9, fontWeight: 900, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}> Kepada (Penerima)</div>
             <div style={{ fontSize: 14, fontWeight: 900, color: '#0F172A', marginBottom: 4 }}>{order?.shipping_name || '-'}</div>
             <div style={{ fontSize: 12, color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
               {order?.shipping_address && (
@@ -163,7 +163,7 @@ export default function PackingSlipPage() {
               {order?.shipping_postal_code && <> {order.shipping_postal_code}</>}
             </div>
             {order?.shipping_phone && (
-              <div style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: 700 }}>📱 {order.shipping_phone}</div>
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: 700 }}> {order.shipping_phone}</div>
             )}
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function PackingSlipPage() {
         {/* ── NOTES ── */}
         {order?.notes && (
           <div style={{ margin: '0 24px 16px', padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FEF3C7', borderRadius: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 900, color: '#92400E', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>📝 Catatan dari Pembeli</div>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#92400E', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}> Catatan dari Pembeli</div>
             <div style={{ fontSize: 12, color: '#78350F', fontWeight: 600, lineHeight: 1.5 }}>{order.notes}</div>
           </div>
         )}

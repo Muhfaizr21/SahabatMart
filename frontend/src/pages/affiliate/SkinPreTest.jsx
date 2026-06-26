@@ -17,14 +17,14 @@ export default function SkinPreTest() {
   });
 
   const next = () => {
-    if (step === 1 && !form.full_name) return toast.error('Isi nama lengkapmu dulu ya ✨');
-    if (step === 1 && !form.skin_type) return toast.error('Pilih jenis kulitmu dulu ya ✨');
+    if (step === 1 && !form.full_name) return toast.error('Isi nama lengkapmu dulu ya.');
+    if (step === 1 && !form.skin_type) return toast.error('Pilih jenis kulitmu dulu ya.');
     setStep(s => s + 1);
   };
   const prev = () => setStep(s => s - 1);
 
   const submit = async () => {
-    if (!form.skin_problem) return toast.error('Ceritakan masalah kulitmu sebentar ya ✨');
+    if (!form.skin_problem) return toast.error('Ceritakan masalah kulitmu sebentar ya.');
     setLoading(true);
     try {
       const res = await fetchJson(`${API_BASE}/api/skin/pretest`, {
@@ -246,7 +246,7 @@ export default function SkinPreTest() {
              <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 text-5xl mx-auto mb-8 shadow-inner">
                 <span className="material-symbols-outlined text-6xl">check_circle</span>
              </div>
-              <h2 style={{ color: 'white', fontSize: '32px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.03em' }}>Selamat Datang! ✨</h2>
+              <h2 style={{ color: 'white', fontSize: '32px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.03em' }}>Selamat Datang!</h2>
               <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '350px', margin: '0 auto 40px' }}>
                 Pendaftaran berhasil. Gunakan barcode ini sebagai ID digital perjalanan kulitmu.
               </p>

@@ -322,9 +322,9 @@ func (rc *RBACController) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rc.DB.Delete(&models.User{}, "id = ? AND role IN ?", id, []string{"admin", "superadmin"})
-	
+
 	rc.Audit.Log(adminID, "delete_admin", "rbac", user.Email, "Admin deleted permanently", r.RemoteAddr)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -371,13 +371,13 @@ func (rc *RBACController) GetStats(w http.ResponseWriter, r *http.Request) {
 		Count(&recentLogins)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"total_roles":      totalRoles,
-		"total_perms":      totalPerms,
-		"active_admins":    activeCount,
-		"inactive_admins":  inactiveCount,
-		"recent_logins":    recentLogins,
-		"dept_stats":       deptStats,
-		"role_stats":       roleStats,
+		"total_roles":     totalRoles,
+		"total_perms":     totalPerms,
+		"active_admins":   activeCount,
+		"inactive_admins": inactiveCount,
+		"recent_logins":   recentLogins,
+		"dept_stats":      deptStats,
+		"role_stats":      roleStats,
 	})
 }
 

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatPaymentMethod } from '../../lib/api';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 const API = ADMIN_API_BASE;
 
 // ── SHIPPING ACTION MODAL (Admin version) ─────────────────────────────────────
@@ -63,12 +65,13 @@ function ShippingActionModal({ group, onClose, onSuccess }) {
   const hasTracking = result?.tracking_number || group?.tracking_number;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#fff', borderRadius: 28, width: '100%', maxWidth: 520, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.2)' }}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+      <div style={{ position: 'relative', background: '#fff', borderRadius: 28, width: '100%', maxWidth: 520, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.2)' }}>
         {/* Header */}
         <div style={{ padding: '24px 32px', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 900, color: '#0F172A' }}>🚚 Kelola Resi Pengiriman</div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: '#0F172A' }}>Kelola Resi Pengiriman</div>
             <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
               Toko: <b>{group?.merchant?.store_name || 'Merchant'}</b> · #{(group?.id || '').slice(0, 8).toUpperCase()}
             </div>
@@ -79,7 +82,7 @@ function ShippingActionModal({ group, onClose, onSuccess }) {
         {/* Already has tracking */}
         {(group?.tracking_number || result?.tracking_number) && (
           <div style={{ margin: '20px 32px', padding: '16px 20px', background: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)', borderRadius: 16, border: '1px solid #86EFAC' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#15803D', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>✅ Resi Aktif</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#15803D', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Resi Aktif</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 900, color: '#0F172A', letterSpacing: 2 }}>
               {result?.tracking_number || group?.tracking_number}
             </div>
@@ -93,7 +96,7 @@ function ShippingActionModal({ group, onClose, onSuccess }) {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid #F1F5F9', background: '#FAFBFF' }}>
-          {[['biteship', '⚡ Biteship Otomatis'], ['manual', '✏️ Input Manual']].map(([val, label]) => (
+          {[['biteship', ' Biteship Otomatis'], ['manual', ' Input Manual']].map(([val, label]) => (
             <button key={val} onClick={() => { setTab(val); setError(''); }}
               style={{ flex: 1, padding: '14px 0', fontSize: 13, fontWeight: tab === val ? 800 : 600, color: tab === val ? '#6366F1' : '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === val ? '3px solid #6366F1' : '3px solid transparent', transition: 'all 0.2s' }}>
               {label}
@@ -104,7 +107,7 @@ function ShippingActionModal({ group, onClose, onSuccess }) {
         <div style={{ padding: '24px 32px' }}>
           {error && (
             <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#DC2626', fontWeight: 600 }}>
-              ⚠️ {error}
+              {error}
             </div>
           )}
 
@@ -124,11 +127,11 @@ function ShippingActionModal({ group, onClose, onSuccess }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, display: 'block' }}>Kurir</label>
-                <select value={courierCode} onChange={e => setCourierCode(e.target.value)}
+                <AdminSelect value={courierCode} onChange={e => setCourierCode(e.target.value)}
                   style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid #E2E8F0', fontSize: 13, fontWeight: 600, color: '#1E293B', background: '#FAFBFF', outline: 'none' }}>
                   <option value="">-- Pilih Kurir --</option>
                   {KURIR_OPTIONS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6, display: 'block' }}>Nomor Resi *</label>

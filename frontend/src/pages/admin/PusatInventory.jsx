@@ -4,6 +4,8 @@ import { fetchJson, postJson, ADMIN_API_BASE, formatImage } from '../../lib/api'
 import { PageHeader, StatRow, TablePanel, statusBadge, idr, fmtDate, A, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
 import toast from 'react-hot-toast';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 const filterSelectStyle = {
   padding: '6px 10px',
   borderRadius: 6,
@@ -243,7 +245,7 @@ const Pagination = ({ currentPage, totalItems, pageSize, onPageChange, onPageSiz
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: '#64748b', fontWeight: 600 }}>
           <span>Tampilkan:</span>
-          <select 
+          <AdminSelect 
             value={pageSize} 
             onChange={e => {
               onPageSizeChange(Number(e.target.value));
@@ -254,7 +256,7 @@ const Pagination = ({ currentPage, totalItems, pageSize, onPageChange, onPageSiz
             {[15, 30, 50, 100].map(sz => (
               <option key={sz} value={sz}>{sz}</option>
             ))}
-          </select>
+          </AdminSelect>
         </div>
 
         {totalPages > 1 && (
@@ -940,7 +942,7 @@ export default function PusatInventory() {
         {/* Left Filters Block */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
           
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={bulkAction} 
             onChange={e => setBulkAction(e.target.value)}
@@ -948,7 +950,7 @@ export default function PusatInventory() {
             <option value="">Tindakan massal</option>
             <option value="edit">Edit</option>
             <option value="delete">Hapus</option>
-          </select>
+          </AdminSelect>
           <button type="button" onClick={handleBulkApply} style={filterButtonStyle}>
             Terapkan
           </button>
@@ -956,7 +958,7 @@ export default function PusatInventory() {
           <div style={{ width: 1, height: 18, background: '#cbd5e1', margin: '0 4px' }} />
 
           {/* SEO Scores */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterSeoScore} 
             onChange={e => setFilterSeoScore(e.target.value)}
@@ -966,10 +968,10 @@ export default function PusatInventory() {
             <option value="orange">Cukup (Oranye)</option>
             <option value="red">Perlu Perbaikan (Merah)</option>
             <option value="grey">Belum Diset (Abu-abu)</option>
-          </select>
+          </AdminSelect>
 
           {/* Readability Scores */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterReadabilityScore} 
             onChange={e => setFilterReadabilityScore(e.target.value)}
@@ -979,10 +981,10 @@ export default function PusatInventory() {
             <option value="orange">Cukup (Oranye)</option>
             <option value="red">Perlu Perbaikan (Merah)</option>
             <option value="grey">Belum Diset (Abu-abu)</option>
-          </select>
+          </AdminSelect>
 
           {/* Category */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterCategory} 
             onChange={e => setFilterCategory(e.target.value)}
@@ -991,10 +993,10 @@ export default function PusatInventory() {
             {categories.map(c => (
               <option key={c.id || c.name} value={c.name}>{c.name}</option>
             ))}
-          </select>
+          </AdminSelect>
 
           {/* Product Type */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterProductType} 
             onChange={e => setFilterProductType(e.target.value)}
@@ -1005,10 +1007,10 @@ export default function PusatInventory() {
             <option value="digital">Produk Digital</option>
             <option value="grouped">Produk Bundel</option>
             <option value="external">Produk Eksternal</option>
-          </select>
+          </AdminSelect>
 
           {/* Stock status */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterStockStatus} 
             onChange={e => setFilterStockStatus(e.target.value)}
@@ -1016,10 +1018,10 @@ export default function PusatInventory() {
             <option value="">Filter status stok</option>
             <option value="in_stock">Tersedia (In stock)</option>
             <option value="out_of_stock">Habis (Out of stock)</option>
-          </select>
+          </AdminSelect>
 
           {/* Brand */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterBrand} 
             onChange={e => setFilterBrand(e.target.value)}
@@ -1028,7 +1030,7 @@ export default function PusatInventory() {
             {brands.map(b => (
               <option key={b.id || b.name} value={b.name}>{b.name}</option>
             ))}
-          </select>
+          </AdminSelect>
 
           <button type="button" onClick={handleResetFilters} style={{ ...filterButtonStyle, background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }} title="Reset Filter">
             <i className="bx bx-refresh" style={{ marginRight: 4 }} /> Reset
@@ -1120,18 +1122,18 @@ export default function PusatInventory() {
         subtitle="Otoritas tertinggi stok AkuGlow. Kelola amunisi barang dan pantau mutasi secara real-time."
       >
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button style={A.btnGhost} onClick={loadAllData}><i className="bx bx-refresh" /> Sync Global</button>
-          <button style={A.btnPrimary} onClick={handlePrintBarcode}>
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={loadAllData}><i className="bx bx-refresh" /> Sync Global</button>
+          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={handlePrintBarcode}>
             <i className="bx bx-barcode-reader" /> Cetak Barcode Master
           </button>
         </div>
       </PageHeader>
 
       <div className="tab-container">
-        <div className={`tab-item ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>📦 Stok Master</div>
-        <div className={`tab-item ${activeTab === 'inbound' ? 'active' : ''}`} onClick={() => setActiveTab('inbound')}>🚚 Inbound (Masuk)</div>
-        <div className={`tab-item ${activeTab === 'suppliers' ? 'active' : ''}`} onClick={() => setActiveTab('suppliers')}>🏭 Supplier</div>
-        <div className={`tab-item ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>👁️ Mata Elang</div>
+        <div className={`tab-item ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}> Stok Master</div>
+        <div className={`tab-item ${activeTab === 'inbound' ? 'active' : ''}`} onClick={() => setActiveTab('inbound')}> Inbound (Masuk)</div>
+        <div className={`tab-item ${activeTab === 'suppliers' ? 'active' : ''}`} onClick={() => setActiveTab('suppliers')}> Supplier</div>
+        <div className={`tab-item ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}> Mata Elang</div>
       </div>
 
       {activeTab === 'stock' && (
@@ -1189,7 +1191,7 @@ export default function PusatInventory() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 12 }}>
                   <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>Daftar Produk Master</span>
-                  <Link to="/admin/products/add" style={{ ...A.btnPrimary, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <Link to="/admin/products/add" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     <i className="bx bx-plus-circle" /> Tambah SKU Induk
                   </Link>
                 </div>
@@ -1201,7 +1203,7 @@ export default function PusatInventory() {
                 <i className="bx bxs-package" style={{ fontSize: 52, opacity: 0.15, color: '#6366f1' }} />
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#475569' }}>Tidak ada produk ditemukan</div>
                 <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>Ubah filter atau tambahkan produk baru.</div>
-                <Link to="/admin/products/add" style={{ ...A.btnPrimary, textDecoration: 'none' }}>
+                <Link to="/admin/products/add" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ textDecoration: 'none' }}>
                   <i className="bx bx-plus" /> Tambah Produk
                 </Link>
               </div>
@@ -1538,19 +1540,19 @@ export default function PusatInventory() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>Riwayat Catatan Inbound</span>
-              <button style={A.btnPrimary} onClick={() => setShowInboundModal(true)}>
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowInboundModal(true)}>
                 <i className="bx bx-plus-circle" /> Catat Barang Datang
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-              <select 
+              <AdminSelect 
                 style={filterSelectStyle} 
                 value={bulkInboundAction} 
                 onChange={e => setBulkInboundAction(e.target.value)}
               >
                 <option value="">Tindakan massal</option>
                 <option value="delete">Hapus</option>
-              </select>
+              </AdminSelect>
               <button type="button" onClick={handleBulkInboundApply} style={filterButtonStyle}>
                 Terapkan
               </button>
@@ -1644,19 +1646,19 @@ export default function PusatInventory() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>Daftar Supplier Mitra</span>
-              <button style={A.btnPrimary} onClick={() => setShowSupplierModal(true)}>
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowSupplierModal(true)}>
                 <i className="bx bx-plus-circle" /> Tambah Supplier
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-              <select 
+              <AdminSelect 
                 style={filterSelectStyle} 
                 value={bulkSupplierAction} 
                 onChange={e => setBulkSupplierAction(e.target.value)}
               >
                 <option value="">Tindakan massal</option>
                 <option value="delete">Hapus</option>
-              </select>
+              </AdminSelect>
               <button type="button" onClick={handleBulkSupplierApply} style={filterButtonStyle}>
                 Terapkan
               </button>
@@ -1664,7 +1666,7 @@ export default function PusatInventory() {
           </div>
         }>
           {suppliers.length === 0 ? (
-            <div style={A.empty}>Belum ada data supplier terdaftar.</div>
+            <div className="text-center p-12 flex flex-col items-center gap-3">Belum ada data supplier terdaftar.</div>
           ) : (
             <>
               <div className="wc-table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
@@ -1743,7 +1745,7 @@ export default function PusatInventory() {
       {activeTab === 'audit' && (
         <TablePanel loading={loading} toolbar={<div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>Global Mutation Log</div>}>
           {mutations.length === 0 ? (
-            <div style={A.empty}>Belum ada riwayat pergerakan stok.</div>
+            <div className="text-center p-12 flex flex-col items-center gap-3">Belum ada riwayat pergerakan stok.</div>
           ) : (
             <>
               <div className="wc-table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
@@ -1807,19 +1809,19 @@ export default function PusatInventory() {
             <div className="responsive-grid" style={{ marginBottom: 24 }}>
               <div>
                 <FieldLabel>Pilih Supplier</FieldLabel>
-                <select 
-                  style={{ ...A.select, width: '100%' }} 
+                <AdminSelect 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} 
                   value={inboundForm.supplier_id} 
                   onChange={e => setInboundForm({...inboundForm, supplier_id: e.target.value})}
                 >
                   <option value="">-- Pilih Supplier --</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <FieldLabel>No. Surat Jalan / Referensi</FieldLabel>
                 <input 
-                  type="text" placeholder="MISAL: SJ/2026/001" style={A.input}
+                  type="text" placeholder="MISAL: SJ/2026/001" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400"
                   value={inboundForm.reference_no} 
                   onChange={e => setInboundForm({...inboundForm, reference_no: e.target.value})}
                 />
@@ -1829,7 +1831,7 @@ export default function PusatInventory() {
             <div style={{ marginBottom: 30 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
                 <h4 style={{ margin: 0, fontSize: 14, color: '#0f172a' }}>Daftar Produk Masuk</h4>
-                <button type="button" onClick={addInboundItem} style={{ ...A.btnGhost, padding: '6px 12px', fontSize: 11 }}>
+                <button type="button" onClick={addInboundItem} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '6px 12px', fontSize: 11 }}>
                   + Tambah Baris
                 </button>
               </div>
@@ -1839,18 +1841,18 @@ export default function PusatInventory() {
                   <div key={idx} className="inbound-row">
                     <div>
                       <FieldLabel>Produk</FieldLabel>
-                      <select style={{ ...A.select, width: '100%' }} value={item.product_id} onChange={e => updateInboundItem(idx, 'product_id', e.target.value)}>
+                      <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={item.product_id} onChange={e => updateInboundItem(idx, 'product_id', e.target.value)}>
                         <option value="">Pilih Produk Master</option>
                         {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
-                      </select>
+                      </AdminSelect>
                     </div>
                     <div>
                       <FieldLabel>Kuantitas</FieldLabel>
-                      <input type="number" placeholder="Qty" style={A.input} value={item.quantity} onChange={e => updateInboundItem(idx, 'quantity', e.target.value)} />
+                      <input type="number" placeholder="Qty" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={item.quantity} onChange={e => updateInboundItem(idx, 'quantity', e.target.value)} />
                     </div>
                     <div>
                       <FieldLabel>Harga Beli (Satuan)</FieldLabel>
-                      <input type="number" placeholder="Harga Beli" style={A.input} value={item.cost_price} onChange={e => updateInboundItem(idx, 'cost_price', e.target.value)} />
+                      <input type="number" placeholder="Harga Beli" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={item.cost_price} onChange={e => updateInboundItem(idx, 'cost_price', e.target.value)} />
                     </div>
                     {inboundForm.items.length > 1 && (
                       <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', paddingBottom: 4 }}>
@@ -1869,8 +1871,8 @@ export default function PusatInventory() {
             </div>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: 20 }}>
-              <button type="button" style={A.btnGhost} onClick={() => setShowInboundModal(false)}>Batal</button>
-              <button type="submit" style={A.btnPrimary}><i className="bx bx-check-circle" /> Simpan & Update Stok</button>
+              <button type="button" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowInboundModal(false)}>Batal</button>
+              <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"><i className="bx bx-check-circle" /> Simpan & Update Stok</button>
             </div>
           </form>
         </Modal>
@@ -1882,33 +1884,33 @@ export default function PusatInventory() {
           <form onSubmit={handleSupplierSubmit}>
             <div style={{ marginBottom: 20 }}>
               <FieldLabel>Nama Perusahaan</FieldLabel>
-              <input type="text" style={A.input} placeholder="PT Contoh Maju Bersama" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} required />
+              <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="PT Contoh Maju Bersama" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} required />
             </div>
             
             <div className="responsive-grid" style={{ marginBottom: 20 }}>
               <div>
                 <FieldLabel>Nama Kontak (PIC)</FieldLabel>
-                <input type="text" style={A.input} placeholder="Budi Santoso" value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} />
+                <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Budi Santoso" value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} />
               </div>
               <div>
                 <FieldLabel>No. Telepon / WhatsApp</FieldLabel>
-                <input type="text" style={A.input} placeholder="08123456789" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} />
+                <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="08123456789" value={supplierForm.phone} onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})} />
               </div>
             </div>
             
             <div style={{ marginBottom: 20 }}>
               <FieldLabel>Email Resmi</FieldLabel>
-              <input type="email" style={A.input} placeholder="info@perusahaan.com" value={supplierForm.email} onChange={e => setSupplierForm({...supplierForm, email: e.target.value})} />
+              <input type="email" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="info@perusahaan.com" value={supplierForm.email} onChange={e => setSupplierForm({...supplierForm, email: e.target.value})} />
             </div>
             
             <div style={{ marginBottom: 30 }}>
               <FieldLabel>Alamat Lengkap</FieldLabel>
-              <textarea style={{...A.textarea, height: 100}} placeholder="Jl. Contoh No. 123..." value={supplierForm.address} onChange={e => setSupplierForm({...supplierForm, address: e.target.value})} />
+              <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 transition-all resize-y placeholder:text-slate-400" style={{ height: 100 }} placeholder="Jl. Contoh No. 123..." value={supplierForm.address} onChange={e => setSupplierForm({...supplierForm, address: e.target.value})} />
             </div>
             
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: 20 }}>
-              <button type="button" style={A.btnGhost} onClick={() => setShowSupplierModal(false)}>Batal</button>
-              <button type="submit" style={A.btnPrimary}><i className="bx bx-save" /> {supplierForm.id ? 'Simpan Perubahan' : 'Daftarkan Supplier'}</button>
+              <button type="button" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowSupplierModal(false)}>Batal</button>
+              <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"><i className="bx bx-save" /> {supplierForm.id ? 'Simpan Perubahan' : 'Daftarkan Supplier'}</button>
             </div>
           </form>
         </Modal>
@@ -1965,13 +1967,13 @@ export default function PusatInventory() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, width: '100%' }}>
               <button 
-                style={{ ...A.btnPrimary, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
                 onClick={() => handlePrintLabel(showQR)}
               >
                 <i className="bx bx-printer" style={{ fontSize: 18 }} /> Cetak Label
               </button>
               <button 
-                style={{ ...A.btnGhost, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
                 onClick={() => setShowQR(null)}
               >
                 Tutup
@@ -1993,7 +1995,7 @@ export default function PusatInventory() {
               <FieldLabel>Nama Produk</FieldLabel>
               <input 
                 type="text" 
-                style={A.input} 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                 value={quickEditData.name} 
                 onChange={e => setQuickEditData({ ...quickEditData, name: e.target.value })} 
               />
@@ -2003,7 +2005,7 @@ export default function PusatInventory() {
                 <FieldLabel>SKU</FieldLabel>
                 <input 
                   type="text" 
-                  style={A.input} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                   value={quickEditData.sku} 
                   onChange={e => setQuickEditData({ ...quickEditData, sku: e.target.value })} 
                 />
@@ -2012,7 +2014,7 @@ export default function PusatInventory() {
                 <FieldLabel>Stok</FieldLabel>
                 <input 
                   type="number" 
-                  style={A.input} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                   value={quickEditData.stock} 
                   onChange={e => setQuickEditData({ ...quickEditData, stock: e.target.value })} 
                 />
@@ -2022,7 +2024,7 @@ export default function PusatInventory() {
               <FieldLabel>Harga Jual (Rp)</FieldLabel>
               <input 
                 type="number" 
-                style={A.input} 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                 value={quickEditData.price} 
                 onChange={e => setQuickEditData({ ...quickEditData, price: e.target.value })} 
               />
@@ -2030,13 +2032,13 @@ export default function PusatInventory() {
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
               <button 
                 onClick={handleQuickEditSave} 
-                style={{ ...A.btnPrimary, flex: 1, justifyContent: 'center', height: 40 }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1, justifyContent: 'center', height: 40 }}
               >
                 Simpan Perubahan
               </button>
               <button 
                 onClick={() => setQuickEditProduct(null)} 
-                style={{ ...A.btnGhost, flex: 1, justifyContent: 'center', height: 40 }}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1, justifyContent: 'center', height: 40 }}
               >
                 Batal
               </button>

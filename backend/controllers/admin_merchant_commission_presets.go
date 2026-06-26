@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"encoding/json"
-	"net/http"
 	"akuglow/backend/models"
 	"akuglow/backend/utils"
+	"encoding/json"
+	"net/http"
 )
 
 // GetMerchantCommissionPresets returns all merchant commission presets

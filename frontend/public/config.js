@@ -16,7 +16,7 @@
  * 3. Simpan — perubahan langsung aktif tanpa rebuild!
  */
 window.APP_CONFIG = {
-  API_BASE: 'http://localhost:8080',
-  SITE_URL: 'http://localhost:5173',
+  API_BASE: '',
+  SITE_URL: '',
 };
 

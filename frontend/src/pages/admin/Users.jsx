@@ -386,7 +386,7 @@ export default function AdminUsers() {
       <div style={{ ...A.searchWrap, minWidth: 280, flex: 1, position: 'relative' }}>
         <i className="bx bx-search" style={A.searchIcon} />
         <input
-          style={{ ...A.searchInput, width: '100%', paddingLeft: 40, paddingRight: 36, height: 42 }}
+          className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ width: '100%', paddingLeft: 40, paddingRight: 36, height: 42 }}
           placeholder="Cari Nama Lengkap, Email, HP, atau ID..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -472,20 +472,20 @@ export default function AdminUsers() {
         />
       </div>
 
-      <button style={{ ...A.btnGhost, height: 42, width: 42, padding: 0, justifyContent: 'center' }} onClick={load}>
+      <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 42, width: 42, padding: 0, justifyContent: 'center' }} onClick={load}>
         <i className="bx bx-refresh" style={{ fontSize: 20 }} />
       </button>
       
       {selectedUserIds.length > 0 && (
         <button 
-          style={{ ...A.btnPrimary, height: 42, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)', border: 'none' }} 
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 42, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)', border: 'none' }} 
           onClick={() => setModal('bulk-notify')}
         >
           <i className="bx bx-send" /> Kirim Pesan ({selectedUserIds.length})
         </button>
       )}
 
-      <button style={{ ...A.btnPrimary, height: 42 }} onClick={() => setModal('create')}>
+      <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 42 }} onClick={() => setModal('create')}>
         <i className="bx bx-plus-circle" /> Add User
       </button>
     </div>
@@ -571,7 +571,7 @@ export default function AdminUsers() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={A.empty}>
+                  <td colSpan={8} className="text-center p-12 flex flex-col items-center gap-3">
                     <i className="bx bxs-user-x" style={{ fontSize: 48, color: '#e2e8f0' }} />
                     <div style={{ fontWeight: 700, color: '#94a3b8' }}>Tidak ada pengguna yang sesuai filter</div>
                   </td>
@@ -647,7 +647,7 @@ export default function AdminUsers() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px' }}>
             {users.length === 0 ? (
-              <div style={A.empty}>
+              <div className="text-center p-12 flex flex-col items-center gap-3">
                 <i className="bx bxs-user-x" style={{ fontSize: 48, color: '#e2e8f0' }} />
                 <div style={{ fontWeight: 700, color: '#94a3b8' }}>Tidak ada pengguna yang sesuai filter</div>
               </div>
@@ -720,12 +720,9 @@ export default function AdminUsers() {
             <button 
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              style={{ 
-                ...A.btnGhost, 
-                padding: '8px 12px', 
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 12px', 
                 opacity: page === 1 ? 0.5 : 1,
-                cursor: page === 1 ? 'not-allowed' : 'pointer'
-              }}
+                cursor: page === 1 ? 'not-allowed' : 'pointer' }}
             >
               <i className="bx bx-chevron-left" /> Prev
             </button>
@@ -747,12 +744,9 @@ export default function AdminUsers() {
             <button 
               disabled={page >= totalPages}
               onClick={() => setPage(p => p + 1)}
-              style={{ 
-                ...A.btnGhost, 
-                padding: '8px 12px', 
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 12px', 
                 opacity: page >= totalPages ? 0.5 : 1,
-                cursor: page >= totalPages ? 'not-allowed' : 'pointer'
-              }}
+                cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
             >
               Next <i className="bx bx-chevron-right" />
             </button>
@@ -767,7 +761,7 @@ export default function AdminUsers() {
             <div>
               <FieldLabel>Judul Notifikasi</FieldLabel>
               <input 
-                style={A.input} 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                 required 
                 value={bulkTitle} 
                 onChange={e => setBulkTitle(e.target.value)} 
@@ -777,14 +771,14 @@ export default function AdminUsers() {
             <div>
               <FieldLabel>Isi Pesan Notifikasi</FieldLabel>
               <textarea 
-                style={{ ...A.input, height: 120, resize: 'none', padding: '12px', boxSizing: 'border-box' }} 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 120, resize: 'none', padding: '12px', boxSizing: 'border-box' }} 
                 required 
                 value={bulkMessage} 
                 onChange={e => setBulkMessage(e.target.value)} 
                 placeholder="Tulis pesan lengkap yang ingin dikirim langsung ke notifikasi pengguna terpilih..." 
               />
             </div>
-            <button type="submit" disabled={saving} style={{ ...A.btnPrimary, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', marginTop: 10, height: 48, justifyContent: 'center', fontSize: 15 }}>
+            <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', marginTop: 10, height: 48, justifyContent: 'center', fontSize: 15 }}>
               {saving ? 'Mengirim...' : 'Kirim Sekarang'}
             </button>
           </form>
@@ -798,21 +792,21 @@ export default function AdminUsers() {
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
               <div>
                 <FieldLabel>Email Address</FieldLabel>
-                <input style={A.input} type="email" required value={newUserData.email} onChange={e => setNewUserData({...newUserData, email: e.target.value})} placeholder="email@example.com" />
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" type="email" required value={newUserData.email} onChange={e => setNewUserData({...newUserData, email: e.target.value})} placeholder="email@example.com" />
               </div>
               <div>
                 <FieldLabel>Full Name</FieldLabel>
-                <input style={A.input} required value={newUserData.fullName} onChange={e => setNewUserData({...newUserData, fullName: e.target.value})} placeholder="Nama Lengkap" />
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" required value={newUserData.fullName} onChange={e => setNewUserData({...newUserData, fullName: e.target.value})} placeholder="Nama Lengkap" />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
               <div>
                 <FieldLabel>Password</FieldLabel>
-                <input style={A.input} type="password" required value={newUserData.password} onChange={e => setNewUserData({...newUserData, password: e.target.value})} placeholder="Min. 8 Karakter" />
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" type="password" required value={newUserData.password} onChange={e => setNewUserData({...newUserData, password: e.target.value})} placeholder="Min. 8 Karakter" />
               </div>
               <div>
                 <FieldLabel>No. Telepon</FieldLabel>
-                <input style={A.input} type="text" value={newUserData.phone || ''} onChange={e => setNewUserData({...newUserData, phone: e.target.value})} placeholder="Contoh: 0812345678" />
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" type="text" value={newUserData.phone || ''} onChange={e => setNewUserData({...newUserData, phone: e.target.value})} placeholder="Contoh: 0812345678" />
               </div>
             </div>
              <div>
@@ -850,7 +844,7 @@ export default function AdminUsers() {
               </div>
             )}
 
-            <button type="submit" disabled={saving} style={{ ...A.btnPrimary, marginTop: 10, height: 48, justifyContent: 'center', fontSize: 15 }}>
+            <button type="submit" disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ marginTop: 10, height: 48, justifyContent: 'center', fontSize: 15 }}>
               {saving ? 'Proses...' : 'Konfirmasi & Buat Akun'}
             </button>
           </form>
@@ -1020,7 +1014,7 @@ export default function AdminUsers() {
                 <FieldLabel>Nomor Telepon (Akun)</FieldLabel>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input 
-                    style={{ ...A.input, flex: 1, height: 42, background: '#fff', fontSize: 13.5 }} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ flex: 1, height: 42, background: '#fff', fontSize: 13.5 }} 
                     type="text" 
                     value={modal.phone || ''} 
                     onChange={e => setModal({ ...modal, phone: e.target.value })} 
@@ -1028,7 +1022,7 @@ export default function AdminUsers() {
                   />
                   <button 
                     onClick={() => updateUser(modal.id, modal.status, modal.role, modal.phone, modal.admin_role)}
-                    style={{ ...A.btnPrimary, height: 42, padding: '0 16px', borderRadius: 10 }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 42, padding: '0 16px', borderRadius: 10 }}
                   >
                     Simpan
                   </button>
@@ -1081,7 +1075,7 @@ export default function AdminUsers() {
                     </div>
                     <button 
                       onClick={() => updateUser(modal.id, modal.status, modal.role, modal.phone, modal.admin_role, modal.affiliate?.upline_code || '')}
-                      style={{ ...A.btnPrimary, height: 42, padding: '0 16px', borderRadius: 10, flexShrink: 0 }}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 42, padding: '0 16px', borderRadius: 10, flexShrink: 0 }}
                     >
                       Simpan Upline
                     </button>
@@ -1120,7 +1114,7 @@ export default function AdminUsers() {
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     onClick={() => impersonate(modal.id)}
-                    style={{ ...A.btnPrimary, flex: 1, height: 44, justifyContent: 'center', background: '#0f172a', borderRadius: 10, fontSize: 13 }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1, height: 44, justifyContent: 'center', background: '#0f172a', borderRadius: 10, fontSize: 13 }}
                   >
                     <i className="bx bx-ghost" /> Ghost Login
                   </button>
@@ -1134,7 +1128,7 @@ export default function AdminUsers() {
                         body: JSON.stringify({ user_id: modal.id, new_password: pass })
                       }).then(res => alert(res.message || 'Password berhasil diubah')).catch(e => alert(e.message));
                     }}
-                    style={{ ...A.btnPrimary, flex: 1, height: 44, justifyContent: 'center', background: '#6366f1', borderRadius: 10, fontSize: 13 }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1, height: 44, justifyContent: 'center', background: '#6366f1', borderRadius: 10, fontSize: 13 }}
                   >
                     <i className="bx bx-key" /> Reset Password
                   </button>

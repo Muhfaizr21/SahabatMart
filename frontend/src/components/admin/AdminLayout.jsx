@@ -2,34 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
 import { fetchJson, ADMIN_API_BASE } from '../../lib/api';
+import { useTheme } from '../../context/ThemeContext';
 
 // ─── DESIGN TOKENS ────────────────────────────────────
 const C = {
-  bg:        '#0f172a',
-  bgSub:     '#1e293b',
-  bgHover:   '#1e293b',
-  accent:    '#6366f1',
-  accentGlow:'rgba(99,102,241,0.15)',
-  text:      '#f1f5f9',
+  bg:        '#ffffff',
+  bgSub:     '#f8fafc',
+  bgHover:   '#f8fafc',
+  accent:    '#01036b',
+  accentGlow:'rgba(1, 3, 107, 0.08)',
+  text:      '#1e1b4b',
   muted:     '#64748b',
-  border:    'rgba(255,255,255,0.06)',
+  border:    '#e2e8f0',
   sideW:     260,
 };
 
 const rawMenu = [
   { type: 'item', name: 'Dashboard', icon: 'bxs-dashboard', path: '/admin', end: true, perm: 'view_dashboard' },
 
-  { type: 'label', text: 'PESANAN' },
+  { type: 'label', text: 'PESANAN & PENJUALAN' },
   { type: 'item', name: 'Semua Pesanan', icon: 'bxs-receipt', path: '/admin/orders', perm: 'order_view' },
-
-
-  { type: 'label', text: 'KASIR' },
   { type: 'item', name: 'Kasir / POS', icon: 'bxs-calculator', path: '/admin/pos', perm: 'order_view' },
 
-  { type: 'label', text: 'ANGGOTA & PENGGUNA' },
-  { type: 'item', name: 'Semua Pengguna', icon: 'bxs-user-account', path: '/admin/users', perm: 'user_view' },
+  { type: 'label', text: 'KATALOG PRODUK' },
+  { type: 'item', name: 'Semua Produk', icon: 'bxs-shopping-bag-alt', path: '/admin/products', perm: 'product_view' },
+  { type: 'item', name: 'Gudang Pusat / Stok', icon: 'bxs-cube', path: '/admin/inventory/pusat', perm: 'inventory_view' },
+  { type: 'item', name: 'Kategori Produk', icon: 'bxs-grid-alt', path: '/admin/categories', perm: 'category_view' },
+  { type: 'item', name: 'Brand / Merek', icon: 'bxs-purchase-tag', path: '/admin/brands', perm: 'product_view' },
+  { type: 'item', name: 'Atribut Produk', icon: 'bx-slider-alt', path: '/admin/attributes', perm: 'product_view' },
+  { type: 'item', name: 'Ulasan Produk', icon: 'bxs-star', path: '/admin/reviews', perm: 'product_view' },
 
-  { type: 'label', text: 'KEMITRAAN & JARINGAN' },
+  { type: 'label', text: 'ANGGOTA & KEMITRAAN' },
+  { type: 'item', name: 'Semua Pengguna', icon: 'bxs-user-account', path: '/admin/users', perm: 'user_view' },
   {
     type: 'item', name: 'Manajemen Afiliasi', icon: 'bxs-network-chart',
     children: [
@@ -47,44 +51,35 @@ const rawMenu = [
     ]
   },
 
-  { type: 'label', text: 'KATALOG PRODUK' },
-  { type: 'item', name: 'Gudang Pusat / Stok', icon: 'bxs-cube', path: '/admin/inventory/pusat', perm: 'inventory_view' },
-  { type: 'item', name: 'Semua Produk', icon: 'bxs-shopping-bag-alt', path: '/admin/products', perm: 'product_view' },
-  { type: 'item', name: 'Kategori Produk', icon: 'bxs-grid-alt', path: '/admin/categories', perm: 'category_view' },
-  { type: 'item', name: 'Brand / Merek', icon: 'bxs-purchase-tag', path: '/admin/brands', perm: 'product_view' },
-  { type: 'item', name: 'Atribut Produk', icon: 'bx-slider-alt', path: '/admin/attributes', perm: 'product_view' },
-  { type: 'item', name: 'Ulasan Produk', icon: 'bxs-star', path: '/admin/reviews', perm: 'product_view' },
-
   { type: 'label', text: 'PROMOSI & MARKETING' },
-  { type: 'item', name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist', perm: 'view_analytics' },
   { type: 'item', name: 'Voucher & Promo', icon: 'bxs-coupon', path: '/admin/vouchers', perm: 'marketing_view_voucher' },
+  { type: 'item', name: 'Analisis Wishlist', icon: 'bxs-heart', path: '/admin/wishlist', perm: 'view_analytics' },
   { type: 'item', name: 'Demografi Pelanggan', icon: 'bx-globe', path: '/admin/demographics', perm: 'view_analytics' },
 
-  { type: 'label', text: 'KEUANGAN' },
+  { type: 'label', text: 'OPERASIONAL & KEUANGAN' },
+  { type: 'item', name: 'Logistic & Kurir', icon: 'bxs-truck', path: '/admin/logistics', perm: 'settings_view' },
+  { type: 'item', name: 'Pesan Masuk', icon: 'bxs-inbox', path: '/admin/inbox', perm: 'user_view' },
   { type: 'item', name: 'Buku Besar / Ledger', icon: 'bxs-bank', path: '/admin/finance', perm: 'finance_view_summary' },
   { type: 'item', name: 'Preset Komisi', icon: 'bxs-badge-dollar', path: '/admin/commission-presets', perm: 'finance_view_summary' },
 
   { type: 'label', text: 'KONTEN & TAMPILAN' },
+  { type: 'item', name: 'Visual CMS (Platform)', icon: 'bxs-dashboard', path: '/admin/cms', end: true, perm: 'view_dashboard' },
+  { type: 'item', name: 'Banner Promo', icon: 'bxs-image', path: '/admin/banners', perm: 'marketing_manage_banner' },
   { type: 'item', name: 'Pustaka Media', icon: 'bxs-photo-album', path: '/admin/media', perm: 'content_blog' },
   { type: 'item', name: 'Artikel Blog', icon: 'bxs-edit', path: '/admin/blogs', perm: 'content_blog' },
-  { type: 'item', name: 'Banner Promo', icon: 'bxs-image', path: '/admin/banners', perm: 'marketing_manage_banner' },
+  { type: 'item', name: 'Bahan Promosi', icon: 'bxs-megaphone', path: '/admin/promo', perm: 'content_promo_material' },
   { type: 'item', name: 'Edukasi Afiliasi', icon: 'bxs-graduation', path: '/admin/education', perm: 'content_education' },
   { type: 'item', name: 'Event Afiliasi', icon: 'bxs-calendar', path: '/admin/events', perm: 'content_event' },
-  { type: 'item', name: 'Bahan Promosi', icon: 'bxs-megaphone', path: '/admin/promo', perm: 'content_promo_material' },
   { type: 'item', name: 'Komunitas Skin', icon: 'bxs-group', path: '/admin/skin-community', perm: 'content_education' },
-
-  { type: 'label', text: 'OPERASIONAL' },
-  { type: 'item', name: 'Logistic & Kurir', icon: 'bxs-truck', path: '/admin/logistics', perm: 'settings_view' },
-  { type: 'item', name: 'Pesan Masuk', icon: 'bxs-inbox', path: '/admin/inbox', perm: 'user_view' },
 
   { type: 'label', text: 'CUSTOMER EXPERIENCE' },
   { type: 'item', name: 'Skin Journey', icon: 'bx-leaf', path: '/admin/skin-journey', perm: 'view_analytics' },
 
   { type: 'label', text: 'SISTEM & KEAMANAN' },
-  { type: 'item', name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security', perm: 'settings_view' },
-  { type: 'item', name: 'Hak Akses / RBAC', icon: 'bxs-key', path: '/admin/rbac', perm: 'rbac_view' },
-  { type: 'item', name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit', perm: 'settings_view' },
   { type: 'item', name: 'Pengaturan Sistem', icon: 'bxs-cog', path: '/admin/settings', perm: 'settings_view' },
+  { type: 'item', name: 'Hak Akses / RBAC', icon: 'bxs-key', path: '/admin/rbac', perm: 'rbac_view' },
+  { type: 'item', name: 'Keamanan', icon: 'bxs-shield-alt-2', path: '/admin/security', perm: 'settings_view' },
+  { type: 'item', name: 'Log Aktivitas', icon: 'bxs-file-find', path: '/admin/audit', perm: 'settings_view' },
 
   { type: 'label', text: 'AKUN' },
   { type: 'item', name: 'Keluar / Logout', icon: 'bx-log-out', path: '/logout', perm: 'view_dashboard' },
@@ -195,6 +190,7 @@ const Label = ({ text }) => (
 
 // ─── MAIN LAYOUT ───────────────────────────────────────
 const AdminLayout = () => {
+  const { theme } = useTheme();
   const [user, setUser] = useState(getStoredUser());
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -297,7 +293,7 @@ const AdminLayout = () => {
           display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
         }}>
           {!collapsed ? (
-            <img src="/akuglow.webp" alt="AkuGlow" style={{ height: 36, width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" style={{ height: 36, width: 'auto', objectFit: 'contain' }} />
           ) : (
             <div style={{
               width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -656,8 +652,8 @@ const AdminLayout = () => {
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.2); }
         * { box-sizing: border-box; }
         
         .admin-main-content {

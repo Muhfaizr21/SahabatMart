@@ -41,6 +41,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	tierCtrl := controllers.NewMembershipTierController(db)
 	mediaCtrl := controllers.NewMediaController(db)
 	demoCtrl := controllers.NewDemographicsController(db)
+	cmsCtrl := controllers.NewCMSController(db)
 
 	// Middleware
 	cors := CorsMiddleware
@@ -181,19 +182,20 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	}
 
 	// Rate Limiting Helpers
-	withLimit := func(limit int, window time.Duration) func(http.HandlerFunc) http.HandlerFunc {
+	withLimit := func(name string, limit int, window time.Duration) func(http.HandlerFunc) http.HandlerFunc {
 		return func(next http.HandlerFunc) http.HandlerFunc {
-			return middleware.RateLimitMiddleware(limit, window)(next).(http.HandlerFunc)
+			return middleware.RateLimitMiddleware(name, limit, window)(next).(http.HandlerFunc)
 		}
 	}
 
-	authLimit := withLimit(10, time.Minute)    // 10 attempts per minute
-	checkoutLimit := withLimit(5, time.Minute) // 5 checkouts per minute
-	lookupLimit := withLimit(30, time.Minute)  // 30 lookups per minute
+	authLimit := withLimit("auth", 10, time.Minute)        // 10 attempts per minute
+	checkoutLimit := withLimit("checkout", 5, time.Minute) // 5 checkouts per minute
+	lookupLimit := withLimit("lookup", 30, time.Minute)    // 30 lookups per minute
 
 	// --- Auth Routes ---
 	mux.HandleFunc("/api/auth/register", authLimit(authCtrl.Register))
 	mux.HandleFunc("/api/auth/login", authLimit(authCtrl.Login))
+	mux.HandleFunc("/api/auth/refresh", authCtrl.RefreshToken)
 	mux.HandleFunc("/api/auth/google/login", authCtrl.GoogleLogin)
 	mux.HandleFunc("/api/auth/google/callback", authCtrl.GoogleCallback)
 	mux.HandleFunc("/api/auth/forgot-password", authLimit(authCtrl.ForgotPassword))
@@ -222,6 +224,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/buyer/orders", buyerOnly(buyerCtrl.GetOrders))
 	mux.HandleFunc("/api/buyer/orders/detail", buyerOnly(buyerCtrl.GetOrderDetail))
 	mux.HandleFunc("/api/buyer/orders/cancel", buyerOnly(buyerCtrl.CancelOrder))
+	mux.HandleFunc("/api/buyer/orders/cancel-group", buyerOnly(buyerCtrl.CancelMerchantGroup))
 	mux.HandleFunc("/api/buyer/orders/dispute", buyerOnly(buyerCtrl.SubmitDispute))
 	mux.HandleFunc("/api/buyer/orders/payment-instructions", buyerOnly(buyerCtrl.GetPaymentInstructions))
 	mux.HandleFunc("/api/buyer/profile", buyerOnly(buyerCtrl.GetProfile))
@@ -265,7 +268,6 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/merchant/pos/products", merchantOnly(merchantCtrl.POSGetProducts))
 	mux.HandleFunc("/api/merchant/pos/checkout", merchantOnly(checkoutLimit(merchantCtrl.POSCheckout)))
 	mux.HandleFunc("/api/merchant/pos/member/", merchantOnly(lookupLimit(merchantCtrl.GetMemberByCode)))
-
 
 	// Finance
 	mux.HandleFunc("/api/merchant/wallet", merchantOnly(merchantCtrl.GetWallet))
@@ -320,6 +322,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/affiliate/notifications/read-all", affiliateOnly(affiliateCtrl.MarkAllNotificationsRead))
 	mux.HandleFunc("/api/affiliate/notifications/delete", affiliateOnly(affiliateCtrl.DeleteNotification))
 	mux.HandleFunc("/api/affiliate/notifications/all", affiliateOnly(affiliateCtrl.DeleteAllNotifications))
+	mux.HandleFunc("/api/affiliate/upload", affiliateOnly(adminCtrl.UploadImage))
 	mux.HandleFunc("/api/public/affiliate/track", affiliateCtrl.TrackClick)
 
 	// --- Admin Routes ---
@@ -609,6 +612,33 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/affiliate-clicks", adminOnly(adminCtrl.GetAffiliateClicks))
 	mux.HandleFunc("/api/admin/upload", adminOnly(adminCtrl.UploadImage))
 
+	// CMS (Visual Headless CMS for Superadmin)
+	mux.HandleFunc("/api/admin/cms/platforms", adminOnly(cmsCtrl.ListPlatforms))
+	mux.HandleFunc("/api/admin/cms/theme", adminOnly(cmsCtrl.GetTheme))
+	mux.HandleFunc("/api/admin/cms/theme/update", adminOnly(cmsCtrl.UpdateTheme))
+	mux.HandleFunc("/api/admin/cms/theme/publish", adminOnly(cmsCtrl.PublishTheme))
+	mux.HandleFunc("/api/admin/cms/sections", adminOnly(cmsCtrl.ListSections))
+	mux.HandleFunc("/api/admin/cms/sections/create", adminOnly(cmsCtrl.CreateSection))
+	mux.HandleFunc("/api/admin/cms/sections/update", adminOnly(cmsCtrl.UpdateSection))
+	mux.HandleFunc("/api/admin/cms/sections/delete", adminOnly(cmsCtrl.DeleteSection))
+	mux.HandleFunc("/api/admin/cms/sections/reorder", adminOnly(cmsCtrl.ReorderSections))
+	mux.HandleFunc("/api/admin/cms/menus", adminOnly(cmsCtrl.GetMenu))
+	mux.HandleFunc("/api/admin/cms/menus/update", adminOnly(cmsCtrl.UpsertMenu))
+	mux.HandleFunc("/api/admin/cms/assets", adminOnly(cmsCtrl.ListAssets))
+	mux.HandleFunc("/api/admin/cms/assets/upload", adminOnly(cmsCtrl.UploadAsset))
+	mux.HandleFunc("/api/admin/cms/assets/delete", adminOnly(cmsCtrl.DeleteAsset))
+
+	// CMS Page Content
+	mux.HandleFunc("/api/admin/cms/page-content", adminOnly(cmsCtrl.GetPageContent))
+	mux.HandleFunc("/api/admin/cms/page-content/update", adminOnly(cmsCtrl.UpdatePageContent))
+
+	// Public CMS API (no auth — consumed by frontend platforms)
+	mux.HandleFunc("/api/public/cms/data", cmsCtrl.GetPublicCMS)
+	mux.HandleFunc("/api/public/cms/preview.css", cmsCtrl.PreviewCSS)
+	mux.HandleFunc("/api/public/cms/preview-page", cmsCtrl.GetPreviewPage)
+	mux.HandleFunc("/api/public/cms/overrides.css", cmsCtrl.OverrideCSS)
+	mux.HandleFunc("/api/public/cms/page-content", cmsCtrl.GetPublicPageContent)
+
 	// Demographics Analytics
 	mux.HandleFunc("/api/admin/demographics/stats", adminOnly(demoCtrl.GetDemographicsStats))
 	mux.HandleFunc("/api/admin/demographics/logs", adminOnly(demoCtrl.GetDemographicsLogs))
@@ -628,6 +658,7 @@ func SetupRoutes(db *gorm.DB) http.Handler {
 	mux.HandleFunc("/api/admin/system/broadcast", superAdminOnly(adminCtrl.BroadcastNotification))
 	mux.HandleFunc("/api/admin/system/stats", superAdminOnly(adminCtrl.GetSystemStats))
 	mux.HandleFunc("/api/admin/system/health", superAdminOnly(adminCtrl.GetSystemHealth))
+	mux.HandleFunc("/api/admin/system/reset-all", superAdminOnly(adminCtrl.ResetSystemData))
 
 	// Commission Presets (Multi-Level Upline Distribution)
 	mux.HandleFunc("/api/admin/commission-presets", adminOnly(adminCtrl.GetCommissionPresets))
@@ -723,16 +754,23 @@ func CorsMiddleware(next http.Handler) http.Handler {
 		}
 	}
 
+	isDev := os.Getenv("APP_ENV") != "production"
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		// Allow any localhost port dynamically (e.g. 5173, 5174, 3000) or any specifically allowed origin
-		isLocalhost := strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:")
-		if allowedOrigins[origin] || isLocalhost {
+		isAllowed := allowedOrigins[origin]
+		// Allow any localhost port dynamically in dev mode
+		if isDev {
+			isAllowed = isAllowed || strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:")
+		}
+		if isAllowed {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning")
+		w.Header().Set("Access-Control-Max-Age", "86400")
 		// Bypass ngrok interstitial for API responses
 		w.Header().Set("ngrok-skip-browser-warning", "true")
 		if r.Method == "OPTIONS" {

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
+import { useTheme } from '../context/ThemeContext';
+
 /**
  * Komponen SEO Utama AkuGlow
  * Mengelola metadata, social tags, canonical URL, dan schema data terstruktur.
@@ -10,14 +12,17 @@ const SEO = ({
   description, 
   name = "AkuGlow", 
   type = "website", 
-  image = "/akuglow.webp", 
+  image, 
   url = window.location.href,
   schema = null,
   noindex = false
 }) => {
+  const { theme } = useTheme();
+  const defaultImage = theme?.platform_logo || '/akuglow.webp';
+  const finalImage = image || defaultImage;
   const fullTitle = title ? `${title} | ${name}` : name;
   const siteUrl = window.location.origin;
-  const ogImage = image.startsWith('http') ? image : `${siteUrl}${image}`;
+  const ogImage = finalImage.startsWith('http') ? finalImage : `${siteUrl}${finalImage}`;
 
   return (
     <Helmet>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
-import { A, PageHeader, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
+import { A, PageHeader, Modal, FieldLabel, statusBadge } from '../../lib/adminStyles.jsx';
+import { AdminInput, AdminFormActions } from '../../lib/adminComponents.jsx';
 import toast from 'react-hot-toast';
 import MediaLibraryModal from '../../components/admin/MediaLibraryModal';
 
@@ -66,25 +67,25 @@ export default function AdminBanners() {
         title="Hero Banners" 
         subtitle="Manage home page slider and promotional content"
       >
-        <button onClick={() => { setFormData({ id: 0, title: '', subtitle: '', badge: '', offer: '', image: '', bg_color: '#3b82f6', link: '/', order: 0, is_active: true }); setShowModal(true); }} style={A.btnPrimary}>
+        <button onClick={() => { setFormData({ id: 0, title: '', subtitle: '', badge: '', offer: '', image: '', bg_color: '#3b82f6', link: '/', order: 0, is_active: true }); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
           <i className="bx bx-plus" /> Add New Banner
         </button>
       </PageHeader>
 
       {loading ? (
-        <div style={A.empty}>
+        <div className="text-center p-12 flex flex-col items-center gap-3">
            <div className="spinner-border text-primary" />
            <p style={{ color: '#94a3b8', fontStyle: 'italic', marginTop: 10 }}>Syncing assets...</p>
         </div>
       ) : banners.length === 0 ? (
-        <div style={A.empty}>
+        <div className="text-center p-12 flex flex-col items-center gap-3">
            <i className="bx bx-image-alt" style={{ fontSize: 48, color: '#e2e8f0' }} />
            <p style={{ color: '#94a3b8', fontWeight: 600 }}>No banners configured yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {banners.map(b => (
-            <div key={b.id} style={{ ...A.card, position: 'relative' }} className="group">
+            <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ position: 'relative' }} className="group">
                {/* Preview Image */}
                <div style={{ height: 160, background: '#f8fafc', overflow: 'hidden', position: 'relative' }}>
                   <img src={formatImage(b.image)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
@@ -126,23 +127,23 @@ export default function AdminBanners() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Banner Title</FieldLabel>
-                    <input style={A.input} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required placeholder="e.g. Mega Sale 12.12" />
+                    <AdminInput value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required placeholder="e.g. Mega Sale 12.12" />
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Badge Text</FieldLabel>
-                    <input style={A.input} value={formData.badge} onChange={e => setFormData({ ...formData, badge: e.target.value })} placeholder="e.g. HOT, NEW, LIMITED" />
+                    <AdminInput value={formData.badge} onChange={e => setFormData({ ...formData, badge: e.target.value })} placeholder="e.g. HOT, NEW, LIMITED" />
                  </div>
                  <div className="col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Subtitle / Description</FieldLabel>
-                    <input style={A.input} value={formData.subtitle} onChange={e => setFormData({ ...formData, subtitle: e.target.value })} placeholder="Short promotional text..." />
+                    <AdminInput value={formData.subtitle} onChange={e => setFormData({ ...formData, subtitle: e.target.value })} placeholder="Short promotional text..." />
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Offer Label</FieldLabel>
-                    <input style={A.input} value={formData.offer} onChange={e => setFormData({ ...formData, offer: e.target.value })} placeholder="e.g. Disc 50% Off" />
+                    <AdminInput value={formData.offer} onChange={e => setFormData({ ...formData, offer: e.target.value })} placeholder="e.g. Disc 50% Off" />
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Target Link</FieldLabel>
-                    <input style={A.input} value={formData.link} onChange={e => setFormData({ ...formData, link: e.target.value })} placeholder="/shop/promo" />
+                    <AdminInput value={formData.link} onChange={e => setFormData({ ...formData, link: e.target.value })} placeholder="/shop/promo" />
                  </div>
 
                  <div className="col-span-2">
@@ -168,7 +169,7 @@ export default function AdminBanners() {
 
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Sort Order</FieldLabel>
-                    <input type="number" style={A.input} value={formData.order} onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) })} />
+                    <AdminInput type="number" value={formData.order} onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) })} />
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <FieldLabel>Background Accent</FieldLabel>
@@ -179,7 +180,8 @@ export default function AdminBanners() {
                  </div>
               </div>
 
-              <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                 <FieldLabel>Active on Homepage</FieldLabel>
                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setFormData({...formData, is_active: !formData.is_active})}>
                     <div style={{ 
                         width: 40, height: 20, borderRadius: 20, background: formData.is_active ? '#16a34a' : '#cbd5e1', 
@@ -192,10 +194,8 @@ export default function AdminBanners() {
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>Active on Homepage</span>
                  </div>
-                 <button type="submit" style={A.btnPrimary}>
-                    {formData.id ? 'Update Banner' : 'Create Banner'}
-                 </button>
               </div>
+              <AdminFormActions onCancel={() => setShowModal(false)} onSave={handleSave} label={formData.id ? 'Update Banner' : 'Create Banner'} />
            </form>
         </Modal>
       )}

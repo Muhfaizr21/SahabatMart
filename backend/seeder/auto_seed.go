@@ -8,6 +8,35 @@ import (
 	"gorm.io/gorm"
 )
 
+func AutoSeedLogisticChannels(db *gorm.DB) {
+	var count int64
+	db.Model(&models.LogisticChannel{}).Count(&count)
+	if count > 0 {
+		return
+	}
+
+	log.Println("📦 Menambahkan logistic channels default...")
+	channels := []models.LogisticChannel{
+		{Code: "jne", Name: "JNE", IsActive: true, LogoURL: ""},
+		{Code: "sicepat", Name: "SiCepat", IsActive: true, LogoURL: ""},
+		{Code: "jnt", Name: "J&T Express", IsActive: true, LogoURL: ""},
+		{Code: "anteraja", Name: "Anteraja", IsActive: true, LogoURL: ""},
+		{Code: "pos", Name: "Pos Indonesia", IsActive: true, LogoURL: ""},
+		{Code: "tiki", Name: "TIKI", IsActive: true, LogoURL: ""},
+		{Code: "lion", Name: "Lion Parcel", IsActive: true, LogoURL: ""},
+		{Code: "idexpress", Name: "ID Express", IsActive: true, LogoURL: ""},
+		{Code: "sentralcargo", Name: "Sentral Cargo", IsActive: true, LogoURL: ""},
+		{Code: "rpx", Name: "RPX", IsActive: true, LogoURL: ""},
+		{Code: "wahana", Name: "Wahana", IsActive: true, LogoURL: ""},
+		{Code: "ninja", Name: "Ninja Xpress", IsActive: true, LogoURL: ""},
+	}
+
+	for _, ch := range channels {
+		db.Where("code = ?", ch.Code).FirstOrCreate(&ch)
+	}
+	log.Printf("✅ %d logistic channels seeded", len(channels))
+}
+
 func AutoSeedCriticalData(db *gorm.DB) {
 	var tierCount int64
 	db.Model(&models.MembershipTier{}).Count(&tierCount)
@@ -56,4 +85,3 @@ func AutoSeedCriticalData(db *gorm.DB) {
 		db.Model(&models.User{}).Where("email = ?", "admin@akuglow.com").Update("status", "active")
 	}
 }
-

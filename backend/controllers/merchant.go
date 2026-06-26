@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"strings"
 	"akuglow/backend/models"
 	"akuglow/backend/services"
 	"akuglow/backend/utils"
+	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -42,7 +42,7 @@ func (mc *MerchantController) GetProducts(w http.ResponseWriter, r *http.Request
 		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
 		return
 	}
-	
+
 	search := r.URL.Query().Get("search")
 	categoryID := r.URL.Query().Get("category_id")
 	stockStatus := r.URL.Query().Get("stock_status")
@@ -92,7 +92,7 @@ func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Requ
 		utils.JSONError(w, http.StatusUnauthorized, "Sesi merchant tidak valid")
 		return
 	}
-	
+
 	var req struct {
 		Items         []models.RestockItem `json:"items"`
 		PaymentMethod string               `json:"payment_method"`
@@ -113,7 +113,7 @@ func (mc *MerchantController) RequestRestock(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Notify Admin
-	mc.Notif.Push(models.AdminID, "admin", "restock_new", "Permintaan Restock Baru", 
+	mc.Notif.Push(models.AdminID, "admin", "restock_new", "Permintaan Restock Baru",
 		fmt.Sprintf("Merchant baru saja mengirimkan permintaan restock untuk %d item.", len(req.Items)), "/admin/merchants/restock")
 
 	utils.JSONResponse(w, http.StatusCreated, request)
@@ -161,7 +161,7 @@ func (mc *MerchantController) GetOrders(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	status := r.URL.Query().Get("status")
-	
+
 	page := utils.QueryInt(r, "page", 1)
 	limit := utils.QueryInt(r, "limit", 10)
 
@@ -183,10 +183,10 @@ func (mc *MerchantController) UpdateOrderStatus(w http.ResponseWriter, r *http.R
 	}
 
 	var req struct {
-		GroupID       string `json:"group_id"`
-		Status        string `json:"status"`
+		GroupID        string `json:"group_id"`
+		Status         string `json:"status"`
 		TrackingNumber string `json:"tracking_number"`
-		CourierCode   string `json:"courier_code"`
+		CourierCode    string `json:"courier_code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
@@ -498,7 +498,7 @@ func (mc *MerchantController) GetNotifications(w http.ResponseWriter, r *http.Re
 	userID, _ := r.Context().Value("user_id").(string)
 
 	var notifs []models.Notification
-	err := mc.DB.Where("(receiver_id = ? AND receiver_type = ?) OR (receiver_id = ? AND receiver_type = ?)", 
+	err := mc.DB.Where("(receiver_id = ? AND receiver_type = ?) OR (receiver_id = ? AND receiver_type = ?)",
 		merchantID, "merchant", userID, "user").
 		Order("created_at desc").
 		Limit(20).
@@ -629,7 +629,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 			ProductID        string  `json:"product_id"`
 			ProductVariantID *string `json:"product_variant_id"`
 			Quantity         int     `json:"quantity"`
-			Price           float64 `json:"price"`
+			Price            float64 `json:"price"`
 		} `json:"items"`
 		PaymentMethod string  `json:"payment_method"`
 		AmountPaid    float64 `json:"amount_paid"`
@@ -652,7 +652,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 		orderNumber := fmt.Sprintf("MPOS-%s-%d", shortCode, time.Now().Unix()%100000)
 
 		var subtotal float64
-		
+
 		// [Akuglow] Instantiate Services for Commission Calculation
 		orderSvc := services.NewOrderService(tx)
 		financeSvc := services.NewFinanceService(tx)
@@ -665,17 +665,17 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				resolvedAffiliateID = &aff.ID
 			}
 		}
-		
+
 		type itemData struct {
-			product               models.Product
-			variant               models.ProductVariant
-			qty                   int
-			price                 float64
-			commissionAmount      float64
-			commissionRate        float64
-			distributionAmount    float64
-			platformFeeAmount     float64
-			cogs                  float64
+			product            models.Product
+			variant            models.ProductVariant
+			qty                int
+			price              float64
+			commissionAmount   float64
+			commissionRate     float64
+			distributionAmount float64
+			platformFeeAmount  float64
+			cogs               float64
 		}
 		var itemsToProcess []itemData
 
@@ -692,23 +692,23 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				}
 			}
 
-		// [BUG-M1 Fix] Harga WAJIB dari database (product.Price / variant.Price).
-		// Jangan trusted item.Price dari client — merchant bisa jual harga berapapun.
-		// Client hanya boleh override harga jika >= product.Price dan >= variant.Price.
-		unitPrice := product.Price
-		if variant.ID != "" {
-			unitPrice = variant.Price
-		}
-		if item.Price > 0 {
-			// Validasi: harga dari client tidak boleh lebih rendah dari harga di database
-			if item.Price < unitPrice {
-				return fmt.Errorf("harga %s tidak boleh lebih rendah dari harga asli (Rp %.2f)", product.Name, unitPrice)
+			// [BUG-M1 Fix] Harga WAJIB dari database (product.Price / variant.Price).
+			// Jangan trusted item.Price dari client — merchant bisa jual harga berapapun.
+			// Client hanya boleh override harga jika >= product.Price dan >= variant.Price.
+			unitPrice := product.Price
+			if variant.ID != "" {
+				unitPrice = variant.Price
 			}
-			unitPrice = item.Price
-		}
+			if item.Price > 0 {
+				// Validasi: harga dari client tidak boleh lebih rendah dari harga di database
+				if item.Price < unitPrice {
+					return fmt.Errorf("harga %s tidak boleh lebih rendah dari harga asli (Rp %.2f)", product.Name, unitPrice)
+				}
+				unitPrice = item.Price
+			}
 
 			subtotal += unitPrice * float64(item.Quantity)
-			
+
 			// [Akuglow] Calculate Commissions using centralized logic (Variant-aware)
 			tempOI := models.OrderItem{
 				ProductID:        product.ID,
@@ -719,15 +719,15 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 			affAmt, affRate, distAmt, platAmt, cogs, _ := orderSvc.CalculateCommissions(tx, tempOI, resolvedAffiliateID, merchantID)
 
 			itemsToProcess = append(itemsToProcess, itemData{
-				product:               product,
-				variant:               variant,
-				qty:                   item.Quantity,
-				price:                 unitPrice,
-				commissionAmount:      affAmt,
-				commissionRate:        affRate,
-				distributionAmount:    distAmt,
-				platformFeeAmount:     platAmt,
-				cogs:                  cogs,
+				product:            product,
+				variant:            variant,
+				qty:                item.Quantity,
+				price:              unitPrice,
+				commissionAmount:   affAmt,
+				commissionRate:     affRate,
+				distributionAmount: distAmt,
+				platformFeeAmount:  platAmt,
+				cogs:               cogs,
 			})
 
 			// 2. Update Merchant Stock
@@ -740,24 +740,26 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 			}
 
 			// [BUG-M11 Fix] FOR UPDATE untuk cegah race condition stock checkout bersamaan
-		if err := dbInv.Set("gorm:query_option", "FOR UPDATE").First(&inv).Error; err != nil {
-			msg := product.Name
-			if variant.ID != "" { msg += " (" + variant.Name + ")" }
-			return fmt.Errorf("stok merchant tidak ditemukan untuk %s", msg)
-		}
-		if inv.Stock < item.Quantity {
-			msg := product.Name
-			if variant.ID != "" { msg += " (" + variant.Name + ")" }
-			return fmt.Errorf("stok merchant tidak mencukupi untuk %s (Tersedia: %d)", msg, inv.Stock)
-		}
-			
+			if err := dbInv.Set("gorm:query_option", "FOR UPDATE").First(&inv).Error; err != nil {
+				msg := product.Name
+				if variant.ID != "" {
+					msg += " (" + variant.Name + ")"
+				}
+				return fmt.Errorf("stok merchant tidak ditemukan untuk %s", msg)
+			}
+			if inv.Stock < item.Quantity {
+				msg := product.Name
+				if variant.ID != "" {
+					msg += " (" + variant.Name + ")"
+				}
+				return fmt.Errorf("stok merchant tidak mencukupi untuk %s (Tersedia: %d)", msg, inv.Stock)
+			}
+
 			stockBefore := inv.Stock
 			if err := dbInv.Update("stock", gorm.Expr("stock - ?", item.Quantity)).Error; err != nil {
 				return err
 			}
 
-
-			
 			// LOG MUTATION (Mata Elang)
 			tx.Create(&models.StockMutation{
 				ProductID:        product.ID,
@@ -765,7 +767,7 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 				MerchantID:       merchantID,
 				Type:             "POS_SALE",
 				Quantity:         item.Quantity,
-				Reference:        orderNumber, 
+				Reference:        orderNumber,
 				StockBefore:      stockBefore,
 				StockAfter:       stockBefore - item.Quantity,
 				Note:             "POS Transaction at Merchant Dashboard",
@@ -782,24 +784,24 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 		}
 
 		order = models.Order{
-			BuyerID:            req.MemberID,
-			AffiliateID:        resolvedAffiliateID,
-			CashierID:          &userID,
-			OrderNumber:        orderNumber,
-			OrderType:          "pos",
-			Status:             models.OrderCompleted,
-			Subtotal:           subtotal,
-			TotalDiscount:      req.Discount,
-			GrandTotal:         grandTotal,
-			TotalAmount:        grandTotal, // backward compatibility
-			TotalPlatformFee:   totalPlatformFee,
-			TotalCommission:    totalCommission,
-			PaymentMethod:      req.PaymentMethod,
-			ShippingName:       "POS Customer",
-			PaidAt:             &[]time.Time{time.Now()}[0],
-			CompletedAt:        &[]time.Time{time.Now()}[0],
-			Notes:              req.Notes,
-			CreatedAt:          time.Now(),
+			BuyerID:          req.MemberID,
+			AffiliateID:      resolvedAffiliateID,
+			CashierID:        &userID,
+			OrderNumber:      orderNumber,
+			OrderType:        "pos",
+			Status:           models.OrderCompleted,
+			Subtotal:         subtotal,
+			TotalDiscount:    req.Discount,
+			GrandTotal:       grandTotal,
+			TotalAmount:      grandTotal, // backward compatibility
+			TotalPlatformFee: totalPlatformFee,
+			TotalCommission:  totalCommission,
+			PaymentMethod:    req.PaymentMethod,
+			ShippingName:     "POS Customer",
+			PaidAt:           &[]time.Time{time.Now()}[0],
+			CompletedAt:      &[]time.Time{time.Now()}[0],
+			Notes:            req.Notes,
+			CreatedAt:        time.Now(),
 		}
 
 		if err := tx.Create(&order).Error; err != nil {
@@ -837,30 +839,30 @@ func (mc *MerchantController) POSCheckout(w http.ResponseWriter, r *http.Request
 		for _, it := range itemsToProcess {
 			var variantID *string
 			sku := it.product.Slug
-			if it.variant.ID != "" { 
-				sku = it.variant.SKU 
+			if it.variant.ID != "" {
+				sku = it.variant.SKU
 				vid := it.variant.ID
 				variantID = &vid
 			}
 
 			oi := models.OrderItem{
-				OrderID:              order.ID,
-				OrderMerchantGroupID: mg.ID,
-				MerchantID:           merchantID,
-				ProductID:            it.product.ID,
-				ProductVariantID:     variantID,
-				ProductName:          it.product.Name,
-				VariantName:          it.variant.Name,
-				SKU:                  sku,
-				Quantity:             it.qty,
-				UnitPrice:            it.price,
-				Subtotal:             it.price * float64(it.qty),
-				CommissionRate:       it.commissionRate,
-				CommissionAmount:     it.commissionAmount,
+				OrderID:               order.ID,
+				OrderMerchantGroupID:  mg.ID,
+				MerchantID:            merchantID,
+				ProductID:             it.product.ID,
+				ProductVariantID:      variantID,
+				ProductName:           it.product.Name,
+				VariantName:           it.variant.Name,
+				SKU:                   sku,
+				Quantity:              it.qty,
+				UnitPrice:             it.price,
+				Subtotal:              it.price * float64(it.qty),
+				CommissionRate:        it.commissionRate,
+				CommissionAmount:      it.commissionAmount,
 				DistributionFeeAmount: it.distributionAmount,
-				PlatformFeeAmount:    it.platformFeeAmount,
-				MerchantAmount:       it.distributionAmount,
-				COGS:                 it.cogs,
+				PlatformFeeAmount:     it.platformFeeAmount,
+				MerchantAmount:        it.distributionAmount,
+				COGS:                  it.cogs,
 			}
 			if err := tx.Create(&oi).Error; err != nil {
 				return err
@@ -931,7 +933,7 @@ func (mc *MerchantController) POSGetProducts(w http.ResponseWriter, r *http.Requ
 	}
 
 	search := r.URL.Query().Get("q")
-	
+
 	// 1. Fetch merchant inventories first
 	var inventories []models.Inventory
 	if err := mc.DB.Where("merchant_id = ?", merchantID).Find(&inventories).Error; err != nil {
@@ -950,7 +952,7 @@ func (mc *MerchantController) POSGetProducts(w http.ResponseWriter, r *http.Requ
 			key += "_" + *inv.ProductVariantID
 		}
 		invMap[key] = inv.Stock
-		
+
 		if !productIDMap[inv.ProductID] {
 			productIDMap[inv.ProductID] = true
 			productIDs = append(productIDs, inv.ProductID)
@@ -1022,7 +1024,7 @@ func (mc *MerchantController) POSGetProducts(w http.ResponseWriter, r *http.Requ
 func (mc *MerchantController) GetMemberByCode(w http.ResponseWriter, r *http.Request) {
 	code := strings.TrimPrefix(r.URL.Path, "/api/merchant/pos/member/")
 	code = strings.TrimSpace(code)
-	
+
 	if code == "" {
 		utils.JSONError(w, http.StatusBadRequest, "Kode member diperlukan")
 		return
@@ -1057,14 +1059,14 @@ func (mc *MerchantController) GetMemberByCode(w http.ResponseWriter, r *http.Req
 
 	// Comprehensive lookup: UUID, Email, Phone, RefCode, and BarcodeToken
 	if _, uuidErr := uuid.Parse(code); uuidErr == nil {
-		query = query.Where("(users.id = ? OR LOWER(users.email) = LOWER(?) OR users.phone = ? OR LOWER(affiliate_members.ref_code) = LOWER(?) OR LOWER(skin_pre_tests.barcode_token) = LOWER(?))", 
+		query = query.Where("(users.id = ? OR LOWER(users.email) = LOWER(?) OR users.phone = ? OR LOWER(affiliate_members.ref_code) = LOWER(?) OR LOWER(skin_pre_tests.barcode_token) = LOWER(?))",
 			code, code, code, code, code)
 	} else {
 		// Clean phone number variations for search
 		phone0 := "0" + strings.TrimPrefix(code, "+62")
 		phone62 := "+62" + strings.TrimPrefix(code, "0")
-		
-		query = query.Where("(LOWER(users.email) = LOWER(?) OR users.phone = ? OR users.phone = ? OR users.phone = ? OR LOWER(affiliate_members.ref_code) = LOWER(?) OR LOWER(skin_pre_tests.barcode_token) = LOWER(?))", 
+
+		query = query.Where("(LOWER(users.email) = LOWER(?) OR users.phone = ? OR users.phone = ? OR users.phone = ? OR LOWER(affiliate_members.ref_code) = LOWER(?) OR LOWER(skin_pre_tests.barcode_token) = LOWER(?))",
 			code, code, phone0, phone62, code, code)
 	}
 
@@ -1315,4 +1317,3 @@ func (mc *MerchantController) GetPackingSlipData(w http.ResponseWriter, r *http.
 		},
 	})
 }
-

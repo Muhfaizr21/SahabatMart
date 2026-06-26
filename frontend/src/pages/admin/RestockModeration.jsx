@@ -3,6 +3,8 @@ import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles';
 import toast from 'react-hot-toast';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 export default function RestockModeration() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +73,7 @@ export default function RestockModeration() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Stock Distribution" subtitle="Review and approve inventory replenishment for localized merchant warehouses.">
-         <button onClick={load} style={A.btnGhost} className="hover:bg-slate-100 p-2 rounded-full transition-all">
+         <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm hover:bg-slate-100 p-2 rounded-full transition-all">
            <i className={`bx bx-refresh ${loading ? 'bx-spin' : ''}`} style={{ fontSize: 20 }} />
          </button>
       </PageHeader>
@@ -156,7 +158,7 @@ export default function RestockModeration() {
                     <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
                        <button 
                          onClick={() => { setNote(req.admin_note || ''); setModal(req); }} 
-                         style={{ ...A.btnGhost, padding: '8px 16px', fontSize: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}
+                         className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 16px', fontSize: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}
                        >
                          <i className='bx bx-search-alt-2' style={{ fontSize: 16, marginRight: 6 }} /> Detail
                        </button>
@@ -218,7 +220,7 @@ export default function RestockModeration() {
               <div style={{ marginBottom: 20 }}>
                 <FieldLabel>Catatan Admin / Internal</FieldLabel>
                 <textarea 
-                  style={{ ...A.textarea, minHeight: 80, background: '#fff', fontSize: 14, borderRadius: 12 }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 transition-all resize-y placeholder:text-slate-400" style={{ minHeight: 80, background: '#fff', fontSize: 14, borderRadius: 12 }} 
                   placeholder="Contoh: Stok mencukupi, segera kirim via kurir internal..."
                   value={note}
                   onChange={e => setNote(e.target.value)}
@@ -228,10 +230,10 @@ export default function RestockModeration() {
               <div style={{ display: 'flex', gap: 12 }}>
                 {(modal.status === 'pending' || modal.status === 'requested') && (
                   <>
-                    <button onClick={() => handleModerate('rejected')} style={{ ...A.btnGhost, color: '#ef4444', borderColor: '#ef4444', flex: 1, height: 48, borderRadius: 12 }}>
+                    <button onClick={() => handleModerate('rejected')} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444', borderColor: '#ef4444', flex: 1, height: 48, borderRadius: 12 }}>
                       Tolak Permintaan
                     </button>
-                    <button onClick={() => handleModerate('approved')} style={{ ...A.btnPrimary, flex: 2, height: 48, borderRadius: 12, background: '#0f172a' }}>
+                    <button onClick={() => handleModerate('approved')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 2, height: 48, borderRadius: 12, background: '#0f172a' }}>
                       Setujui & Potong Stok Pusat
                     </button>
                   </>
@@ -240,8 +242,8 @@ export default function RestockModeration() {
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ background: '#fff', padding: 16, borderRadius: 16, border: '1px solid #e2e8f0' }}>
                       <FieldLabel>Kurir (B2B)</FieldLabel>
-                      <select
-                        style={{ ...A.input, marginBottom: 12, padding: '12px 16px', background: '#f8fafc' }}
+                      <AdminSelect
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ marginBottom: 12, padding: '12px 16px', background: '#f8fafc' }}
                         value={courierCode}
                         onChange={e => setCourierCode(e.target.value)}
                       >
@@ -253,10 +255,10 @@ export default function RestockModeration() {
                         <option value="lion">Lion Parcel</option>
                         <option value="gojek">GoSend</option>
                         <option value="grab">GrabExpress</option>
-                      </select>
+                      </AdminSelect>
                       <button 
                         onClick={() => handleModerate('shipped')} 
-                        style={{ ...A.btnPrimary, width: '100%', height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #0f172a, #334155)', marginTop: 16 }}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #0f172a, #334155)', marginTop: 16 }}
                       >
                         <i className='bx bxs-truck' style={{ marginRight: 8 }} />
                         Konfirmasi & Buat Pesanan Biteship

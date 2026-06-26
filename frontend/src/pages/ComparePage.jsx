@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom';
 
 export default function ComparePage() {
   const products = [
-    { id: 1, name: 'Samsung Galaxy Watch 6 Classic 47mm', price: 'Rp4.480.000', rating: 4.8, brand: 'Samsung', screen: '1.5" Super AMOLED', battery: '425mAh', weight: '59g', img: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=200&h=200&fit=crop' },
-    { id: 2, name: 'Apple Watch Series 9 GPS 45mm', price: 'Rp6.999.000', rating: 4.9, brand: 'Apple', screen: '1.9" Retina LTPO OLED', battery: '308mAh', weight: '38.8g', img: 'https://images.unsplash.com/photo-1434493789847-2f02bbfdcb1f?w=200&h=200&fit=crop' },
-    { id: 3, name: 'Garmin Venu 3 GPS Smartwatch', price: 'Rp7.799.000', rating: 4.7, brand: 'Garmin', screen: '1.4" AMOLED', battery: 'Up to 14 days', weight: '47g', img: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop' }
+    { id: 1, name: 'Samsung Galaxy Watch 6 Classic 47mm', price: 'Rp4.480.000', rating: 4.8, brand: 'Samsung', screen: '1.5" Super AMOLED', battery: '425mAh', weight: '59g' },
+    { id: 2, name: 'Apple Watch Series 9 GPS 45mm', price: 'Rp6.999.000', rating: 4.9, brand: 'Apple', screen: '1.9" Retina LTPO OLED', battery: '308mAh', weight: '38.8g' },
+    { id: 3, name: 'Garmin Venu 3 GPS Smartwatch', price: 'Rp7.799.000', rating: 4.7, brand: 'Garmin', screen: '1.4" AMOLED', battery: 'Up to 14 days', weight: '47g' }
   ];
 
   return (
@@ -32,8 +32,8 @@ export default function ComparePage() {
                     <button className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white shadow-md border border-gray-100 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                       ✕
                     </button>
-                    <div className="h-48 rounded-2xl bg-gray-50 mb-4 overflow-hidden border border-gray-100 flex items-center justify-center p-4">
-                      <img src={p.img} alt={p.name} className="max-h-full object-contain mix-blend-multiply" />
+                    <div className="h-48 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 mb-4 overflow-hidden border border-gray-100 flex items-center justify-center p-4">
+                      <i className='bx bx-watch-alt text-6xl text-slate-300'></i>
                     </div>
                     <Link to={`/product/${p.slug || p.id}`} className="font-bold text-gray-900 text-lg hover:text-blue-600 transition-colors leading-snug line-clamp-2 block mb-2">{p.name}</Link>
                     <div className="text-xl font-black text-blue-600 mb-4">{p.price}</div>
@@ -49,7 +49,7 @@ export default function ComparePage() {
                 <td className="p-4 font-bold text-gray-500 border-b border-gray-50 bg-gray-50/30">Rating Pembeli</td>
                 {products.map(p => (
                   <td key={p.id} className="p-4 font-semibold text-gray-900 border-b border-gray-50 text-center">
-                    ⭐ {p.rating}/5.0
+                     {p.rating}/5.0
                   </td>
                 ))}
               </tr>

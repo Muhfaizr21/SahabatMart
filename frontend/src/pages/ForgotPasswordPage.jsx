@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AUTH_API_BASE, postJson } from '../lib/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function ForgotPasswordPage() {
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -29,147 +31,130 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="min-h-[70vh] py-12 md:py-20 premium-mesh-bg flex items-center justify-center p-4 md:p-8 relative overflow-hidden font-sans">
-
-      {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-50 pointer-events-none"></div>
-
-      {/* Main Glassmorphic Card */}
-      <div className="relative max-w-5xl w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col lg:flex-row border border-slate-100 z-10">
+    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
+      <div className="w-full max-w-[1100px] bg-white rounded-2xl md:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[650px]">
         
-        {/* Left Column - Branding (Visuals) */}
-        <div className="lg:w-1/2 bg-gradient-to-br from-rose-50/40 via-white to-amber-50/20 p-8 lg:p-14 flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-100">
-          {/* Subtle inside glow blobs */}
-          <div className="absolute -top-32 -left-32 w-80 h-80 bg-rose-200/20 rounded-full blur-[80px] pointer-events-none"></div>
-          <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-amber-200/20 rounded-full blur-[80px] pointer-events-none"></div>
-
-          {/* Top Row - Back Button */}
-          <div className="relative z-10">
-            <Link to="/login" className="group inline-flex items-center gap-2 bg-white hover:bg-slate-50 pl-3 pr-4 py-2 rounded-full transition-all duration-300 text-slate-800 text-xs font-semibold border border-slate-200/80 hover:border-slate-300 shadow-sm self-start">
-              <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">arrow_back</span>
-              Kembali ke Login
+        {/* Left Column - Form */}
+        <div className="lg:w-1/2 p-8 lg:p-16 flex flex-col bg-white relative">
+          {/* Top Bar: Logo & Back to Web */}
+          <div className="mb-12 flex justify-between items-center">
+            <Link to="/">
+              <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-8 w-auto object-contain" />
+            </Link>
+            <Link to="/" className="text-slate-400 hover:text-black flex items-center gap-1 text-xs font-semibold transition-colors bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-full">
+              <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+              Back to Web
             </Link>
           </div>
-
-          {/* Middle Row - Slogan & Logo */}
-          <div className="relative z-10 my-10 lg:my-auto">
-            <div className="mb-8">
-              <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
-            </div>
-
-            <div className="space-y-4">
-              <span className="inline-block px-3 py-1 bg-rose-500/10 text-rose-600 font-extrabold text-[10px] rounded-full uppercase tracking-[0.2em] border border-rose-500/20 backdrop-blur-sm">
-                Pemulihan Sandi
-              </span>
-              <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 leading-tight tracking-tight">
-                Lindungi Akun <br />
-                <span className="bg-gradient-to-r from-rose-600 to-amber-500 bg-clip-text text-transparent">Kecantikan Anda.</span>
-              </h2>
-              <p className="text-slate-500 text-sm lg:text-base font-medium leading-relaxed max-w-md">
-                Kami akan membantu Anda mendapatkan kembali akses ke akun AkuGlow Anda dengan aman.
-              </p>
-            </div>
-          </div>
-
-          {/* Bottom Row - Security Info */}
-          <div className="relative z-10 mt-auto">
-            <div className="p-6 bg-white/60 rounded-3xl border border-slate-100 backdrop-blur-md relative overflow-hidden group hover:border-slate-200 transition-all duration-300 shadow-sm">
-              <div className="flex items-center gap-4 text-rose-600 mb-2">
-                <span className="material-symbols-outlined">security</span>
-                <p className="text-xs font-black uppercase tracking-widest">Enkripsi Berlapis</p>
-              </div>
-              <p className="text-[10px] text-slate-400 font-bold leading-relaxed">Data Anda dilindungi oleh sistem keamanan standar industri terbaru.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Form */}
-        <div className="lg:w-1/2 p-8 lg:p-14 flex flex-col justify-center bg-white">
-          <div className="mb-8 text-center lg:text-left">
-            <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner mx-auto lg:mx-0 animate-bounce">
-              <span className="material-symbols-outlined text-3xl">lock_reset</span>
-            </div>
-            <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Lupa Password?</h1>
-            <p className="text-slate-500 text-sm font-medium">Jangan khawatir! Masukkan email Anda untuk memulihkan akses.</p>
-          </div>
           
-          {message ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-green-50 border border-green-100 text-green-700 p-6 rounded-[24px] mb-8 text-sm font-bold flex items-start gap-4">
-                <span className="material-symbols-outlined text-xl mt-0.5">check_circle</span>
-                <div>
-                   <p className="mb-1">Tautan terkirim!</p>
-                   <p className="text-xs opacity-80 font-medium">{message}</p>
+          <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto">
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">Forgot Password?</h1>
+            <p className="text-slate-500 text-sm mb-8">No worries! Enter your email to recover access.</p>
+            
+            {message ? (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-green-50 border border-green-100 text-green-700 p-6 rounded-xl mb-8 text-sm flex items-start gap-3">
+                  <span className="material-symbols-outlined text-xl mt-0.5">check_circle</span>
+                  <div>
+                    <p className="font-bold mb-1">Link sent!</p>
+                    <p className="text-xs opacity-80">{message}</p>
+                  </div>
                 </div>
-              </div>
-              
-              {debugToken && (
-                <div className="bg-amber-50 border border-amber-100 text-amber-800 p-5 rounded-2xl mb-8 text-xs">
-                  <p className="font-black uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">bug_report</span>
-                    Developer Mode
-                  </p>
-                  <Link to={`/reset-password?token=${debugToken}`} className="underline break-all font-bold hover:text-rose-600 transition-colors">
-                    Klik di sini untuk Reset Password (Simulasi Email)
-                  </Link>
-                </div>
-              )}
+                
+                {debugToken && (
+                  <div className="bg-amber-50 border border-amber-100 text-amber-800 p-4 rounded-xl mb-8 text-xs">
+                    <p className="font-bold uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">bug_report</span>
+                      Developer Mode
+                    </p>
+                    <Link to={`/reset-password?token=${debugToken}`} className="underline break-all font-semibold hover:text-black transition-colors">
+                      Click here to Reset Password (Email Simulation)
+                    </Link>
+                  </div>
+                )}
 
-              <Link to="/login" className="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-extrabold py-4 rounded-2xl transition-all duration-300 shadow-md shadow-rose-500/10 flex justify-center items-center gap-3 cursor-pointer">
-                <span className="material-symbols-outlined text-base">login</span>
-                Kembali ke Login
-              </Link>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              {error && (
-                <div className="p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-shake">
-                  <span className="material-symbols-outlined text-lg text-rose-500">error</span>
-                  {error}
-                </div>
-              )}
-              
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-2">Alamat Email Terdaftar</label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-rose-500 transition-colors text-lg">mail</span>
+                <Link to="/login" className="w-full bg-black hover:bg-slate-800 text-white font-bold py-4 rounded transition-all active:scale-[0.98] flex justify-center items-center gap-2">
+                  <span className="material-symbols-outlined text-base">login</span>
+                  Back to Login
+                </Link>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                {error && (
+                  <div className="p-3 bg-red-50 text-red-600 rounded text-xs font-semibold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {error}
+                  </div>
+                )}
+                
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">Registered Email</label>
                   <input 
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nama@email.com" 
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-5 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 hover:border-slate-200 transition-all duration-300" 
+                    placeholder="josh@gmail.com" 
+                    className="w-full border-b border-slate-200 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent"
                     required
                   />
                 </div>
-              </div>
-              
-              <button 
-                type="submit"
-                disabled={isLoading}
-                className="relative w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 text-white font-extrabold py-4 rounded-2xl transition-all duration-300 mt-4 shadow-md shadow-rose-500/10 active:scale-[0.98] overflow-hidden group flex justify-center items-center gap-3 cursor-pointer"
-              >
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                {isLoading ? (
-                  <>
+                
+                <button 
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-black hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold py-4 rounded transition-all active:scale-[0.98] flex justify-center items-center gap-2 mt-4"
+                >
+                  {isLoading ? (
                     <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                    <span>Mengirim...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Kirim Tautan Reset</span>
-                    <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-1">send</span>
-                  </>
-                )}
-              </button>
+                  ) : "Send Reset Link"}
+                </button>
 
-              <Link to="/login" className="text-center text-sm text-slate-500 font-bold hover:text-rose-600 transition-all flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-sm rotate-180">arrow_forward</span>
-                Batal & Kembali
-              </Link>
-            </form>
-          )}
+                <Link to="/login" className="text-center text-xs text-slate-500 font-semibold hover:text-black transition-colors mt-2">
+                  Cancel & Back
+                </Link>
+              </form>
+            )}
+          </div>
         </div>
+
+        {/* Right Column - Visuals & Geometry */}
+        {theme?.auth_side_image ? (
+          <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-100">
+            <img src={theme.auth_side_image} alt="Auth Background" className="absolute inset-0 w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="hidden lg:flex lg:w-1/2 bg-[#264b96] relative overflow-hidden flex-col items-center justify-center p-8">
+          
+          {/* Background Geometry */}
+          <div className="absolute top-8 left-8 w-24 h-24 bg-[radial-gradient(#f472b6_3px,transparent_3px)] bg-[size:14px_14px] opacity-80"></div>
+          <div className="absolute -top-10 -right-10 w-72 h-72 bg-pink-400 rounded-full"></div>
+          <div className="absolute top-10 right-10 w-24 h-24 bg-rose-500 rounded-full"></div>
+          <div className="absolute top-20 right-40 w-32 h-32 bg-[#1e3a8a]" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}></div>
+          <div className="absolute top-1/3 -left-20 w-80 h-80 bg-[#fca5a5] rounded-full mix-blend-screen opacity-90"></div>
+          <div className="absolute top-1/3 right-10 w-32 h-32 bg-pink-200" style={{ clipPath: 'polygon(0 0, 0% 100%, 100% 100%)' }}></div>
+          <div className="absolute bottom-20 -left-10 w-48 h-48 bg-[#1e3a8a] opacity-80" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}></div>
+          <div className="absolute bottom-16 right-16 w-24 h-24 bg-[radial-gradient(#fca5a5_3px,transparent_3px)] bg-[size:14px_14px] opacity-80"></div>
+          <div className="absolute bottom-10 right-48 w-20 h-20 bg-rose-500 rounded-tr-full rounded-br-full"></div>
+
+          {/* Center Graphic Box */}
+          <div className="relative z-10 w-full max-w-sm">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-white shadow-2xl flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">verified</span>
+              </div>
+              <h2 className="text-xl font-semibold mb-3">Check the status</h2>
+              <p className="text-white/80 text-sm leading-relaxed mb-8">It's easy to check the status of your online orders and track your progress in the system.</p>
+              
+              <div className="flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+                <div className="w-2 h-2 rounded-full bg-white/40"></div>
+                <div className="w-2 h-2 rounded-full bg-white/40"></div>
+              </div>
+            </div>
+          </div>
+          </div>
+        )}
+
       </div>
     </main>
   );

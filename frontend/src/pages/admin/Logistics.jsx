@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
 import { PageHeader, StatRow, TablePanel, FieldLabel, A, statusBadge, Modal } from '../../lib/adminStyles.jsx';
+import { AdminInput } from '../../lib/adminComponents.jsx';
+
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
@@ -226,13 +229,10 @@ const AdminLogistics = () => {
                 subtitle="Kelola gateway ekspedisi dan partner pengiriman platform AkuGlow secara global."
             >
                 <button 
-                    style={{ 
-                        ...A.btnPrimary, 
-                        background: 'linear-gradient(135deg, #6366f1, #4f46e5)', 
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', 
                         padding: '12px 24px',
                         border: 'none',
-                        boxShadow: '0 10px 15px -3px rgba(99,102,241,0.3)'
-                    }} 
+                        boxShadow: '0 10px 15px -3px rgba(99,102,241,0.3)' }} 
                     onClick={syncLogistics} 
                     disabled={loading}
                 >
@@ -264,21 +264,21 @@ const AdminLogistics = () => {
                         <div style={{ ...A.searchWrap, minWidth: 260, flex: 1, maxWidth: 400 }}>
                             <i className="bx bx-search" style={A.searchIcon} />
                             <input
-                                style={{ ...A.searchInput, width: '100%', paddingLeft: 40, height: 42 }}
+                                className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ width: '100%', paddingLeft: 40, height: 42 }}
                                 placeholder="Cari nama kurir atau kode (JNE, SiCepat)..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <select 
-                            style={{ ...A.select, height: 42, padding: '0 16px', minWidth: 160 }}
+                        <AdminSelect 
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 42, padding: '0 16px', minWidth: 160 }}
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
                         >
                             <option value="all">Semua Status</option>
                             <option value="active">Aktif / Operasional</option>
                             <option value="inactive">Non-aktif / Offline</option>
-                        </select>
+                        </AdminSelect>
                     </div>
                 </div>
 
@@ -308,29 +308,23 @@ const AdminLogistics = () => {
                         <div style={{ display: 'flex', gap: 10 }}>
                             <button 
                                 onClick={() => handleBulkToggle(true)}
-                                style={{ 
-                                    ...A.btnPrimary, 
-                                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                                    boxShadow: '0 4px 12px rgba(16,185,129,0.2)'
-                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}
                             >
                                 <i className="bx bx-check-circle" style={{ fontSize: 16 }} />
                                 Aktifkan Bersamaan
                             </button>
                             <button 
                                 onClick={() => handleBulkToggle(false)}
-                                style={{ 
-                                    ...A.btnPrimary, 
-                                    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                                    boxShadow: '0 4px 12px rgba(239,68,68,0.2)'
-                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                    boxShadow: '0 4px 12px rgba(239,68,68,0.2)' }}
                             >
                                 <i className="bx bx-x-circle" style={{ fontSize: 16 }} />
                                 Nonaktifkan Bersamaan
                             </button>
                             <button 
                                 onClick={() => setSelectedIds([])}
-                                style={A.btnGhost}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm"
                             >
                                 Batal
                             </button>
@@ -457,17 +451,14 @@ const AdminLogistics = () => {
                                                              });
                                                              setShowEditModal(true);
                                                          }}
-                                                         style={{
-                                                             ...A.btnGhost,
-                                                             padding: '4px 8px',
+                                                         className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '4px 8px',
                                                              borderRadius: 8,
                                                              display: 'flex',
                                                              alignItems: 'center',
                                                              gap: 4,
                                                              fontSize: 12,
                                                              border: '1px solid #e2e8f0',
-                                                             cursor: 'pointer'
-                                                         }}
+                                                             cursor: 'pointer' }}
                                                      >
                                                          <i className="bx bx-edit-alt" style={{ fontSize: 14 }} />
                                                          Edit
@@ -538,7 +529,7 @@ const AdminLogistics = () => {
                         <FieldLabel>Search Origin Area (Kecamatan)</FieldLabel>
                         <div style={{ position: 'relative' }}>
                             <input 
-                                style={{ ...A.input, padding: '12px 16px', fontSize: 13 }} 
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ padding: '12px 16px', fontSize: 13 }} 
                                 placeholder="e.g., Gambir, Jakarta Pusat..." 
                                 onChange={e => handleSearchArea(e.target.value)}
                             />
@@ -585,40 +576,17 @@ const AdminLogistics = () => {
                 </div>
             </div>
 
-            {/* Warning Section */}
-            <div style={{ 
-                marginTop: 24, padding: 32, background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderRadius: 28, 
-                border: '1px solid #e2e8f0', display: 'flex', gap: 24, alignItems: 'center',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}>
-                <div style={{ 
-                    width: 56, height: 56, borderRadius: 16, background: '#fff', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0'
-                }}>
-                    <i className="bx bxs-shield-quarter" style={{ color: '#ef4444', fontSize: 28 }} />
-                </div>
-                <div>
-                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 17, marginBottom: 6 }}>Administrative Notice: Global Logistics Impact</div>
-                    <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6, maxWidth: 800 }}>
-                        Modifikasi pada status saluran logistik di panel ini akan mempengaruhi **seluruh ekosistem AkuGlow**. 
-                        Merchant tidak akan dapat memilih kurir yang dinonaktifkan, dan opsi tersebut akan hilang dari halaman checkout pembeli secara instan.
-                    </div>
-                </div>
-            </div>
-
             {/* Edit Courier Modal */}
             {showEditModal && (
                 <Modal title={`Edit Kurir: ${editingChannel?.code?.toUpperCase()}`} onClose={() => setShowEditModal(false)}>
                     <form onSubmit={handleSaveCourier} style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '10px 0' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             <FieldLabel>Nama Partner Kurir</FieldLabel>
-                            <input 
-                                style={A.input} 
-                                value={editFormData.name} 
-                                onChange={e => setEditFormData({ ...editFormData, name: e.target.value })} 
-                                required 
-                                placeholder="e.g. JNE Express" 
+                            <AdminInput
+                                value={editFormData.name}
+                                onChange={e => setEditFormData({ ...editFormData, name: e.target.value })}
+                                required
+                                placeholder="e.g. JNE Express"
                             />
                         </div>
 
@@ -724,10 +692,10 @@ const AdminLogistics = () => {
                         )}
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 10 }}>
-                            <button type="button" onClick={() => setShowEditModal(false)} style={A.btnGhost}>
+                            <button type="button" onClick={() => setShowEditModal(false)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm">
                                 Batal
                             </button>
-                            <button type="submit" style={{ ...A.btnPrimary, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
+                            <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
                                 Simpan Perubahan
                             </button>
                         </div>

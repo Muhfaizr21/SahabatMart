@@ -59,7 +59,7 @@ export default function AffiliateVouchers() {
       <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[100px] -mr-48 -mt-48"></div>
       
       <div className="flex items-center gap-5 mb-10 relative z-10">
-        <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-purple-500/20 ring-1 ring-white/10">🎫</div>
+        <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-purple-500/20 ring-1 ring-white/10"><i className="bx bx-purchase-tag"></i></div>
         <div>
           <h2 className="text-xl font-black text-white leading-tight italic tracking-tighter">Voucher Promo Mitra</h2>
           <p className="text-slate-400 text-[10px] font-medium mt-0.5">Bagikan kode eksklusif untuk tingkatkan konversi.</p>
@@ -111,7 +111,7 @@ export default function AffiliateVouchers() {
                 : 'bg-white text-slate-900 hover:bg-purple-50'
               }`}
             >
-              {copied === v.code ? 'COPIED! ✅' : 'SALIN KODE VOUCHER ⚡'}
+              {copied === v.code ? 'TERSALIN!' : 'SALIN KODE VOUCHER'}
             </button>
             
             {/* Card Decor */}
@@ -122,7 +122,7 @@ export default function AffiliateVouchers() {
 
       {vouchers.length === 0 && !loading && (
         <div className="text-center py-20 relative z-10">
-            <div className="text-6xl mb-4 opacity-20 grayscale">🎫</div>
+            <div className="mb-4 opacity-20"><i className="bx bx-purchase-tag text-6xl text-slate-400" /></div>
             <h3 className="text-white font-black text-xl tracking-tighter">Belum Ada Voucher Tersedia</h3>
             <p className="text-slate-500 text-sm mt-2">Cek kembali nanti untuk promo menarik lainnya.</p>
         </div>

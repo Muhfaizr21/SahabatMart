@@ -15,7 +15,7 @@ import (
 // POST /api/admin/system/maintenance
 func (ac *AdminController) ToggleMaintenanceMode(w http.ResponseWriter, r *http.Request) {
 	adminID, _ := r.Context().Value("user_id").(string)
-	
+
 	var req struct {
 		Enabled bool   `json:"enabled"`
 		Message string `json:"message"`
@@ -26,7 +26,7 @@ func (ac *AdminController) ToggleMaintenanceMode(w http.ResponseWriter, r *http.
 	}
 
 	configSvc := services.NewConfigService(ac.DB)
-	
+
 	val := "false"
 	if req.Enabled {
 		val = "true"

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { fetchJson, AFFILIATE_API_BASE, API_BASE } from '../../lib/api';
 import { getStoredUser } from '../../lib/auth';
+import { useTheme } from '../../context/ThemeContext';
 
 const toast = (msg, type = 'success') => {
   const el = document.createElement('div');
@@ -18,7 +19,8 @@ const toast = (msg, type = 'success') => {
 };
 
 export default function AffiliateLinks() {
-  const user = getStoredUser();
+  const { theme } = useTheme();
+  const [user, setUser] = useState(getStoredUser());
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'links';
   const [links, setLinks] = useState([]);
@@ -367,7 +369,7 @@ export default function AffiliateLinks() {
 
             {/* AkuGlow Brand Logo */}
             <img 
-              src="/akuglow.webp" 
+              src={theme?.platform_logo || "/akuglow.webp"} 
               alt="AkuGlow Logo" 
               className="h-10 w-auto object-contain brightness-110 mb-6 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]" 
             />

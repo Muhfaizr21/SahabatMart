@@ -79,7 +79,7 @@ function ShippingActionModal({ order, onClose, onSuccess }) {
         {/* Header */}
         <div style={{ padding: '28px 36px', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em' }}>🚚 Konfirmasi Pengiriman</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#0F172A', letterSpacing: '-0.02em' }}>Konfirmasi Pengiriman</div>
             <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: 700 }}>Order #{order.id.slice(0, 8).toUpperCase()}</div>
           </div>
           <button onClick={onClose} style={{ background: '#E2E8F0', border: 'none', width: 40, height: 40, borderRadius: 14, cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900 }}>×</button>
@@ -138,13 +138,13 @@ function ShippingActionModal({ order, onClose, onSuccess }) {
                 onClick={() => { setTab('biteship'); setError(''); }}
                 style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', background: tab === 'biteship' ? '#fff' : 'transparent', color: tab === 'biteship' ? '#0F172A' : '#64748B', boxShadow: tab === 'biteship' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none' }}
               >
-                🚀 Generate via Biteship
+                Generate via Biteship
               </button>
               <button
                 onClick={() => { setTab('manual'); setError(''); }}
                 style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', background: tab === 'manual' ? '#fff' : 'transparent', color: tab === 'manual' ? '#0F172A' : '#64748B', boxShadow: tab === 'manual' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none' }}
               >
-                ✏️ Input Manual
+                Input Manual
               </button>
             </div>
 
@@ -501,7 +501,7 @@ export default function MerchantOrders() {
                     <td style={{ padding: '24px 32px' }}>
                       <span style={{ padding: '8px 16px', borderRadius: 12, fontSize: 10, fontWeight: 900, textTransform: 'uppercase', background: s.bg, color: s.text, border: `1px solid ${s.text}30`, letterSpacing: 0.5 }}>{s.label}</span>
                       {order.tracking_number && (
-                        <div style={{ fontSize: 11, color: '#8B5CF6', marginTop: 6, fontWeight: 800 }}>📦 {order.tracking_number}</div>
+                        <div style={{ fontSize: 11, color: '#8B5CF6', marginTop: 6, fontWeight: 800 }}><i className="bx bx-package" style={{marginRight:4}}/>{order.tracking_number}</div>
                       )}
                     </td>
                     <td style={{ padding: '24px 32px' }}>
@@ -583,7 +583,7 @@ export default function MerchantOrders() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Metode</span>
-                      <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.shipping_type === 'pickup' ? '🏪 Pickup' : '🚚 Kurir'}</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#0F172A' }}>{selectedOrder.shipping_type === 'pickup' ? 'Pickup' : 'Kurir'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>Kurir</span>

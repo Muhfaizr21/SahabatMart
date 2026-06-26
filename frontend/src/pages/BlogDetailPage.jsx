@@ -3,8 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 import SEO from '../components/SEO';
 import DOMPurify from 'dompurify';
+import { useTheme } from '../context/ThemeContext';
 
 export default function BlogDetailPage() {
+  const { theme } = useTheme();
   const { slug } = useParams();
   const [blog, setBlog] = useState(null);
   const [latestPosts, setLatestPosts] = useState([]);
@@ -39,7 +41,7 @@ export default function BlogDetailPage() {
 
   if (!blog) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-        <div className="text-7xl mb-6">🔍</div>
+        <div className="mb-6"><i className="bx bx-search text-7xl text-slate-300" /></div>
         <h2 className="text-2xl font-black text-gray-900 mb-8">Artikel Tidak Ditemukan</h2>
         <Link to="/blog" className="bg-primary text-white px-8 py-3 rounded-2xl font-bold">Kembali ke Blog</Link>
     </div>
@@ -59,7 +61,7 @@ export default function BlogDetailPage() {
       "name": "AkuGlow",
       "logo": {
         "@type": "ImageObject",
-        "url": `${window.location.origin}/akuglow.webp`
+        "url": theme?.platform_logo?.startsWith('http') ? theme.platform_logo : `${window.location.origin}${theme?.platform_logo || '/akuglow.webp'}`
       }
     },
     "datePublished": blog.created_at,

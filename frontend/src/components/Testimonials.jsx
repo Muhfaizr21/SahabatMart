@@ -6,34 +6,36 @@ const reviews = [
     role: 'Loyal Customer',
     text: 'Suka banget sama teksturnya yang ringan dan cepat meresap. Dalam 2 minggu kulit aku jadi lebih cerah dan noda hitam mulai memudar. AkuGlow bener-bener game changer!',
     rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop'
+    color: 'from-rose-300 to-pink-500'
   },
   {
     name: 'Melissa J. Talley',
     role: 'Beauty Enthusiast',
     text: 'Awalnya ragu nyobain karena kulit aku sensitif banget. Tapi pas coba Night Cream-nya, paginya muka jadi kenyal banget dan gak ada iritasi sama sekali. Love it!',
     rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop'
+    color: 'from-purple-300 to-indigo-500'
   },
   {
     name: 'Rini M.',
     role: 'Verified Buyer',
     text: 'Packaging-nya mewah banget, dapet free konsultasi juga dari adminnya yang ramah. Pengiriman cuma sehari udah nyampe. Hasilnya memuaskan untuk mencerahkan wajah.',
     rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop'
+    color: 'from-cyan-300 to-blue-500'
   }
 ];
 
-export default function Testimonials() {
+export default function Testimonials({ title }) {
   return (
     <section className="py-24 bg-white overflow-hidden relative">
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(var(--primary-rgb),0.03),transparent)] pointer-events-none"></div>
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="text-center max-w-2xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-black uppercase tracking-widest mb-4 border border-primary/10">
-            Testimoni Nyata ✨
+            Testimoni Nyata 
           </div>
-          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Apa Kata <span className="text-primary">Komunitas</span> Kami?</h2>
+          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">
+            {title ? title : <>Apa Kata <span className="text-primary">Komunitas</span> Kami?</>}
+          </h2>
           <p className="text-gray-500 text-lg">Ribuan orang telah membuktikan keajaiban produk kami. Sekarang giliran Anda.</p>
         </div>
  
@@ -52,7 +54,9 @@ export default function Testimonials() {
               <div className="flex items-center gap-4 pt-8 border-t border-gray-50">
                 <div className="relative">
                   <div className="absolute inset-0 bg-primary/20 rounded-full blur-md group-hover:blur-lg transition-all"></div>
-                  <img src={r.avatar} alt={r.name} className="w-14 h-14 rounded-full object-cover border-2 border-white relative z-10" />
+                  <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${r.color} flex items-center justify-center text-white text-xl font-black border-2 border-white relative z-10`}>
+                    {r.name.charAt(0)}
+                  </div>
                 </div>
                 <div>
                   <h4 className="font-black text-gray-900 text-lg">{r.name}</h4>

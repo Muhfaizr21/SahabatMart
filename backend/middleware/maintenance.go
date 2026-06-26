@@ -57,10 +57,10 @@ func MaintenanceMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 
 			// Webhooks & Public Config bypass
 			if path == "/api/shipping/webhook" ||
-			   path == "/api/tripay/webhook" ||
-			   path == "/api/callback/tripay" ||
-			   path == "/api/public/configs" ||
-			   path == "/api/public/config" {
+				path == "/api/tripay/webhook" ||
+				path == "/api/callback/tripay" ||
+				path == "/api/public/configs" ||
+				path == "/api/public/config" {
 				next.ServeHTTP(w, r)
 				return
 			}

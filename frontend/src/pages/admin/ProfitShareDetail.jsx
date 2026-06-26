@@ -46,7 +46,7 @@ export default function ProfitShareDetail() {
 
   if (!data || !data.summary) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <div className="text-5xl mb-3">⚠️</div>
+      <div className="mb-3"><i className="bx bx-error text-5xl text-amber-500" /></div>
       <h2 className="text-xl font-bold text-slate-900 mb-2">Gagal Memuat Data</h2>
       <p className="text-slate-400 text-sm mb-6">Pastikan backend server AkuGlow sudah berjalan.</p>
       <button onClick={fetchData} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors">Coba Lagi</button>

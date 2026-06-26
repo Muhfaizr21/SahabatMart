@@ -1,8 +1,8 @@
 package services
 
 import (
-	"errors"
 	"akuglow/backend/models"
+	"errors"
 	"gorm.io/gorm"
 )
 
@@ -85,7 +85,7 @@ func (s *ProductService) AddReview(review *models.Review) error {
 		if err := tx.Create(review).Error; err != nil {
 			return err
 		}
-		
+
 		// Update Product Stats
 		var stats struct {
 			Avg float64
@@ -93,7 +93,7 @@ func (s *ProductService) AddReview(review *models.Review) error {
 		}
 		tx.Model(&models.Review{}).Where("product_id = ? AND is_hidden = ?", review.ProductID, false).
 			Select("AVG(rating), COUNT(*)").Row().Scan(&stats.Avg, &stats.Cnt)
-		
+
 		return tx.Model(&models.Product{}).Where("id = ?", review.ProductID).
 			Updates(map[string]interface{}{
 				"rating":         stats.Avg,
@@ -137,7 +137,7 @@ func (s *ProductService) CanUserReview(userID string, productID string) (bool, s
 	// Cek apakah sudah pernah review untuk order tersebut
 	var count int64
 	s.DB.Model(&models.Review{}).Where("order_id = ? AND product_id = ? AND buyer_id = ?", order.ID, productID, userID).Count(&count)
-	
+
 	if count > 0 {
 		return false, order.ID, nil // Sudah review
 	}
@@ -165,7 +165,7 @@ func (s *ProductService) SyncInventoryMetadata(productID string) error {
 func (s *ProductService) SyncAllInventories() (int64, error) {
 	var products []models.Product
 	s.DB.Where("status = ?", "active").Find(&products)
-	
+
 	var count int64
 	for _, p := range products {
 		if err := s.SyncInventoryMetadata(p.ID); err == nil {
@@ -177,6 +177,9 @@ func (s *ProductService) SyncAllInventories() (int64, error) {
 
 // TrackInteraction mencatat interaksi user (view/pencet)
 func (s *ProductService) TrackInteraction(userID, productID, interactionType string) error {
+	if userID == "" || productID == "" {
+		return nil // Skip tracking for unauthenticated users or missing product id to prevent UUID errors
+	}
 	interaction := models.UserInteraction{
 		UserID:    userID,
 		ProductID: productID,
@@ -230,7 +233,7 @@ func (s *ProductService) GetRecommendedProducts(userID string, limit int) ([]mod
 	if len(recommended) < limit {
 		var popular []models.Product
 		needed := limit - len(recommended)
-		
+
 		var excludeIDs []string
 		for _, p := range recommended {
 			excludeIDs = append(excludeIDs, p.ID)

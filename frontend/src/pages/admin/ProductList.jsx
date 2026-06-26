@@ -5,6 +5,8 @@ import Barcode from 'react-barcode';
 import { PageHeader, StatRow, TablePanel, idr, fmtDate, A, Modal } from '../../lib/adminStyles.jsx';
 import { toast } from 'react-hot-toast';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 const API = ADMIN_API_BASE;
 
 const S_INP = {
@@ -370,7 +372,7 @@ export default function AdminProductList() {
         {/* Left Filters Block */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
           
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={bulkAction} 
             onChange={e => setBulkAction(e.target.value)}
@@ -378,7 +380,7 @@ export default function AdminProductList() {
             <option value="">Tindakan massal</option>
             <option value="edit">Edit</option>
             <option value="delete">Hapus</option>
-          </select>
+          </AdminSelect>
           <button type="button" onClick={handleBulkApply} style={filterButtonStyle}>
             Terapkan
           </button>
@@ -386,7 +388,7 @@ export default function AdminProductList() {
           <div style={{ width: 1, height: 18, background: '#cbd5e1', margin: '0 4px' }} />
 
           {/* SEO Scores */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterSeoScore} 
             onChange={e => setFilterSeoScore(e.target.value)}
@@ -396,10 +398,10 @@ export default function AdminProductList() {
             <option value="orange">Cukup (Oranye)</option>
             <option value="red">Perlu Perbaikan (Merah)</option>
             <option value="grey">Belum Diset (Abu-abu)</option>
-          </select>
+          </AdminSelect>
 
           {/* Readability Scores */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterReadabilityScore} 
             onChange={e => setFilterReadabilityScore(e.target.value)}
@@ -409,10 +411,10 @@ export default function AdminProductList() {
             <option value="orange">Cukup (Oranye)</option>
             <option value="red">Perlu Perbaikan (Merah)</option>
             <option value="grey">Belum Diset (Abu-abu)</option>
-          </select>
+          </AdminSelect>
 
           {/* Category */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterCategory} 
             onChange={e => setFilterCategory(e.target.value)}
@@ -421,10 +423,10 @@ export default function AdminProductList() {
             {categories.map(c => (
               <option key={c.id || c.name} value={c.name}>{c.name}</option>
             ))}
-          </select>
+          </AdminSelect>
 
           {/* Product Type */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterProductType} 
             onChange={e => setFilterProductType(e.target.value)}
@@ -435,10 +437,10 @@ export default function AdminProductList() {
             <option value="digital">Produk Digital</option>
             <option value="grouped">Produk Bundel</option>
             <option value="external">Produk Eksternal</option>
-          </select>
+          </AdminSelect>
 
           {/* Stock status */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterStockStatus} 
             onChange={e => setFilterStockStatus(e.target.value)}
@@ -446,10 +448,10 @@ export default function AdminProductList() {
             <option value="">Filter status stok</option>
             <option value="in_stock">Tersedia (In stock)</option>
             <option value="out_of_stock">Habis (Out of stock)</option>
-          </select>
+          </AdminSelect>
 
           {/* Brand */}
-          <select 
+          <AdminSelect 
             style={filterSelectStyle} 
             value={filterBrand} 
             onChange={e => setFilterBrand(e.target.value)}
@@ -458,7 +460,7 @@ export default function AdminProductList() {
             {brands.map(b => (
               <option key={b.id || b.name} value={b.name}>{b.name}</option>
             ))}
-          </select>
+          </AdminSelect>
 
           <button type="button" onClick={handleApplyFilters} style={{ ...filterButtonStyle, background: '#6366f1', color: '#fff', borderColor: '#4f46e5' }}>
             Filter
@@ -544,7 +546,7 @@ export default function AdminProductList() {
   );
 
   return (
-    <div style={{ ...A.page, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }} className="fade-in admin-page-container">
+    <div style={{ minWidth: 0, maxWidth: '100%', overflow: 'hidden' }} className="fade-in admin-page-container">
       {/* Modal: QR Code */}
       {showQR && (
         <Modal title="Barcode Product ID" onClose={() => setShowQR(null)}>
@@ -601,13 +603,13 @@ export default function AdminProductList() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, width: '100%' }}>
               <button 
-                style={{ ...A.btnPrimary, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
                 onClick={() => handlePrintLabel(showQR)}
               >
                 <i className="bx bx-printer" style={{ fontSize: 18 }} /> Cetak Label
               </button>
               <button 
-                style={{ ...A.btnGhost, height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 52, borderRadius: 16, justifyContent: 'center', fontSize: 14 }} 
                 onClick={() => setShowQR(null)}
               >
                 Tutup
@@ -627,7 +629,7 @@ export default function AdminProductList() {
         title="Katalog Produk" 
         subtitle="Kelola dan moderasi seluruh listing produk platform AkuGlow."
       >
-        <Link to="/admin/products/add" style={{ ...A.btnPrimary, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <Link to="/admin/products/add" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <i className="bx bx-plus" /> Tambah SKU Induk
         </Link>
       </PageHeader>
@@ -651,7 +653,7 @@ export default function AdminProductList() {
             <i className="bx bxs-package" style={{ fontSize: 52, opacity: 0.15, color: '#6366f1' }} />
             <div style={{ fontWeight: 700, fontSize: 15, color: '#475569' }}>Tidak ada produk ditemukan</div>
             <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>Ubah filter atau tambahkan produk baru.</div>
-            <Link to="/admin/products/add" style={{ ...A.btnPrimary, textDecoration: 'none' }}>
+            <Link to="/admin/products/add" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ textDecoration: 'none' }}>
               <i className="bx bx-plus" /> Tambah Produk
             </Link>
           </div>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -57,6 +58,19 @@ func (ac *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	validation := utils.ValidateRegisterInput(req.Email, req.Password, req.FullName, req.Phone)
+	if !validation.Valid {
+		utils.JSONResponse(w, http.StatusBadRequest, map[string]interface{}{
+			"message": "Validasi gagal",
+			"errors":  validation.Errors,
+		})
+		return
+	}
+
+	req.Email = utils.SanitizeString(req.Email)
+	req.FullName = utils.SanitizeString(req.FullName)
+	req.Phone = utils.SanitizeString(req.Phone)
+
 	user, token, err := ac.Service.Register(req.Email, req.Password, req.FullName, req.Phone, req.Role, req.ReferralCode)
 	if err != nil {
 		status := http.StatusInternalServerError
@@ -89,8 +103,18 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Email = utils.SanitizeString(req.Email)
+	if req.Email == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Email wajib diisi")
+		return
+	}
+	if req.Password == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Password wajib diisi")
+		return
+	}
+
 	clientIP := ac.getClientIP(r)
-	user, token, err := ac.Service.Login(req.Email, req.Password, clientIP, req.Remember)
+	user, accessToken, refreshToken, err := ac.Service.Login(req.Email, req.Password, clientIP, req.Remember)
 	if err != nil {
 		utils.JSONError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -100,9 +124,57 @@ func (ac *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	go SyncGuestLogsToUser(ac.Service.DB, user.ID, clientIP)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"message": "Login berhasil",
-		"token":   token,
-		"user":    user,
+		"message":       "Login berhasil",
+		"token":         accessToken,
+		"refresh_token": refreshToken,
+		"user":          user,
+	})
+}
+
+// [FIX #7] RefreshToken — exchanges a valid refresh token for a new access token + rotated refresh token.
+// POST /api/auth/refresh
+func (ac *AuthController) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+	if req.RefreshToken == "" {
+		utils.JSONError(w, http.StatusBadRequest, "refresh_token wajib diisi")
+		return
+	}
+
+	userID, _, err := utils.ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		utils.JSONError(w, http.StatusUnauthorized, "Refresh token tidak valid atau kadaluarsa")
+		return
+	}
+
+	// Revoke old, issue new pair (token rotation)
+	_ = utils.RevokeRefreshToken(req.RefreshToken)
+
+	// Rebuild user context from DB
+	var user models.User
+	if err := ac.Service.DB.Preload("Merchant").Preload("Affiliate").First(&user, "id = ?", userID).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+	ac.Service.PopulatePermissions(&user)
+
+	mID, aID := ac.Service.GetExtraIDs(user.ID, user.Role)
+	accessToken, refreshToken, err := utils.GenerateTokenPair(user.ID, user.Role, user.Email, mID, aID)
+	if err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membuat token baru")
+		return
+	}
+	_ = utils.StoreRefreshToken(user.ID, refreshToken)
+
+	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
+		"message":       "Token berhasil diperbarui",
+		"token":         accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
@@ -152,11 +224,11 @@ func (ac *AuthController) Impersonate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token, _ := utils.GenerateJWT(user.ID, user.Role, user.Email, merchantID, affiliateID, true)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"message": "Ghost login berhasil",
-		"token":   token,
-		"user":    user,
+		"message":  "Ghost login berhasil",
+		"token":    token,
+		"user":     user,
 		"is_ghost": true,
 	})
 }
@@ -180,10 +252,11 @@ func (ac *AuthController) GetMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ac *AuthController) getGoogleConfig() *oauth2.Config {
+	configSvc := services.NewConfigService(ac.Service.DB)
 	return &oauth2.Config{
-		RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
-		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		RedirectURL:  configSvc.Get("google_redirect_url", os.Getenv("GOOGLE_REDIRECT_URL")),
+		ClientID:     configSvc.Get("google_client_id", os.Getenv("GOOGLE_CLIENT_ID")),
+		ClientSecret: configSvc.Get("google_client_secret", os.Getenv("GOOGLE_CLIENT_SECRET")),
 		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
 		Endpoint:     google.Endpoint,
 	}
@@ -201,7 +274,7 @@ func (ac *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	config := ac.getGoogleConfig()
-	
+
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		utils.JSONError(w, http.StatusUnauthorized, "Gagal menukar token Google")
@@ -235,7 +308,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	go SyncGuestLogsToUser(ac.Service.DB, user.ID, ac.getClientIP(r))
 
 	frontendURL := ac.Service.GetFrontendURL()
-	
+
 	// Redirect balik ke frontend dengan token di URL
 	http.Redirect(w, r, fmt.Sprintf("%s/login?token=%s&user_id=%s", frontendURL, jwtToken, user.ID), http.StatusTemporaryRedirect)
 }
@@ -258,14 +331,13 @@ func (ac *AuthController) ForgotPassword(w http.ResponseWriter, r *http.Request)
 	}
 	fmt.Printf("✅ Reset token generated: %s\n", token)
 
-	// In production, token is sent via email. 
-	// For testing, we return it in response if not in production mode.
 	resp := map[string]interface{}{
 		"message": "Instruksi reset password telah dikirim ke email Anda",
 	}
-	
-	if os.Getenv("APP_ENV") != "production" {
-		resp["debug_token"] = token
+
+	isDev := os.Getenv("APP_ENV") != "production"
+	if isDev {
+		log.Printf("📧 [DEV] Reset token for %s: %s", req.Email, token)
 	}
 
 	utils.JSONResponse(w, http.StatusOK, resp)

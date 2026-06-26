@@ -14,9 +14,9 @@ func ReconciliationJob(db *gorm.DB) {
 
 	// 1. Order Totals vs Grand Totals
 	type OrderMismatch struct {
-		OrderID     string
-		CalcTotal   float64
-		GrandTotal  float64
+		OrderID    string
+		CalcTotal  float64
+		GrandTotal float64
 	}
 	var mismatches []OrderMismatch
 	db.Raw(`

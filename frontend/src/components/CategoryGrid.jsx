@@ -38,11 +38,15 @@ const CategoryGrid = () => {
               className="group flex flex-col items-center text-center space-y-4"
             >
               <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-slate-50 border border-slate-100 flex items-center justify-center group-hover:border-primary group-hover:shadow-xl group-hover:shadow-primary/10 transition-all duration-500">
-                <img 
-                  src={formatImage(cat.image || `https://images.unsplash.com/photo-1556228720-195a672e8a03?w=200&q=80&sig=${idx}`)} 
-                  alt={cat.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                />
+                {formatImage(cat.image) ? (
+                  <img 
+                    src={formatImage(cat.image)} 
+                    alt={cat.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                ) : (
+                  <i className="bx bx-category text-3xl text-slate-300 group-hover:text-primary/40 transition-colors"></i>
+                )}
               </div>
               <span className="font-bold text-gray-800 group-hover:text-primary transition-colors">{cat.name}</span>
             </Link>

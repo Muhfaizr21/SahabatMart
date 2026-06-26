@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchJson, AFFILIATE_API_BASE, formatImage } from '../../lib/api';
+import DOMPurify from 'dompurify';
 
 const EducationModal = ({ item, onClose }) => {
   if (!item) return null;
@@ -49,9 +50,10 @@ const EducationModal = ({ item, onClose }) => {
               {item.category || 'Materi'}
             </span>
             <h2 className="text-2xl font-black text-white mb-4 leading-tight">{item.title}</h2>
-            <div className="flex-1 overflow-y-auto max-h-[200px] text-slate-400 text-sm leading-relaxed mb-6 scrollbar-hide">
-              {item.content}
-            </div>
+            <div 
+              className="flex-1 overflow-y-auto max-h-[200px] text-slate-400 text-sm leading-relaxed mb-6 scrollbar-hide ee-content"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content) }}
+            />
             
             <div className="space-y-3">
               {item.video_url && (
@@ -116,7 +118,10 @@ const EducationItem = ({ item, onClick }) => {
         </div>
       </div>
       <h3 className="text-white font-bold text-lg mb-2 group-hover:text-purple-300 transition-colors uppercase tracking-tight">{item.title}</h3>
-      <p className="text-slate-400 text-sm leading-relaxed line-clamp-2">{item.content}</p>
+      <div 
+        className="text-slate-400 text-sm leading-relaxed line-clamp-2"
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content) }}
+      />
       <div className="mt-6 flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
         {item.video_url ? 'Tonton Video' : 'Mulai Belajar'}
         <span className="material-symbols-outlined text-sm">arrow_forward</span>

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"time"
-	"net"
 
 	"akuglow/backend/models"
 	"akuglow/backend/services"
@@ -20,20 +20,21 @@ import (
 )
 
 type BuyerController struct {
-	DB           *gorm.DB
-	OrderService *services.OrderService
-	BuyerService *services.BuyerService
-	AuthService  *services.AuthService
-	TripayService *services.TripayService
+	DB              *gorm.DB
+	OrderService    *services.OrderService
+	BuyerService    *services.BuyerService
+	AuthService     *services.AuthService
+	TripayService   *services.TripayService
 	ShippingService *services.ShippingService
 }
+
 func NewBuyerController(db *gorm.DB) *BuyerController {
 	return &BuyerController{
-		DB:           db,
-		OrderService: services.NewOrderService(db),
-		BuyerService: services.NewBuyerService(db),
-		AuthService:  services.NewAuthService(db),
-		TripayService: services.NewTripayService(db),
+		DB:              db,
+		OrderService:    services.NewOrderService(db),
+		BuyerService:    services.NewBuyerService(db),
+		AuthService:     services.NewAuthService(db),
+		TripayService:   services.NewTripayService(db),
 		ShippingService: services.NewShippingService(db),
 	}
 }
@@ -45,7 +46,7 @@ func (bc *BuyerController) GetCart(w http.ResponseWriter, r *http.Request) {
 	var cart models.Cart
 	// Deep Preload: Mengambil cart -> items -> product & variant & merchant sekaligus
 	err := bc.DB.Preload("Items.Product").Preload("Items.ProductVariant").Preload("Items.Merchant").Where("buyer_id = ?", buyerID).First(&cart).Error
-	
+
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			log.Printf("[Cart] No cart found for buyer %s, creating empty cart", buyerID)
@@ -88,7 +89,7 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 		ProductName string  `json:"product_name"`
 		UnitPrice   float64 `json:"unit_price"`
 		Quantity    int     `json:"quantity"`
-		Weight      int     `json:"weight"`      // in grams
+		Weight      int     `json:"weight"` // in grams
 		MerchantID  string  `json:"merchant_id"`
 	}
 	var req struct {
@@ -134,9 +135,9 @@ func (bc *BuyerController) GetShippingRates(w http.ResponseWriter, r *http.Reque
 	for mID, items := range merchantItems {
 		var merchant models.Merchant
 		bc.DB.First(&merchant, "id = ?", mID)
-		
+
 		origin := merchant.BiteshipAreaID
-		
+
 		if origin == "" {
 			// Ambil BiteshipAreaID dari Merchant Pusat sebagai fallback
 			var pusat models.Merchant
@@ -289,14 +290,14 @@ func (bc *BuyerController) MoveToCart(w http.ResponseWriter, r *http.Request) {
 func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 	var req struct {
-		Items               []models.OrderItem `json:"items"`
-		ShippingInfo        models.Order       `json:"shipping_info"`
-		VoucherCode         string             `json:"voucher_code"`
-		AffiliateID         *string            `json:"affiliate_id"`
-		PaymentMethod       string             `json:"payment_method"`
-		UseShoppingBalance  bool               `json:"use_shopping_balance"`
-		PaymentProofURL     string             `json:"payment_proof_url"`   // untuk manual_transfer
-		PaymentProofNote    string             `json:"payment_proof_note"`  // catatan buyer
+		Items              []models.OrderItem `json:"items"`
+		ShippingInfo       models.Order       `json:"shipping_info"`
+		VoucherCode        string             `json:"voucher_code"`
+		AffiliateID        *string            `json:"affiliate_id"`
+		PaymentMethod      string             `json:"payment_method"`
+		UseShoppingBalance bool               `json:"use_shopping_balance"`
+		PaymentProofURL    string             `json:"payment_proof_url"`  // untuk manual_transfer
+		PaymentProofNote   string             `json:"payment_proof_note"` // catatan buyer
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -305,17 +306,17 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.ShippingInfo.VoucherCode = req.VoucherCode
-	
+
 	// Minimum Order Check
 	configSvc := services.NewConfigService(bc.DB)
 	minOrder := configSvc.GetFloat("platform_min_order", 0)
-	
+
 	// Calculate subtotal
 	var subtotal float64
 	for _, item := range req.Items {
 		subtotal += item.UnitPrice * float64(item.Quantity)
 	}
-	
+
 	if subtotal < minOrder {
 		utils.JSONError(w, http.StatusBadRequest, fmt.Sprintf("Total belanja minimal adalah Rp %.0f", minOrder))
 		return
@@ -353,7 +354,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 				if deduction > order.GrandTotal {
 					deduction = order.GrandTotal
 				}
-				
+
 				if deduction > 0 {
 					// Deduct from ShoppingBalance
 					desc := fmt.Sprintf("Potongan Saldo Belanja untuk Pesanan #%s", order.OrderNumber)
@@ -443,10 +444,19 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 			utils.JSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-	} else if req.PaymentMethod == "manual_transfer" {
-		// Manual Transfer: simpan bukti dan ubah status ke pending_confirmation
+	} else if req.PaymentMethod == "manual_transfer" || req.PaymentMethod == "qris" {
+		// [FIX #5] Idempotency: don't allow re-submit if already submitted proof
+		if order.Status != models.OrderPendingPayment {
+			utils.JSONError(w, http.StatusBadRequest, "Pesanan sudah tidak dalam status menunggu pembayaran")
+			return
+		}
+		if order.PaymentProofURL != "" {
+			utils.JSONError(w, http.StatusBadRequest, "Bukti transfer sudah pernah diupload. Tunggu konfirmasi admin.")
+			return
+		}
+		// Manual Transfer / QRIS: simpan bukti dan ubah status ke pending_confirmation
 		if req.PaymentProofURL == "" {
-			utils.JSONError(w, http.StatusBadRequest, "Bukti transfer wajib diupload untuk metode Transfer Manual")
+			utils.JSONError(w, http.StatusBadRequest, "Bukti pembayaran wajib diupload")
 			return
 		}
 		now := time.Now()
@@ -456,23 +466,23 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 			"payment_proof_note": req.PaymentProofNote,
 			"proof_submitted_at": &now,
 		}).Error; err != nil {
-			utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan bukti transfer")
+			utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan bukti pembayaran")
 			return
 		}
 		// Simpan juga payment record untuk tracking
 		payment := models.Payment{
-			OrderID:       order.ID,
-			PaymentMethod: "manual_transfer",
-			Status:        models.PaymentPending,
-			Gateway:       "manual",
-			Amount:        order.GrandTotal,
+			OrderID:         order.ID,
+			PaymentMethod:   req.PaymentMethod,
+			Status:          models.PaymentPending,
+			Gateway:         "manual",
+			Amount:          order.GrandTotal,
 			GatewayResponse: fmt.Sprintf(`{"proof_url":"%s","note":"%s"}`, req.PaymentProofURL, req.PaymentProofNote),
 		}
 		_ = bc.DB.Create(&payment)
-	} else if req.PaymentMethod != "" && req.PaymentMethod != "manual" {
+	} else if req.PaymentMethod != "" && req.PaymentMethod != "manual" && req.PaymentMethod != "manual_transfer" && req.PaymentMethod != "qris" {
 		// Ambil data item lengkap untuk TriPay
 		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
-		
+
 		tripayResult, err := bc.getTripayData(order, req.PaymentMethod)
 		if err != nil {
 			log.Printf("⚠️ TriPay Request Error: %v", err)
@@ -480,7 +490,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 		} else {
 			if data, ok := tripayResult["data"].(map[string]interface{}); ok {
 				paymentData = data
-				
+
 				// Gunakan amount dari Tripay (sudah termasuk fee customer)
 				var finalAmount float64
 				if amt, ok := paymentData["amount"].(float64); ok {
@@ -488,7 +498,7 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 				} else {
 					finalAmount = order.GrandTotal
 				}
-				
+
 				// Save Payment Record to Database
 				payment := models.Payment{
 					OrderID:              order.ID,
@@ -499,10 +509,10 @@ func (bc *BuyerController) Checkout(w http.ResponseWriter, r *http.Request) {
 					GatewayOrderID:       paymentData["merchant_ref"].(string),
 					Amount:               finalAmount,
 				}
-				
+
 				respJson, _ := json.Marshal(paymentData)
 				payment.GatewayResponse = string(respJson)
-				
+
 				if err := bc.DB.Create(&payment).Error; err != nil {
 					log.Printf("⚠️ Failed to save payment record: %v", err)
 				}
@@ -561,7 +571,7 @@ func (bc *BuyerController) GetPaymentInstructions(w http.ResponseWriter, r *http
 // Helper to get TriPay Instructions (Optional, but good for UX)
 func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod string) (map[string]interface{}, error) {
 	tripay := services.NewTripayService(bc.DB)
-	
+
 	// ⚠️ PENTING: TriPay mewajibkan (Sum of Items == Amount)
 	// Kita hitung total Amount langsung dari sum item yang sudah dibulatkan
 	var totalAmount int64 = 0
@@ -572,7 +582,7 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 		price := int64(math.Round(item.UnitPrice))
 		qty := item.Quantity
 		subtotal := price * int64(qty)
-		
+
 		tripayItems = append(tripayItems, services.TripayItem{
 			SKU:      item.SKU,
 			Name:     item.ProductName,
@@ -594,7 +604,7 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 		})
 		totalAmount += price
 	}
-	
+
 	if order.TotalDiscount > 0 {
 		price := -int64(math.Round(order.TotalDiscount))
 		tripayItems = append(tripayItems, services.TripayItem{
@@ -610,18 +620,19 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 	// Get Customer Info
 	var buyer models.User
 	bc.DB.Preload("Profile").First(&buyer, "id = ?", *order.BuyerID)
-	
+
 	customerName := "Customer"
-	if buyer.Profile.FullName != "" { 
-		customerName = buyer.Profile.FullName 
+	if buyer.Profile.FullName != "" {
+		customerName = buyer.Profile.FullName
 	}
-	
+
 	customerPhone := ""
 	if buyer.Phone != nil {
 		customerPhone = *buyer.Phone
 	}
-	
-	appURL := os.Getenv("APP_URL")
+
+	configSvc := services.NewConfigService(bc.DB)
+	appURL := configSvc.Get("platform_app_url", os.Getenv("APP_URL"))
 	callbackUrl := appURL + "/api/tripay/webhook"
 	returnUrl := appURL + "/order-success"
 
@@ -633,7 +644,7 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 	raw, _ := json.Marshal(result)
 	var resultMap map[string]interface{}
 	json.Unmarshal(raw, &resultMap)
-	
+
 	// Balut dalam "data" agar sesuai ekspektasi Checkout() dan PublicCheckout()
 	return map[string]interface{}{
 		"data": resultMap,
@@ -643,14 +654,14 @@ func (bc *BuyerController) getTripayData(order *models.Order, paymentMethod stri
 // POST /api/public/checkout
 func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email        string             `json:"email"`
-		Password     string             `json:"password"`
-		FullName     string             `json:"full_name"`
-		Phone        string             `json:"phone"`
-		Items        []models.OrderItem `json:"items"`
-		ShippingInfo models.Order       `json:"shipping_info"`
-		UplineID     string             `json:"upline_id"`
-		VoucherCode  string             `json:"voucher_code"`
+		Email         string             `json:"email"`
+		Password      string             `json:"password"`
+		FullName      string             `json:"full_name"`
+		Phone         string             `json:"phone"`
+		Items         []models.OrderItem `json:"items"`
+		ShippingInfo  models.Order       `json:"shipping_info"`
+		UplineID      string             `json:"upline_id"`
+		VoucherCode   string             `json:"voucher_code"`
 		PaymentMethod string             `json:"payment_method"`
 	}
 
@@ -723,24 +734,24 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 
 	// 3. Integrasi TriPay (Copy-paste logic from standard Checkout)
 	var paymentData map[string]interface{}
-	if req.PaymentMethod != "" && req.PaymentMethod != "manual" && req.PaymentMethod != "manual_transfer" {
+	if req.PaymentMethod != "" && req.PaymentMethod != "manual" && req.PaymentMethod != "manual_transfer" && req.PaymentMethod != "qris" {
 		// Ambil data item lengkap untuk TriPay
 		bc.DB.Preload("Items").First(order, "id = ?", order.ID)
-		
+
 		tripayResult, err := bc.getTripayData(order, req.PaymentMethod)
 		if err != nil {
 			log.Printf("⚠️ TriPay Request Error: %v", err)
 		} else {
 			if data, ok := tripayResult["data"].(map[string]interface{}); ok {
 				paymentData = data
-				
+
 				var finalAmount float64
 				if amt, ok := paymentData["amount"].(float64); ok {
 					finalAmount = amt
 				} else {
 					finalAmount = order.GrandTotal
 				}
-				
+
 				// Save Payment Record
 				payment := models.Payment{
 					OrderID:              order.ID,
@@ -753,7 +764,7 @@ func (bc *BuyerController) PublicCheckout(w http.ResponseWriter, r *http.Request
 				}
 				respJson, _ := json.Marshal(paymentData)
 				payment.GatewayResponse = string(respJson)
-				
+
 				if err := bc.DB.Create(&payment).Error; err != nil {
 					log.Printf("⚠️ Failed to save payment record: %v", err)
 				}
@@ -788,7 +799,7 @@ func (bc *BuyerController) GetWishlist(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Wishlist] Fetching for Buyer: %s", buyerID)
 
 	var products []models.Product
-	
+
 	// Standard GORM query with Preload to get all needed associations (variants, etc)
 	err := bc.DB.Model(&models.Product{}).
 		Joins("INNER JOIN wishlists ON wishlists.product_id = products.id").
@@ -848,7 +859,7 @@ func (bc *BuyerController) CheckWishlist(w http.ResponseWriter, r *http.Request)
 
 	var exist models.Wishlist
 	bc.DB.Where("buyer_id = ? AND product_id = ?", buyerID, productID).Limit(1).Find(&exist)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"is_wishlisted": exist.ID != "",
 	})
@@ -858,13 +869,13 @@ func (bc *BuyerController) CheckWishlist(w http.ResponseWriter, r *http.Request)
 func (bc *BuyerController) RemoveFromWishlist(w http.ResponseWriter, r *http.Request) {
 	buyerID := r.Context().Value("user_id").(string)
 	productID := r.URL.Query().Get("product_id")
- 
- 	if productID == "" {
- 		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
- 		return
- 	}
- 
- 	_, err := bc.BuyerService.ToggleWishlist(buyerID, productID)
+
+	if productID == "" {
+		utils.JSONError(w, http.StatusBadRequest, "Product ID dibutuhkan")
+		return
+	}
+
+	_, err := bc.BuyerService.ToggleWishlist(buyerID, productID)
 	if err != nil {
 		log.Printf("Remove from Wishlist error (BuyerID: %s, ProductID: %s): %v", buyerID, productID, err)
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menghapus dari wishlist: "+err.Error())
@@ -1012,7 +1023,7 @@ func (bc *BuyerController) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		profile.Province = req.Province
 		profile.ZipCode = req.ZipCode
 		profile.AreaID = req.AreaID
-		
+
 		if req.AvatarUrl != "" {
 			profile.AvatarUrl = &req.AvatarUrl
 		}
@@ -1107,7 +1118,7 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 	if payment.ID != "" {
 		paymentData, _ := json.Marshal(payment)
 		json.Unmarshal(paymentData, &paymentMap)
-		
+
 		if payment.GatewayResponse != "" {
 			var gresp map[string]interface{}
 			if err := json.Unmarshal([]byte(payment.GatewayResponse), &gresp); err == nil {
@@ -1115,8 +1126,12 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 					paymentMap["checkout_url"] = curl
 				}
 				// Juga ambil qr_url atau pay_url jika ada
-				if qurl, ok := gresp["qr_url"].(string); ok { paymentMap["qr_url"] = qurl }
-				if purl, ok := gresp["pay_url"].(string); ok { paymentMap["pay_url"] = purl }
+				if qurl, ok := gresp["qr_url"].(string); ok {
+					paymentMap["qr_url"] = qurl
+				}
+				if purl, ok := gresp["pay_url"].(string); ok {
+					paymentMap["pay_url"] = purl
+				}
 			}
 		}
 	}
@@ -1124,7 +1139,7 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 	// Fetch reviews for this order to mark items as reviewed
 	var reviews []models.Review
 	bc.DB.Where("order_id = ? AND buyer_id = ?", order.ID, buyerID).Find(&reviews)
-	
+
 	reviewedProducts := make(map[string]bool)
 	for _, r := range reviews {
 		reviewedProducts[r.ProductID] = true
@@ -1147,12 +1162,12 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 		Items []OrderItemWithReview `json:"items"`
 	}
 
-	isPaid := order.Status == models.OrderPaid || 
-		order.Status == models.OrderProcessing || 
-		order.Status == models.OrderCompleted || 
-		order.Status == models.OrderShipped || 
-		order.Status == models.OrderDelivered || 
-		order.Status == models.OrderReadyToShip || 
+	isPaid := order.Status == models.OrderPaid ||
+		order.Status == models.OrderProcessing ||
+		order.Status == models.OrderCompleted ||
+		order.Status == models.OrderShipped ||
+		order.Status == models.OrderDelivered ||
+		order.Status == models.OrderReadyToShip ||
 		order.Status == models.OrderReadyForPickup
 
 	groups := make([]GroupWithReview, len(order.MerchantGroups))
@@ -1171,7 +1186,7 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 				enableReviews = p.EnableReviews
 				if isPaid {
 					purchaseNote = p.PurchaseNote
-					
+
 					// Jika produk digital (dan tidak pakai variasi)
 					if item.ProductVariantID == nil || *item.ProductVariantID == "" {
 						if p.IsDownloadable {
@@ -1217,21 +1232,21 @@ func (bc *BuyerController) GetOrderDetail(w http.ResponseWriter, r *http.Request
 	// Override groups in response
 	response := map[string]interface{}{
 		"order": map[string]interface{}{
-			"id":               order.ID,
-			"order_number":     order.OrderNumber,
-			"status":           order.Status,
-			"grand_total":      order.GrandTotal,
-			"subtotal":         order.Subtotal,
-			"total_shipping":   order.TotalShippingCost,
-			"total_discount":   order.TotalDiscount,
-			"shipping_name":    order.ShippingName,
-			"shipping_phone":   order.ShippingPhone,
-			"shipping_address": order.ShippingAddress,
-			"shipping_city":    order.ShippingCity,
+			"id":                order.ID,
+			"order_number":      order.OrderNumber,
+			"status":            order.Status,
+			"grand_total":       order.GrandTotal,
+			"subtotal":          order.Subtotal,
+			"total_shipping":    order.TotalShippingCost,
+			"total_discount":    order.TotalDiscount,
+			"shipping_name":     order.ShippingName,
+			"shipping_phone":    order.ShippingPhone,
+			"shipping_address":  order.ShippingAddress,
+			"shipping_city":     order.ShippingCity,
 			"shipping_province": order.ShippingProvince,
-			"shipping_postal":  order.ShippingPostalCode,
-			"created_at":       order.CreatedAt,
-			"merchant_groups":  groups,
+			"shipping_postal":   order.ShippingPostalCode,
+			"created_at":        order.CreatedAt,
+			"merchant_groups":   groups,
 		},
 		"payment": paymentMap,
 	}
@@ -1297,6 +1312,36 @@ func (bc *BuyerController) CancelOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Pesanan berhasil dibatalkan"})
+}
+
+// [FIX #1] CancelMerchantGroup - partial cancel per merchant group
+// POST /api/buyer/orders/cancel-group
+func (bc *BuyerController) CancelMerchantGroup(w http.ResponseWriter, r *http.Request) {
+	buyerID := r.Context().Value("user_id").(string)
+	var req struct {
+		GroupID string `json:"group_id"`
+		Reason  string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JSONError(w, http.StatusBadRequest, "Format data tidak valid")
+		return
+	}
+
+	// Security: verify group belongs to this buyer
+	var group models.OrderMerchantGroup
+	if err := bc.DB.Joins("JOIN orders ON orders.id = order_merchant_groups.order_id").
+		Where("order_merchant_groups.id = ? AND orders.buyer_id = ?", req.GroupID, buyerID).
+		First(&group).Error; err != nil {
+		utils.JSONError(w, http.StatusNotFound, "Group tidak ditemukan atau Anda tidak memiliki akses")
+		return
+	}
+
+	if err := bc.OrderService.CancelMerchantGroup(req.GroupID, req.Reason, "buyer"); err != nil {
+		utils.JSONError(w, http.StatusInternalServerError, "Gagal membatalkan group: "+err.Error())
+		return
+	}
+
+	utils.JSONResponse(w, http.StatusOK, map[string]string{"message": "Group berhasil dibatalkan"})
 }
 
 // POST /api/buyer/orders/dispute

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, TablePanel, idr, A, statusBadge } from '../../lib/adminStyles.jsx';
+import { AdminSearch } from '../../lib/adminComponents.jsx';
 
 const API = ADMIN_API_BASE;
 
@@ -36,21 +37,12 @@ export default function AdminModeration() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Moderasi Produk" subtitle="Pintu gerbang kualitas. Tinjau setiap produk yang didaftarkan merchant sebelum publikasi.">
-        <div style={A.searchWrap}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input 
-            style={A.searchInput} 
-            placeholder="Cari nama produk..." 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            onKeyDown={e => e.key === 'Enter' && load()} 
-          />
-        </div>
-        <button style={A.btnGhost} onClick={load}><i className={`bx bx-refresh ${loading ? 'bx-spin' : ''}`} /></button>
+        <AdminSearch placeholder="Cari nama produk..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} />
+        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={load}><i className={`bx bx-refresh ${loading ? 'bx-spin' : ''}`} /></button>
       </PageHeader>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <div style={{ ...A.card, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ ...A.iconBox('#f59e0b'), background: 'rgba(245,158,11,0.1)' }}>
             <i className="bx bxs-hourglass" style={{ fontSize: 20 }} />
           </div>
@@ -119,14 +111,14 @@ export default function AdminModeration() {
                     <button
                       disabled={processingId === p.id}
                       onClick={() => moderate(p.id, 'active', 'Asset verified as per platform luxury standards.')}
-                      style={{ ...A.btnPrimary, background: '#ecfdf5', color: '#10b981', border: '1px solid #bbf7d0', boxShadow: 'none', padding: '7px 14px' }}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: '#ecfdf5', color: '#10b981', border: '1px solid #bbf7d0', boxShadow: 'none', padding: '7px 14px' }}
                     >
                       {processingId === p.id ? '...' : <><i className="bx bx-check-double" /> Approve</>}
                     </button>
                     <button
                       disabled={processingId === p.id}
                       onClick={() => moderate(p.id, 'taken_down', 'Asset failed to meet quality or safety requirements.')}
-                      style={{ ...A.btnGhost, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', padding: '7px 14px' }}
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', padding: '7px 14px' }}
                     >
                       <i className="bx bx-x-circle" /> Reject
                     </button>

@@ -86,7 +86,7 @@ export default function AffiliateSettings() {
     if (!file) return;
     setUploadingAvatar(true);
     try {
-      const res = await uploadFile(`${AFFILIATE_API_BASE.replace('/affiliate', '/buyer')}/upload`, file);
+      const res = await uploadFile(`${AFFILIATE_API_BASE}/upload`, file);
       const imageUrl = res.url || (res.data && res.data.url);
       if (imageUrl) {
         const newForm = { ...form, avatar_url: imageUrl };
@@ -346,7 +346,7 @@ export default function AffiliateSettings() {
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <span className="text-4xl mb-2 block">🏆</span>
+                    <span className="material-symbols-outlined text-4xl mb-2 block text-amber-400">emoji_events</span>
                     <p className="text-xs font-black text-amber-400 uppercase tracking-widest">Level Tertinggi</p>
                     <p className="text-[10px] text-slate-500 mt-1">Anda berada pada level keanggotaan tertinggi.</p>
                   </div>

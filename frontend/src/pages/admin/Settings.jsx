@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, AUTH_API_BASE, ADMIN_API_BASE, fetchJson } from '../../lib/api';
+import { API_BASE, AUTH_API_BASE, ADMIN_API_BASE, fetchJson, testEmailSettings, formatImage } from '../../lib/api';
+
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
 const DEFAULT_CONFIGS = [
   { key: 'platform_name',           value: 'AkuGlow',      description: 'Nama Platform',              group: 'platform',  type: 'text' },
+  { key: 'platform_logo',           value: '/akuglow.webp', description: 'URL Logo Platform',         group: 'platform',  type: 'image' },
+  { key: 'auth_side_image',         value: '',             description: 'Gambar Samping Auth (opsional)', group: 'platform',  type: 'image' },
   { key: 'platform_maintenance',    value: 'false',            description: 'Mode Pemeliharaan',           group: 'platform',  type: 'bool' },
   { key: 'platform_maint_msg',      value: 'Sedang maintenance.', description: 'Pesan Maintenance',       group: 'platform',  type: 'text' },
   { key: 'default_platform_fee',    value: '5',                description: 'Fee Layanan Merchant (Platform Fee) (%)',   group: 'platform',  type: 'number' },
   { key: 'default_affiliate_commission', value: '10',          description: 'Komisi Mitra Default (%)',               group: 'platform',  type: 'number' },
   { key: 'affiliate_withdraw_pct',  value: '70',                description: 'Porsi Komisi Bisa Ditarik (%)',            group: 'affiliate', type: 'number' },
   { key: 'affiliate_shopping_pct',  value: '30',                description: 'Porsi Komisi Untuk Belanja (%)',           group: 'affiliate', type: 'number' },
+  { key: 'platform_app_url',        value: '',                 description: 'APP URL',                    group: 'platform',  type: 'text' },
   { key: 'platform_currency',       value: 'IDR',              description: 'Mata Uang',                  group: 'platform',  type: 'text' },
   { key: 'platform_min_order',      value: '10000',            description: 'Minimum Order (Rp)',         group: 'platform',  type: 'number' },
   { key: 'merchant_min_active_mitra',  value: '100',          description: 'Min. Mitra Aktif (Merchant)', group: 'platform',  type: 'number' },
@@ -34,6 +39,16 @@ const DEFAULT_CONFIGS = [
   { key: 'payment_manual_account_number',   value: '',         description: 'Nomor Rekening',              group: 'payment',   type: 'text' },
   { key: 'payment_manual_account_holder',   value: '',         description: 'Nama Pemilik Rekening',       group: 'payment',   type: 'text' },
   { key: 'payment_manual_instructions',     value: '',         description: 'Instruksi Tambahan (Transfer Manual)', group: 'payment', type: 'textarea' },
+  // QRIS Payment
+  { key: 'payment_qris_enabled',   value: 'false',   description: 'Aktifkan QRIS', group: 'payment', type: 'bool' },
+  { key: 'payment_qris_image_url', value: '',        description: 'Gambar QRIS',   group: 'payment', type: 'text' },
+  // Integrations
+  { key: 'google_client_id',        value: '',                 description: 'Google Client ID',           group: 'integration', type: 'text' },
+  { key: 'google_client_secret',    value: '',                 description: 'Google Client Secret',       group: 'integration', type: 'secret' },
+  { key: 'google_redirect_url',     value: '',                 description: 'Google Redirect URL',        group: 'integration', type: 'text' },
+  { key: 'biteship_api_key',        value: '',                 description: 'Biteship API Key',           group: 'integration', type: 'secret' },
+  { key: 'biteship_base_url',       value: 'https://api.biteship.com', description: 'Biteship Base URL',  group: 'integration', type: 'text' },
+  { key: 'biteship_callback_url',   value: '',                 description: 'Biteship Webhook Callback',  group: 'integration', type: 'text' },
   { key: 'notif_email_enabled',     value: 'true',             description: 'Email Notifikasi',           group: 'notification', type: 'bool' },
   { key: 'notif_wa_enabled',        value: 'false',            description: 'WhatsApp Notifikasi',        group: 'notification', type: 'bool' },
   { key: 'notif_smtp_host',         value: '',                 description: 'SMTP Host',                  group: 'notification', type: 'text' },
@@ -62,12 +77,14 @@ const GROUP_META = {
   platform:     { icon: 'bx-globe',       label: 'Platform',      desc: 'Pengaturan dasar aplikasi dan fee' },
   payout:       { icon: 'bx-wallet',      label: 'Payout',        desc: 'Jadwal dan batas penarikan komisi' },
   payment:      { icon: 'bx-credit-card', label: 'Pembayaran',    desc: 'Payment gateway dan transfer bank' },
+  integration:  { icon: 'bx-link',        label: 'Integrasi API', desc: 'Google OAuth, Biteship, dll' },
   notification: { icon: 'bx-bell',        label: 'Notifikasi',    desc: 'Pengaturan SMTP dan pemberitahuan' },
   skin_ai:      { icon: 'bx-brain',       label: 'AI Skin',       desc: 'Integrasi OpenAI Vision' },
   stats:        { icon: 'bx-bar-chart-alt-2', label: 'Statistik', desc: 'Angka metrik beranda' },
   contact:      { icon: 'bx-phone-call',  label: 'Kontak',        desc: 'Informasi kontak perusahaan' },
   security:     { icon: 'bx-lock-alt',    label: 'Keamanan',      desc: 'Ganti password admin' },
   affiliate:    { icon: 'bx-share-alt',   label: 'Afiliasi',      desc: 'Pengaturan komisi afiliasi' },
+  system:       { icon: 'bx-shield-quarter', label: 'Sistem',     desc: 'Hard reset & perbaikan' },
 };
 
 export default function AdminSettings() {
@@ -79,6 +96,11 @@ export default function AdminSettings() {
   const [activeGroup, setActiveGroup] = useState('platform');
   const [testEmail, setTestEmail] = useState('');
   const [testingEmail, setTestingEmail] = useState(false);
+
+  // Reset System State
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirmationText, setResetConfirmationText] = useState('');
 
   const showToast = (type, msg) => {
     setToast({ type, msg });
@@ -140,6 +162,131 @@ export default function AdminSettings() {
     }).finally(() => setSaving(false));
   };
 
+  const uploadImage = async (e, key) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      showToast('info', 'Mengunggah gambar...');
+      const token = localStorage.getItem('token');
+      const resp = await window.fetch(`${API}/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd
+      });
+      if (!resp.ok) throw new Error('Gagal mengunggah gambar');
+      const data = await resp.json();
+      if (data.url) {
+        handleChange(key, data.url);
+        showToast('success', 'Gambar berhasil diunggah!');
+      } else {
+        throw new Error('URL gambar tidak ditemukan');
+      }
+    } catch (err) {
+      showToast('error', err.message || 'Gagal mengunggah gambar');
+    }
+  };
+
+  const uploadQrisImage = async (e) => {
+    return uploadImage(e, 'payment_qris_image_url');
+  };
+
+  const handleHardReset = async () => {
+    if (resetConfirmationText !== 'SAYA YAKIN') {
+      toast.error('Ketik "SAYA YAKIN" untuk melanjutkan reset.');
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await api.post('/admin/system/reset-all', { type: 'hard' });
+      toast.success(res.data.message || 'Sistem berhasil di-reset!');
+      setShowResetConfirm(false);
+      setResetConfirmationText('');
+      // Refresh after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Gagal mereset sistem.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const renderSystem = () => {
+    return (
+      <div className="form-grid">
+        <div className="form-group full-width">
+          <div style={{ marginBottom: 24, padding: 24, background: '#fff0f2', border: '1px solid #fecdd3', borderRadius: 12 }}>
+            <h4 style={{ fontSize: 18, fontWeight: 700, color: '#e11d48', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="bx bx-error" /> Hard Reset Sistem
+            </h4>
+            <p style={{ fontSize: 14, color: '#be123c', lineHeight: 1.5, marginBottom: 16 }}>
+              <strong>Peringatan Sangat Berbahaya!</strong><br />
+              Tindakan ini akan <strong>menghapus seluruh data operasional</strong> (Produk, User, Transaksi, Komisi, dll) dan mengembalikan sistem seperti baru di-install. Akun Superadmin Anda, Pengaturan Platform, dan Tampilan Tema akan tetap dipertahankan.
+            </p>
+            <button 
+              onClick={() => setShowResetConfirm(true)}
+              className="btn-danger"
+              style={{
+                background: '#e11d48', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer'
+              }}
+            >
+              Lakukan Hard Reset
+            </button>
+          </div>
+        </div>
+
+        {showResetConfirm && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' }}>
+            <div style={{ background: 'white', padding: 32, borderRadius: 16, width: '100%', maxWidth: 460, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+              <h3 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="bx bx-error-circle" style={{ color: '#e11d48', fontSize: 28 }} />
+                Konfirmasi Hard Reset
+              </h3>
+              <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.5, marginBottom: 20 }}>
+                Tindakan ini <strong>TIDAK BISA DIBATALKAN</strong>. Semua data penjualan, pelanggan, dan produk akan hilang permanen.
+              </p>
+              
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
+                  Ketik <strong style={{ color: '#e11d48' }}>SAYA YAKIN</strong> untuk melanjutkan:
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={resetConfirmationText}
+                  onChange={e => setResetConfirmationText(e.target.value)}
+                  placeholder="SAYA YAKIN"
+                  style={{ borderColor: resetConfirmationText === 'SAYA YAKIN' ? '#10b981' : '#e2e8f0' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button 
+                  onClick={() => { setShowResetConfirm(false); setResetConfirmationText(''); }}
+                  disabled={resetting}
+                  style={{ padding: '10px 20px', background: '#f1f5f9', border: 'none', borderRadius: 8, color: '#475569', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={handleHardReset}
+                  disabled={resetConfirmationText !== 'SAYA YAKIN' || resetting}
+                  style={{ padding: '10px 20px', background: '#e11d48', border: 'none', borderRadius: 8, color: 'white', fontWeight: 600, cursor: (resetConfirmationText === 'SAYA YAKIN' && !resetting) ? 'pointer' : 'not-allowed', opacity: (resetConfirmationText === 'SAYA YAKIN' && !resetting) ? 1 : 0.6, display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  {resetting ? <div className="spinner" style={{ width: 16, height: 16, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : null}
+                  {resetting ? 'Mereset...' : 'Ya, Reset Sistem'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderInput = (cfg) => {
     const val = editing[cfg.key] ?? cfg.value;
     if (cfg.type === 'bool') {
@@ -155,9 +302,9 @@ export default function AdminSettings() {
     }
     if (cfg.type === 'select') {
       return (
-        <select className="form-select" value={val} onChange={e => handleChange(cfg.key, e.target.value)}>
+        <AdminSelect className="form-select" value={val} onChange={e => handleChange(cfg.key, e.target.value)}>
           {cfg.options?.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
+        </AdminSelect>
       );
     }
     if (cfg.type === 'secret') {
@@ -168,6 +315,14 @@ export default function AdminSettings() {
     if (cfg.type === 'textarea') {
       return (
         <textarea className="form-textarea" value={val} placeholder={`Masukkan ${cfg.description}...`} onChange={e => handleChange(cfg.key, e.target.value)} />
+      );
+    }
+    if (cfg.type === 'image') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {val && <img src={formatImage(val)} alt="Preview" style={{ height: 60, width: 'auto', objectFit: 'contain', borderRadius: 8, background: '#f8fafc', padding: 8, border: '1px solid #e2e8f0' }} />}
+          <input type="file" accept="image/*" onChange={(e) => uploadImage(e, cfg.key)} className="form-input" style={{ padding: '8px' }} />
+        </div>
       );
     }
     return (
@@ -232,7 +387,7 @@ export default function AdminSettings() {
     );
   };
 
-  const groups = [...new Set(DEFAULT_CONFIGS.map(c => c.group)), 'security'];
+  const groups = [...new Set(DEFAULT_CONFIGS.map(c => c.group)), 'security', 'system'];
   const filtered = configs.filter(c => c.group === activeGroup);
   const gm = GROUP_META[activeGroup];
 
@@ -627,6 +782,8 @@ export default function AdminSettings() {
                 <div className="spinner" style={{ borderColor: '#e2e8f0', borderTopColor: '#2563eb', margin: '0 auto 16px', width: 32, height: 32 }} />
                 <div style={{ fontSize: 14, color: '#64748b' }}>Memuat konfigurasi...</div>
               </div>
+            ) : activeGroup === 'system' ? (
+              renderSystem()
             ) : activeGroup === 'security' ? (
               renderSecurity()
             ) : (
@@ -645,7 +802,7 @@ export default function AdminSettings() {
 
                 {activeGroup === 'payment' ? (
                   <>
-                    {filtered.filter(cfg => !cfg.key.startsWith('payment_manual_')).map(cfg => (
+                    {filtered.filter(cfg => !cfg.key.startsWith('payment_manual_') && !cfg.key.startsWith('payment_qris_')).map(cfg => (
                       <div key={cfg.key} className={`form-group ${cfg.type === 'textarea' ? 'full-width' : ''}`}>
                         <label className="form-label">{cfg.description}</label>
                         {renderInput(cfg)}
@@ -698,6 +855,40 @@ export default function AdminSettings() {
                         </div>
                       )}
                     </div>
+
+                    {/* QRIS Section */}
+                    <div className="manual-transfer-card" style={{ marginTop: 24 }}>
+                      <div className={`manual-transfer-header ${editing['payment_qris_enabled'] === 'true' ? 'active' : ''}`}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          <div style={{ width: 48, height: 48, borderRadius: 12, background: editing['payment_qris_enabled'] === 'true' ? '#10b981' : '#cbd5e1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, transition: '0.3s' }}>
+                            <i className="bx bx-qr-scan" />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>QRIS</div>
+                            <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Pembeli scan kode QR untuk melakukan pembayaran</div>
+                          </div>
+                        </div>
+                        <div className="toggle-wrapper" onClick={() => handleChange('payment_qris_enabled', editing['payment_qris_enabled'] === 'true' ? 'false' : 'true')}>
+                          <div className={`toggle-switch ${editing['payment_qris_enabled'] === 'true' ? 'active' : ''}`}>
+                            <div className="toggle-thumb" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {editing['payment_qris_enabled'] === 'true' && (
+                        <div style={{ padding: 24, borderTop: '1px solid #bfdbfe' }}>
+                          <div className="form-group">
+                            <label className="form-label">Gambar QR Code (QRIS)</label>
+                            {editing['payment_qris_image_url'] && (
+                              <div style={{ marginBottom: 16 }}>
+                                <img src={editing['payment_qris_image_url']} alt="QRIS" style={{ maxWidth: 200, borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                              </div>
+                            )}
+                            <input type="file" accept="image/*" onChange={uploadQrisImage} className="form-input" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </>
                 ) : (
                   filtered.map(cfg => (
@@ -742,7 +933,7 @@ export default function AdminSettings() {
           </div>
 
           {/* Footer Save Button */}
-          {activeGroup !== 'security' && (
+          {activeGroup !== 'security' && activeGroup !== 'system' && (
             <div className="panel-footer">
               <button onClick={handleSave} disabled={saving} className="btn-primary">
                 {saving ? <div className="spinner" /> : <i className="bx bx-check-shield" style={{ fontSize: 20 }} />}

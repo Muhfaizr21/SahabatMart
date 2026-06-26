@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { PageHeader, TablePanel, A, idr, statusBadge, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 export default function SkinJourneyAdmin() {
   const [pretests, setPretests] = useState([]);
   const [journals, setJournals] = useState([]);
@@ -373,9 +375,7 @@ export default function SkinJourneyAdmin() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              ...A.btnGhost,
-              background: activeTab === tab.id ? '#1e293b' : 'white',
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: activeTab === tab.id ? '#1e293b' : 'white',
               color: activeTab === tab.id ? 'white' : '#64748b',
               padding: '10px 20px',
               borderRadius: 12,
@@ -385,8 +385,7 @@ export default function SkinJourneyAdmin() {
               border: '1px solid #e2e8f0',
               fontWeight: 800,
               fontSize: 13,
-              whiteSpace: 'nowrap'
-            }}
+              whiteSpace: 'nowrap' }}
           >
             <i className={`bx ${tab.icon}`} style={{ fontSize: 18 }} />
             {tab.label}
@@ -404,20 +403,20 @@ export default function SkinJourneyAdmin() {
       <PageHeader title="Skin Journey Intelligence" subtitle="Advanced monitoring for member progress and community health.">
         <div style={{ display: 'flex', gap: 12 }}>
           {activeTab === 'pretests' && (
-            <button style={A.btnPrimary} onClick={() => setShowAddPretest(true)}>+ New Journey</button>
+            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddPretest(true)}>+ New Journey</button>
           )}
           {activeTab === 'education' && (
-            <button style={A.btnPrimary} onClick={() => setShowAddEdu(true)}>+ New Article</button>
+            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddEdu(true)}>+ New Article</button>
           )}
           {activeTab === 'config' && (
             <div style={{ display: 'flex', gap: 8 }}>
-              {configSubTab === 'programs' && <button style={A.btnPrimary} onClick={() => setShowAddProgram(true)}>+ New Program</button>}
-              {configSubTab === 'steps' && <button style={A.btnPrimary} onClick={() => setShowAddStep(true)}>+ New Step</button>}
-              {configSubTab === 'routines' && <button style={A.btnPrimary} onClick={() => setShowAddRoutine(true)}>+ New Routine</button>}
-              {configSubTab === 'mappings' && <button style={A.btnPrimary} onClick={() => setShowAddMapping(true)}>+ New Mapping</button>}
+              {configSubTab === 'programs' && <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddProgram(true)}>+ New Program</button>}
+              {configSubTab === 'steps' && <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddStep(true)}>+ New Step</button>}
+              {configSubTab === 'routines' && <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddRoutine(true)}>+ New Routine</button>}
+              {configSubTab === 'mappings' && <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddMapping(true)}>+ New Mapping</button>}
             </div>
           )}
-          <button onClick={loadData} style={A.btnGhost}><i className="bx bx-refresh" /> Sync</button>
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm"><i className="bx bx-refresh" /> Sync</button>
         </div>
       </PageHeader>
 
@@ -429,7 +428,7 @@ export default function SkinJourneyAdmin() {
           { label: 'Sensitive Skin', val: stats.sensitive, icon: 'bx-shield-plus', color: '#ef4444' },
           { label: 'Avg Health Score', val: `${stats.avgScore}/10`, icon: 'bx-heart', color: '#10b981' },
         ].map((s, i) => (
-          <div key={i} style={{ ...A.card, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: `${s.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className={`bx ${s.icon}`} style={{ fontSize: 24, color: s.color }} />
             </div>
@@ -445,23 +444,23 @@ export default function SkinJourneyAdmin() {
 
       {activeTab === 'pretests' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ ...A.card, padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 300, position: 'relative' }}>
               <i className="bx bx-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input 
-                style={{ ...A.input, paddingLeft: 44 }} 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ paddingLeft: 44 }} 
                 placeholder="Search member by name..." 
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
-            <select style={{ ...A.input, width: 200 }} value={skinTypeFilter} onChange={e => setSkinTypeFilter(e.target.value)}>
+            <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: 200 }} value={skinTypeFilter} onChange={e => setSkinTypeFilter(e.target.value)}>
               <option value="">All Skin Types</option>
               <option value="Oily">Oily</option>
               <option value="Dry">Dry</option>
               <option value="Sensitive">Sensitive</option>
               <option value="Combination">Combination</option>
-            </select>
+            </AdminSelect>
           </div>
 
           <div style={A.card}>
@@ -498,7 +497,7 @@ export default function SkinJourneyAdmin() {
                       <td style={A.td}>{p.skin_problem}</td>
                       <td style={A.td}>{new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                       <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                        <button style={A.btnGhost} onClick={() => setSelectedUser(p)}>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setSelectedUser(p)}>
                           <i className="bx bx-right-arrow-alt" style={{ fontSize: 20 }} /> View Journey
                         </button>
                       </td>
@@ -518,7 +517,7 @@ export default function SkinJourneyAdmin() {
                   <button 
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => prev - 1)}
-                    style={{ ...A.btnGhost, padding: '6px 12px', fontSize: 12, opacity: currentPage === 1 ? 0.5 : 1 }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '6px 12px', fontSize: 12, opacity: currentPage === 1 ? 0.5 : 1 }}
                   >
                     Previous
                   </button>
@@ -530,14 +529,11 @@ export default function SkinJourneyAdmin() {
                         <button 
                           key={page}
                           onClick={() => setCurrentPage(page)}
-                          style={{ 
-                            ...A.btnGhost, 
-                            padding: '6px 12px', 
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '6px 12px', 
                             fontSize: 12, 
                             background: currentPage === page ? '#1e293b' : 'transparent',
                             color: currentPage === page ? 'white' : '#64748b',
-                            borderColor: currentPage === page ? '#1e293b' : '#e2e8f0'
-                          }}
+                            borderColor: currentPage === page ? '#1e293b' : '#e2e8f0' }}
                         >
                           {page}
                         </button>
@@ -549,7 +545,7 @@ export default function SkinJourneyAdmin() {
                   <button 
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => prev + 1)}
-                    style={{ ...A.btnGhost, padding: '6px 12px', fontSize: 12, opacity: currentPage === totalPages ? 0.5 : 1 }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '6px 12px', fontSize: 12, opacity: currentPage === totalPages ? 0.5 : 1 }}
                   >
                     Next
                   </button>
@@ -652,7 +648,7 @@ export default function SkinJourneyAdmin() {
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #f1f5f9' }}>
                 <h3 style={{ fontSize: 16, fontWeight: 900 }}>Program Skin Journey Builder</h3>
-                <button style={A.btnPrimary} onClick={() => {
+                <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => {
                   setProgData({ name: '', slug: '', category: 'Acne Treatment', target_skin_type: [], target_concerns: [], duration_weeks: 4, expected_outcome: '', ai_score_focus: [], status: 'draft', level: 1 });
                   setPhaseData([]); setBenefitData([]); setWarningData([]); setFaqData([]); setProductStepData([]);
                   setWizardStep(1);
@@ -675,8 +671,8 @@ export default function SkinJourneyAdmin() {
                         <td style={A.td}>{p.category}</td>
                         <td style={A.td}><span style={statusBadge(p.status)}>{p.status}</span></td>
                         <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                          <button onClick={() => handleEditProgramFlow(p)} style={{ ...A.btnGhost, color: '#6366f1', marginRight: 8 }}>EDIT FLOW</button>
-                          <button onClick={() => handleDeleteProgram(p.id)} style={{ ...A.btnGhost, color: '#ef4444' }}>DELETE</button>
+                          <button onClick={() => handleEditProgramFlow(p)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1', marginRight: 8 }}>EDIT FLOW</button>
+                          <button onClick={() => handleDeleteProgram(p.id)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444' }}>DELETE</button>
                         </td>
                       </tr>
                     ))}
@@ -711,30 +707,30 @@ export default function SkinJourneyAdmin() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                     <div>
                       <FieldLabel>Program Name</FieldLabel>
-                      <input style={A.input} placeholder="e.g. Acne-Free Express 4 Weeks" value={progData.name} onChange={e => setProgData({...progData, name: e.target.value})} />
+                      <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Acne-Free Express 4 Weeks" value={progData.name} onChange={e => setProgData({...progData, name: e.target.value})} />
                     </div>
                     <div>
                       <FieldLabel>Category</FieldLabel>
-                      <select style={A.input} value={progData.category} onChange={e => setProgData({...progData, category: e.target.value})}>
+                      <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={progData.category} onChange={e => setProgData({...progData, category: e.target.value})}>
                         {['Acne Treatment', 'Anti-Aging', 'Brightening', 'Hydration', 'Sensitivity', 'General'].map(c => <option key={c}>{c}</option>)}
-                      </select>
+                      </AdminSelect>
                     </div>
                     <div>
                       <FieldLabel>Duration (Weeks)</FieldLabel>
-                      <input type="number" style={A.input} value={progData.duration_weeks} onChange={e => setProgData({...progData, duration_weeks: parseInt(e.target.value)})} />
+                      <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={progData.duration_weeks} onChange={e => setProgData({...progData, duration_weeks: parseInt(e.target.value)})} />
                     </div>
                     <div>
                       <FieldLabel>Level</FieldLabel>
-                      <input type="number" style={A.input} value={progData.level} onChange={e => setProgData({...progData, level: parseInt(e.target.value)})} />
+                      <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={progData.level} onChange={e => setProgData({...progData, level: parseInt(e.target.value)})} />
                     </div>
                     <div style={{ gridColumn: 'span 2' }}>
                       <FieldLabel>Expected Outcome</FieldLabel>
-                      <textarea style={{ ...A.input, height: 80 }} value={progData.expected_outcome} onChange={e => setProgData({...progData, expected_outcome: e.target.value})} />
+                      <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 80 }} value={progData.expected_outcome} onChange={e => setProgData({...progData, expected_outcome: e.target.value})} />
                     </div>
                   </div>
                   <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                    <button style={A.btnGhost} onClick={() => setWizardStep(0)}>Cancel</button>
-                    <button style={A.btnPrimary} onClick={handleSaveFlow1}>Next: Flow 2 Details</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setWizardStep(0)}>Cancel</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={handleSaveFlow1}>Next: Flow 2 Details</button>
                   </div>
                 </div>
               )}
@@ -747,22 +743,22 @@ export default function SkinJourneyAdmin() {
                   <div style={{ marginBottom: 32 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <h4 style={{ fontSize: 14, fontWeight: 800 }}>Timeline Phases</h4>
-                      <button style={{ ...A.btnGhost, color: '#6366f1' }} onClick={() => setPhaseData([...phaseData, { phase_number: phaseData.length + 1, title: '', description: '', expectations: '' }])}>+ ADD PHASE</button>
+                      <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1' }} onClick={() => setPhaseData([...phaseData, { phase_number: phaseData.length + 1, title: '', description: '', expectations: '' }])}>+ ADD PHASE</button>
                     </div>
                     {phaseData.map((p, idx) => (
                       <div key={idx} style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 12 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 12 }}>
-                          <input type="number" style={A.input} placeholder="Wk" value={p.phase_number} onChange={e => {
+                          <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Wk" value={p.phase_number} onChange={e => {
                             const newP = [...phaseData]; newP[idx].phase_number = parseInt(e.target.value); setPhaseData(newP);
                           }} />
-                          <input style={A.input} placeholder="Phase Title" value={p.title} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Phase Title" value={p.title} onChange={e => {
                             const newP = [...phaseData]; newP[idx].title = e.target.value; setPhaseData(newP);
                           }} />
-                          <input style={A.input} placeholder="Expectations" value={p.expectations} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Expectations" value={p.expectations} onChange={e => {
                             const newP = [...phaseData]; newP[idx].expectations = e.target.value; setPhaseData(newP);
                           }} />
                         </div>
-                        <textarea style={{ ...A.input, height: 60, marginTop: 8 }} placeholder="Phase Description" value={p.description} onChange={e => {
+                        <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 60, marginTop: 8 }} placeholder="Phase Description" value={p.description} onChange={e => {
                           const newP = [...phaseData]; newP[idx].description = e.target.value; setPhaseData(newP);
                         }} />
                       </div>
@@ -774,14 +770,14 @@ export default function SkinJourneyAdmin() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <h4 style={{ fontSize: 14, fontWeight: 800 }}>Benefits</h4>
-                        <button style={{ ...A.btnGhost, color: '#6366f1' }} onClick={() => setBenefitData([...benefitData, { title: '', description: '', icon: '🎯' }])}>+ ADD</button>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1' }} onClick={() => setBenefitData([...benefitData, { title: '', description: '', icon: 'bx bx-check-circle' }])}>+ ADD</button>
                       </div>
                       {benefitData.map((b, idx) => (
                         <div key={idx} style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
-                          <input style={{ ...A.input, width: 40 }} value={b.icon} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: 40 }} value={b.icon} onChange={e => {
                             const newB = [...benefitData]; newB[idx].icon = e.target.value; setBenefitData(newB);
                           }} />
-                          <input style={A.input} placeholder="Benefit Title" value={b.title} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Benefit Title" value={b.title} onChange={e => {
                             const newB = [...benefitData]; newB[idx].title = e.target.value; setBenefitData(newB);
                           }} />
                         </div>
@@ -790,11 +786,11 @@ export default function SkinJourneyAdmin() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <h4 style={{ fontSize: 14, fontWeight: 800 }}>Warnings</h4>
-                        <button style={{ ...A.btnGhost, color: '#ef4444' }} onClick={() => setWarningData([...warningData, { title: '', description: '', type: 'danger', badge: 'PENTING' }])}>+ ADD</button>
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444' }} onClick={() => setWarningData([...warningData, { title: '', description: '', type: 'danger', badge: 'PENTING' }])}>+ ADD</button>
                       </div>
                       {warningData.map((w, idx) => (
                         <div key={idx} style={{ marginBottom: 8 }}>
-                          <input style={A.input} placeholder="Warning Title" value={w.title} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="Warning Title" value={w.title} onChange={e => {
                             const newW = [...warningData]; newW[idx].title = e.target.value; setWarningData(newW);
                           }} />
                         </div>
@@ -803,8 +799,8 @@ export default function SkinJourneyAdmin() {
                   </div>
 
                   <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
-                    <button style={A.btnGhost} onClick={() => setWizardStep(1)}>Back</button>
-                    <button style={A.btnPrimary} onClick={handleSaveFlow2}>Next: Flow 3 Products</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setWizardStep(1)}>Back</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={handleSaveFlow2}>Next: Flow 3 Products</button>
                   </div>
                 </div>
               )}
@@ -813,7 +809,7 @@ export default function SkinJourneyAdmin() {
                 <div className="fade-in">
                   <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 24 }}>FLOW 3: PRODUK YANG DIPAKAI</h3>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                    <button style={A.btnPrimary} onClick={() => setProductStepData([...productStepData, { product_id: '', step_name: '', step_number: productStepData.length+1, phase: 'both', frequency: 'daily' }])}>+ ADD PRODUCT STEP</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setProductStepData([...productStepData, { product_id: '', step_name: '', step_number: productStepData.length+1, phase: 'both', frequency: 'daily' }])}>+ ADD PRODUCT STEP</button>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {productStepData.map((ps, idx) => (
@@ -821,42 +817,42 @@ export default function SkinJourneyAdmin() {
                         <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr', gap: 16 }}>
                           <div>
                             <FieldLabel>Step #</FieldLabel>
-                            <input type="number" style={A.input} value={ps.step_number} onChange={e => {
+                            <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={ps.step_number} onChange={e => {
                               const newPS = [...productStepData]; newPS[idx].step_number = parseInt(e.target.value); setProductStepData(newPS);
                             }} />
                           </div>
                           <div>
                             <FieldLabel>Step Name</FieldLabel>
-                            <input style={A.input} placeholder="e.g. Cleansing" value={ps.step_name} onChange={e => {
+                            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Cleansing" value={ps.step_name} onChange={e => {
                               const newPS = [...productStepData]; newPS[idx].step_name = e.target.value; setProductStepData(newPS);
                             }} />
                           </div>
                           <div>
                             <FieldLabel>Select Product</FieldLabel>
-                            <select style={A.input} value={ps.product_id} onChange={e => {
+                            <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={ps.product_id} onChange={e => {
                               const newPS = [...productStepData]; newPS[idx].product_id = e.target.value; setProductStepData(newPS);
                             }}>
                               <option value="">Choose Product</option>
                               {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
+                            </AdminSelect>
                           </div>
                           <div>
                             <FieldLabel>Phase</FieldLabel>
-                            <select style={A.input} value={ps.phase} onChange={e => {
+                            <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={ps.phase} onChange={e => {
                               const newPS = [...productStepData]; newPS[idx].phase = e.target.value; setProductStepData(newPS);
                             }}>
                               <option value="both">Both (AM & PM)</option>
                               <option value="morning">Morning Only</option>
                               <option value="evening">Evening Only</option>
-                            </select>
+                            </AdminSelect>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                   <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
-                    <button style={A.btnGhost} onClick={() => setWizardStep(2)}>Back</button>
-                    <button style={A.btnPrimary} onClick={() => setWizardStep(4)}>Next: Flow 4 Instructions</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setWizardStep(2)}>Back</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setWizardStep(4)}>Next: Flow 4 Instructions</button>
                   </div>
                 </div>
               )}
@@ -870,25 +866,25 @@ export default function SkinJourneyAdmin() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
                         <div>
                           <FieldLabel>Dosage/Amount</FieldLabel>
-                          <input style={A.input} placeholder="e.g. Seukuran biji jagung" value={ps.amount_text} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Seukuran biji jagung" value={ps.amount_text} onChange={e => {
                             const newPS = [...productStepData]; newPS[idx].amount_text = e.target.value; setProductStepData(newPS);
                           }} />
                         </div>
                         <div>
                           <FieldLabel>Wait Time (Secs)</FieldLabel>
-                          <input type="number" style={A.input} value={ps.wait_time_secs} onChange={e => {
+                          <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={ps.wait_time_secs} onChange={e => {
                             const newPS = [...productStepData]; newPS[idx].wait_time_secs = parseInt(e.target.value); setProductStepData(newPS);
                           }} />
                         </div>
                         <div>
                           <FieldLabel>Mechanism</FieldLabel>
-                          <input style={A.input} placeholder="e.g. Keratolytic" value={ps.mechanism_explain} onChange={e => {
+                          <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Keratolytic" value={ps.mechanism_explain} onChange={e => {
                             const newPS = [...productStepData]; newPS[idx].mechanism_explain = e.target.value; setProductStepData(newPS);
                           }} />
                         </div>
                       </div>
                       <FieldLabel>Pro Tips / Additional Notes</FieldLabel>
-                      <textarea style={{ ...A.input, height: 60 }} placeholder="Tips khusus untuk user..." value={ps.additional_notes} onChange={e => {
+                      <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 60 }} placeholder="Tips khusus untuk user..." value={ps.additional_notes} onChange={e => {
                         const newPS = [...productStepData]; newPS[idx].additional_notes = e.target.value; setProductStepData(newPS);
                       }} />
 
@@ -897,7 +893,7 @@ export default function SkinJourneyAdmin() {
                         {(typeof ps.step_by_step_json === 'string' ? JSON.parse(ps.step_by_step_json || '[]') : (ps.step_by_step_json || [])).map((step, sIdx) => (
                           <div key={sIdx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                             <input 
-                              style={A.input} 
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                               value={step} 
                               onChange={e => {
                                 const newPS = [...productStepData];
@@ -907,7 +903,7 @@ export default function SkinJourneyAdmin() {
                                 setProductStepData(newPS);
                               }} 
                             />
-                            <button style={{ ...A.btnGhost, color: '#ef4444' }} onClick={() => {
+                            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444' }} onClick={() => {
                                 const newPS = [...productStepData];
                                 const currentSteps = typeof newPS[idx].step_by_step_json === 'string' ? JSON.parse(newPS[idx].step_by_step_json || '[]') : (newPS[idx].step_by_step_json || []);
                                 currentSteps.splice(sIdx, 1);
@@ -916,7 +912,7 @@ export default function SkinJourneyAdmin() {
                             }}>X</button>
                           </div>
                         ))}
-                        <button style={{ ...A.btnGhost, color: '#6366f1', fontSize: 11 }} onClick={() => {
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1', fontSize: 11 }} onClick={() => {
                             const newPS = [...productStepData];
                             const currentSteps = typeof newPS[idx].step_by_step_json === 'string' ? JSON.parse(newPS[idx].step_by_step_json || '[]') : (newPS[idx].step_by_step_json || []);
                             currentSteps.push("");
@@ -930,7 +926,7 @@ export default function SkinJourneyAdmin() {
                         {(typeof ps.tips_json === 'string' ? JSON.parse(ps.tips_json || '[]') : (ps.tips_json || [])).map((tip, tIdx) => (
                           <div key={tIdx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                             <input 
-                              style={A.input} 
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" 
                               value={tip} 
                               onChange={e => {
                                 const newPS = [...productStepData];
@@ -940,7 +936,7 @@ export default function SkinJourneyAdmin() {
                                 setProductStepData(newPS);
                               }} 
                             />
-                            <button style={{ ...A.btnGhost, color: '#ef4444' }} onClick={() => {
+                            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444' }} onClick={() => {
                                 const newPS = [...productStepData];
                                 const currentTips = typeof newPS[idx].tips_json === 'string' ? JSON.parse(newPS[idx].tips_json || '[]') : (newPS[idx].tips_json || []);
                                 currentTips.splice(tIdx, 1);
@@ -949,7 +945,7 @@ export default function SkinJourneyAdmin() {
                             }}>X</button>
                           </div>
                         ))}
-                        <button style={{ ...A.btnGhost, color: '#6366f1', fontSize: 11 }} onClick={() => {
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1', fontSize: 11 }} onClick={() => {
                             const newPS = [...productStepData];
                             const currentTips = typeof newPS[idx].tips_json === 'string' ? JSON.parse(newPS[idx].tips_json || '[]') : (newPS[idx].tips_json || []);
                             currentTips.push("");
@@ -960,8 +956,8 @@ export default function SkinJourneyAdmin() {
                     </div>
                   ))}
                   <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between' }}>
-                    <button style={A.btnGhost} onClick={() => setWizardStep(3)}>Back</button>
-                    <button style={{ ...A.btnPrimary, background: '#10b981', borderColor: '#10b981' }} onClick={handleSaveFlow3And4}>PUBLISH COMPLETE PROGRAM 🧬</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setWizardStep(3)}>Back</button>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: '#10b981', borderColor: '#10b981' }} onClick={handleSaveFlow3And4}>PUBLISH COMPLETE PROGRAM </button>
                   </div>
                 </div>
               )}
@@ -976,14 +972,14 @@ export default function SkinJourneyAdmin() {
         <Modal title="Publish New Article" onClose={() => setShowAddEdu(false)}>
           <div style={{ padding: '0 24px 24px' }}>
             <FieldLabel>Article Title</FieldLabel>
-            <input style={A.input} value={newEdu.title} onChange={e => setNewEdu({...newEdu, title: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newEdu.title} onChange={e => setNewEdu({...newEdu, title: e.target.value})} />
             <FieldLabel>Day Target (Milestone)</FieldLabel>
-            <input type="number" style={A.input} value={newEdu.day_target} onChange={e => setNewEdu({...newEdu, day_target: parseInt(e.target.value)})} />
+            <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newEdu.day_target} onChange={e => setNewEdu({...newEdu, day_target: parseInt(e.target.value)})} />
             <FieldLabel>Content Markdown</FieldLabel>
-            <textarea style={{ ...A.input, height: 120 }} value={newEdu.content} onChange={e => setNewEdu({...newEdu, content: e.target.value})} />
+            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 120 }} value={newEdu.content} onChange={e => setNewEdu({...newEdu, content: e.target.value})} />
             <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-              <button style={{ ...A.btnGhost, flex: 1 }} onClick={() => setShowAddEdu(false)}>Cancel</button>
-              <button style={{ ...A.btnPrimary, flex: 1 }} onClick={handleAddEdu}>Publish Article</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1 }} onClick={() => setShowAddEdu(false)}>Cancel</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1 }} onClick={handleAddEdu}>Publish Article</button>
             </div>
           </div>
         </Modal>
@@ -994,12 +990,12 @@ export default function SkinJourneyAdmin() {
         <Modal title="Create New Skincare Program" onClose={() => setShowAddProgram(false)}>
           <div style={{ padding: 24 }}>
             <FieldLabel>Program Name</FieldLabel>
-            <input style={A.input} placeholder="e.g. Essential Glow" value={newProgram.name} onChange={e => setNewProgram({...newProgram, name: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Essential Glow" value={newProgram.name} onChange={e => setNewProgram({...newProgram, name: e.target.value})} />
             <FieldLabel>Description</FieldLabel>
-            <textarea style={{...A.input, height: 100}} placeholder="What is this program about?" value={newProgram.description} onChange={e => setNewProgram({...newProgram, description: e.target.value})} />
+            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 100 }} placeholder="What is this program about?" value={newProgram.description} onChange={e => setNewProgram({...newProgram, description: e.target.value})} />
             <FieldLabel>Program Level</FieldLabel>
-            <input type="number" style={A.input} value={newProgram.level} onChange={e => setNewProgram({...newProgram, level: parseInt(e.target.value)})} />
-            <button onClick={handleSaveProgram} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Save Program</button>
+            <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newProgram.level} onChange={e => setNewProgram({...newProgram, level: parseInt(e.target.value)})} />
+            <button onClick={handleSaveProgram} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', marginTop: 20 }}>Save Program</button>
           </div>
         </Modal>
       )}
@@ -1008,10 +1004,10 @@ export default function SkinJourneyAdmin() {
         <Modal title="Define Journey Step" onClose={() => setShowAddStep(false)}>
           <div style={{ padding: 24 }}>
             <FieldLabel>Step Name</FieldLabel>
-            <input style={A.input} placeholder="e.g. Double Cleansing" value={newStep.name} onChange={e => setNewStep({...newStep, name: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Double Cleansing" value={newStep.name} onChange={e => setNewStep({...newStep, name: e.target.value})} />
             <FieldLabel>Default Instruction</FieldLabel>
-            <textarea style={{...A.input, height: 100}} placeholder="How should the user do this step?" value={newStep.default_instruction} onChange={e => setNewStep({...newStep, default_instruction: e.target.value})} />
-            <button onClick={handleSaveStep} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Create Step</button>
+            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 100 }} placeholder="How should the user do this step?" value={newStep.default_instruction} onChange={e => setNewStep({...newStep, default_instruction: e.target.value})} />
+            <button onClick={handleSaveStep} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', marginTop: 20 }}>Create Step</button>
           </div>
         </Modal>
       )}
@@ -1020,30 +1016,30 @@ export default function SkinJourneyAdmin() {
         <Modal title="Add Step to Program" onClose={() => setShowAddRoutine(false)}>
           <div style={{ padding: 24 }}>
             <FieldLabel>Target Program</FieldLabel>
-            <select style={A.input} value={newRoutine.program_id} onChange={e => setNewRoutine({...newRoutine, program_id: e.target.value})}>
+            <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newRoutine.program_id} onChange={e => setNewRoutine({...newRoutine, program_id: e.target.value})}>
               <option value="">Select Program</option>
               {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            </AdminSelect>
             <FieldLabel>Step to Add</FieldLabel>
-            <select style={A.input} value={newRoutine.step_id} onChange={e => setNewRoutine({...newRoutine, step_id: e.target.value})}>
+            <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newRoutine.step_id} onChange={e => setNewRoutine({...newRoutine, step_id: e.target.value})}>
               <option value="">Select Step</option>
               {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            </AdminSelect>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <FieldLabel>Target Week</FieldLabel>
-                <input type="number" style={A.input} value={newRoutine.week} onChange={e => setNewRoutine({...newRoutine, week: parseInt(e.target.value)})} />
+                <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newRoutine.week} onChange={e => setNewRoutine({...newRoutine, week: parseInt(e.target.value)})} />
               </div>
               <div>
                 <FieldLabel>Time of Day</FieldLabel>
-                <select style={A.input} value={newRoutine.time_of_day} onChange={e => setNewRoutine({...newRoutine, time_of_day: e.target.value})}>
+                <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newRoutine.time_of_day} onChange={e => setNewRoutine({...newRoutine, time_of_day: e.target.value})}>
                   <option value="am">AM (Morning)</option>
                   <option value="pm">PM (Night)</option>
                   <option value="both">Both</option>
-                </select>
+                </AdminSelect>
               </div>
             </div>
-            <button onClick={handleSaveRoutine} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Add to Routine</button>
+            <button onClick={handleSaveRoutine} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', marginTop: 20 }}>Add to Routine</button>
           </div>
         </Modal>
       )}
@@ -1052,37 +1048,37 @@ export default function SkinJourneyAdmin() {
         <Modal title="Product AI Mapping" onClose={() => setShowAddMapping(false)}>
           <div style={{ padding: 24 }}>
             <FieldLabel>Select Product</FieldLabel>
-            <select style={A.input} value={newMapping.product_id} onChange={e => setNewMapping({...newMapping, product_id: e.target.value})}>
+            <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newMapping.product_id} onChange={e => setNewMapping({...newMapping, product_id: e.target.value})}>
               <option value="">Choose Product</option>
               {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            </AdminSelect>
             <FieldLabel>Step Type (Internal ID)</FieldLabel>
-            <input style={A.input} placeholder="e.g. Cleanser, Serum, etc." value={newMapping.step_type} onChange={e => setNewMapping({...newMapping, step_type: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Cleanser, Serum, etc." value={newMapping.step_type} onChange={e => setNewMapping({...newMapping, step_type: e.target.value})} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <FieldLabel>Skin Type</FieldLabel>
-                <select style={A.input} value={newMapping.skin_type} onChange={e => setNewMapping({...newMapping, skin_type: e.target.value})}>
+                <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newMapping.skin_type} onChange={e => setNewMapping({...newMapping, skin_type: e.target.value})}>
                   <option value="">All Types</option>
                   <option value="Oily">Oily</option>
                   <option value="Dry">Dry</option>
                   <option value="Sensitive">Sensitive</option>
                   <option value="Combination">Combination</option>
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <FieldLabel>Skin Concern</FieldLabel>
-                <select style={A.input} value={newMapping.skin_concern} onChange={e => setNewMapping({...newMapping, skin_concern: e.target.value})}>
+                <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newMapping.skin_concern} onChange={e => setNewMapping({...newMapping, skin_concern: e.target.value})}>
                   <option value="">All Concerns</option>
                   <option value="Acne">Acne</option>
                   <option value="Dullness">Dullness</option>
                   <option value="Aging">Aging</option>
                   <option value="Redness">Redness</option>
-                </select>
+                </AdminSelect>
               </div>
             </div>
             <FieldLabel>Recommendation Priority (Higher = Preferred)</FieldLabel>
-            <input type="number" style={A.input} value={newMapping.priority} onChange={e => setNewMapping({...newMapping, priority: parseInt(e.target.value)})} />
-            <button onClick={handleSaveMapping} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Save Mapping</button>
+            <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newMapping.priority} onChange={e => setNewMapping({...newMapping, priority: parseInt(e.target.value)})} />
+            <button onClick={handleSaveMapping} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', marginTop: 20 }}>Save Mapping</button>
           </div>
         </Modal>
       )}
@@ -1091,18 +1087,18 @@ export default function SkinJourneyAdmin() {
         <Modal title={`Configure AI Stage: ${selectedAI.stage}`} onClose={() => setShowEditAI(false)}>
           <div style={{ padding: 24 }}>
             <FieldLabel>Prompt Template</FieldLabel>
-            <textarea style={{...A.input, height: 250, fontFamily: 'monospace', fontSize: 12}} value={selectedAI.prompt_body} onChange={e => setSelectedAI({...selectedAI, prompt_body: e.target.value})} />
+            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 250, fontFamily: 'monospace', fontSize: 12 }} value={selectedAI.prompt_body} onChange={e => setSelectedAI({...selectedAI, prompt_body: e.target.value})} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <FieldLabel>Temperature</FieldLabel>
-                <input type="number" step="0.1" style={A.input} value={selectedAI.temperature} onChange={e => setSelectedAI({...selectedAI, temperature: parseFloat(e.target.value)})} />
+                <input type="number" step="0.1" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={selectedAI.temperature} onChange={e => setSelectedAI({...selectedAI, temperature: parseFloat(e.target.value)})} />
               </div>
               <div>
                 <FieldLabel>Max Tokens</FieldLabel>
-                <input type="number" style={A.input} value={selectedAI.max_tokens} onChange={e => setSelectedAI({...selectedAI, max_tokens: parseInt(e.target.value)})} />
+                <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={selectedAI.max_tokens} onChange={e => setSelectedAI({...selectedAI, max_tokens: parseInt(e.target.value)})} />
               </div>
             </div>
-            <button onClick={handleUpdateAI} style={{...A.btnPrimary, width: '100%', marginTop: 20}}>Update AI Configuration</button>
+            <button onClick={handleUpdateAI} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', marginTop: 20 }}>Update AI Configuration</button>
           </div>
         </Modal>
       )}
@@ -1111,30 +1107,30 @@ export default function SkinJourneyAdmin() {
         <Modal onClose={() => setShowAddPretest(false)} title="Register New Journey Member">
           <div style={{ padding: '0 24px 24px' }}>
             <FieldLabel>User ID (UUID)</FieldLabel>
-            <input style={A.input} value={newPretest.user_id} onChange={e => setNewPretest({...newPretest, user_id: e.target.value})} placeholder="e.g. 07032ac6-..." />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newPretest.user_id} onChange={e => setNewPretest({...newPretest, user_id: e.target.value})} placeholder="e.g. 07032ac6-..." />
             
             <FieldLabel>Full Name</FieldLabel>
-            <input style={A.input} value={newPretest.full_name} onChange={e => setNewPretest({...newPretest, full_name: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newPretest.full_name} onChange={e => setNewPretest({...newPretest, full_name: e.target.value})} />
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <FieldLabel>Skin Type</FieldLabel>
-                <select style={A.input} value={newPretest.skin_type} onChange={e => setNewPretest({...newPretest, skin_type: e.target.value})}>
+                <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newPretest.skin_type} onChange={e => setNewPretest({...newPretest, skin_type: e.target.value})}>
                   <option>Oily</option><option>Dry</option><option>Sensitive</option><option>Combination</option><option>Normal</option>
-                </select>
+                </AdminSelect>
               </div>
               <div>
                 <FieldLabel>Primary Problem</FieldLabel>
-                <input style={A.input} value={newPretest.skin_problem} onChange={e => setNewPretest({...newPretest, skin_problem: e.target.value})} />
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={newPretest.skin_problem} onChange={e => setNewPretest({...newPretest, skin_problem: e.target.value})} />
               </div>
             </div>
             
             <FieldLabel>Skin Goal</FieldLabel>
-            <textarea style={{ ...A.input, height: 80 }} value={newPretest.skin_goal} onChange={e => setNewPretest({...newPretest, skin_goal: e.target.value})} />
+            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 80 }} value={newPretest.skin_goal} onChange={e => setNewPretest({...newPretest, skin_goal: e.target.value})} />
             
             <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-              <button style={{ ...A.btnGhost, flex: 1 }} onClick={() => setShowAddPretest(false)}>Cancel</button>
-              <button style={{ ...A.btnPrimary, flex: 1 }} onClick={handleAddPretest}>Create Journey Record</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1 }} onClick={() => setShowAddPretest(false)}>Cancel</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1 }} onClick={handleAddPretest}>Create Journey Record</button>
             </div>
           </div>
         </Modal>

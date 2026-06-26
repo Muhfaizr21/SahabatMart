@@ -13,18 +13,18 @@ func ensureUUID(id *string) {
 }
 
 // admin_config.go models
-func (p *Product) BeforeCreate(tx *gorm.DB) (err error)        { ensureUUID(&p.ID); return nil }
+func (p *Product) BeforeCreate(tx *gorm.DB) (err error)         { ensureUUID(&p.ID); return nil }
 func (pv *ProductVariant) BeforeCreate(tx *gorm.DB) (err error) { ensureUUID(&pv.ID); return nil }
-func (i *Inventory) BeforeCreate(tx *gorm.DB) (err error)      { ensureUUID(&i.ID); return nil }
-func (r *RestockRequest) BeforeCreate(tx *gorm.DB) (err error) { ensureUUID(&r.ID); return nil }
-func (ri *RestockItem) BeforeCreate(tx *gorm.DB) (err error)   { ensureUUID(&ri.ID); return nil }
-func (s *Supplier) BeforeCreate(tx *gorm.DB) (err error)       { ensureUUID(&s.ID); return nil }
-func (is *InboundStock) BeforeCreate(tx *gorm.DB) (err error)  { ensureUUID(&is.ID); return nil }
-func (ii *InboundItem) BeforeCreate(tx *gorm.DB) (err error)   { ensureUUID(&ii.ID); return nil }
-func (sm *StockMutation) BeforeCreate(tx *gorm.DB) (err error) { ensureUUID(&sm.ID); return nil }
-func (c *Cart) BeforeCreate(tx *gorm.DB) (err error)           { ensureUUID(&c.ID); return nil }
-func (ci *CartItem) BeforeCreate(tx *gorm.DB) (err error)      { ensureUUID(&ci.ID); return nil }
-func (w *Wishlist) BeforeCreate(tx *gorm.DB) (err error)       { ensureUUID(&w.ID); return nil }
+func (i *Inventory) BeforeCreate(tx *gorm.DB) (err error)       { ensureUUID(&i.ID); return nil }
+func (r *RestockRequest) BeforeCreate(tx *gorm.DB) (err error)  { ensureUUID(&r.ID); return nil }
+func (ri *RestockItem) BeforeCreate(tx *gorm.DB) (err error)    { ensureUUID(&ri.ID); return nil }
+func (s *Supplier) BeforeCreate(tx *gorm.DB) (err error)        { ensureUUID(&s.ID); return nil }
+func (is *InboundStock) BeforeCreate(tx *gorm.DB) (err error)   { ensureUUID(&is.ID); return nil }
+func (ii *InboundItem) BeforeCreate(tx *gorm.DB) (err error)    { ensureUUID(&ii.ID); return nil }
+func (sm *StockMutation) BeforeCreate(tx *gorm.DB) (err error)  { ensureUUID(&sm.ID); return nil }
+func (c *Cart) BeforeCreate(tx *gorm.DB) (err error)            { ensureUUID(&c.ID); return nil }
+func (ci *CartItem) BeforeCreate(tx *gorm.DB) (err error)       { ensureUUID(&ci.ID); return nil }
+func (w *Wishlist) BeforeCreate(tx *gorm.DB) (err error)        { ensureUUID(&w.ID); return nil }
 func (tcp *TierCommissionPreset) BeforeCreate(tx *gorm.DB) (err error) {
 	ensureUUID(&tcp.ID)
 	return nil
@@ -81,7 +81,7 @@ func (osh *OrderStatusHistory) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 // user.go models
-func (u *User) BeforeCreate(tx *gorm.DB) (err error)        { ensureUUID(&u.ID); return nil }
+func (u *User) BeforeCreate(tx *gorm.DB) (err error)         { ensureUUID(&u.ID); return nil }
 func (up *UserProfile) BeforeCreate(tx *gorm.DB) (err error) { ensureUUID(&up.ID); return nil }
 
 // media.go models

@@ -15,7 +15,7 @@ func HandleWebhook(db *gorm.DB, gateway, externalID string, payload string, proc
 	return db.Transaction(func(tx *gorm.DB) error {
 		var webhook models.PaymentWebhook
 		err := tx.Set("gorm:query_option", "FOR UPDATE").Where("gateway = ? AND external_id = ?", gateway, externalID).First(&webhook).Error
-		
+
 		if err == nil {
 			// Callback exists
 			if webhook.IsProcessed {
@@ -47,7 +47,7 @@ func HandleWebhook(db *gorm.DB, gateway, externalID string, payload string, proc
 		webhook.IsProcessed = true
 		webhook.ProcessedAt = &now
 		webhook.ErrorMessage = ""
-		
+
 		if err := tx.Save(&webhook).Error; err != nil {
 			return err
 		}

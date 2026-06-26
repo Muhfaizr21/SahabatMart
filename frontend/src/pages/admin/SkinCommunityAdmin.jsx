@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, TablePanel, A, Modal, FieldLabel } from '../../lib/adminStyles.jsx';
 
+import AdminSelect from '../../components/admin/AdminSelect';
+
 export default function SkinCommunityAdmin() {
   const [groups, setGroups] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
@@ -152,38 +154,32 @@ export default function SkinCommunityAdmin() {
       <PageHeader title="Skin Community Moderation" subtitle="Manage interest groups and moderate member feed.">
         <div style={{ display: 'flex', gap: 12 }}>
           {activeTab === 'groups' && (
-            <button style={A.btnPrimary} onClick={() => setShowAddGroup(true)}>+ New Group</button>
+            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setShowAddGroup(true)}>+ New Group</button>
           )}
-          <button onClick={loadData} style={A.btnGhost}><i className="bx bx-refresh" /> Sync</button>
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm"><i className="bx bx-refresh" /> Sync</button>
         </div>
       </PageHeader>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <button
           onClick={() => setActiveTab('feed')}
-          style={{
-            ...A.btnGhost,
-            background: activeTab === 'feed' ? '#1e293b' : 'white',
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: activeTab === 'feed' ? '#1e293b' : 'white',
             color: activeTab === 'feed' ? 'white' : '#64748b',
             padding: '10px 20px',
             borderRadius: 12,
             fontWeight: 800,
-            border: '1px solid #e2e8f0',
-          }}
+            border: '1px solid #e2e8f0', }}
         >
           <i className="bx bx-chat" style={{ marginRight: 8 }} /> Community Feed ({allPosts.length})
         </button>
         <button
           onClick={() => setActiveTab('groups')}
-          style={{
-            ...A.btnGhost,
-            background: activeTab === 'groups' ? '#1e293b' : 'white',
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: activeTab === 'groups' ? '#1e293b' : 'white',
             color: activeTab === 'groups' ? 'white' : '#64748b',
             padding: '10px 20px',
             borderRadius: 12,
             fontWeight: 800,
-            border: '1px solid #e2e8f0',
-          }}
+            border: '1px solid #e2e8f0', }}
         >
           <i className="bx bx-category" style={{ marginRight: 8 }} /> Interest Groups ({groups.length})
         </button>
@@ -198,14 +194,14 @@ export default function SkinCommunityAdmin() {
               <input 
                 type="text" 
                 placeholder="Cari postingan atau nama user..." 
-                style={{ ...A.searchInput, width: '100%' }}
+                className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ width: '100%' }}
                 value={feedSearch}
                 onChange={e => setFeedSearch(e.target.value)}
               />
             </div>
             
-            <select 
-              style={{ ...A.select, minWidth: 160 }}
+            <AdminSelect 
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ minWidth: 160 }}
               value={feedGroupFilter}
               onChange={e => setFeedGroupFilter(e.target.value)}
             >
@@ -213,10 +209,10 @@ export default function SkinCommunityAdmin() {
               {groups.map(g => (
                 <option key={g.id} value={g.id}>{g.name}</option>
               ))}
-            </select>
+            </AdminSelect>
 
-            <select 
-              style={{ ...A.select, minWidth: 160 }}
+            <AdminSelect 
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ minWidth: 160 }}
               value={feedSort}
               onChange={e => setFeedSort(e.target.value)}
             >
@@ -224,7 +220,7 @@ export default function SkinCommunityAdmin() {
               <option value="oldest">Terlama (ID Asc)</option>
               <option value="likes_desc">Likes Terbanyak</option>
               <option value="comments_desc">Komentar Terbanyak</option>
-            </select>
+            </AdminSelect>
           </div>
 
           <div style={A.card}>
@@ -272,7 +268,7 @@ export default function SkinCommunityAdmin() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button 
-                  style={A.btnGhost} 
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" 
                   disabled={feedPage === 1} 
                   onClick={() => setFeedPage(p => Math.max(1, p - 1))}
                 >
@@ -282,7 +278,7 @@ export default function SkinCommunityAdmin() {
                   Page {feedPage} of {totalFeedPages}
                 </div>
                 <button 
-                  style={A.btnGhost} 
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" 
                   disabled={feedPage === totalFeedPages} 
                   onClick={() => setFeedPage(p => Math.min(totalFeedPages, p + 1))}
                 >
@@ -303,21 +299,21 @@ export default function SkinCommunityAdmin() {
               <input 
                 type="text" 
                 placeholder="Cari grup interest..." 
-                style={{ ...A.searchInput, width: '100%' }}
+                className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ width: '100%' }}
                 value={groupSearch}
                 onChange={e => setGroupSearch(e.target.value)}
               />
             </div>
 
-            <select 
-              style={{ ...A.select, minWidth: 180 }}
+            <AdminSelect 
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ minWidth: 180 }}
               value={groupSort}
               onChange={e => setGroupSort(e.target.value)}
             >
               <option value="name_asc">Nama (A-Z)</option>
               <option value="name_desc">Nama (Z-A)</option>
               <option value="desc_length">Deskripsi Terpanjang</option>
-            </select>
+            </AdminSelect>
           </div>
 
           <div style={A.card}>
@@ -340,7 +336,7 @@ export default function SkinCommunityAdmin() {
                       <td style={A.td}><div style={{ maxWidth: 400, fontSize: 12, color: '#64748b' }}>{g.description}</div></td>
                       <td style={A.td}><i className={`bx bx-${g.icon || 'face'}`} style={{ fontSize: 20 }} /></td>
                       <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                        <button onClick={() => handleDeleteGroup(g.id)} style={{ ...A.btnGhost, color: '#ef4444' }}>DELETE</button>
+                        <button onClick={() => handleDeleteGroup(g.id)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444' }}>DELETE</button>
                       </td>
                     </tr>
                   ))}
@@ -357,7 +353,7 @@ export default function SkinCommunityAdmin() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button 
-                  style={A.btnGhost} 
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" 
                   disabled={groupPage === 1} 
                   onClick={() => setGroupPage(p => Math.max(1, p - 1))}
                 >
@@ -367,7 +363,7 @@ export default function SkinCommunityAdmin() {
                   Page {groupPage} of {totalGroupPages}
                 </div>
                 <button 
-                  style={A.btnGhost} 
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" 
                   disabled={groupPage === totalGroupPages} 
                   onClick={() => setGroupPage(p => Math.min(totalGroupPages, p + 1))}
                 >
@@ -383,14 +379,14 @@ export default function SkinCommunityAdmin() {
         <Modal title="Create Interest Group" onClose={() => setShowAddGroup(false)}>
           <div style={{ padding: '0 24px 24px' }}>
             <FieldLabel>Group Name</FieldLabel>
-            <input style={A.input} placeholder="e.g. Acne Fighters" value={newGroup.name} onChange={e => setNewGroup({...newGroup, name: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. Acne Fighters" value={newGroup.name} onChange={e => setNewGroup({...newGroup, name: e.target.value})} />
             <FieldLabel>Description</FieldLabel>
-            <textarea style={{ ...A.input, height: 80 }} placeholder="What is this group about?" value={newGroup.description} onChange={e => setNewGroup({...newGroup, description: e.target.value})} />
+            <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ height: 80 }} placeholder="What is this group about?" value={newGroup.description} onChange={e => setNewGroup({...newGroup, description: e.target.value})} />
             <FieldLabel>Icon (Boxicons Name)</FieldLabel>
-            <input style={A.input} placeholder="e.g. face, spa, heart" value={newGroup.icon} onChange={e => setNewGroup({...newGroup, icon: e.target.value})} />
+            <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" placeholder="e.g. face, spa, heart" value={newGroup.icon} onChange={e => setNewGroup({...newGroup, icon: e.target.value})} />
             <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-              <button style={{ ...A.btnGhost, flex: 1 }} onClick={() => setShowAddGroup(false)}>Cancel</button>
-              <button style={{ ...A.btnPrimary, flex: 1 }} onClick={handleAddGroup}>Create Group</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1 }} onClick={() => setShowAddGroup(false)}>Cancel</button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1 }} onClick={handleAddGroup}>Create Group</button>
             </div>
           </div>
         </Modal>

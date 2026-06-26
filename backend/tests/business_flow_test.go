@@ -40,7 +40,7 @@ func SetupTestDB() *gorm.DB {
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbName, port)
 	db, _ := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	
+
 	if db != nil {
 		// Enable uuid-ossp extension
 		db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
@@ -55,16 +55,16 @@ func TestCheckoutMultiMerchant(t *testing.T) {
 	_ = db // use db
 
 	t.Run("Create Multi-Merchant Order", func(t *testing.T) {
-		assert.True(t, true) 
+		assert.True(t, true)
 	})
 }
 
 func TestDuplicateWebhookProtection(t *testing.T) {
 	db := SetupTestDB()
-	
+
 	// Clean up any stale data from previous test runs
 	db.Exec("DELETE FROM payment_webhooks WHERE gateway = 'midtrans' AND external_id = 'TX-12345'")
-	
+
 	err := utils.HandleWebhook(db, "midtrans", "TX-12345", `{"status":"paid"}`, func(tx *gorm.DB) error {
 		return nil
 	})

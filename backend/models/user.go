@@ -14,9 +14,9 @@ type User struct {
 	PasswordHash        *string        `gorm:"type:text" json:"-"`
 	GoogleID            *string        `gorm:"type:varchar(100);uniqueIndex" json:"google_id"`
 	Role                string         `gorm:"type:user_role;default:'affiliate';not null" json:"role"`
-	AdminRole           string         `gorm:"type:varchar(50)" json:"admin_role"` // super, finance, cs_staff
+	AdminRole           string         `gorm:"type:varchar(50)" json:"admin_role"`  // super, finance, cs_staff
 	Department          string         `gorm:"type:varchar(100)" json:"department"` // IT, Marketing, Finance
-	AdminPermissions    string         `gorm:"type:text" json:"admin_permissions"` // ["manage_users", "manage_finance"]
+	AdminPermissions    string         `gorm:"type:text" json:"admin_permissions"`  // ["manage_users", "manage_finance"]
 	Permissions         []string       `gorm:"-" json:"permissions,omitempty"`
 	Status              string         `gorm:"type:user_status;default:'active';not null" json:"status"`
 	EmailVerifiedAt     *time.Time     `json:"email_verified_at"`
@@ -31,29 +31,29 @@ type User struct {
 	UpdatedAt           time.Time      `json:"updated_at"`
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 
-	Profile UserProfile `gorm:"foreignKey:UserID" json:"profile"`
-	Merchant *Merchant  `gorm:"foreignKey:UserID" json:"merchant,omitempty"`
+	Profile   UserProfile      `gorm:"foreignKey:UserID" json:"profile"`
+	Merchant  *Merchant        `gorm:"foreignKey:UserID" json:"merchant,omitempty"`
 	Affiliate *AffiliateMember `gorm:"foreignKey:UserID" json:"affiliate,omitempty"`
 }
 
 type UserProfile struct {
-	ID          string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	UserID      string    `gorm:"type:uuid;uniqueIndex;not null" json:"user_id"`
-	FullName    string    `gorm:"type:varchar(150);not null" json:"full_name"`
-	DisplayName *string   `gorm:"type:varchar(100)" json:"display_name"`
-	AvatarUrl   *string   `gorm:"type:text" json:"avatar_url"`
-	Gender      *string   `gorm:"type:gender_type" json:"gender"`
-	DateOfBirth *string   `gorm:"type:date" json:"date_of_birth"`
-	Bio         *string   `gorm:"type:text" json:"bio"`
-	Address     string    `gorm:"type:text" json:"address"`
-	District    string    `gorm:"type:varchar(100)" json:"district"`
-	City        string    `gorm:"type:varchar(100)" json:"city"`
-	Province    string    `gorm:"type:varchar(100)" json:"province"`
-	ZipCode     string    `gorm:"type:varchar(10)" json:"zip_code"`
-	AreaID      string    `gorm:"type:varchar(100)" json:"area_id"`
+	ID           string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	UserID       string    `gorm:"type:uuid;uniqueIndex;not null" json:"user_id"`
+	FullName     string    `gorm:"type:varchar(150);not null" json:"full_name"`
+	DisplayName  *string   `gorm:"type:varchar(100)" json:"display_name"`
+	AvatarUrl    *string   `gorm:"type:text" json:"avatar_url"`
+	Gender       *string   `gorm:"type:gender_type" json:"gender"`
+	DateOfBirth  *string   `gorm:"type:date" json:"date_of_birth"`
+	Bio          *string   `gorm:"type:text" json:"bio"`
+	Address      string    `gorm:"type:text" json:"address"`
+	District     string    `gorm:"type:varchar(100)" json:"district"`
+	City         string    `gorm:"type:varchar(100)" json:"city"`
+	Province     string    `gorm:"type:varchar(100)" json:"province"`
+	ZipCode      string    `gorm:"type:varchar(10)" json:"zip_code"`
+	AreaID       string    `gorm:"type:varchar(100)" json:"area_id"`
 	RewardPoints int64     `gorm:"default:0" json:"reward_points"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 func (User) TableName() string {

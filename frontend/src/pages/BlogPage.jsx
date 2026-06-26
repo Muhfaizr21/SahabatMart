@@ -3,14 +3,33 @@ import { Link } from 'react-router-dom';
 import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 import SEO from '../components/SEO';
 
-export default function BlogPage() {
+export default function BlogPage({ previewData }) {
   const [posts, setPosts] = useState([]);
   const [filteredPosts, setFilteredPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Semua');
+  const [cmsContent, setCmsContent] = useState(previewData || null);
 
   const categories = ['Semua', 'Tips', 'Skincare', 'Lifestyle', 'Promo', 'Kesehatan'];
+
+  useEffect(() => {
+    if (previewData) {
+      setCmsContent(previewData);
+      return;
+    }
+    const loadCMS = async () => {
+      try {
+        const res = await fetchJson(`${PUBLIC_API_BASE}/cms/page-content?platform=landing_page&page=blog`);
+        if (res && res.content) {
+          setCmsContent(res.content);
+        }
+      } catch (err) {
+        console.error('Failed to load CMS content:', err);
+      }
+    };
+    loadCMS();
+  }, [previewData]);
 
   useEffect(() => {
     fetchJson(`${PUBLIC_API_BASE}/blogs`)
@@ -40,20 +59,22 @@ export default function BlogPage() {
     setFilteredPosts(result);
   }, [search, category, posts]);
 
+  const str = (v, defaultVal = '') => v || defaultVal;
+  const heroTitle = str(cmsContent?.hero_title || cmsContent?.hero?.title, 'Blog & Edukasi');
+  const heroSubtitle = str(cmsContent?.hero_subtitle || cmsContent?.hero?.subtitle, 'Temukan berbagai tips kecantikan, panduan perawatan kulit, dan informasi terbaru seputar dunia skincare dari para ahli kami.');
+
   return (
     <main className="bg-white min-h-screen">
       <SEO 
-        title="Blog & Edukasi - AkuGlow"
-        description="Temukan berbagai tips kecantikan, panduan perawatan kulit, dan informasi terbaru seputar dunia skincare dari para ahli AkuGlow."
+        title={`${heroTitle} - AkuGlow`}
+        description={heroSubtitle}
       />
       {/* Hero Section */}
       <section className="bg-gray-50 py-20 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 text-center">
-            <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 tracking-tight leading-tight">
-              Blog & <span className="text-primary">Edukasi</span>
-            </h1>
-            <p className="text-gray-500 font-medium max-w-2xl mx-auto text-lg leading-relaxed mb-10">
-              Temukan berbagai tips kecantikan, panduan perawatan kulit, dan informasi terbaru seputar dunia skincare dari para ahli kami.
+            <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 tracking-tight leading-tight" dangerouslySetInnerHTML={{ __html: heroTitle.replace('Edukasi', '<span class="text-primary">Edukasi</span>') }} />
+            <p className="text-gray-500 font-medium max-w-2xl mx-auto text-lg leading-relaxed mb-10 whitespace-pre-wrap">
+              {heroSubtitle}
             </p>
             
             {/* Search and Filters */}
@@ -96,7 +117,7 @@ export default function BlogPage() {
           </div>
         ) : filteredPosts.length === 0 ? (
           <div className="bg-gray-50 rounded-[3rem] p-20 text-center border border-gray-100">
-             <div className="text-6xl mb-6 opacity-40 grayscale">✍️</div>
+             <div className="text-6xl mb-6 opacity-40 grayscale"></div>
              <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Tidak Ada Artikel</h3>
              <p className="text-gray-500 max-w-sm mx-auto font-medium">Kami tidak menemukan artikel yang sesuai dengan kriteria pencarian Anda.</p>
              <button onClick={() => { setSearch(''); setCategory('Semua'); }} className="mt-8 text-primary font-bold underline underline-offset-4 hover:opacity-80 transition-opacity">Reset Filter</button>
@@ -110,8 +131,13 @@ export default function BlogPage() {
                 style={{ animationDelay: `${idx * 100}ms` }}
               >
                 <Link to={`/blog/${post.slug || post.id}`} className="block relative overflow-hidden aspect-[16/10]">
-                  <img src={formatImage(post.image) || 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&h=500&fit=crop'} 
-                    alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                  {formatImage(post.image) ? (
+                    <img src={formatImage(post.image)} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                      <i className='bx bx-news text-5xl text-slate-300'></i>
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <span className="absolute top-2 left-2 md:top-5 md:left-5 bg-white shadow-xl text-primary text-[8px] md:text-[10px] font-black px-2 md:px-4 py-1 md:py-2 rounded-full uppercase tracking-widest">
                     {post.category || 'TIPS'}

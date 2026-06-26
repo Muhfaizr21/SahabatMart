@@ -19,7 +19,7 @@ type APIResponse struct {
 func JSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	
+
 	resp := map[string]interface{}{
 		"status": "success",
 	}

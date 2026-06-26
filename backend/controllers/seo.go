@@ -89,7 +89,7 @@ func (ac *AdminController) GenerateSitemap(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(xml.Header))
-	
+
 	encoder := xml.NewEncoder(w)
 	encoder.Indent("", "  ")
 	if err := encoder.Encode(urlSet); err != nil {

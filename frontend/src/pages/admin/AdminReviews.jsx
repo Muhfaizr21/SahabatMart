@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ADMIN_API_BASE, fetchJson, deleteJson, postJson, putJson, formatImage } from '../../lib/api';
 
 export default function AdminReviews() {
@@ -215,9 +216,10 @@ export default function AdminReviews() {
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+      {showModal && createPortal(
+<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setShowModal(false)}></div>
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -273,8 +275,9 @@ export default function AdminReviews() {
                             <span className="text-gray-400 ml-2 text-xs">{p.sku || ''}</span>
                           </button>
                         ))}
-                      </div>
-                    )}
+                      </div>,
+        document.body
+      )}
                     {selectedProduct && !productResults.length && (
                       <div className="mt-2 flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-sm">
                         <span className="material-symbols-outlined text-sm">check_circle</span>

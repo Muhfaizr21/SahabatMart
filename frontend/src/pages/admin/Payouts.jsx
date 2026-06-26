@@ -51,7 +51,7 @@ export default function AdminPayouts() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Corporate Settlement & Payouts" subtitle="Kelola arus kas keluar platform. Pastikan setiap pencairan dana merchant & affiliate divalidasi dan tercatat.">
-        <button style={A.btnGhost} onClick={load}><i className={`bx bx-refresh ${loading?'bx-spin':''}`} /> Force Sync</button>
+        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={load}><i className={`bx bx-refresh ${loading?'bx-spin':''}`} /> Force Sync</button>
       </PageHeader>
 
       <StatRow stats={[
@@ -174,7 +174,7 @@ export default function AdminPayouts() {
           <div style={{ marginBottom:20 }}>
             <FieldLabel>Official Recording Note</FieldLabel>
             <textarea
-              style={{ ...A.textarea, minHeight:100 }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 transition-all resize-y placeholder:text-slate-400" style={{ minHeight:100 }}
               placeholder="e.g., Wire transfer successful via Treasury Bank ID #889..."
               value={note}
               onChange={e=>setNote(e.target.value)}
@@ -196,7 +196,7 @@ export default function AdminPayouts() {
               <button
                 onClick={()=>processPayout('approved')}
                 disabled={processing}
-                style={{ ...A.btnPrimary, flex: 1, minWidth: '120px', background:'#6366f1', justifyContent:'center', padding:'12px' }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1, minWidth: '120px', background:'#6366f1', justifyContent:'center', padding:'12px' }}
               >
                 {processing ? '...' : <><i className="bx bx-check" /> Approve</>}
               </button>
@@ -205,7 +205,7 @@ export default function AdminPayouts() {
               <button
                 onClick={()=>processPayout('paid')}
                 disabled={processing}
-                style={{ ...A.btnPrimary, flex: 2, minWidth: '150px', background:'linear-gradient(135deg,#10b981,#059669)', justifyContent:'center', padding:'12px', boxShadow: '0 8px 20px rgba(16,185,129,0.3)' }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 2, minWidth: '150px', background:'linear-gradient(135deg,#10b981,#059669)', justifyContent:'center', padding:'12px', boxShadow: '0 8px 20px rgba(16,185,129,0.3)' }}
               >
                 {processing ? '...' : <><i className="bx bx-check-double" /> Settle & Mark Paid</>}
               </button>

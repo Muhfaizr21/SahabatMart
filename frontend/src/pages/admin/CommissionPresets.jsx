@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import toast from 'react-hot-toast';
@@ -108,7 +109,7 @@ export default function CommissionPresets() {
             Template distribusi komisi multi-level ke jaringan upline affiliate. Assign preset ke produk untuk distribusi otomatis.
           </p>
         </div>
-        <button onClick={openNew} style={{ ...A.btnPrimary, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <i className="bx bx-plus" /> Tambah Preset
         </button>
       </div>
@@ -151,7 +152,7 @@ export default function CommissionPresets() {
           <i className="bx bx-git-branch" style={{ fontSize: 48, color: '#e2e8f0', display: 'block', marginBottom: 12 }} />
           <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Belum ada Commission Preset</div>
           <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>Buat preset pertama untuk mendistribusikan komisi ke jaringan upline.</div>
-          <button onClick={openNew} style={A.btnPrimary}>Buat Preset Pertama</button>
+          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">Buat Preset Pertama</button>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>
@@ -221,9 +222,10 @@ export default function CommissionPresets() {
       )}
 
       {/* Modal */}
-      {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+      {modal && createPortal(
+<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setModal(null)}></div>
+          <div style={{ position: 'relative', background: '#fff', borderRadius: 20, width: '100%', maxWidth: 560, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '24px 28px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
                 {modal.id ? 'Edit Preset' : 'Tambah Commission Preset'}
@@ -284,6 +286,15 @@ export default function CommissionPresets() {
                   </span>
                 </div>
 
+                {totalRate(modal.levels) > 0 && (
+                  <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <i className="bx bx-error-circle" style={{ fontSize: 16, marginTop: 1 }} />
+                    <div>
+                      <strong>Peringatan Profit Margin:</strong> Pastikan profit margin (Harga Jual - Harga Modal) setiap produk yang menggunakan preset ini <strong>lebih besar</strong> dari total komisi ({totalRate(modal.levels).toFixed(1)}%) agar tidak mengalami kerugian saat produk terjual.
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {modal.levels?.map((lv, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', borderRadius: 10, padding: '10px 14px', border: '1px solid #f1f5f9' }}>
@@ -333,7 +344,8 @@ export default function CommissionPresets() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

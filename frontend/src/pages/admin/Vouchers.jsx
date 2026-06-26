@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, Modal, FieldLabel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
+import { AdminInput, AdminFormActions } from '../../lib/adminComponents.jsx';
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
 const VOUCHER_TYPE_LABELS = {
-  platform:    { label: 'Platform Umum', icon: '🎟️', color: '#6366f1', desc: 'Berlaku untuk semua produk' },
-  first_order: { label: 'Pembelian Pertama', icon: '🥇', color: '#f59e0b', desc: 'Hanya untuk pelanggan baru (1x pakai)' },
-  group:       { label: 'Kategori Produk', icon: '📂', color: '#10b981', desc: 'Berlaku untuk kategori tertentu' },
-  product:     { label: 'Produk Spesifik', icon: '📦', color: '#3b82f6', desc: 'Berlaku untuk produk tertentu saja' },
-  cart_value:  { label: 'Nilai Keranjang', icon: '🛒', color: '#8b5cf6', desc: 'Berlaku jika nilai belanja mencapai nominal tertentu' },
+  platform:    { label: 'Platform Umum', icon: 'bx bx-purchase-tag', color: '#6366f1', desc: 'Berlaku untuk semua produk' },
+  first_order: { label: 'Pembelian Pertama', icon: 'bx bx-medal', color: '#f59e0b', desc: 'Hanya untuk pelanggan baru (1x pakai)' },
+  group:       { label: 'Kategori Produk', icon: 'bx bx-folder-open', color: '#10b981', desc: 'Berlaku untuk kategori tertentu' },
+  product:     { label: 'Produk Spesifik', icon: 'bx bx-package', color: '#3b82f6', desc: 'Berlaku untuk produk tertentu saja' },
+  cart_value:  { label: 'Nilai Keranjang', icon: 'bx bx-cart', color: '#8b5cf6', desc: 'Berlaku jika nilai belanja mencapai nominal tertentu' },
 };
 
 export default function AdminVouchers() {
@@ -57,7 +59,7 @@ export default function AdminVouchers() {
     <div style={A.page} className="fade-in">
       <PageHeader title="Marketing Vouchers" subtitle="Kelola 4 tipe voucher: Platform, Pembelian Pertama, Kategori, Produk Spesifik, dan Nilai Keranjang.">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
-          <button style={{ ...A.btnPrimary, flex: '1 1 auto' }} onClick={() => setModal({...EMPTY})}>
+          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: '1 1 auto' }} onClick={() => setModal({...EMPTY})}>
             <i className="bx bx-plus" /> Buat Voucher
           </button>
         </div>
@@ -98,7 +100,7 @@ export default function AdminVouchers() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 40, height: 40, borderRadius: 12, background: `${ti.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-                        {ti.icon}
+                        <i className={ti.icon} style={{ fontSize: 20, color: ti.color }} />
                       </div>
                       <div>
                         <div style={{ fontSize: 10, fontWeight: 800, color: ti.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{ti.label}</div>
@@ -168,22 +170,22 @@ export default function AdminVouchers() {
             {/* ── Judul & Kode ── */}
             <div style={{ gridColumn: '1/-1' }}>
               <FieldLabel>Judul Voucher</FieldLabel>
-              <input style={{ ...A.select, width: '100%' }} placeholder="Promo Ramadhan Berkah" value={modal.title} onChange={e => setModal(p => ({...p, title: e.target.value}))} />
+              <AdminInput placeholder="Promo Ramadhan Berkah" value={modal.title} onChange={e => setModal(p => ({...p, title: e.target.value}))} />
             </div>
             <div>
               <FieldLabel>Kode (Unik)</FieldLabel>
-              <input style={{ ...A.select, width: '100%', fontFamily: 'monospace', fontWeight: 800, color: '#6366f1' }} placeholder="KODE123" value={modal.code} onChange={e => setModal(p => ({...p, code: e.target.value.toUpperCase()}))} />
+              <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%', fontFamily: 'monospace', fontWeight: 800, color: '#6366f1' }} placeholder="KODE123" value={modal.code} onChange={e => setModal(p => ({...p, code: e.target.value.toUpperCase()}))} />
             </div>
             <div>
               <FieldLabel>Status</FieldLabel>
-              <select style={{ ...A.select, width: '100%' }} value={modal.status} onChange={e => setModal(p => ({...p, status: e.target.value}))}>
+              <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={modal.status} onChange={e => setModal(p => ({...p, status: e.target.value}))}>
                 <option value="active">Aktif</option>
                 <option value="inactive">Nonaktif</option>
-              </select>
+              </AdminSelect>
             </div>
             <div style={{ gridColumn: '1/-1' }}>
               <FieldLabel>Deskripsi Kupon</FieldLabel>
-              <input style={{ ...A.select, width: '100%' }} placeholder="Deskripsi untuk menarik pembeli..." value={modal.description} onChange={e => setModal(p => ({...p, description: e.target.value}))} />
+              <AdminInput placeholder="Deskripsi untuk menarik pembeli..." value={modal.description} onChange={e => setModal(p => ({...p, description: e.target.value}))} />
             </div>
 
             {/* ── Tipe Voucher ── */}
@@ -214,59 +216,54 @@ export default function AdminVouchers() {
             {modal.voucher_type === 'group' && (
               <div style={{ gridColumn: '1/-1' }}>
                 <FieldLabel>Target Kategori (pisah koma)</FieldLabel>
-                <input style={{ ...A.select, width: '100%' }} placeholder="Skincare, Makeup, Suplemen" value={modal.target_group} onChange={e => setModal(p => ({...p, target_group: e.target.value}))} />
+                <AdminInput placeholder="Skincare, Makeup, Suplemen" value={modal.target_group} onChange={e => setModal(p => ({...p, target_group: e.target.value}))} />
               </div>
             )}
             {modal.voucher_type === 'product' && (
               <div style={{ gridColumn: '1/-1' }}>
                 <FieldLabel>Target Product ID (pisah koma)</FieldLabel>
-                <input style={{ ...A.select, width: '100%', fontSize: 11, fontFamily: 'monospace' }} placeholder="uuid-1, uuid-2, ..." value={modal.target_product} onChange={e => setModal(p => ({...p, target_product: e.target.value}))} />
+                <AdminInput style={{ fontSize: 11, fontFamily: 'monospace' }} placeholder="uuid-1, uuid-2, ..." value={modal.target_product} onChange={e => setModal(p => ({...p, target_product: e.target.value}))} />
               </div>
             )}
             {modal.voucher_type === 'cart_value' && (
               <div>
                 <FieldLabel>Nilai Keranjang Minimal (Rp)</FieldLabel>
-                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.cart_min_value} onChange={e => setModal(p => ({...p, cart_min_value: parseFloat(e.target.value) || 0}))} />
+                <AdminInput type="number" value={modal.cart_min_value} onChange={e => setModal(p => ({...p, cart_min_value: parseFloat(e.target.value) || 0}))} />
               </div>
             )}
 
             {/* ── Diskon ── */}
             <div>
               <FieldLabel>Tipe Diskon</FieldLabel>
-              <select style={{ ...A.select, width: '100%' }} value={modal.discount_type} onChange={e => setModal(p => ({...p, discount_type: e.target.value}))}>
+              <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={modal.discount_type} onChange={e => setModal(p => ({...p, discount_type: e.target.value}))}>
                 <option value="fixed">Nominal (IDR)</option>
                 <option value="percent">Persentase (%)</option>
-              </select>
+              </AdminSelect>
             </div>
             <div>
               <FieldLabel>Nilai Diskon {modal.discount_type === 'percent' ? '(%)' : '(Rp)'}</FieldLabel>
-              <input type="number" style={{ ...A.select, width: '100%' }} value={modal.discount_value} onChange={e => setModal(p => ({...p, discount_value: parseFloat(e.target.value) || 0}))} />
+              <AdminInput type="number" value={modal.discount_value} onChange={e => setModal(p => ({...p, discount_value: parseFloat(e.target.value) || 0}))} />
             </div>
             {modal.discount_type === 'percent' && (
               <div>
                 <FieldLabel>Maks. Diskon (Rp) — 0 = tidak ada cap</FieldLabel>
-                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.max_discount} onChange={e => setModal(p => ({...p, max_discount: parseFloat(e.target.value) || 0}))} />
+                <AdminInput type="number" value={modal.max_discount} onChange={e => setModal(p => ({...p, max_discount: parseFloat(e.target.value) || 0}))} />
               </div>
             )}
             <div>
               <FieldLabel>Min. Pembelian (Rp)</FieldLabel>
-              <input type="number" style={{ ...A.select, width: '100%' }} value={modal.min_order} onChange={e => setModal(p => ({...p, min_order: parseFloat(e.target.value) || 0}))} />
+              <AdminInput type="number" value={modal.min_order} onChange={e => setModal(p => ({...p, min_order: parseFloat(e.target.value) || 0}))} />
             </div>
             <div>
               <FieldLabel>Kuota Total</FieldLabel>
-              <input type="number" style={{ ...A.select, width: '100%' }} value={modal.quota} onChange={e => setModal(p => ({...p, quota: parseInt(e.target.value) || 0}))} />
+              <AdminInput type="number" value={modal.quota} onChange={e => setModal(p => ({...p, quota: parseInt(e.target.value) || 0}))} />
             </div>
             <div>
               <FieldLabel>Tanggal Kedaluwarsa</FieldLabel>
-              <input type="datetime-local" style={{ ...A.select, width: '100%' }} value={modal.expiry_date ? new Date(modal.expiry_date).toISOString().slice(0, 16) : ''} onChange={e => setModal(p => ({...p, expiry_date: new Date(e.target.value).toISOString()}))} />
+              <input type="datetime-local" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={modal.expiry_date ? new Date(modal.expiry_date).toISOString().slice(0, 16) : ''} onChange={e => setModal(p => ({...p, expiry_date: new Date(e.target.value).toISOString()}))} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
-            <button style={A.btnGhost} onClick={() => setModal(null)}>Batal</button>
-            <button style={A.btnPrimary} onClick={save} disabled={saving}>
-              {saving ? '...' : <><i className="bx bx-check-double" /> {modal.id ? 'Simpan Perubahan' : 'Terbitkan'}</>}
-            </button>
-          </div>
+          <AdminFormActions onCancel={() => setModal(null)} onSave={save} saving={saving} label={modal.id ? 'Simpan Perubahan' : 'Terbitkan'} icon="bx-check-double" />
         </Modal>
       )}
     </div>

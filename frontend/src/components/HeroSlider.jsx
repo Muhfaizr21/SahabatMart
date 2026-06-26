@@ -3,12 +3,22 @@ import { Link } from 'react-router-dom';
 import { sliders } from '../data/products';
 import { PUBLIC_API_BASE, fetchJson, formatImage } from '../lib/api';
 
-export default function HeroSlider() {
+export default function HeroSlider({ previewData }) {
   const [current, setCurrent] = useState(0);
   const [banners, setBanners] = useState([]);
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
+    if (previewData) {
+      setBanners([{
+        title: previewData.title || 'Judul',
+        subtitle: previewData.subtitle || 'Subjudul',
+        link: previewData.cta_url || '#',
+        offer: previewData.cta_text || 'PROMO'
+      }]);
+      return;
+    }
+    
     fetchJson(`${PUBLIC_API_BASE}/banners`)
       .then(d => {
         const data = Array.isArray(d) ? d : (d.data || []);
@@ -16,7 +26,7 @@ export default function HeroSlider() {
         else setBanners(sliders); // Fallback to static if empty
       })
       .catch(() => setBanners(sliders));
-  }, []);
+  }, [previewData]);
 
   const activeSliders = (banners && banners.length > 0) ? banners : sliders;
 
@@ -103,11 +113,17 @@ export default function HeroSlider() {
             <div className="absolute inset-0 bg-white/20 blur-[80px] rounded-full scale-75 pointer-events-none"></div>
             <div className="relative animate-[float_6s_ease-in-out_infinite]">
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-black/20 to-transparent mix-blend-overlay z-10 pointer-events-none"></div>
+              {formatImage(slide.image) ? (
               <img 
                 src={formatImage(slide.image)} 
                 alt={slide.title} 
                 className="h-[320px] sm:h-[400px] lg:h-[520px] w-auto object-cover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] ring-1 ring-white/30" 
               />
+              ) : (
+              <div className="h-[320px] sm:h-[400px] lg:h-[520px] w-[400px] flex items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20">
+                <i className='bx bxs-offer text-8xl text-white/40'></i>
+              </div>
+              )}
             </div>
           </div>
         </div>

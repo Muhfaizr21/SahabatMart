@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage, uploadFile } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
+import { AdminSearch, AdminInput, AdminTextarea, AdminPagination, AdminEmptyState, AdminActionButtons, AdminBulkActions, AdminFormActions, AdminToolbar, AdminToolbarLeft, AdminToolbarRight } from '../../lib/adminComponents.jsx';
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
@@ -126,57 +128,34 @@ export default function AdminCategories() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = sortedCategories.slice(indexOfFirstItem, indexOfLastItem);
 
-  // Search & Filters Toolbar
   const toolbar = (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between' }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* Search Input */}
-        <div style={A.searchWrap}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input 
-            style={A.searchInput} 
-            placeholder="Cari kategori..." 
-            value={search} 
-            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} 
-          />
-        </div>
-
-        {/* Sorting Dropdown */}
-        <select 
-          style={A.select} 
-          value={selectedSort} 
+    <AdminToolbar>
+      <AdminToolbarLeft>
+        <AdminSearch value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} placeholder="Cari kategori..." />
+        <AdminSelect
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400"
+          value={selectedSort}
           onChange={e => { setSelectedSort(e.target.value); setCurrentPage(1); }}
         >
           <option value="order_asc">Urutan Tampil (Terkecil)</option>
           <option value="order_desc">Urutan Tampil (Terbesar)</option>
           <option value="name_asc">Nama Kategori (A-Z)</option>
           <option value="name_desc">Nama Kategori (Z-A)</option>
-        </select>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {selectedIds.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 12px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fee2e2' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
-            <button 
-              onClick={bulkDelete}
-              style={{ ...A.btnPrimary, background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
-            >
-              <i className="bx bx-trash" /> Hapus Terpilih
-            </button>
-          </div>
-        )}
+        </AdminSelect>
+      </AdminToolbarLeft>
+      <AdminToolbarRight>
+        {selectedIds.length > 0 && <AdminBulkActions count={selectedIds.length} onDelete={bulkDelete} label="Terpilih" />}
         <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
           {loading ? 'Memuat...' : `${totalItems} kategori`}
         </span>
-      </div>
-    </div>
+      </AdminToolbarRight>
+    </AdminToolbar>
   );
 
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Kategori Produk" subtitle="Atur hirarki kategori produk untuk navigasi yang lebih baik.">
-        <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY })}>
+        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setModal({ ...EMPTY })}>
           <i className="bx bx-plus" /> Tambah Kategori
         </button>
       </PageHeader>
@@ -200,12 +179,7 @@ export default function AdminCategories() {
           </thead>
           <tbody>
             {currentItems.length === 0 && !loading ? (
-              <tr>
-                <td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-                  <i className="bx bx-tag" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.2 }} />
-                  Tidak ada kategori yang cocok dengan kriteria filter.
-                </td>
-              </tr>
+              <AdminEmptyState colSpan={5} icon="bx-tag" message="Tidak ada kategori yang cocok dengan kriteria filter." />
             ) : currentItems.map((cat, idx) => {
               const isSelected = selectedIds.includes(cat.id);
               return (
@@ -244,10 +218,7 @@ export default function AdminCategories() {
                     <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, background: '#f8fafc', border: '1px solid #e2e8f0', fontWeight: 700, fontSize: 13, color: '#475569' }}>{cat.order}</span>
                   </td>
                   <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 6 }}>
-                      <button style={A.iconBtn('#f59e0b', '#fffbeb')} onClick={() => setModal({ ...cat })} title="Edit"><i className="bx bx-pencil" /></button>
-                      <button style={A.iconBtn('#ef4444', '#fff1f2')} onClick={() => del(cat.id)} title="Hapus"><i className="bx bx-trash" /></button>
-                    </div>
+                    <AdminActionButtons onEdit={() => setModal({ ...cat })} onDelete={() => del(cat.id)} />
                   </td>
                 </tr>
               );
@@ -255,104 +226,7 @@ export default function AdminCategories() {
           </tbody>
         </table>
 
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px 24px',
-            background: '#fff',
-            borderTop: '1px solid #f1f5f9',
-            fontSize: 13,
-            color: '#64748b',
-          }}>
-            <div>
-              Menampilkan <strong>{indexOfFirstItem + 1}</strong> - <strong>{Math.min(indexOfLastItem, totalItems)}</strong> dari <strong>{totalItems}</strong> kategori
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button 
-                disabled={currentPage === 1} 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 1 ? 0.5 : 1,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  fontWeight: 700,
-                  color: '#475569'
-                }}
-              >
-                Sebelumnya
-              </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {(() => {
-                  const getPageNumbers = () => {
-                    if (totalPages <= 7) {
-                      return Array.from({ length: totalPages }, (_, i) => i + 1);
-                    }
-                    if (currentPage <= 4) {
-                      return [1, 2, 3, 4, 5, '...', totalPages];
-                    }
-                    if (currentPage >= totalPages - 3) {
-                      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-                    }
-                    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
-                  };
-
-                  return getPageNumbers().map((num, i) => {
-                    if (num === '...') {
-                      return (
-                        <span key={`ellipsis-${i}`} style={{ width: 32, textAlign: 'center', color: '#94a3b8', fontWeight: 700, fontSize: 14 }}>
-                          ...
-                        </span>
-                      );
-                    }
-                    return (
-                      <button
-                        key={num}
-                        onClick={() => setCurrentPage(num)}
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          border: currentPage === num ? 'none' : '1px solid #e2e8f0',
-                          background: currentPage === num ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : '#fff',
-                          color: currentPage === num ? '#fff' : '#475569',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {num}
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-              <button 
-                disabled={currentPage === totalPages} 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages ? 0.5 : 1,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  fontWeight: 700,
-                  color: '#475569'
-                }}
-              >
-                Selanjutnya
-              </button>
-            </div>
-          </div>
-        )}
+        <AdminPagination page={currentPage} totalPages={totalPages} totalItems={totalItems} onChange={setCurrentPage} label="kategori" pageSize={itemsPerPage} />
       </TablePanel>
 
       {modal && (
@@ -361,11 +235,11 @@ export default function AdminCategories() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <FieldLabel>Nama Kategori</FieldLabel>
-                <input style={{ ...A.select, width: '100%' }} placeholder="Misal: Fashion Pria" value={modal.name} onChange={e => handleName(e.target.value)} required />
+                <AdminInput placeholder="Misal: Fashion Pria" value={modal.name} onChange={e => handleName(e.target.value)} required />
               </div>
               <div>
                 <FieldLabel>URL Slug (Auto)</FieldLabel>
-                <input style={{ ...A.select, width: '100%', fontFamily: 'monospace', color: '#6366f1', fontWeight: 700 }} placeholder="fashion-pria" value={modal.slug} onChange={e => setModal(p => ({ ...p, slug: e.target.value }))} required />
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ fontFamily: 'monospace', color: '#6366f1', fontWeight: 700 }} placeholder="fashion-pria" value={modal.slug} onChange={e => setModal(p => ({ ...p, slug: e.target.value }))} required />
               </div>
               <div>
                 <FieldLabel>Thumbnail Kategori</FieldLabel>
@@ -398,7 +272,7 @@ export default function AdminCategories() {
                   <div style={{ flex: 1 }}>
                     <FieldLabel>Atau masukkan URL Foto</FieldLabel>
                     <input 
-                      style={{ ...A.select, width: '100%' }} 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} 
                       placeholder="https://example.com/kategori.webp" 
                       value={modal.image || ''} 
                       onChange={e => setModal(p => ({ ...p, image: e.target.value }))} 
@@ -408,19 +282,14 @@ export default function AdminCategories() {
               </div>
               <div>
                 <FieldLabel>Urutan Tampil</FieldLabel>
-                <input type="number" style={{ ...A.select, width: '100%' }} value={modal.order} onChange={e => setModal(p => ({ ...p, order: parseInt(e.target.value) || 0 }))} />
+                <AdminInput type="number" value={modal.order} onChange={e => setModal(p => ({ ...p, order: parseInt(e.target.value) || 0 }))} />
               </div>
               <div>
                 <FieldLabel>Deskripsi</FieldLabel>
-                <textarea style={{ ...A.textarea, minHeight: 80 }} placeholder="Jelaskan isi kategori ini..." value={modal.description} onChange={e => setModal(p => ({ ...p, description: e.target.value }))} />
+                <AdminTextarea placeholder="Jelaskan isi kategori ini..." value={modal.description} onChange={e => setModal(p => ({ ...p, description: e.target.value }))} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
-              <button type="button" style={A.btnGhost} onClick={() => setModal(null)}>Batal</button>
-              <button type="submit" style={A.btnPrimary} disabled={saving}>
-                {saving ? '...' : <><i className="bx bx-save" /> Simpan</>}
-              </button>
-            </div>
+            <AdminFormActions onCancel={() => setModal(null)} saving={saving} />
           </form>
         </Modal>
       )}

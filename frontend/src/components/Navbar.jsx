@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 import { getStoredUser, isAuthenticated, logout, isAdminUser } from '../lib/auth';
 import { BUYER_API_BASE, PUBLIC_API_BASE, API_BASE, fetchJson } from '../lib/api';
 
@@ -25,6 +26,7 @@ const categories = ['Electronics', 'Smartphones', 'Computers', 'Smart Watches', 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState({ products: [], pages: [], brands: [] });
@@ -225,7 +227,7 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4 lg:gap-8">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0 transition-transform active:scale-95">
-            <img src="/akuglow.webp" alt="AkuGlow" className="h-8 sm:h-10 w-auto object-contain" />
+            <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-8 sm:h-10 w-auto object-contain" />
           </Link>
 
           {/* Desktop Search Bar */}

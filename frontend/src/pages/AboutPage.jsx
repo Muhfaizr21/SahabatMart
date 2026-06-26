@@ -1,13 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import aboutImg from '../assets/9bc151cb-21ca-4872-9afb-cad0c087c661.webp';
 import SEO from '../components/SEO';
+import { fetchJson, PUBLIC_API_BASE } from '../lib/api';
 
-export default function AboutPage() {
+export default function AboutPage({ previewData }) {
+  const [cmsContent, setCmsContent] = useState(previewData || null);
+
+  useEffect(() => {
+    if (previewData) {
+      setCmsContent(previewData);
+      return;
+    }
+    const loadCMS = async () => {
+      try {
+        const res = await fetchJson(`${PUBLIC_API_BASE}/cms/page-content?platform=landing_page&page=about`);
+        if (res && res.content) {
+          setCmsContent(res.content);
+        }
+      } catch (err) {
+        console.error('Failed to load CMS content:', err);
+      }
+    };
+    loadCMS();
+  }, [previewData]);
+
+  const str = (v, defaultVal = '') => v || defaultVal;
+  
+  const heroTitle = str(cmsContent?.hero_title || cmsContent?.hero?.title, 'Kenalan Lebih Dekat dengan Akuglow');
+  const story = str(cmsContent?.story, 'AkuGlow lahir dari semangat untuk memberdayakan setiap individu agar memiliki kepercayaan diri melalui kulit yang sehat dan bercahaya. Kami memahami bahwa kecantikan bukan sekadar tampilan luar, melainkan refleksi dari kesehatan dan kebahagiaan batin.\n\nDengan riset mendalam dan kolaborasi bersama para ahli dermatologi, kami menghadirkan rangkaian produk skincare premium yang diformulasikan khusus untuk iklim tropis. Setiap tetes produk kami mengandung bahan aktif berkualitas tinggi yang aman dan teruji.');
+  const vision = str(cmsContent?.vision, 'Menjadi brand skincare nomor satu yang dipercaya masyarakat Indonesia untuk solusi kecantikan kulit sehat alami yang berkelanjutan.');
+  const mission = str(cmsContent?.mission, 'Memberikan edukasi kecantikan yang tepat, menyediakan produk berkualitas tinggi dengan harga terjangkau, dan membangun komunitas yang sehat.');
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-['Plus_Jakarta_Sans']">
       <SEO 
-        title="Tentang Kami - AkuGlow"
+        title={`${heroTitle} - AkuGlow`}
         description="Kenali lebih dekat AkuGlow. Misi kami adalah memberdayakan individu melalui produk kecantikan premium dan peluang bisnis yang adil."
       />
       {/* Intro Section */}
@@ -18,8 +46,8 @@ export default function AboutPage() {
             <div className="relative">
               <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl">
                 <img 
-                  src={aboutImg} 
-                  alt="Kenalan Lebih Dekat dengan Akuglow" 
+                  src={cmsContent?.hero_image || aboutImg} 
+                  alt={heroTitle} 
                   className="w-full h-auto object-cover"
                 />
               </div>
@@ -37,15 +65,10 @@ export default function AboutPage() {
                 TENTANG AKUGLOW
               </div>
               <h2 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight">
-                Kenalan Lebih Dekat dengan Akuglow
+                {heroTitle}
               </h2>
-              <div className="space-y-4 text-gray-500 text-lg leading-relaxed">
-                <p>
-                  AkuGlow lahir dari semangat untuk memberdayakan setiap individu agar memiliki kepercayaan diri melalui kulit yang sehat dan bercahaya. Kami memahami bahwa kecantikan bukan sekadar tampilan luar, melainkan refleksi dari kesehatan dan kebahagiaan batin.
-                </p>
-                <p>
-                  Dengan riset mendalam dan kolaborasi bersama para ahli dermatologi, kami menghadirkan rangkaian produk skincare premium yang diformulasikan khusus untuk iklim tropis. Setiap tetes produk kami mengandung bahan aktif berkualitas tinggi yang aman dan teruji.
-                </p>
+              <div className="space-y-4 text-gray-500 text-lg leading-relaxed whitespace-pre-wrap">
+                <p>{story}</p>
               </div>
               <div className="pt-6">
                 <Link 
@@ -69,14 +92,14 @@ export default function AboutPage() {
           </div>
           
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-            {[
+            {(cmsContent?.mission_items || [
               { title: 'Innovation', desc: 'Terus berinovasi dalam menghadirkan formula skincare premium berbasis riset dermatologi terbaru.', icon: 'lightbulb' },
               { title: 'Sustainability', desc: 'Berkomitmen pada praktik bisnis yang berkelanjutan dan penggunaan bahan baku yang ramah lingkungan.', icon: 'sync' },
               { title: 'Empowerment', desc: 'Memberdayakan mitra affiliate kami dengan sistem bagi hasil yang adil dan pelatihan bisnis intensif.', icon: 'person' },
               { title: 'Quality', desc: 'Menjamin setiap produk memiliki standar kualitas tertinggi dan telah lulus uji klinis BPOM.', icon: 'verified' },
               { title: 'Distribution', desc: 'Membangun jaringan distribusi yang efisien untuk memastikan produk sampai ke tangan Anda dengan aman.', icon: 'local_shipping' },
               { title: 'Target', desc: 'Menjadi solusi kecantikan utama bagi seluruh masyarakat Indonesia dengan produk yang inklusif.', icon: 'target' }
-            ].map((mission, idx) => (
+            ]).map((mission, idx) => (
               <div key={idx} className="p-6 md:p-10 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-center flex flex-col items-center group">
                 <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-rose-50 flex items-center justify-center mb-4 md:mb-6 group-hover:bg-rose-600 transition-colors duration-300">
                   <span className="material-symbols-outlined text-rose-600 text-2xl md:text-4xl group-hover:text-white transition-colors duration-300">{mission.icon}</span>
@@ -95,7 +118,7 @@ export default function AboutPage() {
       <section className="py-20 bg-[#FDFBF7] px-4 md:px-6 relative overflow-hidden">
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
+            {(cmsContent?.cards_items || [
               { 
                 title: 'Good Quality', 
                 desc: 'Produk kami melewati standar kontrol kualitas yang ketat untuk memastikan hasil terbaik bagi kulit Anda.', 
@@ -111,7 +134,7 @@ export default function AboutPage() {
                 desc: 'Pengiriman cepat dan terjamin keamanannya ke seluruh wilayah Indonesia dengan partner logistik terpercaya.', 
                 icon: 'local_shipping' 
               }
-            ].map((feature, idx) => (
+            ]).map((feature, idx) => (
               <div 
                 key={idx} 
                 className="group relative bg-white p-8 md:p-12 rounded-[2.5rem] md:rounded-[3rem] border border-gray-100 shadow-xl hover:shadow-2xl hover:shadow-rose-600/10 hover:-translate-y-3 transition-all duration-500 overflow-hidden"
@@ -152,8 +175,8 @@ export default function AboutPage() {
                 <span className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs">1</span>
                 Visi
               </h4>
-              <p className="text-gray-500 leading-relaxed text-sm md:text-base">
-                Menjadi brand skincare nomor satu yang dipercaya masyarakat Indonesia untuk solusi kecantikan kulit sehat alami yang berkelanjutan.
+              <p className="text-gray-500 leading-relaxed text-sm md:text-base whitespace-pre-wrap">
+                {vision}
               </p>
             </div>
             <div className="p-6 md:p-8 rounded-3xl bg-gray-50 border border-gray-100">
@@ -161,8 +184,8 @@ export default function AboutPage() {
                 <span className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs">2</span>
                 Misi
               </h4>
-              <p className="text-gray-500 leading-relaxed text-sm md:text-base">
-                Memberikan edukasi kecantikan yang tepat, menyediakan produk berkualitas tinggi dengan harga terjangkau, dan membangun komunitas yang sehat.
+              <p className="text-gray-500 leading-relaxed text-sm md:text-base whitespace-pre-wrap">
+                {mission}
               </p>
             </div>
           </div>
@@ -184,7 +207,7 @@ export default function AboutPage() {
           </div>
           
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-            {[
+            {(cmsContent?.values_items || [
               { title: 'Creative and Innovative', desc: 'Solusi cerdas untuk setiap masalah.', icon: 'lightbulb' },
               { title: 'Respect', desc: 'Menghargai setiap perbedaan.', icon: 'handshake' },
               { title: 'Humility', desc: 'Tetap rendah hati dalam kesuksesan.', icon: 'person_check' },
@@ -192,7 +215,7 @@ export default function AboutPage() {
               { title: 'Teamwork', desc: 'Sinergi mencapai tujuan bersama.', icon: 'groups' },
               { title: 'Ethics and Integrity', desc: 'Integritas dalam setiap tindakan.', icon: 'shield_check' },
               { title: 'Adaptive', desc: 'Cepat beradaptasi dengan perubahan.', icon: 'sync' }
-            ].map((value, idx) => (
+            ]).map((value, idx) => (
               <div 
                 key={idx} 
                 className="group relative p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] bg-white border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-rose-600/5 hover:-translate-y-2 transition-all duration-500 overflow-hidden text-center flex flex-col items-center"

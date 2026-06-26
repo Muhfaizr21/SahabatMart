@@ -28,9 +28,9 @@ type VoucherValidateRequest struct {
 
 // VoucherValidateResult hasil validasi voucher
 type VoucherValidateResult struct {
-	Voucher       models.Voucher `json:"voucher"`
-	DiscountAmount float64       `json:"discount_amount"` // Nominal diskon yang akan diberikan
-	Message       string         `json:"message"`
+	Voucher        models.Voucher `json:"voucher"`
+	DiscountAmount float64        `json:"discount_amount"` // Nominal diskon yang akan diberikan
+	Message        string         `json:"message"`
 }
 
 // Validate memvalidasi voucher berdasarkan tipe dan konteks keranjang

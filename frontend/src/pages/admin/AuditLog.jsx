@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
+import { AdminSearch } from '../../lib/adminComponents.jsx';
+
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
@@ -46,18 +49,15 @@ export default function AdminAuditLog() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Audit Log" subtitle="Seluruh aktivitas administrator tercatat untuk kepatuhan keamanan.">
-        <div style={A.searchWrap}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input style={A.searchInput} placeholder="Cari detail log..." value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==='Enter'&&load()} />
-        </div>
-        <select style={A.select} value={actionFilter} onChange={e=>setActionFilter(e.target.value)}>
+        <AdminSearch placeholder="Cari detail log..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} />
+        <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" value={actionFilter} onChange={e=>setActionFilter(e.target.value)}>
           <option value="">Semua Event</option>
           <option value="login">Access Events</option>
           <option value="create_product">Inventory Changes</option>
           <option value="update_merchant_status">Merchant Status</option>
           <option value="process_payout">Financial</option>
-        </select>
-        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /></button>
+        </AdminSelect>
+        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={load}><i className="bx bx-refresh" /></button>
       </PageHeader>
 
       {/* Security Banner */}

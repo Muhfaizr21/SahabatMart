@@ -4,9 +4,9 @@ import (
 	"akuglow/backend/models"
 	"akuglow/backend/repositories"
 	"fmt"
-	"time"
-	"gorm.io/gorm"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+	"time"
 )
 
 type AdminService struct {
@@ -35,7 +35,7 @@ func (s *AdminService) GetOverviewStats() (map[string]interface{}, error) {
 	s.DB.Model(&models.Order{}).Where("status = ?", models.OrderCompleted).Select("COALESCE(SUM(grand_total), 0)").Scan(&totalRevenue)
 
 	return map[string]interface{}{
-		"users":    userCount,
+		"users":     userCount,
 		"merchants": merchantCount,
 		"orders":    orderCount,
 		"revenue":   totalRevenue,
@@ -79,7 +79,7 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 				if pusatInv.Stock < item.Quantity {
 					return fmt.Errorf("stok pusat tidak cukup untuk %s (Tersisa: %d)", item.ProductID, pusatInv.Stock)
 				}
-				
+
 				stockBefore := pusatInv.Stock
 				pusatInv.Stock -= item.Quantity
 				if err := tx.Save(&pusatInv).Error; err != nil {
@@ -144,9 +144,15 @@ func (s *AdminService) ModerateRestockRequest(adminID, requestID, status, adminN
 		// 3. Notify Merchant
 		title := "📦 Update Restock"
 		msg := fmt.Sprintf("Permintaan kulakan Anda %s telah diperbarui menjadi: %s.", req.ID, status)
-		if status == "approved" { title = "✅ Restock Disetujui" }
-		if status == "shipped" { title = "🚚 Restock Dikirim" }
-		if status == "rejected" { title = "❌ Restock Ditolak" }
+		if status == "approved" {
+			title = "✅ Restock Disetujui"
+		}
+		if status == "shipped" {
+			title = "🚚 Restock Dikirim"
+		}
+		if status == "rejected" {
+			title = "❌ Restock Ditolak"
+		}
 
 		if s.Notif != nil {
 			_ = s.Notif.Push(req.MerchantID, "merchant", "restock_update", title, msg, "/merchant/restock")

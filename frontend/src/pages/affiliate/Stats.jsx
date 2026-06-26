@@ -96,7 +96,7 @@ export default function StatusMitra() {
         >
           <span className="material-symbols-outlined text-2xl flex-shrink-0" style={{ color: '#fbbf24' }}>workspace_premium</span>
           <div>
-            <p className="font-black text-amber-300 text-xs uppercase tracking-widest mb-1">Status Puncak Tercapai 🏆</p>
+            <p className="font-black text-amber-300 text-xs uppercase tracking-widest mb-1">Status Puncak Tercapai</p>
             <p className="text-slate-300 text-xs leading-relaxed">
               Selamat! Anda saat ini telah aktif sebagai <strong className="text-white">Merchant Resmi AkuGlow</strong>. Anda memiliki akses penuh ke Pusat Distribusi, Komisi Distribusi, dan pengelolaan stok gudang mitra Anda secara langsung.
             </p>
@@ -132,7 +132,7 @@ export default function StatusMitra() {
               style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', boxShadow: '0 0 20px rgba(124,58,237,0.4)' }}
             >
               <span className="material-symbols-outlined text-sm">storefront</span>
-              Ajukan Jadi Merchant 🚀
+              Ajukan Jadi Merchant
             </button>
           )}
         </div>
@@ -188,7 +188,7 @@ export default function StatusMitra() {
             className="flex items-start gap-3 p-4 rounded-xl text-sm"
             style={{ background: 'rgba(250,188,78,0.08)', border: '1px solid rgba(250,188,78,0.15)' }}
           >
-            <span className="text-xl mt-0.5">💡</span>
+            <span className="material-symbols-outlined text-xl mt-0.5 text-amber-400">lightbulb</span>
             <div>
               <p className="font-bold text-amber-300 text-xs uppercase tracking-widest mb-1">Tips Naik Level</p>
               <p className="text-slate-400 text-xs leading-relaxed">
@@ -250,16 +250,16 @@ export default function StatusMitra() {
       {/* Benefits */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { icon: '📦', title: 'Pusat Distribusi', desc: 'Jadi titik distribusi bagi mitra di wilayah Anda.' },
-          { icon: '💰', title: 'Komisi Distribusi', desc: 'Komisi tambahan dari setiap barang yang keluar lewat toko Anda.' },
-          { icon: '🌟', title: '2 Sumber Income', desc: 'Komisi distribusi (supply) + komisi affiliate (penjualan) sekaligus.' },
+          { icon: 'bx bx-package', title: 'Pusat Distribusi', desc: 'Jadi titik distribusi bagi mitra di wilayah Anda.' },
+          { icon: 'bx bx-money', title: 'Komisi Distribusi', desc: 'Komisi tambahan dari setiap barang yang keluar lewat toko Anda.' },
+          { icon: 'bx bx-trending-up', title: '2 Sumber Income', desc: 'Komisi distribusi (supply) + komisi affiliate (penjualan) sekaligus.' },
         ].map(b => (
           <div
             key={b.title}
             className="rounded-2xl p-5 text-center"
             style={{ background: 'rgba(35,41,60,0.4)', border: '1px solid rgba(77,67,84,0.15)' }}
           >
-            <div className="text-3xl mb-3">{b.icon}</div>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{background:"rgba(124,58,237,0.15)"}}><i className={b.icon} style={{fontSize:22,color:"#b76dff"}} /></div>
             <h4 className="font-black text-white text-xs uppercase tracking-widest mb-2">{b.title}</h4>
             <p className="text-xs text-slate-400">{b.desc}</p>
           </div>

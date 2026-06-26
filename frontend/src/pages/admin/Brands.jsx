@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
+import { AdminSearch, AdminInput, AdminPagination, AdminEmptyState, AdminActionButtons, AdminFormActions, AdminToolbarLeft } from '../../lib/adminComponents.jsx';
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
@@ -99,36 +101,24 @@ export default function AdminBrands() {
   return (
     <div style={A.page} className="fade-in">
       <PageHeader title="Daftar Brand / Merk" subtitle="Kelola daftar merk produk yang beredar di platform AkuGlow.">
-        <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY })}>
+        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setModal({ ...EMPTY })}>
           <i className="bx bx-plus" /> Tambah Brand
         </button>
       </PageHeader>
 
-      {/* Controls Panel */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <div style={{ ...A.searchWrap, flex: 1, minWidth: 260 }}>
-          <i className="bx bx-search" style={A.searchIcon} />
-          <input 
-            type="text" 
-            placeholder="Cari nama brand..." 
-            style={{ ...A.searchInput, width: '100%' }}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
-        
-        <select 
-          style={{ ...A.select, minWidth: 160 }}
+      <div style={{ marginBottom: 16 }}><AdminToolbarLeft>
+        <AdminSearch value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Cari nama brand..." />
+        <AdminSelect
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ minWidth: 160 }}
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
         >
           <option value="all">Semua Status</option>
-          <option value="featured">Unggulan (⭐)</option>
+          <option value="featured">Unggulan</option>
           <option value="regular">Reguler</option>
-        </select>
-
-        <select 
-          style={{ ...A.select, minWidth: 180 }}
+        </AdminSelect>
+        <AdminSelect
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ minWidth: 180 }}
           value={sortType}
           onChange={e => setSortType(e.target.value)}
         >
@@ -138,8 +128,8 @@ export default function AdminBrands() {
           <option value="products_asc">Produk Tersedikit</option>
           <option value="id_desc">Terbaru Terdaftar</option>
           <option value="id_asc">Terlama Terdaftar</option>
-        </select>
-      </div>
+        </AdminSelect>
+      </AdminToolbarLeft></div>
 
       <TablePanel loading={loading}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
@@ -152,10 +142,7 @@ export default function AdminBrands() {
           </thead>
           <tbody>
             {paginatedBrands.length === 0 && !loading ? (
-              <tr><td colSpan={4} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-                <i className="bx bxs-flag" style={{ fontSize: 40, display: 'block', marginBottom: 8, opacity: 0.2 }} />
-                Tidak ada brand terdaftar yang cocok.
-              </td></tr>
+              <AdminEmptyState colSpan={4} icon="bxs-flag" message="Tidak ada brand terdaftar yang cocok." />
             ) : paginatedBrands.map((b, idx) => (
               <tr key={b.id}
                 style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
@@ -177,7 +164,7 @@ export default function AdminBrands() {
                 </td>
                 <td style={{ ...A.td, textAlign: 'center' }}>
                   <span style={{ display: 'inline-flex', padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: b.is_featured ? '#fffbeb' : '#f8fafc', color: b.is_featured ? '#d97706' : '#94a3b8' }}>
-                    {b.is_featured ? '⭐ Unggulan' : 'Reguler'}
+                    {b.is_featured ? 'Unggulan' : 'Reguler'}
                   </span>
                 </td>
                 <td style={{ ...A.td, textAlign: 'center' }}>
@@ -185,10 +172,7 @@ export default function AdminBrands() {
                   <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>items</span>
                 </td>
                 <td style={{ ...A.td, paddingRight: 24, textAlign: 'right' }}>
-                  <div style={{ display: 'inline-flex', gap: 6 }}>
-                    <button style={A.iconBtn('#f59e0b', '#fffbeb')} onClick={() => setModal({ ...b })} title="Edit"><i className="bx bx-pencil" /></button>
-                    <button style={A.iconBtn('#ef4444', '#fff1f2')} onClick={() => del(b.id)} title="Hapus"><i className="bx bx-trash" /></button>
-                  </div>
+                  <AdminActionButtons onEdit={() => setModal({ ...b })} onDelete={() => del(b.id)} />
                 </td>
               </tr>
             ))}
@@ -196,33 +180,7 @@ export default function AdminBrands() {
         </table>
       </TablePanel>
 
-      {/* Pagination Controls */}
-      {processedBrands.length > 0 && !loading && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>
-            Showing <strong>{((page - 1) * itemsPerPage) + 1}</strong> to <strong>{Math.min(page * itemsPerPage, processedBrands.length)}</strong> of <strong>{processedBrands.length}</strong> brands
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button 
-              style={A.btnGhost} 
-              disabled={page === 1} 
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-            >
-              <i className="bx bx-chevron-left" /> Prev
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
-              Page {page} of {totalPages}
-            </div>
-            <button 
-              style={A.btnGhost} 
-              disabled={page === totalPages} 
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            >
-              Next <i className="bx bx-chevron-right" />
-            </button>
-          </div>
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} totalItems={processedBrands.length} onChange={setPage} label="brand" pageSize={itemsPerPage} />
 
       {modal && (
         <Modal title={modal.id ? 'Edit Brand' : 'Tambah Brand Baru'} onClose={() => setModal(null)}>
@@ -230,23 +188,18 @@ export default function AdminBrands() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <FieldLabel>Nama Brand</FieldLabel>
-                <input style={{ ...A.select, width: '100%' }} placeholder="Misal: Apple, Samsung" value={modal.name} onChange={e => setModal(p => ({ ...p, name: e.target.value }))} required />
+                <AdminInput placeholder="Misal: Apple, Samsung" value={modal.name} onChange={e => setModal(p => ({ ...p, name: e.target.value }))} required />
               </div>
               <div>
                 <FieldLabel>URL Logo (.webp/.webp)</FieldLabel>
-                <input style={{ ...A.select, width: '100%' }} placeholder="https://link-logo.com/image.webp" value={modal.logo_url} onChange={e => setModal(p => ({ ...p, logo_url: e.target.value }))} />
+                <AdminInput placeholder="https://link-logo.com/image.webp" value={modal.logo_url} onChange={e => setModal(p => ({ ...p, logo_url: e.target.value }))} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f8fafc', borderRadius: 11 }}>
                 <input type="checkbox" id="featuredBrand" checked={modal.is_featured} onChange={e => setModal(p => ({ ...p, is_featured: e.target.checked }))} style={{ width: 16, height: 16 }} />
                 <label htmlFor="featuredBrand" style={{ fontSize: 13.5, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Tampilkan sebagai Brand Unggulan</label>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
-              <button type="button" style={A.btnGhost} onClick={() => setModal(null)}>Batal</button>
-              <button type="submit" style={A.btnPrimary} disabled={saving}>
-                {saving ? '...' : <><i className="bx bx-save" /> Simpan</>}
-              </button>
-            </div>
+            <AdminFormActions onCancel={() => setModal(null)} saving={saving} />
           </form>
         </Modal>
       )}

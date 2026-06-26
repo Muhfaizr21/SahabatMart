@@ -108,8 +108,8 @@ export default function WishlistPage() {
         {!hasItems ? (
            <div className="bg-white rounded-[2.5rem] p-16 md:p-24 text-center border-2 border-dashed border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.02)] fade-in">
               <div className="relative inline-block mb-10">
-                 <div className="text-8xl filter drop-shadow-2xl grayscale opacity-20">💖</div>
-                 <div className="absolute inset-0 flex items-center justify-center text-6xl">💖</div>
+                 <div className="text-8xl filter drop-shadow-2xl grayscale opacity-20">♥</div>
+                 <div className="absolute inset-0 flex items-center justify-center text-6xl">♥</div>
               </div>
               
               <h2 className="text-2xl font-black text-slate-900 mb-3">
@@ -124,7 +124,7 @@ export default function WishlistPage() {
               {isSyncError && (
                  <div className="mb-8 p-4 bg-red-50 rounded-2xl border border-red-100 inline-flex items-center gap-3 text-red-600 animate-bounce">
                     <span className="w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
-                    <span className="text-xs font-black uppercase tracking-tighter">⚠️ Sinkronisasi Server Gagal</span>
+                    <span className="text-xs font-black uppercase tracking-tighter"> Sinkronisasi Server Gagal</span>
                  </div>
               )}
 

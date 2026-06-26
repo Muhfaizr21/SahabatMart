@@ -1,3 +1,5 @@
+import AdminSelect from '../../components/admin/AdminSelect';
+
 /**
  * PromoEditor.jsx — Classic Editor untuk Materi Promosi Affiliate
  * Route: /admin/promo/new  |  /admin/promo/edit/:id
@@ -376,7 +378,7 @@ export default function PromoEditor() {
       const res = await resp.json();
       const url = res.url || res.data?.url;
       if (url) {
-        toast.success(`✅ Berkas terunggah!`, { id: 'promo-up' });
+        toast.success(` Berkas terunggah!`, { id: 'promo-up' });
         set('file_url', url);
       }
     } catch (err) {
@@ -488,22 +490,22 @@ export default function PromoEditor() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
             <div>
               <label className="pe-label">Tipe Konten</label>
-              <select className="pe-input" value={form.type} onChange={e => set('type', e.target.value)}>
-                <option value="image">🖼️ Image (Gambar)</option>
-                <option value="video">📽️ Video (MP4)</option>
-                <option value="copywriting">✍️ Copywriting Text</option>
-              </select>
+              <AdminSelect className="pe-input" value={form.type} onChange={e => set('type', e.target.value)}>
+                <option value="image"> Image (Gambar)</option>
+                <option value="video"> Video (MP4)</option>
+                <option value="copywriting"> Copywriting Text</option>
+              </AdminSelect>
             </div>
             <div>
               <label className="pe-label">Kategori Platform</label>
-              <select className="pe-input" value={form.category} onChange={e => set('category', e.target.value)}>
+              <AdminSelect className="pe-input" value={form.category} onChange={e => set('category', e.target.value)}>
                 <option value="Instagram">Instagram</option>
                 <option value="Facebook">Facebook</option>
                 <option value="TikTok">TikTok</option>
                 <option value="WhatsApp">WhatsApp</option>
                 <option value="Telegram">Telegram</option>
                 <option value="Umum">Umum / Lainnya</option>
-              </select>
+              </AdminSelect>
             </div>
           </div>
 

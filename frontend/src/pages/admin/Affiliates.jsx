@@ -494,11 +494,11 @@ export default function AdminAffiliates() {
                 Menampilkan <span style={{ color: '#475569' }}>{affiliates.length}</span> dari <span style={{ color: '#475569' }}>{total}</span> member
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ ...A.btnGhost, padding: '8px 12px', opacity: page === 1 ? 0.5 : 1 }}>
+                <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 12px', opacity: page === 1 ? 0.5 : 1 }}>
                   <i className="bx bx-chevron-left" />
                 </button>
                 <div style={{ padding: '0 12px', fontSize: 13, fontWeight: 800, color: '#6366f1' }}>{page} / {totalPages || 1}</div>
-                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ ...A.btnGhost, padding: '8px 12px', opacity: page >= totalPages ? 0.5 : 1 }}>
+                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 12px', opacity: page >= totalPages ? 0.5 : 1 }}>
                   <i className="bx bx-chevron-right" />
                 </button>
               </div>
@@ -587,18 +587,18 @@ export default function AdminAffiliates() {
             </div>
             <div>
               <FieldLabel>Catatan (opsional)</FieldLabel>
-              <textarea style={{ ...A.select, width: '100%', minHeight: 80, paddingTop: 10 }}
+              <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%', minHeight: 80, paddingTop: 10 }}
                 placeholder="Contoh: Sudah ditransfer via BRI..."
                 value={processWd.note}
                 onChange={e => setProcessWd(p => ({ ...p, note: e.target.value }))} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
-            <button style={{ ...A.btnGhost, color: '#ef4444', border: '1px solid #fecaca' }}
+            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444', border: '1px solid #fecaca' }}
               onClick={() => processWithdrawal('reject')} disabled={saving}>
               <i className="bx bx-x-circle" /> Tolak
             </button>
-            <button style={{ ...A.btnPrimary, background: 'linear-gradient(135deg,#10b981,#059669)' }}
+            <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}
               onClick={() => processWithdrawal('approve')} disabled={saving}>
               {saving ? '...' : <><i className="bx bx-check-circle" /> Approve</>}
             </button>
@@ -615,12 +615,12 @@ export default function AdminAffiliates() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                 <div>
                   <FieldLabel>Nama Lengkap</FieldLabel>
-                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_full_name || ''}
+                  <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={editMemberTier.new_full_name || ''}
                     onChange={e => setEditMemberTier(p => ({ ...p, new_full_name: e.target.value }))} />
                 </div>
                 <div>
                   <FieldLabel>Email</FieldLabel>
-                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_email || ''}
+                  <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={editMemberTier.new_email || ''}
                     onChange={e => setEditMemberTier(p => ({ ...p, new_email: e.target.value }))} />
                 </div>
               </div>
@@ -633,18 +633,18 @@ export default function AdminAffiliates() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <FieldLabel>Nama Bank</FieldLabel>
-                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_bank_name || ''}
+                  <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={editMemberTier.new_bank_name || ''}
                     onChange={e => setEditMemberTier(p => ({ ...p, new_bank_name: e.target.value }))} />
                 </div>
                 <div>
                   <FieldLabel>No Rekening</FieldLabel>
-                  <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_bank_account_number || ''}
+                  <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={editMemberTier.new_bank_account_number || ''}
                     onChange={e => setEditMemberTier(p => ({ ...p, new_bank_account_number: e.target.value }))} />
                 </div>
               </div>
               <div style={{ marginTop: 10 }}>
                 <FieldLabel>Nama Pemilik Rekening</FieldLabel>
-                <input style={{ ...A.select, width: '100%' }} value={editMemberTier.new_bank_account_name || ''}
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ width: '100%' }} value={editMemberTier.new_bank_account_name || ''}
                   onChange={e => setEditMemberTier(p => ({ ...p, new_bank_account_name: e.target.value }))} />
               </div>
             </div>
@@ -679,11 +679,11 @@ export default function AdminAffiliates() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
-            <button onClick={() => setEditMemberTier(null)} style={A.btnGhost}>Batal</button>
+            <button onClick={() => setEditMemberTier(null)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm">Batal</button>
             <button 
               onClick={saveMemberTier} 
               disabled={saving || !editMemberTier.new_tier_id} 
-              style={A.btnPrimary}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
             >
               {saving ? '...' : <><i className="bx bx-save" /> Simpan Perubahan</>}
             </button>

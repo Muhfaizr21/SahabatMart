@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BUYER_API_BASE, fetchJson, formatPaymentMethod } from '../lib/api';
+import { useTheme } from '../context/ThemeContext';
 import toast from 'react-hot-toast';
 
 export default function InvoicePage() {
+  const { theme } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -62,7 +64,7 @@ export default function InvoicePage() {
         <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-10 border-b-4 border-gray-50 pb-8">
           <div className="w-full sm:w-auto">
             <div className="flex items-center gap-3 mb-4">
-              <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
+              <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-12 w-auto object-contain" />
             </div>
             <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Diterbitkan Oleh</p>
             <p className="font-black text-gray-900 text-sm sm:text-base">PT AkuGlow Mart Indonesia</p>
@@ -183,7 +185,7 @@ export default function InvoicePage() {
         {order.merchant_groups?.some(g => g.tracking_number) && (
           <div className="mb-8">
             <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4 border-b border-blue-100 pb-2">
-              🚚 Informasi Pengiriman
+              Informasi Pengiriman
             </h3>
             <div className="flex flex-col gap-3">
               {order.merchant_groups?.filter(g => g.tracking_number).map((group, idx) => (

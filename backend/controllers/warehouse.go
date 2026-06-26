@@ -179,6 +179,10 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 		// Update Product/Variant Global Stock (Sync for legacy visibility)
 		if item.ProductVariantID != nil && *item.ProductVariantID != "" {
 			tx.Model(&models.ProductVariant{}).Where("id = ?", *item.ProductVariantID).Update("stock", inventory.Stock)
+			// [FIX #15] Sync parent product stock = sum of all variant stocks
+			var totalVariantStock int64
+			tx.Table("product_variants").Where("product_id = ?", item.ProductID).Select("COALESCE(SUM(stock), 0)").Scan(&totalVariantStock)
+			tx.Model(&models.Product{}).Where("id = ?", item.ProductID).Update("stock", totalVariantStock)
 		} else {
 			tx.Model(&models.Product{}).Where("id = ?", item.ProductID).Update("stock", inventory.Stock)
 		}
@@ -193,7 +197,7 @@ func (ctrl *WarehouseController) CreateInbound(w http.ResponseWriter, r *http.Re
 			Reference:        inbound.ID,
 			StockBefore:      stockBefore,
 			StockAfter:       inventory.Stock,
-			Note:        "Inbound from Supplier: " + input.ReferenceNo,
+			Note:             "Inbound from Supplier: " + input.ReferenceNo,
 		}
 		tx.Create(&mutation)
 
@@ -347,9 +351,9 @@ func (ctrl *WarehouseController) ApproveRestock(w http.ResponseWriter, r *http.R
 			Quantity:         -item.Quantity,
 			StockBefore:      stockBefore,
 			StockAfter:       pusatInv.Stock,
-			Reference:   restock.ID,
-			Note:        fmt.Sprintf("Restock untuk merchant %s (Req: %s)", restock.MerchantID, restock.ID),
-			CreatedAt:   time.Now(),
+			Reference:        restock.ID,
+			Note:             fmt.Sprintf("Restock untuk merchant %s (Req: %s)", restock.MerchantID, restock.ID),
+			CreatedAt:        time.Now(),
 		}
 		if err := tx.Create(&mutation).Error; err != nil {
 			tx.Rollback()
@@ -387,8 +391,8 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 	}
 
 	var input struct {
-		CourierCode    string `json:"courier_code"`
-		AdminNote      string `json:"admin_note"`
+		CourierCode string `json:"courier_code"`
+		AdminNote   string `json:"admin_note"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -428,8 +432,8 @@ func (ctrl *WarehouseController) ShipRestock(w http.ResponseWriter, r *http.Requ
 		fmt.Sprintf("Restock %s sedang dalam pengiriman B2B via %s (Resi: %s).", restock.ID, strings.ToUpper(input.CourierCode), waybillID), "/merchant/restock")
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
-		"message": "Pengiriman berhasil diproses & resi terbit otomatis",
-		"tracking_number": waybillID,
+		"message":           "Pengiriman berhasil diproses & resi terbit otomatis",
+		"tracking_number":   waybillID,
 		"biteship_order_id": biteshipOrderID,
 	})
 }
@@ -444,7 +448,7 @@ func (ctrl *WarehouseController) SyncInventory(w http.ResponseWriter, r *http.Re
 	for _, p := range products {
 		var variantCount int64
 		ctrl.DB.Model(&models.ProductVariant{}).Where("product_id = ?", p.ID).Count(&variantCount)
-		
+
 		initialStock := 1000
 		if variantCount > 0 {
 			initialStock = 0 // Base stock should be 0 if variants exist
@@ -454,9 +458,9 @@ func (ctrl *WarehouseController) SyncInventory(w http.ResponseWriter, r *http.Re
 		err := ctrl.DB.Where("product_id = ? AND merchant_id = ? AND (product_variant_id IS NULL OR product_variant_id = '')", p.ID, models.PusatID).First(&inv).Error
 		if err == gorm.ErrRecordNotFound {
 			ctrl.DB.Create(&models.Inventory{
-				ProductID: p.ID,
+				ProductID:  p.ID,
 				MerchantID: models.PusatID,
-				Stock: initialStock,
+				Stock:      initialStock,
 			})
 			count++
 		} else if variantCount > 0 && inv.Stock > 0 {
@@ -471,10 +475,10 @@ func (ctrl *WarehouseController) SyncInventory(w http.ResponseWriter, r *http.Re
 		err := ctrl.DB.Where("product_id = ? AND product_variant_id = ? AND merchant_id = ?", v.ProductID, idCopy, models.PusatID).First(&inv).Error
 		if err == gorm.ErrRecordNotFound {
 			ctrl.DB.Create(&models.Inventory{
-				ProductID: v.ProductID,
+				ProductID:        v.ProductID,
 				ProductVariantID: &idCopy,
-				MerchantID: models.PusatID,
-				Stock: 1000,
+				MerchantID:       models.PusatID,
+				Stock:            1000,
 			})
 			count++
 		}

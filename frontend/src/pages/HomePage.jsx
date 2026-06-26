@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import HeroSlider from '../components/HeroSlider';
 import FeatureBar from '../components/FeatureBar';
 import CategoryGrid from '../components/CategoryGrid';
@@ -8,10 +8,10 @@ import StatsSection from '../components/StatsSection';
 import Testimonials from '../components/Testimonials';
 import DiagnosticCTA from '../components/DiagnosticCTA';
 import PromoBanner from '../components/PromoBanner';
-import NewsletterSection from '../components/NewsletterSection';
 import RecommendedSection from '../components/RecommendedSection';
-
 import SEO from '../components/SEO';
+import { useTheme } from '../context/ThemeContext';
+import { fetchJson, PUBLIC_API_BASE } from '../lib/api';
 
 /**
  * HomePage Component
@@ -21,15 +21,34 @@ import SEO from '../components/SEO';
  * Setiap section dipisahkan menjadi komponen mandiri untuk maintainability tinggi.
  */
 const HomePage = () => {
+  const { theme } = useTheme();
   const siteUrl = window.location.origin;
-  
+  const finalLogo = theme?.platform_logo || '/akuglow.webp';
+  const logoUrl = finalLogo.startsWith('http') ? finalLogo : `${siteUrl}${finalLogo}`;
+
+  const [cmsContent, setCmsContent] = useState(null);
+
+  useEffect(() => {
+    const loadCMS = async () => {
+      try {
+        const res = await fetchJson(`${PUBLIC_API_BASE}/cms/page-content?platform=landing_page&page=home`);
+        if (res && res.content) {
+          setCmsContent(res.content);
+        }
+      } catch (err) {
+        console.error('Failed to load CMS content:', err);
+      }
+    };
+    loadCMS();
+  }, []);
+
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "AkuGlow",
     "alternateName": "AkuGlow Premium",
     "url": siteUrl,
-    "logo": `${siteUrl}/akuglow.webp`,
+    "logo": logoUrl,
     "sameAs": [
       "https://facebook.com/akuglow",
       "https://instagram.com/akuglow"
@@ -53,8 +72,8 @@ const HomePage = () => {
 
   return (
     <main className="home-page overflow-hidden">
-      <SEO 
-        title="Pusat Kecantikan & Kesehatan Premium" 
+      <SEO
+        title="Pusat Kecantikan & Kesehatan Premium"
         description="Temukan produk kecantikan terbaik dari AkuGlow. Rahasia kulit sehat terpancar dari pilihan komunitas kami."
         schema={[organizationSchema, websiteSchema]}
       />
@@ -62,20 +81,20 @@ const HomePage = () => {
       <HeroSlider />
 
       {/* 2. Value Proposition - Mengapa Memilih Kami? */}
-      <FeatureBar />
+      <FeatureBar data={cmsContent?.features} />
 
       {/* 3. Discovery Hub - Navigasi Kategori */}
       <CategoryGrid />
 
-      {/* 4. Brand Story - Misi & Filosofi Produk */}
-      <AboutMission />
+      {/* 5. About & Mission - Trust Building */}
+      <AboutMission data={cmsContent?.about_mission} />
 
       {/* 5. Hero Products - Produk Terlaris (Dynamic Limit) */}
       <section className="py-16 bg-slate-50/40">
-        <ProductSection 
-          title="Koleksi Terlaris AkuGlow ✨" 
+        <ProductSection
+          title="Koleksi Terlaris AkuGlow "
           subtitle="Rahasia kulit sehat terpancar dari pilihan komunitas kami."
-          limit={4} 
+          limit={4}
         />
       </section>
 
@@ -83,19 +102,17 @@ const HomePage = () => {
       <RecommendedSection limit={4} className="bg-white" />
 
       {/* 7. Social Proof - Pencapaian & Angka Real */}
-      <StatsSection />
+      <StatsSection data={cmsContent?.stats} />
 
       {/* 7. Community Voice - Ulasan dari Pelanggan Setia */}
-      <Testimonials />
+      <Testimonials title={cmsContent?.testimonials_title} />
 
       {/* 8. Activation - Diagnosa Kulit Interaktif */}
-      <DiagnosticCTA />
+      <DiagnosticCTA data={cmsContent?.diagnostic} />
 
       {/* 9. Visual Promo - Highlight Kampanye Berjalan */}
       <PromoBanner />
 
-      {/* 10. Engagement - Berlangganan Newsletter */}
-      <NewsletterSection />
     </main>
   );
 };

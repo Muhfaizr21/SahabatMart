@@ -17,36 +17,66 @@ import (
 )
 
 type ShippingService struct {
-	DB     *gorm.DB
-	ApiKey string
+	DB      *gorm.DB
+	ApiKey  string
 	BaseURL string
+	client  *http.Client
 }
 
 func NewShippingService(db *gorm.DB) *ShippingService {
-	apiKey := os.Getenv("BITESHIP_API_KEY")
-	baseURL := os.Getenv("BITESHIP_BASE_URL")
+	configSvc := NewConfigService(db)
+	apiKey := configSvc.Get("biteship_api_key", os.Getenv("BITESHIP_API_KEY"))
+	baseURL := configSvc.Get("biteship_base_url", os.Getenv("BITESHIP_BASE_URL"))
 	if baseURL == "" {
 		baseURL = "https://api.biteship.com"
 	}
-	
+
 	return &ShippingService{
 		DB:      db,
 		ApiKey:  apiKey,
 		BaseURL: baseURL,
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
+}
+
+// doRequest performs HTTP requests with automatic retries for transient errors
+func (s *ShippingService) doRequest(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Clone request body if we need to retry and it's a POST/PUT
+		// Not strictly necessary if we only retry on GET, but good practice.
+		
+		resp, err = s.client.Do(req)
+		if err == nil && resp.StatusCode < 500 {
+			return resp, nil
+		}
+		
+		if resp != nil {
+			resp.Body.Close()
+		}
+		
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+	}
+	return nil, err
 }
 
 // SearchArea mencari ID Wilayah Biteship berdasarkan input teks
 func (s *ShippingService) SearchArea(input string) ([]map[string]interface{}, error) {
 	url := fmt.Sprintf("%s/v1/maps/areas?countries=ID&input=%s", s.BaseURL, url.QueryEscape(input))
-	
+
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
 	log.Printf("[Biteship] Searching area for: %s", input)
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +125,7 @@ func (s *ShippingService) FetchCouriers() ([]map[string]interface{}, error) {
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -171,8 +200,7 @@ func (s *ShippingService) GetRates(originAreaID, destinationAreaID string, items
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -399,9 +427,10 @@ func (s *ShippingService) CreateOrder(order models.Order, group models.OrderMerc
 		courierType = "reguler"
 	}
 
+	configSvc := NewConfigService(s.DB)
 	payload := map[string]interface{}{
 		"order_note":   fmt.Sprintf("Order #%s", order.OrderNumber),
-		"callback_url": os.Getenv("BITESHIP_CALLBACK_URL"),
+		"callback_url": configSvc.Get("biteship_callback_url", os.Getenv("BITESHIP_CALLBACK_URL")),
 
 		// Origin (Pick-up) Details
 		"origin_contact_name":  merchant.StoreName,
@@ -428,8 +457,7 @@ func (s *ShippingService) CreateOrder(order models.Order, group models.OrderMerc
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return "", "", fmt.Errorf("network error: %v", err)
 	}
@@ -533,8 +561,8 @@ func (s *ShippingService) CreateBiteshipOrderForRestock(restock models.RestockRe
 	}
 
 	payload := map[string]interface{}{
-		"order_note":   fmt.Sprintf("Restock B2B #%s", restock.ID),
-		
+		"order_note": fmt.Sprintf("Restock B2B #%s", restock.ID),
+
 		// Origin (Pick-up) Details
 		"origin_contact_name":  originName,
 		"origin_contact_phone": originPhone,
@@ -560,8 +588,7 @@ func (s *ShippingService) CreateBiteshipOrderForRestock(restock models.RestockRe
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return "", "", "", fmt.Errorf("network error: %v", err)
 	}
@@ -577,7 +604,7 @@ func (s *ShippingService) CreateBiteshipOrderForRestock(restock models.RestockRe
 		if errorMsg == "" {
 			errorMsg = string(respBody)
 		}
-		
+
 		if os.Getenv("GO_ENV") != "production" {
 			// Dev Mode Fallback: Kalau gagal di Sandbox, generate resi dummy untuk keperluan testing.
 			log.Printf("💡 [Dev Mode] Biteship API error — generating DUMMY waybill for testing...")
@@ -585,7 +612,7 @@ func (s *ShippingService) CreateBiteshipOrderForRestock(restock models.RestockRe
 			dummyLink := "https://track.biteship.com/dummy-track-link"
 			return "biteship-dummy-" + restock.ID[:8], dummyResi, dummyLink, nil
 		}
-		
+
 		return "", "", "", fmt.Errorf("biteship api returned status %d: %s", resp.StatusCode, errorMsg)
 	}
 
@@ -610,8 +637,6 @@ func (s *ShippingService) CreateBiteshipOrderForRestock(restock models.RestockRe
 	return result.ID, result.Courier.WaybillID, result.Courier.Link, nil
 }
 
-
-
 // GetPublicTracking melacak resi manual via Public API Biteship
 func (s *ShippingService) GetPublicTracking(waybillID, courierCode string) (map[string]interface{}, error) {
 	url := fmt.Sprintf("%s/v1/trackings/%s/couriers/%s", s.BaseURL, waybillID, courierCode)
@@ -620,8 +645,7 @@ func (s *ShippingService) GetPublicTracking(waybillID, courierCode string) (map[
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	res, err := client.Do(req)
+	res, err := s.doRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reach biteship: %v", err)
 	}
@@ -643,8 +667,7 @@ func (s *ShippingService) GetTracking(biteshipOrderID string) (map[string]interf
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -666,8 +689,7 @@ func (s *ShippingService) GetOrderLabel(biteshipOrderID string) (map[string]inte
 	req.Header.Set("authorization", s.ApiKey)
 	req.Header.Set("content-type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := s.doRequest(req)
 	if err != nil {
 		return nil, err
 	}

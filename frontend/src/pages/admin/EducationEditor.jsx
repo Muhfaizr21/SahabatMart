@@ -1,3 +1,5 @@
+import AdminSelect from '../../components/admin/AdminSelect';
+
 /**
  * EducationEditor.jsx — Classic Editor untuk Materi Edukasi Affiliate
  * Route: /admin/education/new  |  /admin/education/edit/:id
@@ -6,6 +8,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import toast from 'react-hot-toast';
+import JoditEditor from 'jodit-react';
+import { marked } from 'marked';
 
 /* ─── WebP converter (Canvas API) ────────────────────────── */
 const convertToWebP = (file, quality = 0.88) =>
@@ -317,8 +321,6 @@ export default function EducationEditor() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [customCat, setCustomCat] = useState(false);
-  const contentRef = useRef(null);
-
   // Media Picker
   const [pickerOpen, setPickerOpen] = useState(false);
   const [mediaList, setMediaList] = useState([]);
@@ -333,7 +335,13 @@ export default function EducationEditor() {
     fetchJson(`${ADMIN_API_BASE}/education?search=&page=1&limit=200`)
       .then(d => {
         const found = (d?.data || []).find(e => String(e.id) === String(id));
-        if (found) setForm({ ...EMPTY, ...found });
+        if (found) {
+          setForm({ 
+            ...EMPTY, 
+            ...found,
+            content: found.content ? marked.parse(found.content, { breaks: true, async: false }) : ''
+          });
+        }
         else toast.error('Materi tidak ditemukan');
       })
       .catch(() => toast.error('Gagal memuat materi'))
@@ -342,36 +350,6 @@ export default function EducationEditor() {
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
-  /* toolbar insert */
-  const insertAtCursor = useCallback((before, after = '') => {
-    const ta = contentRef.current;
-    if (!ta) return;
-    const s = ta.selectionStart, e = ta.selectionEnd;
-    const sel = ta.value.slice(s, e);
-    const newVal = ta.value.slice(0, s) + before + sel + after + ta.value.slice(e);
-    setForm(prev => ({ ...prev, content: newVal }));
-    requestAnimationFrame(() => {
-      ta.setSelectionRange(s + before.length, s + before.length + sel.length);
-      ta.focus();
-    });
-  }, []);
-
-  const toolbarActions = [
-    { label: 'B', title: 'Bold', fn: () => insertAtCursor('**', '**') },
-    { label: 'I', title: 'Italic', fn: () => insertAtCursor('*', '*') },
-    { label: 'U', title: 'Underline', fn: () => insertAtCursor('<u>', '</u>') },
-    null,
-    { label: 'H2', title: 'Heading 2', fn: () => insertAtCursor('\n## ') },
-    { label: 'H3', title: 'Heading 3', fn: () => insertAtCursor('\n### ') },
-    null,
-    { icon: 'bx-link', title: 'Link', fn: () => { const u = prompt('URL:'); if (u) insertAtCursor('[', `](${u})`); } },
-    { icon: 'bx-list-ul', title: 'Bullet List', fn: () => insertAtCursor('\n- ') },
-    { icon: 'bx-list-ol', title: 'Ordered List', fn: () => insertAtCursor('\n1. ') },
-    null,
-    { icon: 'bxs-quote-left', title: 'Blockquote', fn: () => insertAtCursor('\n> ') },
-    { icon: 'bx-code-block', title: 'Code', fn: () => insertAtCursor('\n```\n', '\n```\n') },
-    { icon: 'bx-horizontal-rule', title: 'Divider', fn: () => insertAtCursor('\n---\n') },
-  ];
 
   /* upload image → WebP */
   const uploadImage = async (file) => {
@@ -391,7 +369,7 @@ export default function EducationEditor() {
       const res = await resp.json();
       const url = res?.data?.url || res?.imageUrl || res?.url;
       if (url) {
-        toast.success('✅ Thumbnail terupload (WebP)', { id: 'edu-up' });
+        toast.success(' Thumbnail terupload (WebP)', { id: 'edu-up' });
         return url;
       }
     } catch (err) {
@@ -488,7 +466,7 @@ export default function EducationEditor() {
               <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, background: form.is_active ? '#dcfce7' : '#fee2e2', color: form.is_active ? '#16a34a' : '#dc2626' }}>
                 {form.is_active ? '● Aktif' : '● Hidden'}
               </span>
-              {form.is_featured && <span style={{ marginLeft: 4, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, background: '#fef3c7', color: '#d97706' }}>⭐ Unggulan</span>}
+              {form.is_featured && <span style={{ marginLeft: 4, padding: '1px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, background: '#fef3c7', color: '#d97706' }}> Unggulan</span>}
             </div>
           </div>
         </div>
@@ -533,13 +511,13 @@ export default function EducationEditor() {
                     </div>
                   )
                   : (
-                    <select className="ee-input" value={form.category} onChange={e => {
+                    <AdminSelect className="ee-input" value={form.category} onChange={e => {
                       if (e.target.value === '__new__') { setCustomCat(true); set('category', ''); }
                       else set('category', e.target.value);
                     }}>
                       {DEFAULT_CATS.map(c => <option key={c} value={c}>{c}</option>)}
-                      <option value="__new__">➕ Tambah Kategori Baru...</option>
-                    </select>
+                      <option value="__new__">+ Tambah Kategori Baru...</option>
+                    </AdminSelect>
                   )
                 }
               </div>
@@ -656,7 +634,7 @@ export default function EducationEditor() {
                       const url = res.url || res.data?.url;
                       if (url) {
                         set('video_url', url);
-                        toast.success('✅ Video berhasil terunggah!', { id: 'vid-up' });
+                        toast.success(' Video berhasil terunggah!', { id: 'vid-up' });
                       } else {
                         throw new Error('No URL returned');
                       }
@@ -694,9 +672,9 @@ export default function EducationEditor() {
           {/* Content — Classic Editor */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', marginBottom: 6 }}>
-              <label className="ee-label" style={{ marginBottom: 0 }}>
+              <label className="ee-label">
                 <i className="bx bx-edit" style={{ marginRight: 4, fontSize: 12 }} />
-                Deskripsi / Konten — Classic Editor
+                Deskripsi / Konten
               </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{wc} kata</span>
@@ -705,27 +683,17 @@ export default function EducationEditor() {
               </div>
             </div>
 
-            {/* Toolbar */}
-            <div className="ee-toolbar">
-              {toolbarActions.map((action, i) =>
-                action === null
-                  ? <div key={i} className="ee-toolbar-sep" />
-                  : <TBtn key={i} label={action.label} icon={action.icon} title={action.title} onClick={action.fn} />
-              )}
-              <div style={{ flex: 1 }} />
-              <div className="ee-toolbar-text" style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 600, alignSelf: 'center', letterSpacing: '0.05em' }}>
-                MARKDOWN SUPPORTED
-              </div>
+            <div style={{ borderRadius: '0 0 12px 12px', borderTop: 'none', background: '#fff' }}>
+              <JoditEditor
+                value={form.content}
+                config={{
+                  readonly: false,
+                  height: 500,
+                  placeholder: 'Tulis deskripsi materi di sini...'
+                }}
+                onBlur={newContent => set('content', newContent)}
+              />
             </div>
-
-            <textarea
-              ref={contentRef}
-              className="ee-content-area"
-              style={{ borderRadius: '0 0 12px 12px', borderTop: 'none' }}
-              placeholder={`Tulis deskripsi materi di sini...\n\n## Apa yang akan dipelajari?\n\nTuliskan ringkasan materi secara jelas dan menarik.\n\n### Tips:\n- Gunakan heading ## dan ### untuk struktur\n- Bold teks penting dengan **teks**\n- Tambahkan list dengan - atau 1.`}
-              value={form.content}
-              onChange={e => set('content', e.target.value)}
-            />
           </div>
 
           {/* Bottom save bar */}
@@ -755,7 +723,7 @@ export default function EducationEditor() {
               <Toggle
                 checked={form.is_featured}
                 onChange={v => set('is_featured', v)}
-                label="Tampilkan sebagai Unggulan ⭐"
+                label="Tampilkan sebagai Unggulan"
               />
             </div>
           </ESection>
@@ -807,12 +775,12 @@ export default function EducationEditor() {
           <ESection icon="bx-bulb" title="Tips Konten" iconColor="#f59e0b" defaultOpen={false}>
             <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                '✅ Judul singkat, jelas, dan menarik',
-                '✅ Konten minimal 100 kata agar informatif',
-                '✅ Tambahkan video YouTube untuk engagement lebih tinggi',
-                '✅ Gunakan heading ## untuk struktur yang rapi',
-                '✅ Set "Unggulan" untuk materi terpenting',
-                '✅ Thumbnail menarik meningkatkan klik mitra',
+                'Judul singkat, jelas, dan menarik',
+                'Konten minimal 100 kata agar informatif',
+                'Tambahkan video YouTube untuk engagement lebih tinggi',
+                'Gunakan heading ## untuk struktur yang rapi',
+                'Set "Unggulan" untuk materi terpenting',
+                'Thumbnail menarik meningkatkan klik mitra',
               ].map((t, i) => (
                 <div key={i} style={{ fontSize: 11, color: '#64748b' }}>{t}</div>
               ))}

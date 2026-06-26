@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { A, PageHeader, TablePanel, statusBadge, fmtDate } from '../../lib/adminStyles.jsx';
+import { AdminActionButtons, AdminEmptyState } from '../../lib/adminComponents.jsx';
 import toast from 'react-hot-toast';
 
 const CustomSelect = ({ label, value, options, onChange, icon }) => {
@@ -204,18 +205,18 @@ export default function AdminBlogs() {
       >
         <button
           onClick={() => navigate('/admin/blogs/new')}
-          style={A.btnPrimary}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
         >
           <i className="bx bx-plus-circle" /> Tulis Artikel Baru
         </button>
       </PageHeader>
 
       {/* FILTER & SEARCH BAR */}
-      <div style={{ ...A.card, overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
         <div style={{ flex: 1, minWidth: 260, position: 'relative' }}>
           <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
           <input
-            style={{ ...A.input, paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
             placeholder="Cari judul, summary atau konten artikel..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -251,7 +252,7 @@ export default function AdminBlogs() {
         {(search || category || status) && (
           <button
             onClick={() => { setSearch(''); setCategory(''); setStatus(''); setPage(1); }}
-            style={{ ...A.btnGhost, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
           >
             <i className="bx bx-x" /> Reset Filter
           </button>
@@ -267,7 +268,7 @@ export default function AdminBlogs() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
                 <button 
                   onClick={bulkDelete}
-                  style={{ ...A.btnPrimary, background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
                 >
                   <i className="bx bx-trash" /> Hapus Terpilih
                 </button>
@@ -338,20 +339,13 @@ export default function AdminBlogs() {
                      <span style={statusBadge(b.status)}>{b.status}</span>
                   </td>
                   <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
-                     <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
-                        <button onClick={() => navigate(`/admin/blogs/edit/${b.id}`)} style={A.iconBtn()} title="Edit Artikel"><i className="bx bx-edit-alt" /></button>
-                        <button onClick={() => deleteBlog(b.id)} style={A.iconBtn('#ef4444', '#fef2f2')} title="Hapus"><i className="bx bx-trash" /></button>
-                     </div>
+                     <AdminActionButtons onEdit={() => navigate(`/admin/blogs/edit/${b.id}`)} onDelete={() => deleteBlog(b.id)} />
                   </td>
                 </tr>
               );
             })}
             {blogs.length === 0 && !loading && (
-              <tr>
-                <td colSpan="6" style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
-                   Belum ada artikel yang ditemukan.
-                </td>
-              </tr>
+              <AdminEmptyState colSpan={6} message="Belum ada artikel yang ditemukan." />
             )}
           </tbody>
         </table>
@@ -363,7 +357,7 @@ export default function AdminBlogs() {
           <button 
             onClick={() => setPage(p => Math.max(1, p - 1))} 
             disabled={page === 1}
-            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 16px', opacity: page === 1 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <i className="bx bx-chevron-left" /> Sebelumnya
           </button>
@@ -395,7 +389,7 @@ export default function AdminBlogs() {
           <button 
             onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
             disabled={page === totalPages}
-            style={{ ...A.btnGhost, padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '8px 16px', opacity: page === totalPages ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
           >
             Berikutnya <i className="bx bx-chevron-right" />
           </button>

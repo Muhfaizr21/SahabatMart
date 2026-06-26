@@ -1,3 +1,5 @@
+import AdminSelect from '../../components/admin/AdminSelect';
+
 /**
  * BlogEditor.jsx — Classic Editor + Yoast SEO Analyzer
  * Halaman penuh (bukan modal) untuk menulis & mengedit artikel.
@@ -7,6 +9,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson, formatImage, getSiteUrl } from '../../lib/api';
 import toast from 'react-hot-toast';
+import JoditEditor from 'jodit-react';
+import { marked } from 'marked';
 
 /* ─── WebP converter (client-side via Canvas) ──────────────── */
 const convertToWebP = (file, quality = 0.88) =>
@@ -502,7 +506,7 @@ const Section = ({ icon, title, iconColor = '#6366f1', children, defaultOpen = t
 const EMPTY = {
   id: 0, title: '', slug: '', summary: '', content: '',
   author: 'Admin AkuGlow', category: 'Update', tags: '',
-  image: '', status: 'draft',
+  image: '', status: 'published',
   meta_title: '', meta_description: '', focus_keyword: '',
   og_image: '', canonical_url: '', no_index: false,
 };
@@ -519,7 +523,6 @@ export default function BlogEditor() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [sideTab, setSideTab] = useState('seo');
-  const contentRef = useRef(null);
 
   // Media Library Picker
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
@@ -537,7 +540,13 @@ export default function BlogEditor() {
       .then(d => {
         const all = d?.data || [];
         const found = all.find(b => String(b.id) === String(id));
-        if (found) setForm({ ...EMPTY, ...found });
+        if (found) {
+          setForm({ 
+            ...EMPTY, 
+            ...found, 
+            content: found.content ? marked.parse(found.content, { breaks: true, async: false }) : '' 
+          });
+        }
         else toast.error('Artikel tidak ditemukan');
       })
       .catch(() => toast.error('Gagal memuat artikel'))
@@ -562,40 +571,7 @@ export default function BlogEditor() {
     return next;
   });
 
-  /* Toolbar insert */
-  const insertAtCursor = useCallback((before, after = '') => {
-    const ta = contentRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const selected = ta.value.slice(start, end);
-    const newVal = ta.value.slice(0, start) + before + selected + after + ta.value.slice(end);
-    set('content', newVal);
-    // restore selection after React re-render
-    requestAnimationFrame(() => {
-      ta.setSelectionRange(start + before.length, start + before.length + selected.length);
-      ta.focus();
-    });
-  }, []);
-
-  const toolbarActions = [
-    { label: 'B', title: 'Bold', fn: () => insertAtCursor('**', '**') },
-    { label: 'I', title: 'Italic', action: 'italic', fn: () => insertAtCursor('*', '*') },
-    { label: 'U', title: 'Underline', fn: () => insertAtCursor('<u>', '</u>') },
-    null,
-    { label: 'H2', title: 'Heading 2', fn: () => insertAtCursor('\n## ', '') },
-    { label: 'H3', title: 'Heading 3', fn: () => insertAtCursor('\n### ', '') },
-    null,
-    { icon: 'bx-link', title: 'Link', fn: () => { const url = prompt('URL:'); if (url) insertAtCursor('[', `](${url})`); } },
-    { icon: 'bx-image', title: 'Gambar', fn: () => { const url = prompt('URL Gambar:'); if (url) insertAtCursor(`\n![Alt text](${url})\n`); } },
-    null,
-    { icon: 'bx-list-ul', title: 'Bullet List', fn: () => insertAtCursor('\n- ', '') },
-    { icon: 'bx-list-ol', title: 'Numbered List', fn: () => insertAtCursor('\n1. ', '') },
-    { icon: 'bx-code-block', title: 'Code Block', fn: () => insertAtCursor('\n```\n', '\n```\n') },
-    null,
-    { icon: 'bx-horizontal-rule', title: 'Divider', fn: () => insertAtCursor('\n---\n') },
-    { icon: 'bxs-quote-left', title: 'Blockquote', fn: () => insertAtCursor('\n> ', '') },
-  ];
+  // Toolbar and insertAtCursor removed for JoditEditor
 
   /* Load media library */
   const loadMediaLibrary = (search = '') => {
@@ -655,7 +631,7 @@ export default function BlogEditor() {
           if (field === 'image' && !prev.og_image) next.og_image = url;
           return next;
         });
-        toast.success(`✅ Terupload sebagai WebP!`, { id: 'webp-convert' });
+        toast.success(` Terupload sebagai WebP!`, { id: 'webp-convert' });
       }
     } catch (err) {
       toast.error('Upload gagal: ' + err.message, { id: 'webp-convert' });
@@ -735,20 +711,20 @@ export default function BlogEditor() {
             <span style={{ fontSize: 12, fontWeight: 700, color: scoreColor(seo.score) }}>SEO {scoreLabel(seo.score)}</span>
           </div>
 
-          <select
+          <AdminSelect
             value={form.status}
             onChange={e => set('status', e.target.value)}
             style={{ padding: '8px 12px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 13, fontWeight: 700, color: '#1e293b', background: '#fff', cursor: 'pointer', outline: 'none' }}
           >
-            <option value="draft">📁 Draft</option>
-            <option value="published">✅ Published</option>
-          </select>
+            <option value="draft"> Draft</option>
+            <option value="published"> Published</option>
+          </AdminSelect>
 
           <button className="be-btn be-btn-ghost be-btn-sm" type="button" onClick={() => handleSave('draft')} disabled={saving}>
             <i className="bx bx-save" /> Simpan Draft
           </button>
           <button className="be-btn be-btn-primary" type="button" onClick={() => handleSave()} disabled={saving}>
-            {saving ? <><i className="bx bx-loader-alt bx-spin" /> Menyimpan...</> : <><i className="bx bx-send" /> {form.status === 'published' ? 'Perbarui' : 'Terbitkan'}</>}
+            {saving ? <><i className="bx bx-loader-alt bx-spin" /> Menyimpan...</> : <><i className="bx bx-send" /> {isEdit ? 'Perbarui' : 'Terbitkan'}</>}
           </button>
         </div>
       </div>
@@ -792,9 +768,9 @@ export default function BlogEditor() {
               </div>
               <div>
                 <label className="be-label">Kategori</label>
-                <select className="be-input" style={{ width: 150 }} value={form.category} onChange={e => set('category', e.target.value)}>
+                <AdminSelect className="be-input" style={{ width: 150 }} value={form.category} onChange={e => set('category', e.target.value)}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                </AdminSelect>
               </div>
             </div>
           </div>
@@ -879,12 +855,12 @@ export default function BlogEditor() {
             />
           </div>
 
-          {/* Classic Editor Toolbar + Content */}
+          {/* WYSIWYG Editor */}
           <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <label className="be-label" style={{ marginBottom: 0 }}>
                 <i className="bx bx-edit" style={{ marginRight: 4, fontSize: 12 }} />
-                Konten Artikel — Classic Editor
+                Konten Artikel
               </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{wc} kata</span>
@@ -895,33 +871,10 @@ export default function BlogEditor() {
               </div>
             </div>
 
-            {/* Toolbar */}
-            <div className="be-toolbar">
-              {toolbarActions.map((action, i) => {
-                if (action === null) return <div key={i} className="be-toolbar-sep" />;
-                return (
-                  <TBtn
-                    key={i}
-                    label={action.label}
-                    icon={action.icon}
-                    title={action.title}
-                    onClick={action.fn}
-                  />
-                );
-              })}
-              <div style={{ flex: 1 }} />
-              <div className="be-toolbar-text" style={{ fontSize: 10, color: '#cbd5e1', fontWeight: 600, alignSelf: 'center', letterSpacing: '0.05em' }}>
-                MARKDOWN SUPPORTED
-              </div>
-            </div>
-
-            <textarea
-              ref={contentRef}
-              className="be-content-area"
-              style={{ borderRadius: '0 0 12px 12px', borderTop: 'none' }}
-              placeholder={`Tulis konten artikel Anda di sini...\n\n## Gunakan heading untuk struktur yang baik\n\nSertakan focus keyword secara alami di paragraf pertama.\n\n### Tips menulis konten SEO-friendly:\n- Gunakan focus keyword 2–3x per 100 kata\n- Tambahkan internal link ke halaman relevan\n- Tulis minimal 300 kata untuk konten berkualitas`}
+            <JoditEditor
               value={form.content}
-              onChange={e => set('content', e.target.value)}
+              config={{ placeholder: 'Tulis konten artikel Anda di sini...', minHeight: 400 }}
+              onBlur={newContent => set('content', newContent)}
             />
           </div>
 
@@ -1074,16 +1027,16 @@ export default function BlogEditor() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
                     <label className="be-label">Status</label>
-                    <select className="be-input" value={form.status} onChange={e => set('status', e.target.value)}>
-                      <option value="draft">📁 Draft</option>
-                      <option value="published">✅ Published</option>
-                    </select>
+                    <AdminSelect className="be-input" value={form.status} onChange={e => set('status', e.target.value)}>
+                      <option value="draft"> Draft</option>
+                      <option value="published"> Published</option>
+                    </AdminSelect>
                   </div>
                   <div>
                     <label className="be-label">Kategori</label>
-                    <select className="be-input" value={form.category} onChange={e => set('category', e.target.value)}>
+                    <AdminSelect className="be-input" value={form.category} onChange={e => set('category', e.target.value)}>
                       {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    </AdminSelect>
                   </div>
                   <div>
                     <label className="be-label">Penulis</label>

@@ -2,10 +2,10 @@ package services
 
 import (
 	"akuglow/backend/models"
+	"gorm.io/gorm"
 	"strconv"
 	"strings"
 	"time"
-	"gorm.io/gorm"
 )
 
 type ConfigService struct {
@@ -56,13 +56,13 @@ func (s *ConfigService) Set(key string, value string, description string) error 
 	err := s.DB.Where("key = ?", key).First(&cfg).Error
 	if err != nil {
 		cfg = models.PlatformConfig{
-			Key:   key,
-			Value: value,
+			Key:         key,
+			Value:       value,
 			Description: description,
 		}
 		return s.DB.Create(&cfg).Error
 	}
-	
+
 	cfg.Value = value
 	cfg.Description = description
 	return s.DB.Save(&cfg).Error
@@ -88,18 +88,18 @@ func (s *ConfigService) SeedFinancialConfigs() {
 
 func (s *ConfigService) IsPayday() (bool, string) {
 	schedule := s.Get("payout_schedule", "weekly")
-	
+
 	if schedule == "daily" {
 		return true, ""
 	}
-	
+
 	if schedule == "weekly" {
 		payoutDay := strings.ToLower(s.Get("payout_day", "friday"))
 		todayWeekday := strings.ToLower(time.Now().Weekday().String())
 		if todayWeekday == payoutDay {
 			return true, ""
 		}
-		
+
 		var indonesianDay string
 		switch payoutDay {
 		case "monday":
@@ -121,7 +121,7 @@ func (s *ConfigService) IsPayday() (bool, string) {
 		}
 		return false, "Hari " + indonesianDay
 	}
-	
+
 	// monthly schedule
 	datesStr := s.Get("payout_payday_dates", "25,30")
 	if datesStr == "all" || datesStr == "" {

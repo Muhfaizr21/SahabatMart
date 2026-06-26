@@ -68,7 +68,7 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 		var item models.CartItem
 		// [BUG-H3 Fix] ProductVariantID sekarang *string, query tetap menggunakan string value
 		result := tx.Where("cart_id = ? AND product_variant_id = ? AND merchant_id = ? AND metadata = ?", cart.ID, variantID, merchantID, metadata).First(&item)
-		
+
 		if result.Error == nil {
 			// Update quantity if exists
 			item.Quantity += quantity
@@ -95,7 +95,7 @@ func (s *BuyerService) AddToCart(buyerID string, productID string, variantID str
 		if quantity <= 0 {
 			return nil
 		}
-		
+
 		// [BUG-H3 Fix] ProductVariantID sekarang *string — gunakan pointer jika tidak kosong
 		var variantPtr *string
 		if variantID != "" {
@@ -156,7 +156,7 @@ func (s *BuyerService) MoveFromWishlistToCart(buyerID string, productID string, 
 func (s *BuyerService) ToggleWishlist(buyerID string, productID string) (bool, error) {
 	var exist models.Wishlist
 	err := s.DB.Where("buyer_id = ? AND product_id = ?", buyerID, productID).First(&exist).Error
-	
+
 	if err == nil {
 		// Already exists, remove it
 		err = s.DB.Delete(&exist).Error
@@ -210,11 +210,11 @@ func (s *BuyerService) ClearCart(buyerID string) error {
 			fmt.Printf("[ERROR] ClearCart: Failed to delete cart items for cart %s: %v\n", cart.ID, result.Error)
 			return result.Error
 		}
-		
+
 		fmt.Printf("[DEBUG] ClearCart: Deleted %d items from cart %s for buyer %s\n", result.RowsAffected, cart.ID, buyerID)
-		
+
 		// Optional: We could delete the cart record too, but keeping it empty is usually fine
-		
+
 		utils.Hub.Broadcast(buyerID, map[string]interface{}{"type": "cart_update", "trigger": "cart_cleared"})
 		return nil
 	})

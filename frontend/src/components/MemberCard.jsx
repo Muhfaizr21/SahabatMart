@@ -1,7 +1,9 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useTheme } from '../context/ThemeContext';
 
 const MemberCard = ({ user, profile, size = 'small' }) => {
+  const { theme } = useTheme();
   if (!user) return null;
 
   // Format ID to look like a credit/e-money card number (4 groups of 4 characters)
@@ -67,7 +69,7 @@ const MemberCard = ({ user, profile, size = 'small' }) => {
           {/* Top-Left: AkuGlow Logo Badge */}
           <div className="bg-transparent flex items-center justify-center">
             <img 
-              src="/akuglow.webp" 
+              src={theme?.platform_logo || "/akuglow.webp"} 
               alt="AkuGlow" 
               className="w-auto object-contain"
               style={{

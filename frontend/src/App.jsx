@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
@@ -120,6 +120,9 @@ import MembershipTiers from './pages/admin/MembershipTiers';
 import AdminReviews from './pages/admin/AdminReviews';
 import CommissionPresets from './pages/admin/CommissionPresets';
 import AdminDemographics from './pages/admin/Demographics';
+import CMSDashboard from './pages/admin/cms/CMSDashboard';
+import CMSPlatformEditor from './pages/admin/cms/CMSPlatformEditor';
+import CMSThemeProvider from './lib/cms';
 import HomePage from './pages/HomePage';
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -128,7 +131,7 @@ import { ThemeProvider } from './context/ThemeContext';
 function NavbarManager({ maintenanceActive }) {
   const location = useLocation();
   if (maintenanceActive) return null;
-  const hidePaths = ['/admin', '/merchant', '/affiliate', '/invoice', '/packing-slip'];
+  const hidePaths = ['/admin', '/merchant', '/affiliate', '/invoice', '/packing-slip', '/login', '/register', '/forgot-password', '/reset-password'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return (
     <>
@@ -142,7 +145,7 @@ function NavbarManager({ maintenanceActive }) {
 function FooterManager({ maintenanceActive }) {
   const location = useLocation();
   if (maintenanceActive) return null;
-  const hidePaths = ['/admin', '/merchant', '/affiliate', '/invoice', '/packing-slip'];
+  const hidePaths = ['/admin', '/merchant', '/affiliate', '/invoice', '/packing-slip', '/login', '/register', '/forgot-password', '/reset-password'];
   if (hidePaths.some(path => location.pathname.startsWith(path))) return null;
   return <Footer />;
 }
@@ -232,6 +235,24 @@ function AppContent() {
   const isPanel = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
   const [maintenance, setMaintenance] = useState({ active: false, message: '' });
 
+  // Device location cache (from browser Geolocation API)
+  const deviceLocRef = useRef(null);
+
+  // Grab device location once on mount — no prompt on every nav
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        deviceLocRef.current = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        };
+      },
+      () => {}, // permission denied → silently skip
+      { timeout: 3000, enableHighAccuracy: false }
+    );
+  }, []);
+
   // Automatic page tracking for user locations
   useEffect(() => {
     const isPanelPath = ['/admin', '/merchant', '/affiliate'].some(path => location.pathname.startsWith(path));
@@ -250,10 +271,18 @@ function AppContent() {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const body = {
+      visited_url: location.pathname + location.search,
+      ...(deviceLocRef.current ? {
+        lat: deviceLocRef.current.lat,
+        lon: deviceLocRef.current.lon,
+      } : {}),
+    };
+
     fetch(`${base}/api/public/location/log`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ visited_url: location.pathname + location.search }),
+      body: JSON.stringify(body),
     }).catch(() => {});
   }, [location.pathname, location.search]);
 
@@ -323,6 +352,7 @@ function AppContent() {
       <ScrollToTop />
       <Toaster position="top-right" reverseOrder={false} />
       <NavbarManager maintenanceActive={maintenance.active} />
+      {!isPanel && <CMSThemeProvider platform="landing_page" />}
       <div className={`flex-1 ${isPanel ? '' : 'bg-white'}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -406,6 +436,10 @@ function AppContent() {
             <Route path="membership-tiers" element={<MembershipTiers />} />
             <Route path="commission-presets" element={<CommissionPresets />} />
             <Route path="settings" element={<AdminSettings />} />
+
+            {/* CMS Visual Editor — all in one page per platform */}
+            <Route path="cms" element={<CMSDashboard />} />
+            <Route path="cms/:platform" element={<CMSPlatformEditor />} />
 
           </Route>
 

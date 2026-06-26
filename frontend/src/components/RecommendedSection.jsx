@@ -6,7 +6,7 @@ import { isAuthenticated } from '../lib/auth';
 export default function RecommendedSection({ 
   productId = "",
   limit = 5, 
-  title = "Rekomendasi Spesial ✨", 
+  title = "Rekomendasi Spesial ", 
   subtitle = "Berdasarkan aktivitas dan minat Anda.",
   className = ""
 }) {

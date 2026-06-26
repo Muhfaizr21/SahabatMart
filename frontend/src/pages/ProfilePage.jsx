@@ -276,7 +276,11 @@ export default function ProfilePage() {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-32 h-32 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-4xl font-black mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg relative group cursor-pointer"
               >
-                <img src={formatImage(formData.avatar_url || profile.avatar_url) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop"} alt={profile.full_name} className={`w-full h-full object-cover transition-transform ${uploadingAvatar ? 'opacity-50' : 'group-hover:scale-110'}`} />
+                {(formatImage(formData.avatar_url || profile.avatar_url)) ? (
+                  <img src={formatImage(formData.avatar_url || profile.avatar_url)} alt={profile.full_name} className={`w-full h-full object-cover transition-transform ${uploadingAvatar ? 'opacity-50' : 'group-hover:scale-110'}`} />
+                ) : (
+                  <span className="text-4xl font-black text-rose-600">{profile.full_name?.charAt(0)?.toUpperCase() || '?'}</span>
+                )}
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <i className={`bx ${uploadingAvatar ? 'bx-loader-alt animate-spin' : 'bx-camera'} text-white text-3xl`}></i>
                 </div>
@@ -430,7 +434,7 @@ export default function ProfilePage() {
                           </div>
                        ) : areaSearch.length > 0 && (
                           <div className="mt-2 text-[10px] text-orange-500 font-bold flex items-center gap-1">
-                            <span>⚠️</span> Silakan pilih lokasi dari daftar yang muncul
+                            <span></span> Silakan pilih lokasi dari daftar yang muncul
                           </div>
                        )}
                     </div>
@@ -476,7 +480,7 @@ export default function ProfilePage() {
                   
                   {orders.length === 0 ? (
                      <div className="text-center py-20 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
-                        <div className="text-5xl mb-4 opacity-50">🛒</div>
+                        <div className="text-5xl mb-4 opacity-50"></div>
                         <h4 className="text-lg font-bold text-gray-900 mb-2">Belum ada pesanan</h4>
                         <p className="text-gray-400 mb-6 text-sm">Pesanan yang Anda buat akan muncul di sini.</p>
                         <Link to="/shop" className="bg-gray-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-blue-600 transition-colors">Mulai Belanja</Link>
@@ -538,7 +542,7 @@ export default function ProfilePage() {
                   {orders.length > 0 ? (
                     <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
                       <div className="flex items-center gap-4 mb-6">
-                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">📍</div>
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl"></div>
                         <div>
                           <h4 className="font-black text-gray-900">{orders[0].shipping_name}</h4>
                           <p className="text-xs text-gray-400 font-bold">{orders[0].shipping_phone}</p>
@@ -563,7 +567,7 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-gray-200 bg-gray-50/50 rounded-3xl p-10 text-center relative max-w-lg mx-auto mt-10">
-                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-4xl mx-auto mb-6">📍</div>
+                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-4xl mx-auto mb-6"></div>
                       <h4 className="text-lg font-black text-gray-900 mb-2">Belum Ada Alamat Tersimpan</h4>
                       <p className="text-gray-500 text-sm leading-relaxed mb-6">Untuk saat ini, setiap kali Anda melakukan pemesanan (Checkout), data alamat pengiriman Anda akan secara otomatis diperbarui berdasarkan entri tersebut.</p>
                       <button onClick={() => navigate('/shop')} className="bg-gray-900 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-xl text-sm transition-all shadow-xl shadow-gray-200">

@@ -43,7 +43,7 @@ const EligibilityCard = ({ eligibility, totalMitra, activeMitra, monthlyTurnover
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
             {isEligible
-              ? '🎉 Anda memenuhi syarat! Ajukan upgrade sekarang.'
+              ? ' Anda memenuhi syarat! Ajukan upgrade sekarang.'
               : `Penuhi ${totalReqs} syarat berikut untuk naik jenjang`}
           </p>
         </div>

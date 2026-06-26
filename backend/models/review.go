@@ -20,7 +20,7 @@ type Review struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 
-	Buyer            User      `gorm:"foreignKey:BuyerID" json:"buyer,omitempty"`
+	Buyer User `gorm:"foreignKey:BuyerID" json:"buyer,omitempty"`
 }
 
 func (Review) TableName() string { return "reviews" }

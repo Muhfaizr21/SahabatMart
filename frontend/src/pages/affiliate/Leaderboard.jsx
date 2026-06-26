@@ -3,7 +3,8 @@ import { fetchJson, AFFILIATE_API_BASE } from '../../lib/api';
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
-const medals = ['🥇', '🥈', '🥉'];
+const medalColors = ['#fabc4e', '#94a3b8', '#c97c3a'];
+const medalLabels = ['#1', '#2', '#3'];
 
 export default function Leaderboard() {
   const [data, setData] = useState([]);
@@ -51,7 +52,7 @@ export default function Leaderboard() {
             className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
             style={{ background: 'rgba(250,188,78,0.15)' }}
           >
-            🏆
+            <i className="bx bx-trophy text-2xl" style={{color:'#fabc4e'}}/>
           </div>
           <div>
             <h2 className="font-black text-white font-['Plus_Jakarta_Sans']">Mitra Berprestasi</h2>
@@ -83,7 +84,7 @@ export default function Leaderboard() {
                     fontSize: idx < 3 ? '18px' : '14px',
                   }}
                 >
-                  {idx < 3 ? medals[idx] : item.rank}
+                  {idx < 3 ? medalLabels[idx] : item.rank}
                 </div>
 
                 {/* Avatar + Info */}

@@ -9,155 +9,238 @@ import (
 	"gorm.io/gorm"
 )
 
-func StartHousekeeping(db *gorm.DB) {
+func StartHousekeeping(db *gorm.DB) func() {
 	log.Println("🧹 Housekeeping Background Worker Started")
 	financeService := NewFinanceService(db)
 	notifService := NewNotificationService(db)
 	affiliateService := NewAffiliateService(db, notifService)
 	orderService := NewOrderService(db)
 
-	ticker := time.NewTicker(5 * time.Minute) // Check every 5 minutes for expiry
-	for range ticker.C {
-		log.Println("🔄 Running Platform Housekeeping...")
+	stop := make(chan struct{})
+	ticker := time.NewTicker(5 * time.Minute)
 
-		// 1. Process Merchant Settlements
-		settled, err := financeService.ProcessSettlements()
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("🔥 Housekeeping panic recovered: %v", r)
+			}
+		}()
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-stop:
+				log.Println("🧹 Housekeeping worker stopped")
+				return
+			case <-ticker.C:
+				runHousekeepingCycle(db, financeService, notifService, affiliateService, orderService)
+			}
+		}
+	}()
+
+	return func() { close(stop) }
+}
+
+func runHousekeepingCycle(db *gorm.DB,
+	financeService *FinanceService,
+	notifService *NotificationService,
+	affiliateService *AffiliateService,
+	orderService *OrderService,
+) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("🔥 Housekeeping cycle panic recovered: %v", r)
+		}
+	}()
+
+	log.Println("🔄 Running Platform Housekeeping...")
+
+	tasks := []struct {
+		name string
+		fn   func() error
+	}{
+		{"Settlement", func() error {
+			settled, err := financeService.ProcessSettlements()
+			if err == nil && settled > 0 {
+				log.Printf("💰 Financial Sync: %d transactions settled", settled)
+			}
+			return err
+		}},
+		{"Logistics", func() error { return autoUpdateLogisticsWithRetry(db, orderService) }},
+		{"Affiliate Commissions", func() error { return releaseAffiliateCommissions(db, notifService) }},
+		{"Order Expiry", func() error { return orderService.ExpireOrders() }},
+		{"Merchant Overdue", func() error { return autoCancelOverdueMerchantOrders(db, orderService, notifService) }},
+		{"Leaderboard Sync", func() error { return affiliateService.SyncLeaderboard() }},
+		{"Voucher Cleanup", func() error { return cleanupVouchers(db) }},
+		{"Platform Ledger", func() error {
+			ledger, err := financeService.SyncPlatformLedger()
+			if err == nil {
+				log.Printf("📊 Platform Ledger Sync: %+v", ledger)
+			}
+			return err
+		}},
+		{"Merchant Downgrade", func() error {
+			_, err := affiliateService.CheckAndDowngradeMerchants()
+			return err
+		}},
+	}
+
+	for _, task := range tasks {
+		if err := task.fn(); err != nil {
+			log.Printf("❌ Housekeeping Error (%s): %v", task.name, err)
+		}
+	}
+
+	// Check recent affiliates for tier upgrades
+	var recentlyActiveAffiliates []models.AffiliateMember
+	checkSince := time.Now().Add(-15 * time.Minute)
+	db.Where("status = 'active' AND updated_at >= ?", checkSince).Find(&recentlyActiveAffiliates)
+	if len(recentlyActiveAffiliates) > 0 {
+		log.Printf("👥 Safety Check: Validating tier upgrades for %d recently active affiliates...", len(recentlyActiveAffiliates))
+		for _, aff := range recentlyActiveAffiliates {
+			go func(id string) {
+				defer func() { recover() }()
+				affiliateService.TriggerTierUpgrade(id)
+			}(aff.ID)
+		}
+	}
+
+	// Cleanup old logs
+	db.Exec("DELETE FROM user_location_logs WHERE created_at < ?", time.Now().AddDate(0, 0, -90))
+	db.Exec("DELETE FROM ip_location_caches WHERE created_at < ?", time.Now().AddDate(0, 0, -90))
+
+	// Weekly demographics report
+	sendWeeklyDemographicsReport(db)
+}
+
+func autoUpdateLogisticsWithRetry(db *gorm.DB, orderService *OrderService) error {
+	shippingSvc := NewShippingService(db)
+	now := time.Now()
+	deadline := now.Add(-48 * time.Hour)
+
+	var groups []models.OrderMerchantGroup
+	if err := db.Where("status = ? AND biteship_order_id != '' AND updated_at <= ?",
+		models.MOrderShipped, deadline).Find(&groups).Error; err != nil {
+		return err
+	}
+
+	for _, group := range groups {
+		// [FIX #14] Validate biteship_order_id format before calling API
+		if len(group.BiteshipOrderID) < 10 {
+			log.Printf("⚠️ [FIX #14] Invalid biteship_order_id for group %s: %q", group.ID, group.BiteshipOrderID)
+			db.Model(&group).Update("status", models.MOrderCancelled)
+			db.Model(&group).Update("cancel_reason", "Status pengiriman tidak valid (invalid Biteship ID)")
+			continue
+		}
+
+		tracking, err := shippingSvc.GetTracking(group.BiteshipOrderID)
 		if err != nil {
-			log.Printf("❌ Housekeeping Error (Settlement): %v", err)
-		} else if settled > 0 {
-			log.Printf("💰 Financial Sync: %d transactions settled to available balance", settled)
+			log.Printf("⚠️ [Housekeeping] Biteship tracking check failed for group %s: %v", group.ID, err)
+			continue
 		}
 
-		// 2. Auto-update Logistics & Order Completion
-		if err := autoUpdateLogistics(db, orderService); err != nil {
-			log.Printf("❌ Housekeeping Error (Logistics): %v", err)
-		}
-
-		// 3. Release Affiliate Commissions
-		if err := releaseAffiliateCommissions(db, notifService); err != nil {
-			log.Printf("❌ Housekeeping Error (Affiliate Commissions): %v", err)
-		}
-
-		// 4. Auto-expire unpaid orders & return stock
-		if err := orderService.ExpireOrders(); err != nil {
-			log.Printf("❌ Housekeeping Error (Order Expiry): %v", err)
-		}
-
-		// 5. Auto-upgrade Affiliate Tiers (Optimization: Only check recently active ones)
-		// We avoid looping through 10K+ users every run. 
-		// Real-time upgrades are handled in OrderService; this is a safety fallback.
-		var recentlyActiveAffiliates []models.AffiliateMember
-		checkSince := time.Now().Add(-15 * time.Minute)
-		db.Where("status = 'active' AND updated_at >= ?", checkSince).Find(&recentlyActiveAffiliates)
-		
-		if len(recentlyActiveAffiliates) > 0 {
-			log.Printf("👥 Safety Check: Validating tier upgrades for %d recently active affiliates...", len(recentlyActiveAffiliates))
-			for _, aff := range recentlyActiveAffiliates {
-				go affiliateService.TriggerTierUpgrade(aff.ID) // [BUG-M1 Fix] Run async
-			}
-		}
-
-		// 6. Auto-cancel Merchant orders if not shipped within 48h
-		if err := autoCancelOverdueMerchantOrders(db, orderService, notifService); err != nil {
-			log.Printf("❌ Housekeeping Error (Merchant Overdue): %v", err)
-		}
-
-		// 7. Sync Leaderboard Cache (Hourly or every 5 mins for now)
-		if err := affiliateService.SyncLeaderboard(); err != nil {
-			log.Printf("❌ Housekeeping Error (Leaderboard): %v", err)
-		}
-
-		// 8. Cleanup Expired Vouchers
-		if err := cleanupVouchers(db); err != nil {
-			log.Printf("❌ Housekeeping Error (Voucher Cleanup): %v", err)
-		}
-
-		// 9. Sync Platform Ledger
-		ledger, err := financeService.SyncPlatformLedger()
-		if err == nil {
-			log.Printf("📊 Platform Ledger Sync: %+v", ledger)
-		}
-
-		// 10. [Sync Fix] Update Merchant Stats & Send Warnings jika tidak memenuhi syarat
-		_, errMerchant := affiliateService.CheckAndDowngradeMerchants()
-		if errMerchant != nil {
-			log.Printf("❌ Housekeeping Error (Merchant Downgrade Check): %v", errMerchant)
-		}
-
-		// 11. Cleanup Demographics Logs > 90 Days
-		db.Exec("DELETE FROM user_location_logs WHERE created_at < ?", time.Now().AddDate(0, 0, -90))
-		db.Exec("DELETE FROM ip_location_caches WHERE created_at < ?", time.Now().AddDate(0, 0, -90))
-
-		// 12. Send Weekly Demographics Report (Every Monday at 8 AM)
-		now := time.Now()
-		if now.Weekday() == time.Monday && now.Hour() == 8 {
-			weekStr := now.Format("2006-W02")
-			var sentCfg models.PlatformConfig
-			var lastSent string
-			if err := db.Where("key = ?", "last_demographics_report_sent").First(&sentCfg).Error; err == nil {
-				lastSent = sentCfg.Value
+		status, _ := tracking["status"].(string)
+		if status == "delivered" {
+			now := time.Now()
+			group.Status = models.MOrderDelivered
+			group.DeliveredAt = &now
+			if err := db.Save(&group).Error; err != nil {
+				log.Printf("❌ [Housekeeping] Failed to update delivered status for group %s: %v", group.ID, err)
+				continue
 			}
 
-			if lastSent != weekStr {
-				var reportEnabled models.PlatformConfig
-				var adminEmail models.PlatformConfig
-				db.Where("key = ?", "demographics_weekly_report").First(&reportEnabled)
-				db.Where("key = ?", "demographics_admin_email").First(&adminEmail)
-
-				if reportEnabled.Value == "true" && adminEmail.Value != "" {
-					var uniqueVisitors int64
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&uniqueVisitors)
-
-					var countriesCount int64
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("country_code").Count(&countriesCount)
-
-					type TopCity struct {
-						City  string
-						Count int64
-					}
-					var topCity TopCity
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Select("city, COUNT(DISTINCT ip_hash) as count").Group("city").Order("count DESC").Limit(1).Scan(&topCity)
-
-					var vCount, pCount, cCount, oCount int64
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&vCount)
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND visited_url LIKE ?", now.AddDate(0, 0, -7), "%/product%").Distinct("ip_hash").Count(&pCount)
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND (visited_url LIKE ? OR visited_url LIKE ?)", now.AddDate(0, 0, -7), "%/checkout%", "%/cart%").Distinct("ip_hash").Count(&cCount)
-					db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND is_converted = true", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&oCount)
-
-					recommendation := "- Performa konversi berjalan dengan baik. Pertimbangkan untuk meningkatkan kampanye marketing untuk kota teratas.\n"
-					if vCount > 0 && (float64(oCount)/float64(vCount)*100.0) < 2.0 {
-						recommendation = "- Rasio konversi mingguan Anda berada di bawah 2%. Pertimbangkan untuk menawarkan promo gratis ongkir atau diskon voucher di wilayah dengan traffic tinggi.\n"
-					}
-
-					emailBody := fmt.Sprintf("Halo Admin,\n\nBerikut adalah Laporan Demografi Mingguan AkuGlow untuk periode 7 hari terakhir:\n\nMETRIK UTAMA:\n- Total Pengunjung Unik: %d\n- Jumlah Negara Terdeteksi: %d\n- Kota dengan Traffic Tertinggi: %s (%d pengunjung)\n\nFUNNEL KONVERSI WILAYAH:\n- Total Pengunjung: %d\n- Lihat Produk: %d (%.1f%%)\n- Masuk Checkout/Keranjang: %d (%.1f%%)\n- Sukses Transaksi: %d (%.1f%%)\n\nREKOMENDASI SISTEM:\n%s\nSalam,\nSistem Analitik AkuGlow",
-						uniqueVisitors, countriesCount, topCity.City, topCity.Count, vCount, pCount, func() float64 {
-							if vCount > 0 { return float64(pCount)/float64(vCount)*100 }
-							return 0
-						}(), cCount, func() float64 {
-							if vCount > 0 { return float64(cCount)/float64(vCount)*100 }
-							return 0
-						}(), oCount, func() float64 {
-							if vCount > 0 { return float64(oCount)/float64(vCount)*100 }
-							return 0
-						}(), recommendation)
-
-					emailSvc := NewEmailService(db)
-					errEmail := emailSvc.SendEmail(adminEmail.Value, "Laporan Demografi Mingguan AkuGlow - "+weekStr, emailBody)
-					if errEmail != nil {
-						log.Printf("❌ Failed to send weekly demographics email: %v", errEmail)
-					} else {
-						log.Printf("📧 Weekly Demographics Report sent successfully to %s", adminEmail.Value)
-						if sentCfg.Key != "" {
-							sentCfg.Value = weekStr
-							db.Save(&sentCfg)
-						} else {
-							db.Create(&models.PlatformConfig{Key: "last_demographics_report_sent", Value: weekStr})
-						}
-					}
-				}
+			financeService := NewFinanceService(db)
+			if err := financeService.UpdateSettlementDatesOnDelivery(db, group.OrderID); err != nil {
+				log.Printf("⚠️ [Housekeeping] Failed to update settlement for order %s: %v", group.OrderID, err)
 			}
-		}
 
+			if err := orderService.SyncOrderStatusFromGroups(db, group.OrderID); err != nil {
+				log.Printf("⚠️ [Housekeeping] Failed to sync order status for %s: %v", group.OrderID, err)
+			}
+
+			log.Printf("✅ [Housekeeping] Auto-delivered group %s via Biteship tracking", group.ID)
+		} else if status == "cancelled" || status == "not_found" {
+			// [FIX #14] Auto-cancel groups where Biteship rejected/dropped the shipment
+			log.Printf("⚠️ [FIX #14] Biteship %s for group %s, auto-cancelling", status, group.ID)
+			db.Model(&group).Updates(map[string]interface{}{
+				"status":        models.MOrderCancelled,
+				"cancel_reason": fmt.Sprintf("Status pengiriman dari Biteship: %s", status),
+			})
+		}
+	}
+
+	return nil
+}
+
+func sendWeeklyDemographicsReport(db *gorm.DB) {
+	now := time.Now()
+	if now.Weekday() != time.Monday || now.Hour() != 8 {
+		return
+	}
+
+	weekStr := now.Format("2006-W02")
+	var sentCfg models.PlatformConfig
+	var lastSent string
+	if err := db.Where("key = ?", "last_demographics_report_sent").First(&sentCfg).Error; err == nil {
+		lastSent = sentCfg.Value
+	}
+	if lastSent == weekStr {
+		return
+	}
+
+	var reportEnabled models.PlatformConfig
+	var adminEmail models.PlatformConfig
+	db.Where("key = ?", "demographics_weekly_report").First(&reportEnabled)
+	db.Where("key = ?", "demographics_admin_email").First(&adminEmail)
+
+	if reportEnabled.Value != "true" || adminEmail.Value == "" {
+		return
+	}
+
+	var uniqueVisitors int64
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&uniqueVisitors)
+
+	var countriesCount int64
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("country_code").Count(&countriesCount)
+
+	type TopCity struct {
+		City  string
+		Count int64
+	}
+	var topCity TopCity
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Select("city, COUNT(DISTINCT ip_hash) as count").Group("city").Order("count DESC").Limit(1).Scan(&topCity)
+
+	var vCount, pCount, cCount, oCount int64
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ?", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&vCount)
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND visited_url LIKE ?", now.AddDate(0, 0, -7), "%/product%").Distinct("ip_hash").Count(&pCount)
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND (visited_url LIKE ? OR visited_url LIKE ?)", now.AddDate(0, 0, -7), "%/checkout%", "%/cart%").Distinct("ip_hash").Count(&cCount)
+	db.Model(&models.UserLocationLog{}).Where("created_at >= ? AND is_converted = true", now.AddDate(0, 0, -7)).Distinct("ip_hash").Count(&oCount)
+
+	cRate := 0.0
+	if vCount > 0 {
+		cRate = float64(oCount) / float64(vCount) * 100.0
+	}
+	recommendation := "- Performa konversi berjalan dengan baik.\n"
+	if cRate < 2.0 {
+		recommendation = "- Rasio konversi mingguan di bawah 2%. Pertimbangkan promo gratis ongkir atau voucher.\n"
+	}
+
+	emailBody := fmt.Sprintf("Halo Admin,\n\nBerikut adalah Laporan Demografi Mingguan AkuGlow untuk periode 7 hari terakhir:\n\nMETRIK UTAMA:\n- Total Pengunjung Unik: %d\n- Jumlah Negara: %d\n- Kota dengan Traffic Tertinggi: %s (%d pengunjung)\n\nFUNNEL:\n- Total: %d\n- Lihat Produk: %d\n- Checkout: %d\n- Transaksi: %d\n\nREKOMENDASI:\n%s\nSalam,\nSistem Analitik AkuGlow",
+		uniqueVisitors, countriesCount, topCity.City, topCity.Count,
+		vCount, pCount, cCount, oCount, recommendation)
+
+	emailSvc := NewEmailService(db)
+	if err := emailSvc.SendEmail(adminEmail.Value, "Laporan Demografi Mingguan AkuGlow - "+weekStr, emailBody); err != nil {
+		log.Printf("❌ Failed to send weekly demographics email: %v", err)
+		return
+	}
+
+	log.Printf("📧 Weekly Demographics Report sent to %s", adminEmail.Value)
+	if sentCfg.Key != "" {
+		sentCfg.Value = weekStr
+		db.Save(&sentCfg)
+	} else {
+		db.Create(&models.PlatformConfig{Key: "last_demographics_report_sent", Value: weekStr})
 	}
 }
 
@@ -239,13 +322,6 @@ func releaseAffiliateCommissions(db *gorm.DB, notif *NotificationService) error 
 	return nil
 }
 
-func autoUpdateLogistics(db *gorm.DB, orderService *OrderService) error {
-	// [BUG-M3 Fix] Simulasi resi "99" dihapus karena ini production environment. 
-	// Webhook kurir yang akan mengubah status ke 'delivered'.
-	// Di sini kita bisa integrasi cek status resi tertunda via API pihak ke-3 jika diperlukan.
-	return nil
-}
-
 // autoCancelOverdueMerchantOrders: Membatalkan pesanan jika merchant tidak kirim dalam 48 jam
 func autoCancelOverdueMerchantOrders(db *gorm.DB, orderService *OrderService, notif *NotificationService) error {
 	deadline := time.Now().Add(-48 * time.Hour)
@@ -259,12 +335,12 @@ func autoCancelOverdueMerchantOrders(db *gorm.DB, orderService *OrderService, no
 
 	for _, group := range overdueGroups {
 		reason := "Sistem: Merchant tidak mengirim pesanan dalam waktu 48 jam"
-		
+
 		if err := orderService.CancelOrder(group.OrderID, reason, "system"); err == nil {
 			log.Printf("⚠️ Auto-Cancelled Order %s due to Merchant %s delay", group.OrderID, group.MerchantID)
-			
+
 			// Notifikasi ke Merchant (Penalti Teguran)
-			_ = notif.Push(group.MerchantID, "merchant", "order_penalty", "Pesanan Dibatalkan Otomatis", 
+			_ = notif.Push(group.MerchantID, "merchant", "order_penalty", "Pesanan Dibatalkan Otomatis",
 				fmt.Sprintf("Pesanan %s dibatalkan karena Anda tidak memproses pengiriman dalam 48 jam.", group.OrderID), "")
 		}
 	}

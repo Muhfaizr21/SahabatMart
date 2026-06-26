@@ -350,7 +350,7 @@ const AdminPOS = () => {
                         toast.success(`${p.name} ditambahkan`);
                       } else {
                         if (p.variants && p.variants.length > 0) {
-                          toast('Pilih varian produk di bawah', { icon: '👇' });
+                          toast('Pilih varian produk di bawah', );
                         } else {
                           if (displayStock <= 0) {
                             toast.error('Stok habis');

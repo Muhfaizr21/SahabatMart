@@ -135,31 +135,30 @@ func (ac *AffiliateController) GetDashboard(w http.ResponseWriter, r *http.Reque
 		"status":    "success",
 		"affiliate": affiliateMember,
 		"stats": map[string]interface{}{
-			"balance":              wallet.Balance,
-			"shopping_balance":     wallet.ShoppingBalance,
-			"pending_commission":   wallet.PendingBalance,
-			"total_commission":     wallet.TotalEarned,
-			"paid_commission":      wallet.TotalWithdrawn,
+			"balance":            wallet.Balance,
+			"shopping_balance":   wallet.ShoppingBalance,
+			"pending_commission": wallet.PendingBalance,
+			"total_commission":   wallet.TotalEarned,
+			"paid_commission":    wallet.TotalWithdrawn,
 			// [Sync Fix] approved_commission = Balance - Pending (ShoppingBalance is a separate column and not included in Balance)
-			"approved_commission":  wallet.Balance - wallet.PendingBalance,
-			"total_clicks":         affiliateMember.TotalClicks,
-			"total_orders":         totalOrders,
-			"total_orders_pending": pendingOrders,
-			"total_downline":       totalDownline,
-			"active_mitra_count":   activeMitraCount,
-			"active_mitra":         activeMitraCount, // Alias for Stats.jsx
-			"qualified_mitra_count": qualifiedMitraCount,
-			"team_monthly_turnover": teamTurnover,
-			"monthly_turnover":      teamTurnover,    // Alias for Stats.jsx
+			"approved_commission":    wallet.Balance - wallet.PendingBalance,
+			"total_clicks":           affiliateMember.TotalClicks,
+			"total_orders":           totalOrders,
+			"total_orders_pending":   pendingOrders,
+			"total_downline":         totalDownline,
+			"active_mitra_count":     activeMitraCount,
+			"active_mitra":           activeMitraCount, // Alias for Stats.jsx
+			"qualified_mitra_count":  qualifiedMitraCount,
+			"team_monthly_turnover":  teamTurnover,
+			"monthly_turnover":       teamTurnover, // Alias for Stats.jsx
 			"next_tier_req_mitra":    reqMitra,
 			"next_tier_req_turnover": reqTurnover,
-			"is_eligible":          isEligible,
+			"is_eligible":            isEligible,
 		},
 		"recent_commissions": recentCommissions,
 		"monthly_data":       monthlyData,
 	})
 }
-
 
 // GET /api/affiliate/commissions
 func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Request) {
@@ -172,15 +171,15 @@ func (ac *AffiliateController) GetCommissions(w http.ResponseWriter, r *http.Req
 	status := r.URL.Query().Get("status")
 
 	type CommRow struct {
-		ID          string    `json:"id"`
-		OrderID     string    `json:"order_id"`
-		ProductID   string    `json:"product_id"`
-		ProductName string    `json:"product_name"`
-		GrossAmount float64   `json:"gross_amount"`
-		RateApplied float64   `json:"rate_applied"`
-		Amount      float64   `json:"amount"`
-		Status      string    `json:"status"`
-		CreatedAt   time.Time `json:"created_at"`
+		ID          string     `json:"id"`
+		OrderID     string     `json:"order_id"`
+		ProductID   string     `json:"product_id"`
+		ProductName string     `json:"product_name"`
+		GrossAmount float64    `json:"gross_amount"`
+		RateApplied float64    `json:"rate_applied"`
+		Amount      float64    `json:"amount"`
+		Status      string     `json:"status"`
+		CreatedAt   time.Time  `json:"created_at"`
 		HoldUntil   *time.Time `json:"hold_until"`
 		PaidAt      *time.Time `json:"paid_at"`
 	}
@@ -325,14 +324,14 @@ func (ac *AffiliateController) GetTopProducts(w http.ResponseWriter, r *http.Req
 	_ = affiliateID
 
 	type ProductRow struct {
-		ID           string  `json:"id"`
-		Name         string  `json:"name"`
-		Price        float64 `json:"price"`
-		Image        string  `json:"image"`
-		Category     string  `json:"category"`
-		StoreName    string  `json:"store_name"`
-		CommRate     float64 `json:"commission_rate"`
-		TotalSold    int     `json:"total_sold"`
+		ID        string  `json:"id"`
+		Name      string  `json:"name"`
+		Price     float64 `json:"price"`
+		Image     string  `json:"image"`
+		Category  string  `json:"category"`
+		StoreName string  `json:"store_name"`
+		CommRate  float64 `json:"commission_rate"`
+		TotalSold int     `json:"total_sold"`
 	}
 
 	var rows []ProductRow
@@ -659,9 +658,9 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		AvatarUrl    string    `json:"avatar_url"`
 	}
 	var downlines []DownlineRow
-	
+
 	searchQuery := "%" + search + "%"
-	
+
 	// Query with Recursive CTE to get all levels + Filter + Pagination
 	if levelFilter == "2plus" {
 		ac.DB.Raw(`
@@ -841,10 +840,10 @@ func (ac *AffiliateController) GetTeamStats(w http.ResponseWriter, r *http.Reque
 		"is_drill_down":   isDrillDown,
 		"root_member":     rootMember,
 		"pagination": map[string]interface{}{
-			"current_page":   page,
-			"limit":          limit,
-			"total_items":    totalFiltered,
-			"total_pages":    totalPages,
+			"current_page": page,
+			"limit":        limit,
+			"total_items":  totalFiltered,
+			"total_pages":  totalPages,
 		},
 	})
 }
@@ -869,14 +868,14 @@ func (ac *AffiliateController) CheckMerchantEligibility(w http.ResponseWriter, r
 	}
 
 	resp := map[string]interface{}{
-		"is_eligible":      isEligible,
-		"is_merchant":      isMerchant,
-		"active_mitra":     activeMitra,
-		"qualified_mitra":  qualifiedMitra,
-		"direct_mitra":     directMitra,
+		"is_eligible":        isEligible,
+		"is_merchant":        isMerchant,
+		"active_mitra":       activeMitra,
+		"qualified_mitra":    qualifiedMitra,
+		"direct_mitra":       directMitra,
 		"total_transactions": totalTransactions,
 		"performance_points": performancePoints,
-		"monthly_turnover": monthlyTurnover,
+		"monthly_turnover":   monthlyTurnover,
 		"requirements": map[string]interface{}{
 			"min_mitra":              reqMitra,
 			"min_turnover":           reqTurnover,
@@ -973,7 +972,7 @@ func (ac *AffiliateController) GetEvents(w http.ResponseWriter, r *http.Request)
 func (ac *AffiliateController) GetEducations(w http.ResponseWriter, r *http.Request) {
 	var educations []models.AffiliateEducation
 	ac.DB.Where("is_active = ?", true).Order("is_featured DESC, created_at DESC").Find(&educations)
-	
+
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data":   educations,
@@ -1040,7 +1039,7 @@ func (ac *AffiliateController) ApplyForMerchant(w http.ResponseWriter, r *http.R
 	isEligible, activeMitra, monthlyTurnover, reqMitra, reqTurnover, _ := ac.Service.CheckMerchantEligibility(affiliateID)
 	if !isEligible {
 		utils.JSONError(w, http.StatusForbidden,
-			fmt.Sprintf("Belum memenuhi syarat. Mitra aktif: %d/%d, Omset tim: Rp %.0f/%.0f", 
+			fmt.Sprintf("Belum memenuhi syarat. Mitra aktif: %d/%d, Omset tim: Rp %.0f/%.0f",
 				activeMitra, reqMitra, monthlyTurnover, reqTurnover))
 		return
 	}
@@ -1131,7 +1130,7 @@ func (ac *AffiliateController) LinkUpline(w http.ResponseWriter, r *http.Request
 	if err := ac.DB.Select("id, user_id").Where("ref_code = ?", req.RefCode).First(&upline).Error; err == nil {
 		var memberName struct{ FullName string }
 		ac.DB.Table("user_profiles").Select("full_name").Where("user_id = ?", userID).Scan(&memberName)
-		
+
 		msg := fmt.Sprintf("%s baru saja bergabung ke tim Anda menggunakan kode referral Anda! 🚀", memberName.FullName)
 		ac.Notif.Push(upline.ID, "affiliate", "new_downline", "Mitra Tim Baru", msg, "/affiliate/team")
 	}
@@ -1157,7 +1156,7 @@ func (ac *AffiliateController) GetNotifications(w http.ResponseWriter, r *http.R
 
 	var notifs []models.Notification
 	// Fetch Combined Notifications: (AffiliateID as 'affiliate') OR (UserID as 'user')
-	err := ac.DB.Where("(receiver_id = ? AND receiver_type = ?) OR (receiver_id = ? AND receiver_type = ?)", 
+	err := ac.DB.Where("(receiver_id = ? AND receiver_type = ?) OR (receiver_id = ? AND receiver_type = ?)",
 		affiliateID, "affiliate", affiliate.UserID, "user").
 		Order("created_at desc").
 		Limit(30).
@@ -1228,4 +1227,3 @@ func (ac *AffiliateController) DeleteAllNotifications(w http.ResponseWriter, r *
 	}
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"status": "success"})
 }
-

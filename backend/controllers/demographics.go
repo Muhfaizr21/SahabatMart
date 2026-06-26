@@ -44,33 +44,6 @@ type IPAPIResponse struct {
 	Query       string  `json:"query"`
 }
 
-var mockLocations = []struct {
-	City        string
-	Region      string
-	CountryName string
-	CountryCode string
-	Lat         float64
-	Lon         float64
-}{
-	{"Jakarta", "DKI Jakarta", "Indonesia", "ID", -6.2088, 106.8456},
-	{"Surabaya", "Jawa Timur", "Indonesia", "ID", -7.2575, 112.7521},
-	{"Bandung", "Jawa Barat", "Indonesia", "ID", -6.9175, 107.6191},
-	{"Medan", "Sumatera Utara", "Indonesia", "ID", 3.5952, 98.6722},
-	{"Denpasar", "Bali", "Indonesia", "ID", -8.6705, 115.2126},
-	{"Singapore", "Central Singapore", "Singapore", "SG", 1.3521, 103.8198},
-	{"Tokyo", "Tokyo", "Japan", "JP", 35.6762, 139.6503},
-	{"New York", "New York", "United States", "US", 40.7128, -74.0060},
-}
-
-func getMockLocation(ip string) (string, string, string, string, float64, float64) {
-	sum := 0
-	for _, char := range ip {
-		sum += int(char)
-	}
-	loc := mockLocations[sum%len(mockLocations)]
-	return loc.City, loc.Region, loc.CountryName, loc.CountryCode, loc.Lat, loc.Lon
-}
-
 func getClientIP(r *http.Request) string {
 	ip := r.Header.Get("X-Forwarded-For")
 	if ip == "" {
@@ -139,12 +112,12 @@ func applyFilters(db *gorm.DB, r *http.Request) *gorm.DB {
 	countries := r.URL.Query().Get("countries")
 	if countries != "" {
 		codes := strings.Split(countries, ",")
-		q = q.Where("country_code IN ?", codes)
+		q = q.Where("user_location_logs.country_code IN ?", codes)
 	}
 
 	city := r.URL.Query().Get("city")
 	if city != "" {
-		q = q.Where("LOWER(city) LIKE LOWER(?)", "%"+strings.ToLower(city)+"%")
+		q = q.Where("LOWER(user_location_logs.city) LIKE LOWER(?)", "%"+strings.ToLower(city)+"%")
 	}
 
 	userType := r.URL.Query().Get("user_type")
@@ -156,9 +129,9 @@ func applyFilters(db *gorm.DB, r *http.Request) *gorm.DB {
 
 	purchaseStatus := r.URL.Query().Get("purchase_status")
 	if purchaseStatus == "purchased" {
-		q = q.Where("is_converted = true")
+		q = q.Where("user_location_logs.is_converted = true")
 	} else if purchaseStatus == "not_purchased" {
-		q = q.Where("is_converted = false")
+		q = q.Where("user_location_logs.is_converted = false")
 	}
 
 	return q
@@ -173,63 +146,77 @@ func (dc *DemographicsController) TrackLocation(w http.ResponseWriter, r *http.R
 	}
 
 	var req struct {
-		VisitedURL string `json:"visited_url"`
+		VisitedURL  string  `json:"visited_url"`
+		Latitude    float64 `json:"lat"`
+		Longitude   float64 `json:"lon"`
+		City        string  `json:"city"`
+		Region      string  `json:"region"`
+		CountryName string  `json:"country_name"`
+		CountryCode string  `json:"country_code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		req.VisitedURL = r.URL.Query().Get("visited_url")
 		if req.VisitedURL == "" {
 			req.VisitedURL = r.Referer()
 		}
 	}
 
+	// Try device-provided location first (from browser Geolocation API)
+	deviceHasLocation := req.Latitude != 0 || req.Longitude != 0 || req.City != ""
 	ip := getClientIP(r)
 	ipHash := hashIP(ip)
-
-	var cache models.IPLocationCache
-	cacheFound := false
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
-	if err := dc.DB.Where("ip_hash = ? AND created_at >= ?", ipHash, thirtyDaysAgo).First(&cache).Error; err == nil {
-		cacheFound = true
-	}
 
 	var lat, lon float64
 	var city, region, countryName, countryCode string
 
-	if cacheFound {
-		lat = cache.Latitude
-		lon = cache.Longitude
-		city = cache.City
-		region = cache.Region
-		countryName = cache.CountryName
-		countryCode = cache.CountryCode
+	if deviceHasLocation {
+		lat = req.Latitude
+		lon = req.Longitude
+		city = req.City
+		region = req.Region
+		countryName = req.CountryName
+		countryCode = req.CountryCode
 	} else {
-		if isPrivateIP(ip) {
-			city, region, countryName, countryCode, lat, lon = getMockLocation(ip)
-		} else {
-			apiRes, err := lookupIP(ip)
-			if err == nil && apiRes.Status == "success" {
-				lat = apiRes.Lat
-				lon = apiRes.Lon
-				city = apiRes.City
-				region = apiRes.RegionName
-				countryName = apiRes.Country
-				countryCode = apiRes.CountryCode
-			} else {
-				city, region, countryName, countryCode, lat, lon = getMockLocation(ip)
-			}
+		var cache models.IPLocationCache
+		cacheFound := false
+		thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+		if err := dc.DB.Where("ip_hash = ? AND created_at >= ?", ipHash, thirtyDaysAgo).First(&cache).Error; err == nil {
+			cacheFound = true
 		}
 
-		newCache := models.IPLocationCache{
-			IPHash:      ipHash,
-			Latitude:    lat,
-			Longitude:   lon,
-			City:        city,
-			Region:      region,
-			CountryName: countryName,
-			CountryCode: countryCode,
-			CreatedAt:   time.Now(),
+		if cacheFound {
+			lat = cache.Latitude
+			lon = cache.Longitude
+			city = cache.City
+			region = cache.Region
+			countryName = cache.CountryName
+			countryCode = cache.CountryCode
+		} else {
+			if !isPrivateIP(ip) {
+				apiRes, err := lookupIP(ip)
+				if err == nil && apiRes.Status == "success" {
+					lat = apiRes.Lat
+					lon = apiRes.Lon
+					city = apiRes.City
+					region = apiRes.RegionName
+					countryName = apiRes.Country
+					countryCode = apiRes.CountryCode
+				}
+			}
+			// Only cache if we got real data — skip caching empty/mock
+			if city != "" {
+				newCache := models.IPLocationCache{
+					IPHash:      ipHash,
+					Latitude:    lat,
+					Longitude:   lon,
+					City:        city,
+					Region:      region,
+					CountryName: countryName,
+					CountryCode: countryCode,
+					CreatedAt:   time.Now(),
+				}
+				dc.DB.Save(&newCache)
+			}
 		}
-		dc.DB.Save(&newCache)
 	}
 
 	var userID *string
@@ -342,26 +329,26 @@ func (dc *DemographicsController) GetDemographicsStats(w http.ResponseWriter, r 
 
 	var prevUniques int64 = 0
 	if dateFilterActive {
-		qPrev := dc.DB.Model(&models.UserLocationLog{}).Where("created_at BETWEEN ? AND ?", prevStart, prevEnd)
+		qPrev := dc.DB.Model(&models.UserLocationLog{}).Where("user_location_logs.created_at BETWEEN ? AND ?", prevStart, prevEnd)
 		countries := r.URL.Query().Get("countries")
 		if countries != "" {
-			qPrev = qPrev.Where("country_code IN ?", strings.Split(countries, ","))
+			qPrev = qPrev.Where("user_location_logs.country_code IN ?", strings.Split(countries, ","))
 		}
 		city := r.URL.Query().Get("city")
 		if city != "" {
-			qPrev = qPrev.Where("LOWER(city) LIKE LOWER(?)", "%"+strings.ToLower(city)+"%")
+			qPrev = qPrev.Where("LOWER(user_location_logs.city) LIKE LOWER(?)", "%"+strings.ToLower(city)+"%")
 		}
 		userType := r.URL.Query().Get("user_type")
 		if userType == "guest" {
-			qPrev = qPrev.Where("user_id IS NULL")
+			qPrev = qPrev.Where("user_location_logs.user_id IS NULL")
 		} else if userType == "member" {
-			qPrev = qPrev.Where("user_id IS NOT NULL")
+			qPrev = qPrev.Where("user_location_logs.user_id IS NOT NULL")
 		}
 		purchaseStatus := r.URL.Query().Get("purchase_status")
 		if purchaseStatus == "purchased" {
-			qPrev = qPrev.Where("is_converted = true")
+			qPrev = qPrev.Where("user_location_logs.is_converted = true")
 		} else if purchaseStatus == "not_purchased" {
-			qPrev = qPrev.Where("is_converted = false")
+			qPrev = qPrev.Where("user_location_logs.is_converted = false")
 		}
 		qPrev.Distinct("ip_hash").Count(&prevUniques)
 	}
@@ -402,14 +389,16 @@ func (dc *DemographicsController) GetDemographicsStats(w http.ResponseWriter, r 
 	}
 
 	type CityAvgPages struct {
-		City     string  `json:"city"`
-		AvgPages float64 `json:"avg_pages"`
+		City      string  `json:"city"`
+		AvgPages  float64 `json:"avg_pages"`
+		TotalHits int64   `json:"total_hits"`
 	}
 	var cityAvgPages []CityAvgPages
 	applyFilters(dc.DB.Model(&models.UserLocationLog{}), r).
-		Select("city, CAST(COUNT(id) AS float) / COUNT(DISTINCT ip_hash) as avg_pages").
+		Where("city != '' AND city IS NOT NULL").
+		Select("city, CAST(COUNT(id) AS float) / COUNT(DISTINCT ip_hash) as avg_pages, COUNT(id) as total_hits").
 		Group("city").
-		Order("avg_pages DESC").
+		Order("total_hits DESC").
 		Limit(5).
 		Scan(&cityAvgPages)
 
@@ -423,6 +412,7 @@ func (dc *DemographicsController) GetDemographicsStats(w http.ResponseWriter, r 
 	}
 	var markers []MapMarker
 	applyFilters(dc.DB.Model(&models.UserLocationLog{}), r).
+		Where("city != '' AND city IS NOT NULL").
 		Select("city, country_name, AVG(latitude) as latitude, AVG(longitude) as longitude, COUNT(DISTINCT ip_hash) as unique_count, SUM(CASE WHEN is_converted = true THEN 1 ELSE 0 END) as buyer_count").
 		Group("city, country_name").
 		Order("unique_count DESC").
@@ -511,19 +501,19 @@ func (dc *DemographicsController) GetDemographicsStats(w http.ResponseWriter, r 
 	}
 
 	stats := map[string]interface{}{
-		"total_visitors":          totalUniques,
-		"percentage_change":       pctChange,
-		"countries_count":         countryCount,
-		"top_city":                topCity,
-		"domestic_percentage":     domesticPct,
+		"total_visitors":           totalUniques,
+		"percentage_change":        pctChange,
+		"countries_count":          countryCount,
+		"top_city":                 topCity,
+		"domestic_percentage":      domesticPct,
 		"international_percentage": intlPct,
-		"city_avg_pages":          cityAvgPages,
-		"markers":                 markers,
-		"funnel":                  funnel,
-		"hourly_trend":            hourlyTrend,
-		"retention":               retention,
-		"traffic_spike_alert":     trafficSpikeAlert,
-		"last_updated":            time.Now().Format(time.RFC3339),
+		"city_avg_pages":           cityAvgPages,
+		"markers":                  markers,
+		"funnel":                   funnel,
+		"hourly_trend":             hourlyTrend,
+		"retention":                retention,
+		"traffic_spike_alert":      trafficSpikeAlert,
+		"last_updated":             time.Now().Format(time.RFC3339),
 	}
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{"status": "success", "data": stats})
@@ -543,7 +533,7 @@ func (dc *DemographicsController) GetDemographicsLogs(w http.ResponseWriter, r *
 	export := r.URL.Query().Get("export")
 	if export == "csv" {
 		var logs []LogDetail
-		
+
 		baseQuery := dc.DB.Table("user_location_logs").
 			Select("user_location_logs.*, users.email AS user_email, user_profiles.full_name AS user_fullname").
 			Joins("LEFT JOIN users ON users.id = user_location_logs.user_id").
@@ -910,51 +900,65 @@ func (dc *DemographicsController) BroadcastGeoNotification(w http.ResponseWriter
 func (dc *DemographicsController) GetUserDistribution(w http.ResponseWriter, r *http.Request) {
 	roleFilter := r.URL.Query().Get("role") // e.g. "affiliate", "merchant", "all"
 
-	baseQ := dc.DB.Table("user_profiles").
+	// Total registered users — fresh query
+	var totalUsers int64
+	tq := dc.DB.Table("user_profiles").
 		Joins("JOIN users ON users.id = user_profiles.user_id").
 		Where("users.deleted_at IS NULL AND users.status = 'active'")
-
 	if roleFilter != "" && roleFilter != "all" {
-		baseQ = baseQ.Where("users.role = ?", roleFilter)
+		tq = tq.Where("users.role = ?", roleFilter)
 	}
+	tq.Count(&totalUsers)
 
-	// Total registered users
-	var totalUsers int64
-	baseQ.Count(&totalUsers)
-
-	// By Province
+	// By Province — fresh query
 	type ProvRow struct {
 		Province string `json:"province"`
 		Count    int64  `json:"count"`
 	}
 	var byProvince []ProvRow
-	baseQ.Session(&gorm.Session{}).
-		Select("user_profiles.province, COUNT(*) as count").
+	pq := dc.DB.Table("user_profiles").
+		Joins("JOIN users ON users.id = user_profiles.user_id").
+		Where("users.deleted_at IS NULL AND users.status = 'active'")
+	if roleFilter != "" && roleFilter != "all" {
+		pq = pq.Where("users.role = ?", roleFilter)
+	}
+	pq.Select("user_profiles.province, COUNT(*) as count").
 		Where("user_profiles.province IS NOT NULL AND user_profiles.province != ''").
 		Group("user_profiles.province").
 		Order("count DESC").
 		Scan(&byProvince)
 
-	// By City (top 20)
+	// By City (top 20) — fresh query
 	type CityRow struct {
 		City     string `json:"city"`
 		Province string `json:"province"`
 		Count    int64  `json:"count"`
 	}
 	var byCity []CityRow
-	baseQ.Session(&gorm.Session{}).
-		Select("user_profiles.city, user_profiles.province, COUNT(*) as count").
+	cq := dc.DB.Table("user_profiles").
+		Joins("JOIN users ON users.id = user_profiles.user_id").
+		Where("users.deleted_at IS NULL AND users.status = 'active'")
+	if roleFilter != "" && roleFilter != "all" {
+		cq = cq.Where("users.role = ?", roleFilter)
+	}
+	cq.Select("user_profiles.city, user_profiles.province, COUNT(*) as count").
 		Where("user_profiles.city IS NOT NULL AND user_profiles.city != ''").
 		Group("user_profiles.city, user_profiles.province").
 		Order("count DESC").
 		Limit(20).
 		Scan(&byCity)
 
-	// Users with no location data
+	// Users with no location data — fresh query
 	var noLocation int64
-	baseQ.Session(&gorm.Session{}).Where("(user_profiles.city IS NULL OR user_profiles.city = '') AND (user_profiles.province IS NULL OR user_profiles.province = '')").Count(&noLocation)
+	nq := dc.DB.Table("user_profiles").
+		Joins("JOIN users ON users.id = user_profiles.user_id").
+		Where("users.deleted_at IS NULL AND users.status = 'active'")
+	if roleFilter != "" && roleFilter != "all" {
+		nq = nq.Where("users.role = ?", roleFilter)
+	}
+	nq.Where("(user_profiles.city IS NULL OR user_profiles.city = '') AND (user_profiles.province IS NULL OR user_profiles.province = '')").Count(&noLocation)
 
-	// List of Users
+	// List of Users — fresh query
 	type UserDetail struct {
 		ID       string `json:"id"`
 		FullName string `json:"full_name"`
@@ -964,27 +968,24 @@ func (dc *DemographicsController) GetUserDistribution(w http.ResponseWriter, r *
 		City     string `json:"city"`
 	}
 	var usersList []UserDetail
-	// Create a new query for the list to avoid modifying the baseQ state with Where condition
-	listQ := dc.DB.Table("user_profiles").
+	lq := dc.DB.Table("user_profiles").
 		Joins("JOIN users ON users.id = user_profiles.user_id").
 		Where("users.deleted_at IS NULL AND users.status = 'active'")
-		
 	if roleFilter != "" && roleFilter != "all" {
-		listQ = listQ.Where("users.role = ?", roleFilter)
+		lq = lq.Where("users.role = ?", roleFilter)
 	}
-	
-	listQ.Select("users.id, user_profiles.full_name, users.email, users.role, user_profiles.province, user_profiles.city").
+	lq.Select("users.id, user_profiles.full_name, users.email, users.role, user_profiles.province, user_profiles.city").
 		Order("users.created_at DESC").
 		Scan(&usersList)
 
 	utils.JSONResponse(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"data": map[string]interface{}{
-			"total_users":  totalUsers,
-			"by_province":  byProvince,
-			"by_city":      byCity,
-			"no_location":  noLocation,
-			"users_list":   usersList,
+			"total_users": totalUsers,
+			"by_province": byProvince,
+			"by_city":     byCity,
+			"no_location": noLocation,
+			"users_list":  usersList,
 		},
 	})
 }

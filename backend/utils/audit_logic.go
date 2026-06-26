@@ -22,13 +22,27 @@ const (
 	ActionLogin         AuditAction = "login"
 	ActionProcessPayout AuditAction = "process_payout"
 	ActionRefund        AuditAction = "refund"
+	// [FIX #16] Financial audit actions
+	ActionFundDistribution  AuditAction = "fund_distribution"
+	ActionSettlement        AuditAction = "settlement"
+	ActionReverseFunds      AuditAction = "reverse_funds"
+	ActionCommissionRelease AuditAction = "commission_release"
+	ActionWalletTransfer    AuditAction = "wallet_transfer"
 )
 
 // LogAudit records sensitive actions for auditing (Req 9)
+// [FIX #16] Now stores before/after JSON and uses proper IP/UA extraction
 func LogAudit(db *gorm.DB, adminID string, action AuditAction, entityType, entityID, description string, before, after interface{}, ip, ua string) {
-	// For robust auditing, we should store before/after data
-	// beforeJSON, _ := json.Marshal(before)
-	// afterJSON, _ := json.Marshal(after)
+	beforeJSON, _ := json.Marshal(before)
+	afterJSON, _ := json.Marshal(after)
+
+	if adminID == "system" || adminID == "" {
+		adminID = "00000000-0000-0000-0000-000000000000" // Use zero UUID for system actions
+	}
+
+	if ip == "" {
+		ip = "127.0.0.1"
+	}
 
 	audit := models.AuditLog{
 		AdminID:    adminID,
@@ -36,21 +50,20 @@ func LogAudit(db *gorm.DB, adminID string, action AuditAction, entityType, entit
 		TargetType: entityType,
 		TargetID:   entityID,
 		Detail:     description,
-		// Using the original AuditLog model field name 'Detail', but in db.md it was 'description'
-		// Let's assume AuditLog in models/admin_config.go is the current definition
 		IPAddress:  ip,
+		UserAgent:  ua,
+		BeforeData: string(beforeJSON),
+		AfterData:  string(afterJSON),
 		CreatedAt:  time.Now(),
 	}
 
-	// For robust auditing, we should store before/after data
-	// Let's create a more robust ActivityLog table instead of basic AuditLog
 	db.Create(&audit)
 }
 
 // LogError handles observability (Req 14)
 func LogError(db *gorm.DB, service, message string, context map[string]interface{}) {
 	contextJSON, _ := json.Marshal(context)
-	
+
 	// Create system log for observability (Requirement: structured logging)
 	// We'll use a Background job to avoid blocking (Requirement 13)
 	go func() {

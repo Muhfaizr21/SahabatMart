@@ -181,7 +181,7 @@ export default function CartPage() {
       <div className="max-w-7xl mx-auto px-6 py-10">
         {items.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
-            <div className="text-6xl mb-4">🛒</div>
+            <div className="mb-4"><i className="bx bx-cart text-6xl text-slate-300" /></div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Keranjang Kosong</h2>
             <p className="text-gray-500 mb-8">Kamu belum menambahkan produk ke keranjang.</p>
             <Link to="/shop" className="bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
@@ -341,7 +341,7 @@ export default function CartPage() {
             {crossSells.length > 0 && (
               <div className="mt-16 w-full border-t border-gray-100 pt-12">
                 <div className="mb-8">
-                  <h2 className="text-2xl font-black text-gray-900">Mungkin Kamu Butuhkan 🛍️</h2>
+                  <h2 className="text-2xl font-black text-gray-900">Mungkin Kamu Butuhkan </h2>
                   <p className="text-slate-500 text-sm mt-1">Produk pelengkap yang cocok untuk belanjaan kamu.</p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">

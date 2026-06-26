@@ -7,177 +7,179 @@ import (
 type OrderStatus string
 
 const (
-	OrderPendingPayment    OrderStatus = "pending_payment"
+	OrderPendingPayment      OrderStatus = "pending_payment"
 	OrderPendingConfirmation OrderStatus = "pending_confirmation" // Bukti transfer sudah diupload, menunggu konfirmasi admin
-	OrderPaid             OrderStatus = "paid"
-	OrderProcessing       OrderStatus = "processing"
-	OrderReadyToShip      OrderStatus = "ready_to_ship"
-	OrderShipped          OrderStatus = "shipped"
-	OrderDelivered        OrderStatus = "delivered"
-	OrderReadyForPickup   OrderStatus = "ready_for_pickup"
-	OrderCompleted        OrderStatus = "completed"
-	OrderCancelled        OrderStatus = "cancelled"
-	OrderRefundRequested  OrderStatus = "refund_requested"
-	OrderRefundProcessing OrderStatus = "refund_processing"
-	OrderRefunded         OrderStatus = "refunded"
-	OrderDisputed         OrderStatus = "disputed"
-	OrderFrozen           OrderStatus = "frozen" // Transaksi dibekukan oleh admin
+	OrderPaid                OrderStatus = "paid"
+	OrderProcessing          OrderStatus = "processing"
+	OrderReadyToShip         OrderStatus = "ready_to_ship"
+	OrderShipped             OrderStatus = "shipped"
+	OrderDelivered           OrderStatus = "delivered"
+	OrderReadyForPickup      OrderStatus = "ready_for_pickup"
+	OrderCompleted           OrderStatus = "completed"
+	OrderCancelled           OrderStatus = "cancelled"
+	OrderRefundRequested     OrderStatus = "refund_requested"
+	OrderRefundProcessing    OrderStatus = "refund_processing"
+	OrderRefunded            OrderStatus = "refunded"
+	OrderDisputed            OrderStatus = "disputed"
+	OrderFrozen              OrderStatus = "frozen" // Transaksi dibekukan oleh admin
 )
 
 type MerchantOrderStatus string
 
 const (
-	MOrderNew            MerchantOrderStatus = "new"
-	MOrderConfirmed      MerchantOrderStatus = "confirmed"
-	MOrderProcessing     MerchantOrderStatus = "processing"
-	MOrderPacked         MerchantOrderStatus = "packed"
+	MOrderNew             MerchantOrderStatus = "new"
+	MOrderConfirmed       MerchantOrderStatus = "confirmed"
+	MOrderProcessing      MerchantOrderStatus = "processing"
+	MOrderPacked          MerchantOrderStatus = "packed"
 	MOrderHandedToCourier MerchantOrderStatus = "handed_to_courier"
-	MOrderShipped        MerchantOrderStatus = "shipped"
-	MOrderDelivered      MerchantOrderStatus = "delivered"
-	MOrderReadyForPickup MerchantOrderStatus = "ready_for_pickup"
-	MOrderCompleted      MerchantOrderStatus = "completed"
-	MOrderCancelled      MerchantOrderStatus = "cancelled"
+	MOrderShipped         MerchantOrderStatus = "shipped"
+	MOrderDelivered       MerchantOrderStatus = "delivered"
+	MOrderReadyForPickup  MerchantOrderStatus = "ready_for_pickup"
+	MOrderCompleted       MerchantOrderStatus = "completed"
+	MOrderCancelled       MerchantOrderStatus = "cancelled"
 	MOrderRefundRequested MerchantOrderStatus = "refund_requested"
-	MOrderRefunded       MerchantOrderStatus = "refunded"
+	MOrderRefunded        MerchantOrderStatus = "refunded"
 )
 
 type Order struct {
-	ID                  string         `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	OrderNumber         string         `gorm:"type:varchar(30);unique;not null" json:"order_number"`
-	BuyerID             *string        `gorm:"type:uuid" json:"buyer_id"`
-	CashierID           *string        `gorm:"type:uuid" json:"cashier_id"`
-	OrderType           string         `gorm:"type:varchar(20);default:'online';not null" json:"order_type"` // online, pos
-	
-	// Affiliate attribution
-	AffiliateID         *string        `gorm:"type:uuid" json:"affiliate_id"`
-	AffiliateRefCode    *string        `gorm:"type:varchar(20)" json:"affiliate_ref_code"`
-	AffiliateClickID    *string        `gorm:"type:uuid" json:"affiliate_click_id"`
-	
-	// Shipping Snapshot (Nullable for POS)
-	ShippingName        string         `gorm:"type:varchar(150)" json:"shipping_name"`
-	ShippingPhone       string         `gorm:"type:varchar(20)" json:"shipping_phone"`
-	ShippingAddress     string         `gorm:"type:text" json:"shipping_address"`
-	ShippingDistrict    string         `gorm:"type:varchar(100)" json:"shipping_district"`
-	ShippingCity        string         `gorm:"type:varchar(100)" json:"shipping_city"`
-	ShippingProvince    string         `gorm:"type:varchar(100)" json:"shipping_province"`
-	ShippingPostalCode  string         `gorm:"type:varchar(10)" json:"shipping_postal_code"`
-	DestinationAreaID   string         `gorm:"type:varchar(100)" json:"destination_area_id"` // Biteship Area ID
-	
-	// Financials
-	Subtotal            float64        `gorm:"type:decimal(15,2);not null" json:"subtotal"`
-	TotalShippingCost   float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_shipping_cost"`
-	TotalPlatformFee    float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_platform_fee"`
-	TotalCommission     float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_commission"`
-	TotalDiscount       float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_discount"`
-	ShoppingBalanceDeduction float64   `gorm:"type:decimal(15,2);not null;default:0" json:"shopping_balance_deduction"`
-	GrandTotal          float64        `gorm:"type:decimal(15,2);not null" json:"grand_total"`
-	TotalAmount         float64        `gorm:"type:decimal(15,2);not null;default:0" json:"total_amount"` // Final amount after discount/fees
-	PaymentMethod       string         `gorm:"type:varchar(50)" json:"payment_method"` // cash, transfer, wallet, etc.
-	TotalWeight         float64        `gorm:"type:decimal(10,3);default:0" json:"total_weight"`
-	
-	VoucherID           *uint          `gorm:"index" json:"voucher_id"`
-	VoucherCode         string         `gorm:"type:varchar(50)" json:"voucher_code"`
+	ID          string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	OrderNumber string  `gorm:"type:varchar(30);unique;not null" json:"order_number"`
+	BuyerID     *string `gorm:"type:uuid" json:"buyer_id"`
+	CashierID   *string `gorm:"type:uuid" json:"cashier_id"`
+	OrderType   string  `gorm:"type:varchar(20);default:'online';not null" json:"order_type"` // online, pos
 
-	Status              OrderStatus    `gorm:"type:varchar(50);default:'pending_payment';not null" json:"status"`
-	Notes               string         `gorm:"type:text" json:"notes"`
-	CancelReason        string         `gorm:"type:text" json:"cancel_reason"`
-	CancelledBy         *string        `gorm:"type:varchar(100)" json:"cancelled_by"`
-	CancelledAt         *time.Time     `json:"cancelled_at"`
+	// Affiliate attribution
+	AffiliateID      *string `gorm:"type:uuid" json:"affiliate_id"`
+	AffiliateRefCode *string `gorm:"type:varchar(20)" json:"affiliate_ref_code"`
+	AffiliateClickID *string `gorm:"type:uuid" json:"affiliate_click_id"`
+
+	// Shipping Snapshot (Nullable for POS)
+	ShippingName       string `gorm:"type:varchar(150)" json:"shipping_name"`
+	ShippingPhone      string `gorm:"type:varchar(20)" json:"shipping_phone"`
+	ShippingAddress    string `gorm:"type:text" json:"shipping_address"`
+	ShippingDistrict   string `gorm:"type:varchar(100)" json:"shipping_district"`
+	ShippingCity       string `gorm:"type:varchar(100)" json:"shipping_city"`
+	ShippingProvince   string `gorm:"type:varchar(100)" json:"shipping_province"`
+	ShippingPostalCode string `gorm:"type:varchar(10)" json:"shipping_postal_code"`
+	DestinationAreaID  string `gorm:"type:varchar(100)" json:"destination_area_id"` // Biteship Area ID
+
+	// Financials
+	Subtotal                 float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
+	TotalShippingCost        float64 `gorm:"type:decimal(15,2);not null;default:0" json:"total_shipping_cost"`
+	TotalPlatformFee         float64 `gorm:"type:decimal(15,2);not null;default:0" json:"total_platform_fee"`
+	TotalCommission          float64 `gorm:"type:decimal(15,2);not null;default:0" json:"total_commission"`
+	TotalDiscount            float64 `gorm:"type:decimal(15,2);not null;default:0" json:"total_discount"`
+	ShoppingBalanceDeduction float64 `gorm:"type:decimal(15,2);not null;default:0" json:"shopping_balance_deduction"`
+	GrandTotal               float64 `gorm:"type:decimal(15,2);not null" json:"grand_total"`
+	TotalAmount              float64 `gorm:"type:decimal(15,2);not null;default:0" json:"total_amount"` // Final amount after discount/fees
+	PaymentMethod            string  `gorm:"type:varchar(50)" json:"payment_method"`                    // cash, transfer, wallet, etc.
+	TotalWeight              float64 `gorm:"type:decimal(10,3);default:0" json:"total_weight"`
+
+	VoucherID   *uint  `gorm:"index" json:"voucher_id"`
+	VoucherCode string `gorm:"type:varchar(50)" json:"voucher_code"`
+
+	Status       OrderStatus `gorm:"type:varchar(50);default:'pending_payment';not null" json:"status"`
+	Notes        string      `gorm:"type:text" json:"notes"`
+	CancelReason string      `gorm:"type:text" json:"cancel_reason"`
+	CancelledBy  *string     `gorm:"type:varchar(100)" json:"cancelled_by"`
+	CancelledAt  *time.Time  `json:"cancelled_at"`
 
 	// Manual Transfer Payment Proof
-	PaymentProofURL     string         `gorm:"type:text" json:"payment_proof_url"`
-	PaymentProofNote    string         `gorm:"type:text" json:"payment_proof_note"`
-	ProofSubmittedAt    *time.Time     `json:"proof_submitted_at"`
-	ProofReviewedAt     *time.Time     `json:"proof_reviewed_at"`
-	ProofReviewedBy     *string        `gorm:"type:varchar(100)" json:"proof_reviewed_by"`
-	ProofRejectReason   string         `gorm:"type:text" json:"proof_reject_reason"`
+	PaymentProofURL   string     `gorm:"type:text" json:"payment_proof_url"`
+	PaymentProofNote  string     `gorm:"type:text" json:"payment_proof_note"`
+	ProofSubmittedAt  *time.Time `json:"proof_submitted_at"`
+	ProofReviewedAt   *time.Time `json:"proof_reviewed_at"`
+	ProofReviewedBy   *string    `gorm:"type:varchar(100)" json:"proof_reviewed_by"`
+	ProofRejectReason string     `gorm:"type:text" json:"proof_reject_reason"`
 
-	PaidAt              *time.Time     `json:"paid_at"`
-	ExpiredAt           *time.Time     `json:"expired_at"`
-	CompletedAt         *time.Time     `json:"completed_at"`
-	AutoCompleteAt      *time.Time     `json:"auto_complete_at"`
+	PaidAt         *time.Time `json:"paid_at"`
+	ExpiredAt      *time.Time `json:"expired_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	AutoCompleteAt *time.Time `json:"auto_complete_at"`
 
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
-	MerchantGroups      []OrderMerchantGroup `gorm:"foreignKey:OrderID" json:"merchant_groups"`
-	Items               []OrderItem          `gorm:"foreignKey:OrderID" json:"items"`
-	Payment             *Payment             `gorm:"foreignKey:OrderID" json:"payment"`
+	MerchantGroups []OrderMerchantGroup `gorm:"foreignKey:OrderID" json:"merchant_groups"`
+	Items          []OrderItem          `gorm:"foreignKey:OrderID" json:"items"`
+	Payment        *Payment             `gorm:"foreignKey:OrderID" json:"payment"`
 }
 
 type OrderMerchantGroup struct {
-	ID              string              `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	OrderID         string              `gorm:"type:uuid;not null;index" json:"order_id"`
-	MerchantID      string              `gorm:"type:uuid;not null;index" json:"merchant_id"` // Sang Distributor
-	Status          MerchantOrderStatus `gorm:"type:varchar(50);default:'new';not null" json:"status"`
+	ID         string              `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	OrderID    string              `gorm:"type:uuid;not null;index" json:"order_id"`
+	MerchantID string              `gorm:"type:uuid;not null;index" json:"merchant_id"` // Sang Distributor
+	Status     MerchantOrderStatus `gorm:"type:varchar(50);default:'new';not null" json:"status"`
 
-	Subtotal        float64             `gorm:"type:decimal(15,2);not null" json:"subtotal"`
-	ShippingCost    float64             `gorm:"type:decimal(15,2);not null;default:0" json:"shipping_cost"`
-	PlatformFee     float64             `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee"`
-	
+	Subtotal     float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
+	ShippingCost float64 `gorm:"type:decimal(15,2);not null;default:0" json:"shipping_cost"`
+	PlatformFee  float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee"`
+
 	// Dual Commissions
-	DistributionCommission float64     `gorm:"type:decimal(15,2);not null;default:0" json:"distribution_commission"` // Jatah Merchant Distributor
-	AffiliateCommission    float64     `gorm:"type:decimal(15,2);not null;default:0" json:"affiliate_commission"`    // Jatah Pengajak (Affiliate)
-	
-	Commission      float64             `gorm:"type:decimal(15,2);not null;default:0" json:"commission"` // Legacy/Total
-	Discount        float64             `gorm:"type:decimal(15,2);not null;default:0" json:"discount"`
-	MerchantPayout  float64             `gorm:"type:decimal(15,2);not null;default:0" json:"merchant_payout"`
+	DistributionCommission float64 `gorm:"type:decimal(15,2);not null;default:0" json:"distribution_commission"` // Jatah Merchant Distributor
+	AffiliateCommission    float64 `gorm:"type:decimal(15,2);not null;default:0" json:"affiliate_commission"`    // Jatah Pengajak (Affiliate)
 
-	ShippingType    string              `gorm:"type:varchar(20);default:'expedition'" json:"shipping_type"` // pickup, expedition
-	CourierCode     string              `gorm:"type:varchar(50)" json:"courier_code"`
-	CourierService  string              `gorm:"type:varchar(50)" json:"courier_service"`
-	ServiceCode     string              `gorm:"type:varchar(50)" json:"service_code"`
-	TrackingNumber  string              `gorm:"type:varchar(100)" json:"tracking_number"`
-	BiteshipOrderID string              `gorm:"type:varchar(100)" json:"biteship_order_id"` // External Reference
-	ShippedAt       *time.Time          `json:"shipped_at"`
-	DeliveredAt     *time.Time          `json:"delivered_at"`
-	
-	Merchant        *Merchant           `gorm:"foreignKey:MerchantID" json:"merchant"`
-	Order           *Order              `gorm:"foreignKey:OrderID" json:"order"`
-	CreatedAt       time.Time           `json:"created_at"`
-	UpdatedAt       time.Time           `json:"updated_at"`
+	Commission     float64 `gorm:"type:decimal(15,2);not null;default:0" json:"commission"` // Legacy/Total
+	Discount       float64 `gorm:"type:decimal(15,2);not null;default:0" json:"discount"`
+	MerchantPayout float64 `gorm:"type:decimal(15,2);not null;default:0" json:"merchant_payout"`
 
-	Items           []OrderItem         `gorm:"foreignKey:OrderMerchantGroupID" json:"items"`
+	ShippingType    string     `gorm:"type:varchar(20);default:'expedition'" json:"shipping_type"` // pickup, expedition
+	CourierCode     string     `gorm:"type:varchar(50)" json:"courier_code"`
+	CourierService  string     `gorm:"type:varchar(50)" json:"courier_service"`
+	ServiceCode     string     `gorm:"type:varchar(50)" json:"service_code"`
+	TrackingNumber  string     `gorm:"type:varchar(100)" json:"tracking_number"`
+	BiteshipOrderID string     `gorm:"type:varchar(100)" json:"biteship_order_id"` // External Reference
+	ShippedAt       *time.Time `json:"shipped_at"`
+	DeliveredAt     *time.Time `json:"delivered_at"`
+	CancelReason    string     `gorm:"type:text" json:"cancel_reason"` // [FIX #1]
+	CancelledAt     *time.Time `json:"cancelled_at"`                   // [FIX #1]
+
+	Merchant  *Merchant `gorm:"foreignKey:MerchantID" json:"merchant"`
+	Order     *Order    `gorm:"foreignKey:OrderID" json:"order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	Items []OrderItem `gorm:"foreignKey:OrderMerchantGroupID" json:"items"`
 }
 
 type OrderItem struct {
-	ID                    string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	OrderID               string  `gorm:"type:uuid;not null;index" json:"order_id"`
-	OrderMerchantGroupID  string  `gorm:"type:uuid;not null;index" json:"order_merchant_group_id"`
+	ID                   string  `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	OrderID              string  `gorm:"type:uuid;not null;index" json:"order_id"`
+	OrderMerchantGroupID string  `gorm:"type:uuid;not null;index" json:"order_merchant_group_id"`
 	MerchantID           string  `gorm:"type:uuid;not null" json:"merchant_id"` // Sang Distributor
 	ProductID            string  `gorm:"type:uuid;not null" json:"product_id"`
 	ProductVariantID     *string `gorm:"type:uuid" json:"product_variant_id"`
 
-	ProductName          string  `gorm:"type:varchar(255);not null" json:"product_name"`
-	VariantName          string  `gorm:"type:varchar(255)" json:"variant_name"`
-	SKU                  string  `gorm:"type:varchar(100)" json:"sku"`
-	ProductImageURL      string  `gorm:"type:text" json:"product_image_url"`
+	ProductName     string `gorm:"type:varchar(255);not null" json:"product_name"`
+	VariantName     string `gorm:"type:varchar(255)" json:"variant_name"`
+	SKU             string `gorm:"type:varchar(100)" json:"sku"`
+	ProductImageURL string `gorm:"type:text" json:"product_image_url"`
 
-	Quantity             int     `gorm:"not null" json:"quantity"`
-	UnitPrice            float64 `gorm:"type:decimal(15,2);not null" json:"unit_price"`
-	Weight               int     `gorm:"default:0" json:"weight"` // Snapshot weight in grams
-	Subtotal             float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
-	Metadata             string  `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
-	PlatformFeeAmount    float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee_amount"`
-	COGS                 float64 `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Snapshot modal saat beli
-	
+	Quantity          int     `gorm:"not null" json:"quantity"`
+	UnitPrice         float64 `gorm:"type:decimal(15,2);not null" json:"unit_price"`
+	Weight            int     `gorm:"default:0" json:"weight"` // Snapshot weight in grams
+	Subtotal          float64 `gorm:"type:decimal(15,2);not null" json:"subtotal"`
+	Metadata          string  `gorm:"type:text" json:"metadata"` // JSON: {color: "Black"}
+	PlatformFeeAmount float64 `gorm:"type:decimal(15,2);not null;default:0" json:"platform_fee_amount"`
+	COGS              float64 `gorm:"type:decimal(15,2);not null;default:0" json:"cogs"` // Snapshot modal saat beli
+
 	// Commissions
-	CommissionRate         float64 `gorm:"type:decimal(5,4);not null;default:0" json:"commission_rate"`           // Affiliate Rate
-	CommissionAmount       float64 `gorm:"type:decimal(15,2);not null;default:0" json:"commission_amount"`         // Affiliate Amount
-	DistributionFeeAmount  float64 `gorm:"type:decimal(15,2);not null;default:0" json:"distribution_fee_amount"`  // Distributor Amount
-	
-	DiscountAmount       float64 `gorm:"type:decimal(15,2);not null;default:0" json:"discount_amount"`
-	MerchantAmount       float64 `gorm:"type:decimal(15,2);not null" json:"merchant_amount"` // Net for Distributor
+	CommissionRate        float64 `gorm:"type:decimal(5,4);not null;default:0" json:"commission_rate"`          // Affiliate Rate
+	CommissionAmount      float64 `gorm:"type:decimal(15,2);not null;default:0" json:"commission_amount"`       // Affiliate Amount
+	DistributionFeeAmount float64 `gorm:"type:decimal(15,2);not null;default:0" json:"distribution_fee_amount"` // Distributor Amount
 
-	CreatedAt            time.Time `json:"created_at"`
+	DiscountAmount float64 `gorm:"type:decimal(15,2);not null;default:0" json:"discount_amount"`
+	MerchantAmount float64 `gorm:"type:decimal(15,2);not null" json:"merchant_amount"` // Net for Distributor
+
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type OrderStatusHistory struct {
-	ID         string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	OrderID    string    `gorm:"type:uuid" json:"order_id"`
-	GroupID    *string   `gorm:"type:uuid" json:"group_id"`
-	Status     string    `gorm:"type:varchar(50);not null" json:"status"`
-	Note       string    `gorm:"type:text" json:"note"`
-	ChangedBy  string    `gorm:"type:uuid" json:"changed_by"`
-	ChangedAt  time.Time `gorm:"autoCreateTime" json:"changed_at"`
+	ID        string    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	OrderID   string    `gorm:"type:uuid" json:"order_id"`
+	GroupID   *string   `gorm:"type:uuid" json:"group_id"`
+	Status    string    `gorm:"type:varchar(50);not null" json:"status"`
+	Note      string    `gorm:"type:text" json:"note"`
+	ChangedBy string    `gorm:"type:uuid" json:"changed_by"`
+	ChangedAt time.Time `gorm:"autoCreateTime" json:"changed_at"`
 }

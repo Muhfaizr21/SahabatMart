@@ -7,7 +7,7 @@ const ingredients = [
   { name: 'Aloe Vera', desc: 'Memberikan hidrasi instan dan sensasi dingin.' },
 ];
 
-export default function AboutMission() {
+export default function AboutMission({ data }) {
   return (
     <section className="py-24 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
@@ -15,13 +15,18 @@ export default function AboutMission() {
           {/* Left: Content */}
           <div className="order-2 lg:order-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-600/10 text-rose-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-6">
-              Tentang AkuGlow
+              {data?.label || 'Tentang AkuGlow'}
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight mb-6">
-              Formula Premium Korea untuk <span className="text-rose-600">Kecantikan Alami</span> Anda.
+              {(data?.title || 'Formula Premium Korea untuk Kecantikan Alami Anda.').split(data?.highlight || 'Kecantikan Alami').map((part, i, arr) => (
+                <React.Fragment key={i}>
+                  {part}
+                  {i < arr.length - 1 && <span className="text-rose-600">{data?.highlight || 'Kecantikan Alami'}</span>}
+                </React.Fragment>
+              ))}
             </h2>
             <p className="text-gray-500 text-lg mb-10 leading-relaxed">
-              Kami percaya bahwa setiap orang berhak memiliki kulit sehat dan bercahaya. Dengan standar formulasi dari Korea, kami menghadirkan rangkaian perawatan kulit yang aman, lembut, namun sangat efektif.
+              {data?.desc || 'Kami percaya bahwa setiap orang berhak memiliki kulit sehat dan bercahaya. Dengan standar formulasi dari Korea, kami menghadirkan rangkaian perawatan kulit yang aman, lembut, namun sangat efektif.'}
             </p>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -44,7 +49,7 @@ export default function AboutMission() {
             
             <div className="relative z-10 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-rose-600/10 border-8 border-white">
               <img 
-                src="/skincare_ingredients.webp" 
+                src={data?.image || "/skincare_ingredients.webp"} 
                 alt="AkuGlow Ingredients" 
                 className="w-full h-auto object-cover"
               />

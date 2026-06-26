@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { A, PageHeader, TablePanel, statusBadge, Modal, fmtDate } from '../../lib/adminStyles.jsx';
+import { AdminSearch } from '../../lib/adminComponents.jsx';
 import toast from 'react-hot-toast';
 
 export default function AdminInbox() {
@@ -117,10 +118,10 @@ export default function AdminInbox() {
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
-                 <a href={`mailto:${selectedMsg.email}?subject=Re: ${selectedMsg.subject}`} onClick={() => updateStatus(selectedMsg.id, 'replied')} style={{ ...A.btnPrimary, flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
+                 <a href={`mailto:${selectedMsg.email}?subject=Re: ${selectedMsg.subject}`} onClick={() => updateStatus(selectedMsg.id, 'replied')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
                     <i className="bx bx-reply" /> Balas via Email
                  </a>
-                 <button onClick={() => deleteMsg(selectedMsg.id)} style={{ ...A.btnGhost, color: '#ef4444' }}>
+                 <button onClick={() => deleteMsg(selectedMsg.id)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#ef4444' }}>
                     <i className="bx bx-trash" /> Hapus
                  </button>
               </div>

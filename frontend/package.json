@@ -18,6 +18,8 @@
     "dompurify": "^3.4.7",
     "html-to-image": "^1.11.13",
     "html5-qrcode": "^2.3.8",
+    "jodit": "^4.12.29",
+    "jodit-react": "^5.3.21",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.7.0",

@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"akuglow/backend/models"
@@ -44,17 +45,38 @@ func (ac *AdminController) BulkNotifyUsers(w http.ResponseWriter, r *http.Reques
 
 	// Kirim notifikasi secara background
 	go func(users []models.User, title, msg string) {
+		var merchantUserIDs []string
+		for _, u := range users {
+			if u.Role == "merchant" {
+				merchantUserIDs = append(merchantUserIDs, u.ID)
+			}
+		}
+
+		merchantMap := make(map[string]string)
+		if len(merchantUserIDs) > 0 {
+			var merchants []models.Merchant
+			if err := ac.DB.Select("id, user_id").Where("user_id IN ?", merchantUserIDs).Find(&merchants).Error; err == nil {
+				for _, m := range merchants {
+					merchantMap[m.UserID] = m.ID
+				}
+			} else {
+				log.Printf("⚠️ [BulkNotify] Gagal mengambil data merchants: %v", err)
+			}
+		}
+
 		for _, u := range users {
 			receiverID := u.ID
 			receiverType := "user"
 			if u.Role == "merchant" {
-				var merchant models.Merchant
-				if err := ac.DB.Select("id").First(&merchant, "user_id = ?", u.ID).Error; err == nil {
-					receiverID = merchant.ID
+				if mID, exists := merchantMap[u.ID]; exists {
+					receiverID = mID
 					receiverType = "merchant"
 				}
 			}
-			_ = ac.Notif.Push(receiverID, receiverType, "admin_message", title, msg, "")
+			err := ac.Notif.Push(receiverID, receiverType, "admin_message", title, msg, "")
+			if err != nil {
+				log.Printf("⚠️ [BulkNotify] Gagal kirim notif ke %s (%s): %v", receiverType, receiverID, err)
+			}
 		}
 	}(targetUsers, req.Title, req.Message)
 

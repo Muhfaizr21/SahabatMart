@@ -6,13 +6,13 @@ import (
 	"akuglow/backend/utils"
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-	"gorm.io/gorm"
 )
 
 type SkinController struct {
@@ -22,7 +22,8 @@ type SkinController struct {
 }
 
 func NewSkinController(db *gorm.DB) *SkinController {
-	baseURL := os.Getenv("APP_URL")
+	configSvc := services.NewConfigService(db)
+	baseURL := configSvc.Get("platform_app_url", os.Getenv("APP_URL"))
 	if baseURL == "" {
 		baseURL = os.Getenv("BASE_URL")
 	}
@@ -46,7 +47,9 @@ func (sc *SkinController) SubmitPreTest(w http.ResponseWriter, r *http.Request) 
 	if userID == "" {
 		tokenStr := r.Header.Get("Authorization")
 		claims, err := utils.ParseJWT(tokenStr)
-		if err == nil { userID = claims.UserID }
+		if err == nil {
+			userID = claims.UserID
+		}
 	}
 
 	if userID == "" {
@@ -157,28 +160,28 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 	}
 
 	var results struct {
-		PreTest           models.SkinPreTest                `json:"pretest"`
-		ProgressLogs      []models.SkinProgress             `json:"progress_logs"`
-		Journals          []models.SkinJournal              `json:"journals"`
-		WarriorLevel      models.SkinWarriorLevel           `json:"warrior_level"`
-		Education         []models.SkinEducation            `json:"education"`
-		DayCount          int                               `json:"day_count"`
-		Affirmations      []string                          `json:"affirmations"`
-		Voucher           string                            `json:"voucher,omitempty"`
-		VoucherMessage    string                            `json:"voucher_message,omitempty"`
-		RitualInstruction string                            `json:"ritual_instruction,omitempty"`
-		Program           *models.SkinJourneyProgram        `json:"program,omitempty"`
-		Routines          []models.SkinJourneyRoutine       `json:"routines,omitempty"`
-		Recommendations   []models.SkinJourneyProductMapping `json:"recommendations,omitempty"`
-		CompletedStepsToday []uint                         `json:"completed_steps_today"`
-		IsCompleted       bool                              `json:"is_completed"`
-		FirstPhoto        string                            `json:"first_photo,omitempty"`
-		LastPhoto         string                            `json:"last_photo,omitempty"`
-		ConsistencyScore  int                               `json:"consistency_score"`
-		UserName          string                            `json:"user_name"`
-		StartedAt         *time.Time                        `json:"started_at,omitempty"` // BUG-01 fix
-		SkinProfileJSON   string                            `json:"skin_profile_json,omitempty"`
-		PurchasedProductIDs []string                        `json:"purchased_product_ids"`
+		PreTest             models.SkinPreTest                 `json:"pretest"`
+		ProgressLogs        []models.SkinProgress              `json:"progress_logs"`
+		Journals            []models.SkinJournal               `json:"journals"`
+		WarriorLevel        models.SkinWarriorLevel            `json:"warrior_level"`
+		Education           []models.SkinEducation             `json:"education"`
+		DayCount            int                                `json:"day_count"`
+		Affirmations        []string                           `json:"affirmations"`
+		Voucher             string                             `json:"voucher,omitempty"`
+		VoucherMessage      string                             `json:"voucher_message,omitempty"`
+		RitualInstruction   string                             `json:"ritual_instruction,omitempty"`
+		Program             *models.SkinJourneyProgram         `json:"program,omitempty"`
+		Routines            []models.SkinJourneyRoutine        `json:"routines,omitempty"`
+		Recommendations     []models.SkinJourneyProductMapping `json:"recommendations,omitempty"`
+		CompletedStepsToday []uint                             `json:"completed_steps_today"`
+		IsCompleted         bool                               `json:"is_completed"`
+		FirstPhoto          string                             `json:"first_photo,omitempty"`
+		LastPhoto           string                             `json:"last_photo,omitempty"`
+		ConsistencyScore    int                                `json:"consistency_score"`
+		UserName            string                             `json:"user_name"`
+		StartedAt           *time.Time                         `json:"started_at,omitempty"` // BUG-01 fix
+		SkinProfileJSON     string                             `json:"skin_profile_json,omitempty"`
+		PurchasedProductIDs []string                           `json:"purchased_product_ids"`
 	}
 
 	if pretest.ID != 0 {
@@ -220,7 +223,7 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		if len(results.Routines) == 0 {
 			var productSteps []models.SkinJourneyProductStep
 			sc.DB.Preload("Product").Where("program_id = ?", userJourney.ProgramID).Order("step_number asc").Find(&productSteps)
-			
+
 			for _, ps := range productSteps {
 				// Map Phase to Routine structure (Legacy logic uses TimeOfDay)
 				results.Routines = append(results.Routines, models.SkinJourneyRoutine{
@@ -247,27 +250,27 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 				requiredProductIDs = append(requiredProductIDs, r.ProductID)
 			}
 		}
-		
+
 		if len(requiredProductIDs) > 0 {
 			var boughtProductIDs []string
 			sc.DB.Table("order_items oi").
 				Joins("JOIN orders o ON o.id = oi.order_id").
-				Where("o.buyer_id = ? AND o.status IN (?, ?, ?, ?, ?)", userID, 
-					models.OrderPaid, models.OrderProcessing, models.OrderReadyToShip, 
+				Where("o.buyer_id = ? AND o.status IN (?, ?, ?, ?, ?)", userID,
+					models.OrderPaid, models.OrderProcessing, models.OrderReadyToShip,
 					models.OrderShipped, models.OrderCompleted).
 				Where("oi.product_id IN ?", requiredProductIDs).
 				Distinct("oi.product_id").
 				Pluck("oi.product_id", &boughtProductIDs)
-			
+
 			results.PurchasedProductIDs = boughtProductIDs
 		}
 	}
-	
+
 	// Fetch Product Recommendations based on skin type and concern from PreTest
 	if results.PreTest.ID != 0 {
 		sc.DB.Preload("Product").Where("skin_type = ? OR skin_concern = ?", results.PreTest.SkinType, results.PreTest.SkinProblem).Order("priority desc").Find(&results.Recommendations)
 	}
-	
+
 	// Auto-generate barcode if missing for existing user
 	if results.PreTest.ID != 0 && results.PreTest.BarcodeToken == "" {
 		shortID := "USER"
@@ -285,7 +288,7 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 	}
 
 	sc.DB.Where("user_id = ? AND created_at >= ?", userID, startTime).Order("week_number desc").Find(&results.ProgressLogs)
-	
+
 	// Sanitize ProgressLogs (Fix W0 issue in old data)
 	for i := range results.ProgressLogs {
 		if results.ProgressLogs[i].WeekNumber < 1 {
@@ -340,11 +343,13 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 
 	if results.DayCount >= 25 {
 		results.Voucher = cfgVoucherCode.Value
-		if results.Voucher == "" { results.Voucher = "AKUGLOW25" }
-		
+		if results.Voucher == "" {
+			results.Voucher = "AKUGLOW25"
+		}
+
 		results.VoucherMessage = cfgVoucherMsg.Value
-		if results.VoucherMessage == "" { 
-			results.VoucherMessage = "Kamu sudah berjuang 25 hari! Ini diskon 5% untuk stok bulan depan agar perjalananmu tidak terputus." 
+		if results.VoucherMessage == "" {
+			results.VoucherMessage = "Kamu sudah berjuang 25 hari! Ini diskon 5% untuk stok bulan depan agar perjalananmu tidak terputus."
 		}
 	}
 
@@ -355,11 +360,13 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 		sc.DB.Where("key = ?", "skin_journey_grad_voucher_message").First(&cfgGradMsg)
 
 		results.Voucher = cfgGradVoucher.Value
-		if results.Voucher == "" { results.Voucher = "GLOWGRADUATE" }
-		
+		if results.Voucher == "" {
+			results.Voucher = "GLOWGRADUATE"
+		}
+
 		results.VoucherMessage = cfgGradMsg.Value
-		if results.VoucherMessage == "" { 
-			results.VoucherMessage = "SELAMAT! Kamu telah lulus Skin Journey. Gunakan kode GLOWGRADUATE untuk diskon 15% pada pembelian berikutnya sebagai hadiah kelulusanmu! 🎓✨" 
+		if results.VoucherMessage == "" {
+			results.VoucherMessage = "SELAMAT! Kamu telah lulus Skin Journey. Gunakan kode GLOWGRADUATE untuk diskon 15% pada pembelian berikutnya sebagai hadiah kelulusanmu! 🎓✨"
 		}
 	}
 
@@ -367,7 +374,7 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 	var firstProgress, lastProgress models.SkinProgress
 	sc.DB.Where("user_id = ?", userID).Order("created_at asc").First(&firstProgress)
 	sc.DB.Where("user_id = ?", userID).Order("created_at desc").First(&lastProgress)
-	
+
 	results.FirstPhoto = firstProgress.SelfieURL
 	results.LastPhoto = lastProgress.SelfieURL
 
@@ -377,7 +384,9 @@ func (sc *SkinController) GetJourneyData(w http.ResponseWriter, r *http.Request)
 	// Example: total days since start vs journal count
 	if results.DayCount > 0 {
 		results.ConsistencyScore = int((journalCount * 100) / int64(results.DayCount))
-		if results.ConsistencyScore > 100 { results.ConsistencyScore = 100 }
+		if results.ConsistencyScore > 100 {
+			results.ConsistencyScore = 100
+		}
 	}
 
 	results.RitualInstruction = cfgRitual.Value
@@ -398,7 +407,7 @@ func (sc *SkinController) PostDailyJournal(w http.ResponseWriter, r *http.Reques
 	}
 	userID, _ := r.Context().Value("user_id").(string)
 	journal.UserID = userID
-	
+
 	// Set DayNumber based on PreTest creation date
 	var pretest models.SkinPreTest
 	if err := sc.DB.Where("user_id = ?", userID).Order("created_at desc").First(&pretest).Error; err == nil {
@@ -417,7 +426,7 @@ func (sc *SkinController) PostDailyJournal(w http.ResponseWriter, r *http.Reques
 	var countToday int64
 	today := time.Now().Truncate(24 * time.Hour)
 	sc.DB.Model(&models.SkinJournal{}).Where("user_id = ? AND created_at >= ?", userID, today).Count(&countToday)
-	
+
 	giveExp := countToday <= 1 // Termasuk yang barusan dibuat
 	sc.updateWarriorExperience(userID, 10, giveExp)
 
@@ -427,8 +436,10 @@ func (sc *SkinController) PostDailyJournal(w http.ResponseWriter, r *http.Reques
 func (sc *SkinController) updateWarriorExperience(userID string, expToAdd int, giveExp bool) {
 	var isJournal bool = false
 	// check if this is from journal for stats
-	if expToAdd == 10 { isJournal = true }
-	
+	if expToAdd == 10 {
+		isJournal = true
+	}
+
 	var level models.SkinWarriorLevel
 	err := sc.DB.Where("user_id = ?", userID).First(&level).Error
 	if err != nil {
@@ -483,7 +494,9 @@ func (sc *SkinController) PostWeeklyProgress(w http.ResponseWriter, r *http.Requ
 			var lastLog models.SkinProgress
 			sc.DB.Where("user_id = ?", userID).Order("week_number desc").First(&lastLog)
 			progress.WeekNumber = lastLog.WeekNumber + 1
-			if progress.WeekNumber < 1 { progress.WeekNumber = 1 }
+			if progress.WeekNumber < 1 {
+				progress.WeekNumber = 1
+			}
 		}
 	}
 
@@ -622,7 +635,7 @@ func (sc *SkinController) SetUserProgram(w http.ResponseWriter, r *http.Request)
 	}
 
 	userID, _ := r.Context().Value("user_id").(string)
-	
+
 	// --- Atomic Update dalam Transaksi ---
 	err := sc.DB.Transaction(func(tx *gorm.DB) error {
 		updateData := map[string]interface{}{
@@ -667,7 +680,7 @@ func (sc *SkinController) MarkStepComplete(w http.ResponseWriter, r *http.Reques
 	}
 
 	userID, _ := r.Context().Value("user_id").(string)
-	
+
 	// Check if already completed today
 	var existing models.SkinStepLog
 	today := time.Now().Truncate(24 * time.Hour)
@@ -798,7 +811,9 @@ func (sc *SkinController) GetCommunityFeed(w http.ResponseWriter, r *http.Reques
 	groupID := r.URL.Query().Get("group_id")
 	var posts []models.SkinCommunityPost
 	query := sc.DB.Preload("User.Profile").Preload("Comments.User.Profile").Order("created_at desc")
-	if groupID != "" { query = query.Where("group_id = ?", groupID) }
+	if groupID != "" {
+		query = query.Where("group_id = ?", groupID)
+	}
 	query.Limit(50).Find(&posts)
 	utils.JSONResponse(w, http.StatusOK, posts)
 }
@@ -809,7 +824,9 @@ func (sc *SkinController) PostCommunityPost(w http.ResponseWriter, r *http.Reque
 	userID, _ := r.Context().Value("user_id").(string)
 	if userID == "" {
 		claims, _ := utils.ParseJWT(r.Header.Get("Authorization"))
-		if claims != nil { userID = claims.UserID }
+		if claims != nil {
+			userID = claims.UserID
+		}
 	}
 	post.UserID = userID
 	sc.DB.Create(&post)
@@ -823,7 +840,9 @@ func (sc *SkinController) PostCommunityComment(w http.ResponseWriter, r *http.Re
 	userID, _ := r.Context().Value("user_id").(string)
 	if userID == "" {
 		claims, _ := utils.ParseJWT(r.Header.Get("Authorization"))
-		if claims != nil { userID = claims.UserID }
+		if claims != nil {
+			userID = claims.UserID
+		}
 	}
 	comment.UserID = userID
 	sc.DB.Create(&comment)
@@ -866,7 +885,9 @@ func (sc *SkinController) LikeCommunityPost(w http.ResponseWriter, r *http.Reque
 	userID, _ := r.Context().Value("user_id").(string)
 	if userID == "" {
 		claims, _ := utils.ParseJWT(r.Header.Get("Authorization"))
-		if claims != nil { userID = claims.UserID }
+		if claims != nil {
+			userID = claims.UserID
+		}
 	}
 
 	// BUG-13 fix: cegah like berkali-kali dari user yang sama
@@ -892,47 +913,32 @@ func parseUint(s string) uint {
 
 // UploadCommunityImage - Menangani upload gambar dari lokal
 func (sc *SkinController) UploadCommunityImage(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(10 << 20) // Max 10MB
-	if err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "File terlalu besar (Max 10MB)")
+	if r.Method != http.MethodPost {
+		utils.JSONError(w, http.StatusMethodNotAllowed, "Metode tidak diizinkan")
 		return
 	}
 
+	r.ParseMultipartForm(10 << 20) // 10MB max
 	file, handler, err := r.FormFile("image")
 	if err != nil {
-		utils.JSONError(w, http.StatusBadRequest, "Gagal mengambil file")
+		utils.JSONError(w, http.StatusBadRequest, "Gagal mengambil gambar")
 		return
 	}
 	defer file.Close()
 
-	// BUG-05 fix: pastikan direktori upload ada
-	if err := os.MkdirAll("uploads/community", 0755); err != nil {
-		log.Printf("❌ [Community] Gagal membuat direktori uploads/community: %v", err)
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyiapkan direktori upload")
-		return
-	}
+	// Use the built-in StorageService to handle webp conversion & naming consistently
+	// For community, we temporarily change the upload dir to "uploads/community"
+	originalDir := sc.Storage.UploadDir
+	sc.Storage.UploadDir = "uploads/community"
+	url, err := sc.Storage.SaveImage(file, handler)
+	sc.Storage.UploadDir = originalDir // Restore
 
-	// Buat nama file unik
-	fileName := fmt.Sprintf("%d-%s", time.Now().Unix(), handler.Filename)
-	filePath := "uploads/community/" + fileName
-
-	dst, err := os.Create(filePath)
 	if err != nil {
-		log.Printf("❌ [Community] Gagal membuat file %s: %v", filePath, err)
+		log.Printf("❌ [Community] Gagal menyimpan gambar: %v", err)
 		utils.JSONError(w, http.StatusInternalServerError, "Gagal menyimpan file di server")
 		return
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
-		utils.JSONError(w, http.StatusInternalServerError, "Gagal menulis file")
-		return
-	}
-
-	// Return URL absolut agar frontend bisa akses
-	baseURL := os.Getenv("APP_URL")
-	if baseURL == "" { baseURL = os.Getenv("BASE_URL") }
-	url := fmt.Sprintf("%s/uploads/community/%s", strings.TrimRight(baseURL, "/"), fileName)
 	utils.JSONResponse(w, http.StatusOK, map[string]string{"url": url})
 }
 
@@ -1031,21 +1037,23 @@ func (sc *SkinController) FinishJourney(w http.ResponseWriter, r *http.Request) 
 				FinalRank:       warrior.LevelName,
 				SkinProfileJSON: userJourney.SkinProfileJSON,
 			}
-			
+
 			var totalSteps, completedSteps int64
 			tx.Model(&models.SkinJourneyRoutine{}).Where("program_id = ?", userJourney.ProgramID).Count(&totalSteps)
 			expectedTotalSteps := int64(history.DayCount) * totalSteps
 			tx.Model(&models.SkinStepLog{}).Where("user_id = ? AND created_at >= ?", userID, userJourney.StartedAt).Count(&completedSteps)
 			if expectedTotalSteps > 0 {
 				history.ConsistencyScore = int((float64(completedSteps) / float64(expectedTotalSteps)) * 100)
-				if history.ConsistencyScore > 100 { history.ConsistencyScore = 100 }
+				if history.ConsistencyScore > 100 {
+					history.ConsistencyScore = 100
+				}
 			}
-			
+
 			if err := tx.Create(&history).Error; err != nil {
 				return err
 			}
 		}
-		
+
 		tx.Model(&warrior).Update("experience", warrior.Experience+500)
 		return nil
 	})
@@ -1239,7 +1247,10 @@ func (sc *SkinController) AdminSavePhase(w http.ResponseWriter, r *http.Request)
 		utils.JSONError(w, http.StatusBadRequest, "Format tidak valid")
 		return
 	}
-	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	if item.ProgramID == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "program_id wajib")
+		return
+	}
 	sc.DB.Save(&item)
 	utils.JSONResponse(w, http.StatusOK, item)
 }
@@ -1253,7 +1264,10 @@ func (sc *SkinController) AdminDeletePhase(w http.ResponseWriter, r *http.Reques
 func (sc *SkinController) AdminSaveBenefit(w http.ResponseWriter, r *http.Request) {
 	var item models.SkinJourneyBenefit
 	json.NewDecoder(r.Body).Decode(&item)
-	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	if item.ProgramID == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "program_id wajib")
+		return
+	}
 	sc.DB.Save(&item)
 	utils.JSONResponse(w, http.StatusOK, item)
 }
@@ -1267,7 +1281,10 @@ func (sc *SkinController) AdminDeleteBenefit(w http.ResponseWriter, r *http.Requ
 func (sc *SkinController) AdminSaveWarning(w http.ResponseWriter, r *http.Request) {
 	var item models.SkinJourneyWarning
 	json.NewDecoder(r.Body).Decode(&item)
-	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	if item.ProgramID == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "program_id wajib")
+		return
+	}
 	sc.DB.Save(&item)
 	utils.JSONResponse(w, http.StatusOK, item)
 }
@@ -1281,7 +1298,10 @@ func (sc *SkinController) AdminDeleteWarning(w http.ResponseWriter, r *http.Requ
 func (sc *SkinController) AdminSaveFAQ(w http.ResponseWriter, r *http.Request) {
 	var item models.SkinJourneyFAQ
 	json.NewDecoder(r.Body).Decode(&item)
-	if item.ProgramID == 0 { utils.JSONError(w, http.StatusBadRequest, "program_id wajib"); return }
+	if item.ProgramID == 0 {
+		utils.JSONError(w, http.StatusBadRequest, "program_id wajib")
+		return
+	}
 	sc.DB.Save(&item)
 	utils.JSONResponse(w, http.StatusOK, item)
 }
@@ -1371,7 +1391,9 @@ func (sc *SkinController) AdminGetRoutines(w http.ResponseWriter, r *http.Reques
 	programID := r.URL.Query().Get("program_id")
 	var list []models.SkinJourneyRoutine
 	q := sc.DB.Preload("Step")
-	if programID != "" { q = q.Where("program_id = ?", programID) }
+	if programID != "" {
+		q = q.Where("program_id = ?", programID)
+	}
 	q.Find(&list)
 	utils.JSONResponse(w, http.StatusOK, list)
 }

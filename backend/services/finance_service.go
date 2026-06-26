@@ -33,7 +33,7 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 	if err := tx.Preload("MerchantGroups").First(&order, "id = ?", orderID).Error; err != nil {
 		return err
 	}
-	
+
 	// 1. [TOTAL INFLOW] Customer pays FULL amount to HQ
 	descInflow := fmt.Sprintf("Penerimaan Pembayaran Pesanan #%s", order.OrderNumber)
 	if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxSaleRevenue, order.GrandTotal, order.ID, "order", descInflow, nil); err != nil {
@@ -41,7 +41,7 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 	}
 
 	orderSvc := NewOrderService(tx)
-	
+
 	for _, group := range order.MerchantGroups {
 		// 2. [ALLOCATION] Payout to Merchant
 		var merchant models.Merchant
@@ -51,10 +51,10 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 
 		actualPayout := group.MerchantPayout
 		if actualPayout > 0 {
-			settleDate := time.Now().Add(24 * time.Hour) 
-			
+			settleDate := time.Now().Add(24 * time.Hour)
+
 			descPayout := fmt.Sprintf("Bagi Hasil Penjualan (Pesanan #%s)", order.OrderNumber)
-			
+
 			// Debit Admin (Source)
 			descDebitAdmin := fmt.Sprintf("Alokasi Penjualan Merchant %s (Pesanan #%s)", merchant.StoreName, order.OrderNumber)
 			if err := s.ProcessTransaction(tx, models.PusatID, models.WalletAdmin, models.TxPayoutOutflow, -actualPayout, order.ID, "order", descDebitAdmin, nil); err != nil {
@@ -71,12 +71,12 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 		var orderItems []models.OrderItem
 		// Filter items by Group ID to avoid double-counting
 		tx.Where("order_id = ? AND order_merchant_group_id = ?", order.ID, group.ID).Find(&orderItems)
-		
+
 		for _, item := range orderItems {
 			presetDistributed := false
 			if order.AffiliateID != nil && *order.AffiliateID != "" {
 				entries, err := orderSvc.DistributePresetCommissions(tx, order, item, *order.AffiliateID)
-				
+
 				// [BUG-C3 Fix] Jika ada entry yang berhasil dibuat (len > 0),
 				// set presetDistributed = true meskipun ada error partial.
 				// Ini mencegah fallback membuat duplicate commission untuk affiliate yang sama.
@@ -91,8 +91,8 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 						}
 
 						descComm := fmt.Sprintf("Komisi Affiliate Lvl %d - %s (Pesanan #%s)", ent.Level, item.ProductName, order.OrderNumber)
-						
-						holdDays := 0 
+
+						holdDays := 0
 						if err := tx.Preload("Tier").First(&member, "id = ?", ent.AffiliateID).Error; err == nil {
 							if member.Tier != nil {
 								holdDays = member.Tier.CommissionHoldDays
@@ -121,7 +121,7 @@ func (s *FinanceService) DistributeFunds(tx *gorm.DB, orderID string) error {
 				var member models.AffiliateMember
 				if tx.First(&member, "id = ?", *order.AffiliateID).Error == nil {
 					descFallback := fmt.Sprintf("Komisi Affiliate - %s (Pesanan #%s)", item.ProductName, order.OrderNumber)
-					
+
 					holdDays := 0
 					if err := tx.Preload("Tier").First(&member, "id = ?", *order.AffiliateID).Error; err == nil {
 						if member.Tier != nil {
@@ -225,10 +225,10 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 	if ownerType == models.WalletAdmin {
 		// INFLOW: Real money coming into the system
 		isPlatformInflow := amount > 0 && (txType == models.TxSaleRevenue || txType == models.TxRestockRevenue || txType == models.TxPlatformFee)
-		
+
 		// OUTFLOW: Physical money leaving the system (Withdrawals/Payouts)
 		// We ignore internal allocations (refType 'order' or 'affiliate_commission') because those are just digital moves
-		isPhysicalOutflow := amount < 0 && txType == models.TxPayoutOutflow && 
+		isPhysicalOutflow := amount < 0 && txType == models.TxPayoutOutflow &&
 			refType != "order" && refType != "affiliate_commission"
 
 		if isPlatformInflow || isPhysicalOutflow {
@@ -237,7 +237,7 @@ func (s *FinanceService) ProcessTransaction(tx *gorm.DB, ownerID string, ownerTy
 			var primaryLoc models.FinancialLocation
 			if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("is_primary = ?", true).First(&primaryLoc).Error; err == nil {
 				tx.Model(&primaryLoc).Update("balance", gorm.Expr("balance + ?", amount))
-				
+
 				// Record mutation for audit trail
 				now := time.Now()
 				mutType := "income"
@@ -298,7 +298,7 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		var txs []models.WalletTransaction
 		now := time.Now()
-		
+
 		err := tx.Where("is_settled = ? AND target_settlement_date IS NOT NULL AND target_settlement_date <= ?", false, now).Find(&txs).Error
 		if err != nil {
 			return err
@@ -325,7 +325,7 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 				wallet.PendingBalance -= txn.Amount
 				wallet.Balance += txn.Amount
 			}
-			
+
 			if err := tx.Save(&wallet).Error; err != nil {
 				return err
 			}
@@ -334,7 +334,7 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 			txn.SettledAt = &now
 			txn.BalanceAfter = wallet.Balance
 			txn.PendingAfter = wallet.PendingBalance
-			
+
 			if err := tx.Save(&txn).Error; err != nil {
 				return err
 			}
@@ -342,7 +342,7 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 			// [SYNC] Update AffiliateCommission status if applicable
 			if txn.ReferenceType == "affiliate_commission" && txn.ReferenceID != nil {
 				tx.Model(&models.AffiliateCommission{}).Where("id = ?", *txn.ReferenceID).Update("status", models.CommissionApproved)
-				
+
 				// [Akuglow Sync] Kumpulkan ID affiliate untuk trigger kalkulasi setelah TX selesai
 				if wallet.OwnerType == models.WalletAffiliate {
 					var member models.AffiliateMember
@@ -351,7 +351,7 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 					}
 				}
 			}
-			
+
 			count++
 			log.Printf("[Settlement] Processed txn %s for wallet %s (Amount: %.2f)", txn.ID, wallet.ID, txn.Amount)
 		}
@@ -377,15 +377,14 @@ func (s *FinanceService) ProcessSettlements() (int, error) {
 func (s *FinanceService) UpdateSettlementDatesOnDelivery(tx *gorm.DB, orderID string) error {
 	configSvc := NewConfigService(tx)
 	merchantSettleHours := configSvc.GetInt("settlement_merchant_hours", 24)
-	
+
 	newSettleDate := time.Now().Add(time.Duration(merchantSettleHours) * time.Hour)
-	
+
 	// Cari semua transaksi merchant terkait order ini yang masih pending
 	return tx.Model(&models.WalletTransaction{}).
 		Where("reference_id = ? AND reference_type = 'order' AND is_settled = ?", orderID, false).
 		Update("target_settlement_date", newSettleDate).Error
 }
-
 
 func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error {
 	// [Idempotency] Check if already reversed
@@ -396,7 +395,7 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 	}
 
 	var txs []models.WalletTransaction
-	
+
 	// Direct order transactions
 	if err := tx.Where("reference_id = ? AND reference_type IN ('order', 'order_fallback_comm')", orderID).Find(&txs).Error; err != nil {
 		return err
@@ -408,7 +407,7 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 	tx.Raw(`SELECT wt.* FROM wallet_transactions wt 
 		    JOIN affiliate_commissions ac ON wt.reference_id = ac.id 
 			WHERE ac.order_id = ? AND wt.reference_type = 'affiliate_commission'`, orderID).Scan(&commTxs)
-	
+
 	txs = append(txs, commTxs...)
 
 	for _, txn := range txs {
@@ -457,7 +456,7 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 			}
 			wallet.PendingBalance -= deductPending
 		}
-		
+
 		if txn.Amount > 0 {
 			prevEarned := wallet.TotalEarned
 			wallet.TotalEarned -= txn.Amount
@@ -499,7 +498,13 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 			Amount:        -txn.Amount,
 			BalanceBefore: wallet.Balance + addedBack,
 			BalanceAfter:  wallet.Balance,
-			PendingBefore: wallet.PendingBalance + (func() float64 { if !txn.IsSettled { return txn.Amount } else { return 0 } }()),
+			PendingBefore: wallet.PendingBalance + (func() float64 {
+				if !txn.IsSettled {
+					return txn.Amount
+				} else {
+					return 0
+				}
+			}()),
 			PendingAfter:  wallet.PendingBalance,
 			Description:   fmt.Sprintf("Pembalikan: %s", txn.Description),
 			ReferenceID:   txn.ReferenceID,
@@ -561,7 +566,7 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 	var comms []models.AffiliateCommission
 	if err := tx.Where("order_id = ?", orderID).Find(&comms).Error; err == nil {
 		tx.Model(&models.AffiliateCommission{}).Where("order_id = ?", orderID).Update("status", models.CommissionCancelled)
-		
+
 		// Recalculate total_earned for each affected affiliate
 		affSvc := NewAffiliateService(tx, nil)
 		for _, c := range comms {
@@ -573,15 +578,15 @@ func (s *FinanceService) ReverseDistribution(tx *gorm.DB, orderID string) error 
 }
 
 type PlatformLedger struct {
-	TotalAssets     float64
-	MerchantPending float64
+	TotalAssets      float64
+	MerchantPending  float64
 	AffiliatePending float64
-	AdminBalance    float64
+	AdminBalance     float64
 }
 
 func (s *FinanceService) SyncPlatformLedger() (*PlatformLedger, error) {
 	var ledger PlatformLedger
-	
+
 	// [BUG-M3 Fix] Error handling untuk Scan — jangan silent swallow
 	if err := s.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletAdmin).Select("COALESCE(SUM(balance), 0)").Scan(&ledger.AdminBalance).Error; err != nil {
 		log.Printf("[SyncPlatformLedger] AdminBalance scan error: %v", err)
@@ -592,9 +597,9 @@ func (s *FinanceService) SyncPlatformLedger() (*PlatformLedger, error) {
 	if err := s.DB.Model(&models.Wallet{}).Where("owner_type = ?", models.WalletAffiliate).Select("COALESCE(SUM(pending_balance), 0)").Scan(&ledger.AffiliatePending).Error; err != nil {
 		log.Printf("[SyncPlatformLedger] AffiliatePending scan error: %v", err)
 	}
-	
+
 	ledger.TotalAssets = ledger.AdminBalance + ledger.MerchantPending + ledger.AffiliatePending
-	
+
 	return &ledger, nil
 }
 
@@ -639,4 +644,3 @@ func (s *FinanceService) RecordTransactionAllocation(tx *gorm.DB, gross float64,
 		CreatedAt:   time.Now(),
 	})
 }
-

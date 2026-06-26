@@ -71,7 +71,7 @@ export default function SkinJourney() {
     } else if (ritualSeconds === 0) {
       setRitualActive(false);
       setRitualSeconds(60);
-      toast.success('Ritual Selesai! Kulitmu berterima kasih. ✨', { duration: 5000 });
+      toast.success('Ritual Selesai! Kulitmu berterima kasih.', { duration: 5000 });
     }
     return () => clearInterval(interval);
   }, [ritualActive, ritualSeconds]);
@@ -139,7 +139,7 @@ export default function SkinJourney() {
         method: 'POST',
         body: JSON.stringify({ program_id: programId })
       });
-      toast.success('Program berhasil diaktifkan! ✨');
+      toast.success('Program berhasil diaktifkan!');
       await fetchJourney(); // Ensure we wait for fetch
       setLoading(false);
     } catch (_err) {
@@ -193,7 +193,7 @@ export default function SkinJourney() {
     
     try {
       await fetchJson(`${API_BASE}/api/skin/finish-program`, { method: 'POST' });
-      toast.success('🎉 Selamat! Program kamu telah selesai!');
+      toast.success('Selamat! Program kamu telah selesai!');
       fetchJourney();
     } catch (_err) {
       toast.error(_err.message || 'Gagal menyelesaikan program');
@@ -256,11 +256,11 @@ export default function SkinJourney() {
 
           // Kita ubah dari "Blokir" menjadi "Peringatan" agar tidak kaku
           if (avgLuminance < 25) {
-            toast("Fotonya terlihat agak gelap, AI mungkin kurang akurat. Coba cari cahaya lebih ya!", { icon: '⚠️' });
+            toast("Fotonya terlihat agak gelap, AI mungkin kurang akurat. Coba cari cahaya lebih ya!", {});
           }
           
           if (sharpness < 1.5) {
-             toast("Fotonya terdeteksi agak buram. Pastikan kamera fokus agar hasil maksimal!", { icon: '⚠️' });
+             toast("Fotonya terdeteksi agak buram. Pastikan kamera fokus agar hasil maksimal!", {});
           }
 
           // Kita hanya blokir jika BENAR-BENAR ekstrem (misal layar hitam total atau blank)
@@ -298,7 +298,7 @@ export default function SkinJourney() {
 
   const handleSaveProgress = async () => {
     if (alreadyUploadedThisWeek) {
-      toast.error(`Kamu sudah upload progres minggu ke-${currentWeekNumber}! Tunggu minggu depan ya 💪`);
+      toast.error(`Kamu sudah upload progres minggu ke-${currentWeekNumber}! Tunggu minggu depan ya!`);
       return;
     }
 
@@ -349,7 +349,7 @@ export default function SkinJourney() {
           setTrackerForm(prev => ({ ...prev, selfie_url: aiResult.photo_url }));
         }
         
-        toast.success('✨ Analisis AI selesai!', { id: 'ai-analyze' });
+        toast.success('Analisis AI selesai!', { id: 'ai-analyze' });
       } catch (_err) {
         toast.error(_err.message || 'Gagal menganalisis foto', { id: 'ai-analyze' });
       } finally {
@@ -463,7 +463,7 @@ export default function SkinJourney() {
       link.href = dataUrl;
       link.click();
       
-      toast.success('Sertifikat berhasil diunduh! ✨', { id: tid });
+      toast.success('Sertifikat berhasil diunduh!', { id: tid });
     } catch (_err) {
       console.error("Download Error:", _err);
       toast.error(`Gagal mengunduh: ${_err.message || 'Error teknis'}`, { id: tid });
@@ -606,7 +606,7 @@ export default function SkinJourney() {
 
             {/* After */}
             <div className="group">
-              <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.4em] mb-4">Today: Result ✨</p>
+              <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.4em] mb-4">Today: Result</p>
               <div className="relative aspect-[3/4] rounded-[56px] overflow-hidden border-8 border-rose-500/20 bg-black/40 shadow-2xl group-hover:rotate-[2deg] transition-transform duration-700">
                 {journeyData?.last_photo ? (
                   <img src={journeyData.last_photo} alt="After" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
@@ -631,7 +631,7 @@ export default function SkinJourney() {
       {journeyData?.voucher && (
         <div className="mb-12 p-8 rounded-[40px] bg-gradient-to-r from-amber-500/10 to-rose-500/10 border border-amber-500/20 relative overflow-hidden group">
           <div className="relative z-10">
-            <p className="text-amber-500 text-[10px] font-black uppercase tracking-widest mb-2">Reward Kelulusan 🎓</p>
+            <p className="text-amber-500 text-[10px] font-black uppercase tracking-widest mb-2">Reward Kelulusan</p>
             <h3 className="text-white font-black text-2xl mb-4">{journeyData?.voucherMessage}</h3>
             <div className="inline-flex items-center gap-4 p-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-xl">
                <span className="text-2xl font-black text-white tracking-widest uppercase">{journeyData?.voucher}</span>
@@ -1303,7 +1303,7 @@ export default function SkinJourney() {
                               </div>
                             </div>
                             <div className="pt-2 border-t border-white/5">
-                              <p className="text-emerald-400 text-[9px] font-black italic">✨ {aiAnalysis.healing_message}</p>
+                              <p className="text-emerald-400 text-[9px] font-black italic">{aiAnalysis.healing_message}</p>
                             </div>
                           </div>
                         </div>
@@ -1613,7 +1613,7 @@ export default function SkinJourney() {
                     <div>
                       <p className="text-amber-200 text-xs font-black uppercase tracking-tight mb-1">Produk Belum Dibeli</p>
                       <p className="text-amber-200/60 text-[10px] leading-relaxed">
-                        "Produk kamu belum beli, silakan beli agar journey kamu maksimal!" ✨
+                        "Produk kamu belum beli, silakan beli agar journey kamu maksimal!"
                       </p>
                     </div>
                   </div>

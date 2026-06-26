@@ -135,7 +135,7 @@ export default function ReviewSection({ productID }) {
       <div className="space-y-6">
         {reviews.length === 0 ? (
             <div className="text-center py-20 bg-gray-50/50 rounded-[3rem] border border-dashed border-gray-200">
-                <div className="text-4xl mb-4">✍️</div>
+                <div className="text-4xl mb-4"></div>
                 <p className="text-gray-400 font-bold">Belum ada ulasan untuk produk ini.</p>
                 <p className="text-[10px] text-gray-300 uppercase tracking-widest mt-1">Jadilah yang pertama memberikan ulasan!</p>
             </div>

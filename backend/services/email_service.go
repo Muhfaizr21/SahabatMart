@@ -3,9 +3,9 @@ package services
 import (
 	"akuglow/backend/models"
 	"fmt"
+	"gorm.io/gorm"
 	"net/smtp"
 	"os"
-	"gorm.io/gorm"
 )
 
 type EmailService struct {
@@ -18,7 +18,7 @@ func NewEmailService(db *gorm.DB) *EmailService {
 
 func (s *EmailService) SendEmail(to, subject, body string) error {
 	configSvc := NewConfigService(s.DB)
-	
+
 	enabled := configSvc.Get("notif_email_enabled", "false") == "true"
 	if !enabled {
 		return nil
@@ -35,9 +35,12 @@ func (s *EmailService) SendEmail(to, subject, body string) error {
 	}
 
 	auth := smtp.PlainAuth("", user, pass, host)
-	
-	msg := []byte("To: " + to + "\r\n" +
+
+	msg := []byte("From: " + from + "\r\n" +
+		"To: " + to + "\r\n" +
 		"Subject: " + subject + "\r\n" +
+		"MIME-version: 1.0\r\n" +
+		"Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
 		"\r\n" +
 		body + "\r\n")
 

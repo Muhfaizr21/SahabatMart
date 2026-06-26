@@ -113,7 +113,7 @@ export default function MarketingMaterials() {
       <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] -mr-48 -mt-48"></div>
       
       <div className="flex items-center gap-6 mb-12 relative z-10">
-        <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-purple-500/20">📸</div>
+        <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-purple-500/20"><i className="bx bx-camera"></i></div>
         <div>
           <h2 className="text-2xl font-black text-white leading-tight italic tracking-tighter">Materi Promosi AkuGlow</h2>
           <p className="text-slate-400 text-xs font-medium mt-1">Aset profesional untuk konversi tinggi.</p>
@@ -165,7 +165,7 @@ export default function MarketingMaterials() {
                     copied === asset.id ? 'bg-green-500 text-white' : 'bg-white text-slate-900 hover:bg-purple-100'
                   }`}
                 >
-                  {copied === asset.id ? 'Copied! ✅' : 'Copy Link & Text'}
+                  {copied === asset.id ? 'Tersalin!' : 'Copy Link & Text'}
                 </button>
                 
                 {asset.type === 'copywriting' ? (
@@ -180,7 +180,7 @@ export default function MarketingMaterials() {
                     onClick={() => handleDownload(asset)}
                     className="w-full bg-slate-800 text-slate-300 py-2 rounded-xl font-bold text-[9px] uppercase tracking-widest text-center hover:bg-slate-700 transition-colors border border-slate-700 flex items-center justify-center gap-2"
                   >
-                    { (asset.file_url.includes('youtube.com') || asset.file_url.includes('youtu.be')) ? 'Buka YouTube ↗️' : 'Download ⬇️' }
+                    { (asset.file_url.includes('youtube.com') || asset.file_url.includes('youtu.be')) ? 'Buka YouTube' : 'Unduh' }
                   </button>
                 )}
               </div>

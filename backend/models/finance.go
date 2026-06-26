@@ -28,38 +28,38 @@ const (
 	TxRefundDeduction     WalletTransactionType = "refund_deduction"
 	TxBonus               WalletTransactionType = "bonus"
 	TxAdjustment          WalletTransactionType = "adjustment"
-	TxRestockPayment      WalletTransactionType = "restock_payment" // Merchant pays HQ
-	TxRestockRevenue      WalletTransactionType = "restock_revenue" // HQ receives money
-	TxPayoutOutflow       WalletTransactionType = "payout_outflow"  // HQ pays out to Merchant/Affiliate
+	TxRestockPayment      WalletTransactionType = "restock_payment"  // Merchant pays HQ
+	TxRestockRevenue      WalletTransactionType = "restock_revenue"  // HQ receives money
+	TxPayoutOutflow       WalletTransactionType = "payout_outflow"   // HQ pays out to Merchant/Affiliate
 	TxShoppingPayment     WalletTransactionType = "shopping_payment" // Affiliate uses bonus to shop
 )
 
 type Wallet struct {
-	ID             string          `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	OwnerID        string          `gorm:"type:uuid;not null;index:idx_wallet_owner" json:"owner_id"`
-	OwnerType      WalletOwnerType `gorm:"type:varchar(20);not null;index:idx_wallet_owner" json:"owner_type"`
-	Balance        float64         `gorm:"type:decimal(15,2);not null;default:0" json:"balance"`         // Ready for withdrawal
-	PendingBalance float64         `gorm:"type:decimal(15,2);not null;default:0" json:"pending_balance"` // Hold balance
-	ShoppingBalance float64        `gorm:"type:decimal(15,2);not null;default:0" json:"shopping_balance"` // For shopping only
-	TotalEarned    float64         `gorm:"type:decimal(15,2);not null;default:0" json:"total_earned"`
-	TotalWithdrawn float64         `gorm:"type:decimal(15,2);not null;default:0" json:"total_withdrawn"`
-	IsActive       bool            `gorm:"default:true" json:"is_active"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID              string          `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	OwnerID         string          `gorm:"type:uuid;not null;index:idx_wallet_owner" json:"owner_id"`
+	OwnerType       WalletOwnerType `gorm:"type:varchar(20);not null;index:idx_wallet_owner" json:"owner_type"`
+	Balance         float64         `gorm:"type:decimal(15,2);not null;default:0" json:"balance"`          // Ready for withdrawal
+	PendingBalance  float64         `gorm:"type:decimal(15,2);not null;default:0" json:"pending_balance"`  // Hold balance
+	ShoppingBalance float64         `gorm:"type:decimal(15,2);not null;default:0" json:"shopping_balance"` // For shopping only
+	TotalEarned     float64         `gorm:"type:decimal(15,2);not null;default:0" json:"total_earned"`
+	TotalWithdrawn  float64         `gorm:"type:decimal(15,2);not null;default:0" json:"total_withdrawn"`
+	IsActive        bool            `gorm:"default:true" json:"is_active"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
 type WalletTransaction struct {
-	ID             string                `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	WalletID       string                `gorm:"type:uuid;not null;index" json:"wallet_id"`
-	Type           WalletTransactionType `gorm:"type:varchar(50);not null" json:"type"`
-	Amount         float64               `gorm:"type:decimal(15,2);not null" json:"amount"` // Pos = credit, Neg = debit
-	BalanceBefore  float64               `gorm:"type:decimal(15,2);not null" json:"balance_before"`
-	BalanceAfter   float64               `gorm:"type:decimal(15,2);not null" json:"balance_after"`
-	PendingBefore  float64               `gorm:"type:decimal(15,2)" json:"pending_before"`
-	PendingAfter   float64               `gorm:"type:decimal(15,2)" json:"pending_after"`
-	Description    string                `gorm:"type:text" json:"description"`
-	ReferenceID    *string               `gorm:"type:uuid" json:"reference_id"`
-	ReferenceType  string                `gorm:"type:varchar(50)" json:"reference_type"` // order, commission, withdrawal, refund
+	ID                   string                `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	WalletID             string                `gorm:"type:uuid;not null;index" json:"wallet_id"`
+	Type                 WalletTransactionType `gorm:"type:varchar(50);not null" json:"type"`
+	Amount               float64               `gorm:"type:decimal(15,2);not null" json:"amount"` // Pos = credit, Neg = debit
+	BalanceBefore        float64               `gorm:"type:decimal(15,2);not null" json:"balance_before"`
+	BalanceAfter         float64               `gorm:"type:decimal(15,2);not null" json:"balance_after"`
+	PendingBefore        float64               `gorm:"type:decimal(15,2)" json:"pending_before"`
+	PendingAfter         float64               `gorm:"type:decimal(15,2)" json:"pending_after"`
+	Description          string                `gorm:"type:text" json:"description"`
+	ReferenceID          *string               `gorm:"type:uuid" json:"reference_id"`
+	ReferenceType        string                `gorm:"type:varchar(50)" json:"reference_type"` // order, commission, withdrawal, refund
 	IsSettled            bool                  `gorm:"default:false;index" json:"is_settled"`
 	SettledAt            *time.Time            `json:"settled_at"`
 	TargetSettlementDate *time.Time            `gorm:"index" json:"target_settlement_date"` // Target date for moving pending to balance
@@ -78,28 +78,28 @@ const (
 )
 
 type WithdrawalRequest struct {
-	ID                 string       `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	WalletID           string       `gorm:"type:uuid;not null" json:"wallet_id"`
-	RequesterID        string       `gorm:"type:uuid;not null" json:"requester_id"`
-	RequesterType      WalletOwnerType `gorm:"type:varchar(20);not null" json:"requester_type"`
-	
-	Amount             float64      `gorm:"type:decimal(15,2);not null" json:"amount"`
-	Fee                float64      `gorm:"type:decimal(15,2);not null;default:0" json:"fee"`
-	NetAmount          float64      `gorm:"type:decimal(15,2);not null" json:"net_amount"`
+	ID            string          `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	WalletID      string          `gorm:"type:uuid;not null" json:"wallet_id"`
+	RequesterID   string          `gorm:"type:uuid;not null" json:"requester_id"`
+	RequesterType WalletOwnerType `gorm:"type:varchar(20);not null" json:"requester_type"`
 
-	BankName           string       `gorm:"type:varchar(100);not null" json:"bank_name"`
-	BankAccountNumber  string       `gorm:"type:text;not null" json:"bank_account_number"`
-	BankAccountName    string       `gorm:"type:varchar(200);not null" json:"bank_account_name"`
-	
-	Status             PayoutStatus `gorm:"type:varchar(50);default:'requested';not null" json:"status"`
-	Notes              string       `gorm:"type:text" json:"notes"`
+	Amount    float64 `gorm:"type:decimal(15,2);not null" json:"amount"`
+	Fee       float64 `gorm:"type:decimal(15,2);not null;default:0" json:"fee"`
+	NetAmount float64 `gorm:"type:decimal(15,2);not null" json:"net_amount"`
 
-	ReviewedBy         *string      `gorm:"type:uuid" json:"reviewed_by"`
-	ReviewedAt         *time.Time   `json:"reviewed_at"`
-	ProcessedAt        *time.Time   `json:"processed_at"`
+	BankName          string `gorm:"type:varchar(100);not null" json:"bank_name"`
+	BankAccountNumber string `gorm:"type:text;not null" json:"bank_account_number"`
+	BankAccountName   string `gorm:"type:varchar(200);not null" json:"bank_account_name"`
 
-	CreatedAt          time.Time    `json:"created_at"`
-	UpdatedAt          time.Time    `json:"updated_at"`
+	Status PayoutStatus `gorm:"type:varchar(50);default:'requested';not null" json:"status"`
+	Notes  string       `gorm:"type:text" json:"notes"`
+
+	ReviewedBy  *string    `gorm:"type:uuid" json:"reviewed_by"`
+	ReviewedAt  *time.Time `json:"reviewed_at"`
+	ProcessedAt *time.Time `json:"processed_at"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type RefundStatus string
@@ -113,18 +113,18 @@ const (
 )
 
 type Refund struct {
-	ID              string       `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	OrderID         string       `gorm:"type:uuid;not null" json:"order_id"`
-	OrderMerchantGroupID *string `gorm:"type:uuid" json:"order_merchant_group_id"`
-	RequestedBy     string       `gorm:"type:uuid;not null" json:"requested_by"`
-	Reason          string       `gorm:"type:text;not null" json:"reason"`
-	Amount          float64      `gorm:"type:decimal(15,2);not null" json:"amount"`
-	Status          RefundStatus `gorm:"type:varchar(50);default:'pending';not null" json:"status"`
-	
-	ApprovedBy      *string      `gorm:"type:uuid" json:"approved_by"`
-	ApprovedAt      *time.Time   `json:"approved_at"`
-	ProcessedAt     *time.Time   `json:"processed_at"`
-	
-	CreatedAt       time.Time    `json:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at"`
+	ID                   string       `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	OrderID              string       `gorm:"type:uuid;not null" json:"order_id"`
+	OrderMerchantGroupID *string      `gorm:"type:uuid" json:"order_merchant_group_id"`
+	RequestedBy          string       `gorm:"type:uuid;not null" json:"requested_by"`
+	Reason               string       `gorm:"type:text;not null" json:"reason"`
+	Amount               float64      `gorm:"type:decimal(15,2);not null" json:"amount"`
+	Status               RefundStatus `gorm:"type:varchar(50);default:'pending';not null" json:"status"`
+
+	ApprovedBy  *string    `gorm:"type:uuid" json:"approved_by"`
+	ApprovedAt  *time.Time `json:"approved_at"`
+	ProcessedAt *time.Time `json:"processed_at"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

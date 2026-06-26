@@ -5,8 +5,8 @@ import (
 	"akuglow/backend/repositories"
 	"errors"
 	"fmt"
-	"log"
 	"gorm.io/gorm"
+	"log"
 	"time"
 )
 
@@ -60,7 +60,7 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 	if search != "" {
 		baseQuery = baseQuery.Where("(products.name ILIKE ? OR pv.name ILIKE ? OR pv.sku ILIKE ?)", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
-	
+
 	if categoryID != "" && categoryID != "0" && categoryID != "all" {
 		var cat models.Category
 		if err := s.DB.First(&cat, categoryID).Error; err == nil {
@@ -82,8 +82,12 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 		return nil, err
 	}
 
-	if limit <= 0 { limit = 10 }
-	if page <= 1 { page = 1 }
+	if limit <= 0 {
+		limit = 10
+	}
+	if page <= 1 {
+		page = 1
+	}
 	offset := (page - 1) * limit
 
 	err := baseQuery.Select(`
@@ -103,7 +107,7 @@ func (s *MerchantService) GetProducts(merchantID string, search, categoryID, sto
 		return nil, err
 	}
 
-	log.Printf("[MerchantService] GetProducts: merchant=%s, found=%d, total=%d, filter(cat=%s, stock=%s)", 
+	log.Printf("[MerchantService] GetProducts: merchant=%s, found=%d, total=%d, filter(cat=%s, stock=%s)",
 		merchantID, len(results), total, categoryID, stockStatus)
 
 	return map[string]interface{}{
@@ -122,7 +126,7 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 	}
 
 	totalQty := 0
-	
+
 	req := &models.RestockRequest{
 		MerchantID:    merchantID,
 		Status:        "requested",
@@ -141,11 +145,11 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 			items[i].RestockID = req.ID
 			items[i].UnitPrice = 0 // No billing for restock
 			items[i].Subtotal = 0
-			
+
 			if err := tx.Create(&items[i]).Error; err != nil {
 				return err
 			}
-			
+
 			totalQty += items[i].Quantity
 		}
 
@@ -166,7 +170,7 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 
 		return nil
 	})
-	
+
 	var finalReq models.RestockRequest
 	if err == nil {
 		s.DB.Preload("Items").First(&finalReq, "id = ?", req.ID)
@@ -174,8 +178,8 @@ func (s *MerchantService) CreateRestockRequest(merchantID string, items []models
 		// [Akuglow Sync] Notify Admin
 		if s.Notif != nil {
 			adminID := models.AdminID
-			s.Notif.Push(adminID, "admin", "restock_requested", "🛒 Permintaan Kulakan Baru", 
-				fmt.Sprintf("Merchant %s mengajukan permintaan kulakan baru (%d item).", merchantID, totalQty), 
+			s.Notif.Push(adminID, "admin", "restock_requested", "🛒 Permintaan Kulakan Baru",
+				fmt.Sprintf("Merchant %s mengajukan permintaan kulakan baru (%d item).", merchantID, totalQty),
 				"/admin/merchants/restock")
 		}
 	}
@@ -201,16 +205,20 @@ func (s *MerchantService) GetOrders(merchantID string, status string, page, limi
 
 	query.Count(&total)
 
-	if limit <= 0 { limit = 10 }
-	if page <= 0 { page = 1 }
+	if limit <= 0 {
+		limit = 10
+	}
+	if page <= 0 {
+		page = 1
+	}
 	offset := (page - 1) * limit
 
 	err := query.Preload("Order").Preload("Items").Order("created_at desc").Limit(limit).Offset(offset).Find(&groups).Error
-	
+
 	return map[string]interface{}{
-		"data": groups,
+		"data":  groups,
 		"total": total,
-		"page": page,
+		"page":  page,
 		"limit": limit,
 	}, err
 }
@@ -271,10 +279,10 @@ func (s *MerchantService) GetWallet(merchantID string) (map[string]interface{}, 
 	}
 
 	return map[string]interface{}{
-		"balance":           wallet.Balance,
-		"pending_balance":   wallet.PendingBalance,
-		"total_earned":      wallet.TotalEarned,
-		"service_fee":       0.0,
+		"balance":         wallet.Balance,
+		"pending_balance": wallet.PendingBalance,
+		"total_earned":    wallet.TotalEarned,
+		"service_fee":     0.0,
 	}, nil
 }
 
@@ -404,7 +412,7 @@ func (s *MerchantService) GetDetailedAnalytics(merchantID string, year int) (map
 	var totalOrders int64
 	var totalSales float64
 	var totalNet float64
-	
+
 	var affOrders int64
 	var affComm float64
 	var affSales float64
@@ -431,7 +439,7 @@ func (s *MerchantService) GetDetailedAnalytics(merchantID string, year int) (map
 		Sales float64
 	}
 	var monthlyResults []MonthlyData
-	
+
 	s.DB.Model(&models.OrderMerchantGroup{}).
 		Select("EXTRACT(MONTH FROM created_at) as month, COUNT(*) as count, SUM(subtotal) as sales").
 		Where("merchant_id = ? AND EXTRACT(YEAR FROM created_at) = ?", merchantID, year).
@@ -489,11 +497,13 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 			} else {
 				dbInv = dbInv.Where("product_variant_id IS NULL OR product_variant_id = ''")
 			}
-			
+
 			err := dbInv.First(&inv).Error
-			
+
 			stockBefore := 0
-			if err == nil { stockBefore = inv.Stock }
+			if err == nil {
+				stockBefore = inv.Stock
+			}
 
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				inv = models.Inventory{
@@ -504,13 +514,17 @@ func (s *MerchantService) ReceiveRestock(merchantID, requestID string) error {
 					BasePrice:        prod.COGS,
 					LastSyncPrice:    time.Now(),
 				}
-				if err := tx.Create(&inv).Error; err != nil { return err }
+				if err := tx.Create(&inv).Error; err != nil {
+					return err
+				}
 			} else if err == nil {
 				if err := tx.Model(&inv).Updates(map[string]interface{}{
 					"stock":           gorm.Expr("stock + ?", item.Quantity),
 					"base_price":      prod.COGS,
 					"last_sync_price": time.Now(),
-				}).Error; err != nil { return err }
+				}).Error; err != nil {
+					return err
+				}
 				inv.Stock += item.Quantity // For mutation log
 			} else {
 				return err

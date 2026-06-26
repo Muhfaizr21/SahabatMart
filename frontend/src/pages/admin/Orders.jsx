@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, TablePanel, statusBadge, idr, fmtDate, A } from '../../lib/adminStyles.jsx';
+import { AdminActionButtons } from '../../lib/adminComponents.jsx';
 
 const API = ADMIN_API_BASE;
 
@@ -215,7 +216,7 @@ export default function AdminOrders() {
 
   return (
     <>
-    <div style={{ ...A.page, padding: '24px 20px', background: '#fafbff' }} className="fade-in admin-page-container">
+    <div style={{ padding: '24px 20px', background: '#fafbff' }} className="fade-in admin-page-container">
       <style>{`
         @media (max-width: 768px) {
           .admin-desktop-table { display: none; }
@@ -295,7 +296,7 @@ export default function AdminOrders() {
                 <i className="bx bx-calendar" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 14 }} />
                 <input
                   type="date"
-                  style={{ ...A.select, padding: '10px 12px 10px 36px', width: '100%', borderRadius: 12 }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ padding: '10px 12px 10px 36px', width: '100%', borderRadius: 12 }}
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                 />
@@ -305,7 +306,7 @@ export default function AdminOrders() {
                 <i className="bx bx-calendar" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 14 }} />
                 <input
                   type="date"
-                  style={{ ...A.select, padding: '10px 12px 10px 36px', width: '100%', borderRadius: 12 }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ padding: '10px 12px 10px 36px', width: '100%', borderRadius: 12 }}
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
                 />
@@ -547,8 +548,9 @@ export default function AdminOrders() {
 
       {/* ── Modal Verifikasi Bukti Transfer ── */}
       {confirmModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 24, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setConfirmModal(null)}></div>
+          <div style={{ position: 'relative', background: '#fff', borderRadius: 24, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
             <div style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', padding: '24px', color: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

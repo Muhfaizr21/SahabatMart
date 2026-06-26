@@ -62,7 +62,7 @@ export default function CouponPage() {
             </div>
           ) : coupons.length === 0 ? (
             <div className="col-span-full py-24 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm text-center">
-                <div className="text-4xl mb-4 text-gray-300">🎫</div>
+                <div className="text-4xl mb-4 text-gray-300"></div>
                 <p className="text-gray-500 font-medium text-lg">Belum ada kupon tersedia untuk saat ini.</p>
             </div>
           ) : coupons.map((c, i) => (

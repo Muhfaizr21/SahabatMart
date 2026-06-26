@@ -196,12 +196,16 @@ export default function MerchantDashboard() {
         subtitle="Selamat datang kembali di pusat kendali bisnis Anda."
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, overflow: 'hidden', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <img 
-              src={user.profile?.avatar_url ? formatImage(user.profile.avatar_url) : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&q=80'} 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              alt="Avatar"
-            />
+          <div style={{ width: 44, height: 44, borderRadius: 12, overflow: 'hidden', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', backgroundColor: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18, color: '#6366f1' }}>
+            {user.profile?.avatar_url ? (
+              <img 
+                src={formatImage(user.profile.avatar_url)} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                alt="Avatar"
+              />
+            ) : (
+              user.profile?.full_name?.charAt(0)?.toUpperCase() || '?'
+            )}
           </div>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{user.profile?.full_name}</div>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>MITRA TERVERIFIKASI</div>

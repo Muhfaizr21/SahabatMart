@@ -285,7 +285,7 @@ export default function AdminMerchants() {
       <div style={{ ...A.searchWrap, minWidth: 280, flex: 1, position: 'relative' }}>
         <i className="bx bx-search" style={A.searchIcon} />
         <input
-          style={{ ...A.searchInput, width: '100%', paddingLeft: 40, paddingRight: 36, height: 42 }}
+          className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-indigo-400 transition-all w-full" style={{ width: '100%', paddingLeft: 40, paddingRight: 36, height: 42 }}
           placeholder="Cari nama merchant..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -345,7 +345,7 @@ export default function AdminMerchants() {
         />
       </div>
 
-      <button style={{ ...A.btnGhost, height: 42, width: 42, padding: 0, justifyContent: 'center' }} onClick={load}>
+      <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ height: 42, width: 42, padding: 0, justifyContent: 'center' }} onClick={load}>
         <i className="bx bx-refresh" style={{ fontSize: 20 }} />
       </button>
     </div>
@@ -593,7 +593,7 @@ export default function AdminMerchants() {
                 ))}
               </div>
               <textarea
-                style={{ ...A.textarea, minHeight: 80, fontSize: 12, padding: 12, background: '#fff', border: '1px solid #e2e8f0' }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 transition-all resize-y placeholder:text-slate-400" style={{ minHeight: 80, fontSize: 12, padding: 12, background: '#fff', border: '1px solid #e2e8f0' }}
                 placeholder="Alasan perubahan status..."
                 value={note}
                 onChange={e => setNote(e.target.value)}
@@ -609,10 +609,10 @@ export default function AdminMerchants() {
                     type="number"
                     value={commission.fee_percent}
                     onChange={e => setCommission({ ...commission, fee_percent: e.target.value })}
-                    style={{ ...A.input, padding: '10px 12px', fontSize: 14, flex: 1 }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ padding: '10px 12px', fontSize: 14, flex: 1 }}
                     placeholder="Fee %"
                   />
-                  <button onClick={saveCommission} disabled={commission.loading} style={{ ...A.btnPrimary, padding: '0 16px', fontSize: 12 }}>Simpan</button>
+                  <button onClick={saveCommission} disabled={commission.loading} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ padding: '0 16px', fontSize: 12 }}>Simpan</button>
                 </div>
                 <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>Tarif fee layanan khusus untuk entitas ini.</p>
               </div>
@@ -620,14 +620,12 @@ export default function AdminMerchants() {
               <button
                 onClick={() => toggleVerify(modal.id, modal.is_verified)}
                 disabled={verifying}
-                style={{
-                  ...A.btnGhost, width: '100%', justifyContent: 'center', padding: '12px', fontSize: 12,
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: 12,
                   borderColor: modal.is_verified ? '#64748b' : '#10b981',
                   color: modal.is_verified ? '#64748b' : '#10b981',
                   marginBottom: 16,
                   opacity: verifying ? 0.6 : 1,
-                  cursor: verifying ? 'not-allowed' : 'pointer'
-                }}
+                  cursor: verifying ? 'not-allowed' : 'pointer' }}
               >
                 {verifying ? (
                   <div style={{ width: 14, height: 14, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
@@ -641,7 +639,7 @@ export default function AdminMerchants() {
                 <FieldLabel>Area Logistik Biteship</FieldLabel>
                 <div style={{ position: 'relative' }}>
                   <input 
-                    style={{ ...A.input, padding: '10px 12px', fontSize: 12 }} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ padding: '10px 12px', fontSize: 12 }} 
                     placeholder="Cari Kecamatan..." 
                     value={searchInput}
                     onChange={e => handleSearchArea(e.target.value)}
@@ -695,7 +693,7 @@ export default function AdminMerchants() {
           <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center' }}>
              <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>Entitas Merchant terdaftar sejak {fmtDate(modal.created_at)}</p>
              <button
-                style={{ ...A.btnPrimary, width: '100%', justifyContent: 'center', padding: '12px', background: 'linear-gradient(135deg, #1e293b, #0f172a)' }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', justifyContent: 'center', padding: '12px', background: 'linear-gradient(135deg, #1e293b, #0f172a)' }}
                 onClick={() => setModal(null)}
              >
                 Tutup Panel Kendali

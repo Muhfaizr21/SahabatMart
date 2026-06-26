@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { A, PageHeader, TablePanel, statusBadge } from '../../lib/adminStyles.jsx';
+import { AdminSearch, AdminActionButtons, AdminEmptyState } from '../../lib/adminComponents.jsx';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const CustomSelect = ({ label, value, options, onChange, icon }) => {
   const [open, setOpen] = useState(false);
@@ -242,9 +245,9 @@ export default function AdminPromo() {
   const tabs = (
     <div style={{ display: 'flex', gap: 4 }}>
       <button style={A.tab(selectedType === 'all')} onClick={() => { setSelectedType('all'); setCurrentPage(1); }}>Semua Tipe</button>
-      <button style={A.tab(selectedType === 'image')} onClick={() => { setSelectedType('image'); setCurrentPage(1); }}>🖼️ Gambar</button>
-      <button style={A.tab(selectedType === 'video')} onClick={() => { setSelectedType('video'); setCurrentPage(1); }}>📽️ Video</button>
-      <button style={A.tab(selectedType === 'copywriting')} onClick={() => { setSelectedType('copywriting'); setCurrentPage(1); }}>✍️ Teks</button>
+      <button style={A.tab(selectedType === 'image')} onClick={() => { setSelectedType('image'); setCurrentPage(1); }}> Gambar</button>
+      <button style={A.tab(selectedType === 'video')} onClick={() => { setSelectedType('video'); setCurrentPage(1); }}> Video</button>
+      <button style={A.tab(selectedType === 'copywriting')} onClick={() => { setSelectedType('copywriting'); setCurrentPage(1); }}> Teks</button>
     </div>
   );
 
@@ -256,7 +259,7 @@ export default function AdminPromo() {
             <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{selectedIds.length} Terpilih</span>
             <button 
               onClick={bulkDelete}
-              style={{ ...A.btnPrimary, background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" style={{ background: '#ef4444', height: 32, padding: '0 12px', fontSize: 12 }}
             >
               <i className="bx bx-trash" /> Hapus Terpilih
             </button>
@@ -272,22 +275,18 @@ export default function AdminPromo() {
   return (
     <div style={A.page}>
       <PageHeader title="Promo Materials" subtitle="Content assets for affiliate marketing">
-        <button onClick={() => navigate('/admin/promo/new')} style={A.btnPrimary}>
+        <button onClick={() => navigate('/admin/promo/new')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
            <i className="bx bx-plus-circle" /> Tambah Asset
         </button>
       </PageHeader>
 
       {/* FILTER & SEARCH BAR */}
-      <div style={{ ...A.card, overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
-        <div style={{ flex: 1, minWidth: 260, position: 'relative' }}>
-          <i className="bx bx-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 18 }} />
-          <input
-            style={{ ...A.input, paddingLeft: 42, background: '#f8fafc', border: '1.5px solid #e2e8f0' }}
-            placeholder="Cari materi promo..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ overflow: 'visible', padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', border: '1px solid #f1f5f9', background: '#fff', marginBottom: 24 }}>
+        <AdminSearch
+          placeholder="Cari materi promo..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
 
         <CustomSelect
           label="Kategori"
@@ -315,7 +314,7 @@ export default function AdminPromo() {
         {(search || selectedCategory !== 'all' || selectedStatus !== 'all') && (
           <button
             onClick={() => { setSearch(''); setSelectedCategory('all'); setSelectedStatus('all'); setCurrentPage(1); }}
-            style={{ ...A.btnGhost, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
           >
             <i className="bx bx-x" /> Reset Filter
           </button>
@@ -343,11 +342,7 @@ export default function AdminPromo() {
           </thead>
           <tbody>
             {currentItems.length === 0 ? (
-              <tr>
-                <td colSpan="6" style={{ ...A.td, textAlign: 'center', padding: '40px 24px', color: '#94a3b8' }}>
-                  Tidak ada materi promo yang cocok dengan kriteria filter.
-                </td>
-              </tr>
+              <AdminEmptyState colSpan={6} message="Tidak ada materi promo yang cocok dengan kriteria filter." />
             ) : (
               currentItems.map((p, idx) => {
                 const isSelected = selectedIds.includes(p.id);
@@ -377,7 +372,7 @@ export default function AdminPromo() {
                               ) : p.type === 'video' ? (
                                 <video src={formatImage(p.file_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
                               ) : (
-                                <img src={formatImage(p.file_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }} />
+                                <img src={formatImage(p.file_url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
                               )}
                           </div>
                           <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.title}</div>
@@ -387,10 +382,7 @@ export default function AdminPromo() {
                     <td style={A.td}>{p.category}</td>
                     <td style={A.td}><span style={statusBadge(p.is_active ? 'active' : 'inactive')}>{p.is_active ? 'Visible' : 'Hidden'}</span></td>
                     <td style={{ ...A.td, textAlign: 'right', paddingRight: 24 }}>
-                       <div style={{ display: 'inline-flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <button onClick={() => navigate(`/admin/promo/edit/${p.id}`)} style={A.iconBtn()} title="Edit"><i className="bx bx-edit-alt" /></button>
-                          <button onClick={() => handleDelete(p.id)} style={A.iconBtn('#dc2626', 'rgba(220, 38, 38, 0.08)')} title="Hapus"><i className="bx bx-trash" /></button>
-                       </div>
+                       <AdminActionButtons onEdit={() => navigate(`/admin/promo/edit/${p.id}`)} onDelete={() => handleDelete(p.id)} />
                     </td>
                   </tr>
                 );
@@ -418,7 +410,7 @@ export default function AdminPromo() {
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 11, color: '#94a3b8' }}>Tampilkan:</span>
-              <select
+              <AdminSelect
                 value={itemsPerPage}
                 onChange={e => {
                   setItemsPerPage(Number(e.target.value));
@@ -440,7 +432,7 @@ export default function AdminPromo() {
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
-              </select>
+              </AdminSelect>
             </div>
           </div>
 

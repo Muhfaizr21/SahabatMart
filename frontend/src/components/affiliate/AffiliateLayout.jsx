@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getStoredUser } from '../../lib/auth';
 import { fetchJson, AFFILIATE_API_BASE, API_BASE, formatImage } from '../../lib/api';
+import { useTheme } from '../../context/ThemeContext';
+import CMSThemeProvider from '../../lib/cms';
 
 // Menu items sesuai DOKUMEN RESMI Alur Mitra Affiliate Akuglow - Section 2
 // Urutan persis sesuai spesifikasi: Dashboard, Merchant Area*, Profil Saya, Omset Tim,
@@ -91,8 +93,9 @@ const SidebarLink = ({ item, collapsed }) => {
   );
 };
 
-const AffiliateLayout = () => {
-  const user = getStoredUser();
+function AffiliateLayout() {
+  const { theme } = useTheme();
+  const [user, setUser] = useState(getStoredUser());
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -251,7 +254,7 @@ const AffiliateLayout = () => {
       {/* Logo */}
       <div className={`px-6 py-8 flex items-center ${(!sidebarOpen && !isMobile) ? 'justify-center' : 'justify-between'} sticky top-0 bg-[#0c1324] z-10 whitespace-nowrap overflow-hidden transition-all duration-300 border-b border-white/5`}>
         {(sidebarOpen || isMobile) ? (
-          <img src="/akuglow.webp" alt="AkuGlow" className="h-10 w-auto object-contain brightness-110" />
+          <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-10 w-auto object-contain brightness-110" />
         ) : (
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
              <i className="bx bxs-store" style={{ color: '#fff', fontSize: 18 }} />
@@ -334,7 +337,9 @@ const AffiliateLayout = () => {
   );
 
   return (
-    <div
+    <>
+      <CMSThemeProvider platform="affiliate_dashboard" />
+      <div
       className="min-h-screen flex"
       style={{
         background: '#0c1324',
@@ -589,6 +594,7 @@ const AffiliateLayout = () => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 

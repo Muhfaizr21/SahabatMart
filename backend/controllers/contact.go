@@ -1,11 +1,11 @@
 package controllers
 
 import (
-	"encoding/json"
-	"net/http"
 	"akuglow/backend/models"
 	"akuglow/backend/utils"
+	"encoding/json"
 	"gorm.io/gorm"
+	"net/http"
 )
 
 type ContactController struct {

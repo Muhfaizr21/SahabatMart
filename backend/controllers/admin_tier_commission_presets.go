@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"encoding/json"
-	"net/http"
 	"akuglow/backend/models"
 	"akuglow/backend/utils"
+	"encoding/json"
+	"net/http"
 )
 
 func (c *AdminController) GetTierCommissionPresets(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +25,7 @@ func (c *AdminController) UpsertTierCommissionPreset(w http.ResponseWriter, r *h
 	if payload.ID != "" {
 		// hapus item lama agar bersih
 		c.DB.Where("preset_id = ?", payload.ID).Delete(&models.TierCommissionPresetItem{})
-		
+
 		// Sync Rate to Decimal (Percentage -> Decimal)
 		for i := range payload.Tiers {
 			payload.Tiers[i].CommissionRate = payload.Tiers[i].CommissionRate / 100.0

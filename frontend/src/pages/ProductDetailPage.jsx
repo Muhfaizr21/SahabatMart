@@ -26,10 +26,11 @@ const tabs = ['Deskripsi', 'Informasi Tambahan', 'Ulasan'];
 // ── Markdown → HTML Renderer ─────────────────
 function renderMarkdown(md) {
   if (!md) return '';
-  const rawHtml = marked.parse(md, { breaks: true, async: false });
+  const isHtml = /<[a-z][\s\S]*>/i.test(md);
+  const rawHtml = isHtml ? md : marked.parse(md, { breaks: true, async: false });
   return DOMPurify.sanitize(rawHtml, { 
-    ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'b', 'i', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'hr', 'span', 'div'],
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style']
+    ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'b', 'i', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'hr', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style', 'src', 'alt']
   });
 }
 
@@ -216,6 +217,10 @@ export default function ProductDetailPage() {
         const productData = d?.product || d;
         const sellersData = d?.sellers || [];
         const digitalFlag  = d?.is_digital || productData?.product_type === 'digital' || productData?.is_virtual || false;
+        
+        if (d && d.content) {
+          setCmsContent(d.content);
+        }
         
         if (productData && productData.id) {
           if (cancelled) return;
@@ -443,7 +448,7 @@ export default function ProductDetailPage() {
   
   if (!product) return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center bg-white px-6">
-        <div className="text-7xl mb-6">🏜️</div>
+        <div className="text-7xl mb-6"></div>
         <h2 className="text-2xl font-black text-gray-900 mb-2">Produk Tidak Ditemukan</h2>
         <p className="text-gray-500 text-center max-w-sm mb-8">Maaf, produk yang Anda cari mungkin sudah tidak tersedia atau telah dihapus oleh admin.</p>
         <Link to="/shop" className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">Kembali ke Toko</Link>
@@ -676,7 +681,7 @@ export default function ProductDetailPage() {
             {/* [Akuglow] Sumber Pengiriman — Pusat selalu ada, distributor hanya jika restock */}
             {isDigital ? (
               <div className="mb-10 p-5 rounded-3xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl shadow-lg flex-shrink-0">💾</div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl shadow-lg flex-shrink-0"><i className="bx bx-save"/></div>
                 <div>
                   <div className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-1">Produk Digital</div>
                   <h4 className="font-black text-indigo-900 text-sm">Akses Langsung Setelah Pembayaran</h4>
@@ -991,7 +996,7 @@ export default function ProductDetailPage() {
       <RecommendedSection 
         productId={product.id}
         limit={5} 
-        title="Mungkin Kamu Juga Suka 💖" 
+        title="Mungkin Kamu Juga Suka ♥" 
         subtitle="Produk lain yang sesuai dengan selera kamu." 
         className="mt-20 border-t border-gray-100/50"
       />

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { getStoredUser, logout } from '../../lib/auth';
 import { fetchJson, MERCHANT_API_BASE, formatImage } from '../../lib/api';
+import CMSThemeProvider from '../../lib/cms';
+import { useTheme } from '../../context/ThemeContext';
 import toast from 'react-hot-toast';
 
 const SidebarLink = ({ item }) => (
@@ -22,7 +24,8 @@ const SidebarLink = ({ item }) => (
 );
 
 const MerchantLayout = () => {
-  const user = getStoredUser();
+  const { theme } = useTheme();
+  const [user, setUser] = useState(getStoredUser());
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -124,12 +127,16 @@ const MerchantLayout = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f3f7fb] text-[#171c1f] font-['Plus_Jakarta_Sans'] flex overflow-hidden">
+    <>
+      <CMSThemeProvider platform="merchant_dashboard" />
+      <div className="min-h-screen bg-[#f3f7fb] text-[#171c1f] font-['Plus_Jakarta_Sans'] flex overflow-hidden">
       
       {/* Sidebar Navigation */}
       <aside className={`h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-50 border-r border-slate-200/60 flex flex-col py-8 px-6 space-y-2 z-50 transition-all duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="mb-10 px-2 flex items-center justify-between">
-            <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
+          <div className="p-6 border-b border-slate-200">
+            <Link to="/" className="flex items-center gap-2">
+              <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-12 w-auto object-contain" />
+            </Link>
           </div>
 
         <nav className="flex-1 space-y-1">
@@ -340,6 +347,7 @@ const MerchantLayout = () => {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
+    </>
   );
 };
 

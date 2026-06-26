@@ -16,21 +16,14 @@ function resolveApiBase() {
     base = import.meta.env.VITE_API_BASE.replace(/\/+$/, '');
   }
 
-  // Localhost Optimization: If page is loaded on localhost and API base is an ngrok URL,
-  // override to http://localhost:8080 for speed (no ngrok latency).
-  if (typeof window !== 'undefined' && window.location) {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocal && (!base || base.includes('ngrok-free.dev'))) {
-      base = 'http://localhost:8080';
-    }
-  }
+
 
   // Fallback: same-origin (FE & BE behind same domain/port)
   if (base) return base;
   if (typeof window !== 'undefined' && window.location) {
     return window.location.origin;
   }
-  return 'http://localhost:8080';
+  return '';
 }
 
 // [BUG-M9 Fix] Lazy resolve — panggil resolveApiBase() setiap kali export diakses,
@@ -46,7 +39,7 @@ export function getSiteUrl() {
   if (typeof window !== 'undefined' && window.location) {
     return window.location.origin;
   }
-  return 'http://localhost:5173';
+  return '';
 }
 const RAW_API_BASE = resolveApiBase();
 export const API_BASE = RAW_API_BASE;
@@ -79,8 +72,34 @@ export async function fetchJson(url, options = {}) {
     const response = await fetch(url, { ...options, headers });
 
     if (response.status === 401) {
+      // [FIX #17] Attempt token refresh before logging out
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        try {
+          const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            localStorage.setItem('token', refreshData.token);
+            localStorage.setItem('refresh_token', refreshData.refresh_token);
+            // Retry original request with new token
+            headers['Authorization'] = `Bearer ${refreshData.token}`;
+            const retryRes = await fetch(url, { ...options, headers });
+            if (retryRes.ok) {
+              const text = await retryRes.text();
+              return text ? JSON.parse(text) : null;
+            }
+          }
+        } catch (_) {
+          // Refresh failed — fall through to logout
+        }
+      }
       // BUG-03 fix: auto-logout saat token tidak valid / expired
       localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/admin')) {
         window.location.href = '/login';
@@ -145,56 +164,37 @@ export async function deleteJson(url, options = {}) {
   });
 }
 
-export async function uploadFile(url, file, fieldName = 'image') {
-  const token = localStorage.getItem('token');
-  const formData = new FormData();
-  formData.append(fieldName, file);
-
-  const headers = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error('Gagal mengunggah file');
-  }
-
-  const data = await response.json();
-  return data;
+export async function deleteConfig(key) {
+  return await fetchJson(`${API_BASE}/api/admin/configs/${key}`, { method: 'DELETE' });
 }
 
-// Fungsi yang hilang dan menyebabkan error
+export async function testEmailSettings(toEmail) {
+  return await fetchJson(`${API_BASE}/api/admin/configs/test-email`, {
+    method: 'POST',
+    body: JSON.stringify({ to: toEmail }),
+  });
+}
+
+export async function uploadFile(url, file, fieldName = 'image') {
+  const formData = new FormData();
+  formData.append(fieldName, file);
+  return fetchJson(url, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export function formatImage(path) {
-  let finalPath = path;
-  if (!finalPath) {
-    finalPath = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80";
-  }
+  if (!path) return null;
 
-  // Handle Unsplash shorthand first to allow proxying it
-  let cleanPath = finalPath.replace(/^https?:\/\/[^\/]+/, ''); // Remove protocol and domain
-  cleanPath = cleanPath.replace(/^\/+/, ''); // Remove leading slashes
-  if (cleanPath.startsWith('photo-')) {
-    finalPath = `https://images.unsplash.com/${cleanPath}?auto=format&fit=crop&q=80&w=800`;
-  }
-  
-  // If it is an Unsplash URL, proxy it to bypass Indonesia DNS blocking (Internet Positif)
-  if (finalPath.includes('images.unsplash.com')) {
-    return `https://images.weserv.nl/?url=${encodeURIComponent(finalPath)}`;
-  }
-  
-  // 1. If it's already a full URL (external, blob, or data), return as is
-  if (finalPath.startsWith('blob:') || finalPath.startsWith('data:')) return finalPath;
-  if (finalPath.startsWith('http') && !finalPath.includes('localhost') && !finalPath.includes('127.0.0.1')) return finalPath;
+  if (path.startsWith('blob:') || path.startsWith('data:')) return path;
+  if (path.startsWith('http') && !path.includes('localhost') && !path.includes('127.0.0.1')) return path;
 
-  // 2. Prepend API_BASE for local uploaded files
+  let clean = path.replace(/^https?:\/\/[^\/]+/, '');
+  clean = clean.replace(/^\/+/, '');
+
   const base = API_BASE.replace(/\/+$/, '');
-  return `${base}/${cleanPath}`;
+  return `${base}/${clean}`;
 }
 
 /**
@@ -228,25 +228,41 @@ export async function captureAffiliate() {
 
 /**
  * SSE Real-time Hub
- * Memungkinkan Dashboard mendengarkan notifikasi secara instan
+ * [FIX #18] Use auth cookie instead of query param for better security.
+ * Auto-reconnect on error with exponential backoff.
  */
 export function subscribeToNotifications(userId, onMessage) {
   const token = localStorage.getItem('token');
   if (!token) return null;
   
-  const eventSource = new EventSource(`${API_BASE}/api/notifications/stream?t=${token}`);
+  // [FIX #18] Pass token via cookie for SSE auth instead of query param
+  document.cookie = `sse_token=${token}; path=/; SameSite=Lax`;
+  const eventSource = new EventSource(`${API_BASE}/api/notifications/stream`);
   
+  let reconnectAttempts = 0;
+  const maxReconnect = 10;
+
   eventSource.onmessage = (event) => {
+    reconnectAttempts = 0; // reset on successful message
     try {
       const data = JSON.parse(event.data);
       onMessage(data);
     } catch (_err) {
-      // silent — SSE parse error tidak perlu log ke console
+      // silent
     }
   };
 
   eventSource.onerror = () => {
     eventSource.close();
+    // [FIX #18] Auto-reconnect with exponential backoff
+    if (reconnectAttempts < maxReconnect && localStorage.getItem('token')) {
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+      reconnectAttempts++;
+      setTimeout(() => {
+        document.cookie = `sse_token=${localStorage.getItem('token')}; path=/; SameSite=Lax`;
+        Object.assign(eventSource, new EventSource(`${API_BASE}/api/notifications/stream`));
+      }, delay);
+    }
   };
 
   return eventSource;

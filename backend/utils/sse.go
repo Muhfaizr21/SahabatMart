@@ -21,7 +21,7 @@ var Hub = &NotificationHub{
 func (h *NotificationHub) AddClient(userID string) chan string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	ch := make(chan string, 10)
 	h.clients[userID] = ch
 	return ch
@@ -30,7 +30,7 @@ func (h *NotificationHub) AddClient(userID string) chan string {
 func (h *NotificationHub) RemoveClient(userID string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	if ch, ok := h.clients[userID]; ok {
 		close(ch)
 		delete(h.clients, userID)
@@ -40,7 +40,7 @@ func (h *NotificationHub) RemoveClient(userID string) {
 func (h *NotificationHub) Broadcast(userID string, payload interface{}) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	data, _ := json.Marshal(payload)
 	if ch, ok := h.clients[userID]; ok {
 		select {

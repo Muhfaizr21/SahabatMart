@@ -5,8 +5,33 @@ import { useConfig } from '../hooks/useConfig';
 import toast from 'react-hot-toast';
 import SEO from '../components/SEO';
 
-export default function ContactPage() {
+import { useEffect } from 'react';
+
+export default function ContactPage({ previewData }) {
   const { config } = useConfig();
+
+  const [cmsContent, setCmsContent] = useState(previewData || null);
+
+  useEffect(() => {
+    if (previewData) {
+      setCmsContent(previewData);
+      return;
+    }
+    const loadCMS = async () => {
+      try {
+        const res = await fetchJson(`${PUBLIC_API_BASE}/cms/page-content?platform=landing_page&page=contact`);
+        if (res && res.content) {
+          setCmsContent(res.content);
+        }
+      } catch (e) {
+        console.warn("Failed to load CMS content:", e);
+      }
+    };
+    loadCMS();
+  }, [previewData]);
+
+  const str = (val, fallback) => (cmsContent && cmsContent[val] ? cmsContent[val] : fallback);
+
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -39,18 +64,22 @@ export default function ContactPage() {
         description="Ada pertanyaan atau butuh bantuan? Hubungi AkuGlow melalui formulir kontak, WhatsApp, atau email. Tim kami siap membantu Anda."
       />
       <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Hubungi <span className="text-rose-600">Kami</span></h1>
-        <p className="text-gray-500 font-medium max-w-xl mx-auto">Ada pertanyaan atau butuh bantuan? Tim kami siap membantu Anda kapan saja.</p>
+        <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">{str('hero_title', 'Hubungi Kami').split(' ').map((word, i, arr) => (
+          <React.Fragment key={i}>
+            {i < arr.length - 1 ? word + ' ' : <span className="text-rose-600">{word}</span>}
+          </React.Fragment>
+        ))}</h1>
+        <p className="text-gray-500 font-medium max-w-xl mx-auto">{str('hero_subtitle', 'Ada pertanyaan atau butuh bantuan? Tim kami siap membantu Anda kapan saja.')}</p>
         <div className="w-20 h-1.5 bg-rose-600 rounded-full mx-auto mt-6 shadow-lg shadow-rose-100" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         <div className="lg:col-span-7 bg-white rounded-[2.5rem] p-8 md:p-12 shadow-2xl shadow-blue-100/50 border border-gray-100">
-          <h2 className="text-2xl font-black text-gray-900 mb-8">Kirim Pesan</h2>
+          <h2 className="text-2xl font-black text-gray-900 mb-8">{str('form_title', 'Kirim Pesan')}</h2>
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Nama Lengkap</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">{str('form_name_label', 'Nama Lengkap')}</label>
                 <input 
                   type="text" 
                   value={formData.name}
@@ -61,7 +90,7 @@ export default function ContactPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Email</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">{str('form_email_label', 'Email')}</label>
                 <input 
                   type="email" 
                   value={formData.email}
@@ -73,7 +102,7 @@ export default function ContactPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Subjek</label>
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">{str('form_subject_label', 'Subjek')}</label>
               <input 
                 type="text" 
                 value={formData.subject}
@@ -84,7 +113,7 @@ export default function ContactPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Pesan</label>
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">{str('form_message_label', 'Pesan')}</label>
               <textarea 
                 rows={5} 
                 value={formData.message}
@@ -104,7 +133,7 @@ export default function ContactPage() {
               ) : (
                 <>
                   <Send size={20} />
-                  Kirim Pesan Sekarang
+                  {str('form_title', 'Kirim Pesan')} Sekarang
                 </>
               )}
             </button>
@@ -121,7 +150,7 @@ export default function ContactPage() {
               <div>
                 <h4 className="font-bold text-gray-900 mb-1">Alamat Kantor</h4>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  {config.contact_address || 'Jl. Sudirman No. 123, Jakarta Pusat'}
+                  {str('address', config.contact_address || 'Jl. Sudirman No. 123, Jakarta Pusat')}
                 </p>
               </div>
             </div>
@@ -132,7 +161,7 @@ export default function ContactPage() {
               </div>
               <div>
                 <h4 className="font-bold text-gray-900 mb-1">Nomor Telepon</h4>
-                <p className="text-sm text-gray-500">{config.contact_phone || '+62 21 1234 5678'}</p>
+                <p className="text-sm text-gray-500">{str('phone', config.contact_phone || '+62 21 1234 5678')}</p>
                 <p className="text-xs text-rose-600 font-bold mt-1 uppercase tracking-tighter cursor-pointer hover:underline">
                   WhatsApp: {config.contact_whatsapp || '+62 812-3456-7890'}
                 </p>
@@ -145,7 +174,7 @@ export default function ContactPage() {
               </div>
               <div>
                 <h4 className="font-bold text-gray-900 mb-1">Email Support</h4>
-                <p className="text-sm text-gray-500">{config.contact_email || 'support@akuglow.id'}</p>
+                <p className="text-sm text-gray-500">{str('email', config.contact_email || 'support@akuglow.id')}</p>
               </div>
             </div>
 

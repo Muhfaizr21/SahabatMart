@@ -152,7 +152,7 @@ export function ProductCard({ product }) {
   );
 }
 
-export default function ProductSection({ title = "Koleksi Terpopuler AkuGlow ✨", subtitle = "Pilihan produk skincare terbaik yang paling dicintai oleh komunitas kami.", limit = 3 }) {
+export default function ProductSection({ title = "Koleksi Terpopuler AkuGlow ", subtitle = "Pilihan produk skincare terbaik yang paling dicintai oleh komunitas kami.", limit = 3 }) {
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
 

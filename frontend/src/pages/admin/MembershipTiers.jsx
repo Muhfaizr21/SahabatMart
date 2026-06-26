@@ -1,42 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson } from '../../lib/api';
 import { PageHeader, TablePanel, Modal, FieldLabel, A } from '../../lib/adminStyles.jsx';
+import { AdminInput, AdminTextarea, AdminEmptyState, AdminActionButtons, AdminFormActions } from '../../lib/adminComponents.jsx';
+import AdminSelect from '../../components/admin/AdminSelect';
 
 const API = ADMIN_API_BASE;
 
 const formatRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
 
 const ICON_OPTIONS = [
-  { value: 'star', label: '⭐ Bintang' },
-  { value: 'workspace_premium', label: '🏆 Trophy' },
-  { value: 'verified', label: '✅ Terverifikasi' },
-  { value: 'diamond', label: '💎 Diamond' },
-  { value: 'emoji_events', label: '🎖️ Medal' },
-  { value: 'military_tech', label: '🎖️ Teknologi' },
-  { value: 'card_membership', label: '🎫 Kartu Anggota' },
-  { value: 'loyalty', label: '💚 Loyalty' },
-  { value: 'account_circle', label: '👤 Akun' },
-  { value: 'groups', label: '👥 Grup' },
-  { value: 'trending_up', label: '📈 Naik' },
-  { value: 'bolt', label: '⚡ Kilat' },
-  { value: 'local_fire_department', label: '🔥 Api' },
-  { value: 'shield', label: '🛡️ Perisai' },
-  { value: 'security', label: '🔒 Aman' },
-  { value: 'storefront', label: '🏪 Toko' },
-  { value: 'sell', label: '🏷️ Jual' },
-  { value: 'redeem', label: '🎁 Hadiah' },
-  { value: 'payments', label: '💰 Bayar' },
-  { value: 'insights', label: '📊 Data' },
-  { value: 'school', label: '🎓 Sekolah' },
-  { value: 'campaign', label: '📢 Kampanye' },
-  { value: 'celebration', label: '🎉 Pesta' },
-  { value: 'emoji_good', label: '👍 Bagus' },
-  { value: 'auto_awesome', label: '✨ Hebat' },
-  { value: 'crown', label: '👑 Mahkota' },
-  { value: 'rocket_launch', label: '🚀 Roket' },
-  { value: 'favorite', label: '❤️ Fav' },
-  { value: 'thumb_up', label: '👍 Suka' },
-  { value: 'build', label: '🔧 Alat' },
+  { value: 'star', label: 'Bintang' },
+  { value: 'workspace_premium', label: 'Trophy' },
+  { value: 'verified', label: 'Terverifikasi' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'emoji_events', label: 'Medal' },
+  { value: 'military_tech', label: 'Teknologi' },
+  { value: 'card_membership', label: 'Kartu Anggota' },
+  { value: 'loyalty', label: 'Loyalty' },
+  { value: 'account_circle', label: 'Akun' },
+  { value: 'groups', label: 'Grup' },
+  { value: 'trending_up', label: 'Naik' },
+  { value: 'bolt', label: 'Kilat' },
+  { value: 'local_fire_department', label: 'Api' },
+  { value: 'shield', label: 'Perisai' },
+  { value: 'security', label: 'Aman' },
+  { value: 'storefront', label: 'Toko' },
+  { value: 'sell', label: 'Jual' },
+  { value: 'redeem', label: 'Hadiah' },
+  { value: 'payments', label: 'Bayar' },
+  { value: 'insights', label: 'Data' },
+  { value: 'school', label: 'Sekolah' },
+  { value: 'campaign', label: 'Kampanye' },
+  { value: 'celebration', label: 'Pesta' },
+  { value: 'emoji_good', label: 'Bagus' },
+  { value: 'auto_awesome', label: 'Hebat' },
+  { value: 'crown', label: 'Mahkota' },
+  { value: 'rocket_launch', label: 'Roket' },
+  { value: 'favorite', label: 'Fav' },
+  { value: 'thumb_up', label: 'Suka' },
+  { value: 'build', label: 'Alat' },
 ];
 
 export default function MembershipTiers() {
@@ -138,7 +140,7 @@ export default function MembershipTiers() {
         title="Jenjang Keanggotaan"
         subtitle="Atur jenjang membership, syarat upgrade, dan komisi tiap jenjang."
       >
-        <button style={A.btnPrimary} onClick={() => setModal({ ...EMPTY, level: tiers.length + 1 })}>
+        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onClick={() => setModal({ ...EMPTY, level: tiers.length + 1 })}>
           <i className="bx bx-plus" /> Tambah Jenjang
         </button>
       </PageHeader>
@@ -196,11 +198,7 @@ export default function MembershipTiers() {
             </thead>
             <tbody>
               {tiers.length === 0 && !loading ? (
-                <tr><td colSpan={6} style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-                  <i className="bx bx-layer" style={{ fontSize: 48, display: 'block', marginBottom: 10, opacity: 0.25 }} />
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>Belum ada jenjang</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>Klik "Tambah Jenjang" untuk membuat</div>
-                </td></tr>
+                <AdminEmptyState colSpan={6} icon="bx-layer" message="Belum ada jenjang" subtitle='Klik "Tambah Jenjang" untuk membuat' />
               ) : tiers.map((tier, idx) => (
                 <tr key={tier.id}
                   style={{ borderBottom: idx < tiers.length - 1 ? '1px solid #f1f5f9' : 'none' }}
@@ -306,24 +304,8 @@ export default function MembershipTiers() {
                     </span>
                   </td>
 
-                  {/* Opsi */}
                   <td style={{ ...A.td, paddingRight: 28, textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 8 }}>
-                      <button
-                        style={{ ...A.iconBtn('#6366f1', '#eef2ff'), width: 36, height: 36 }}
-                        onClick={() => setModal({ ...tier, max_commission_depth: tier.max_commission_depth || 1 })}
-                        title="Edit"
-                      >
-                        <i className="bx bx-pencil" />
-                      </button>
-                      <button
-                        style={{ ...A.iconBtn('#ef4444', '#fff1f2'), width: 36, height: 36 }}
-                        onClick={() => del(tier.id)}
-                        title="Hapus"
-                      >
-                        <i className="bx bx-trash" />
-                      </button>
-                    </div>
+                    <AdminActionButtons onEdit={() => setModal({ ...tier, max_commission_depth: tier.max_commission_depth || 1 })} onDelete={() => del(tier.id)} />
                   </td>
                 </tr>
               ))}
@@ -342,28 +324,20 @@ export default function MembershipTiers() {
               {/* Nama */}
               <div style={{ gridColumn: 'span 2' }}>
                 <FieldLabel>Nama Jenjang</FieldLabel>
-                <input
-                  style={{ ...A.select, width: '100%' }}
-                  placeholder="Contoh: Bronze, Silver, Gold"
-                  value={modal.name || ''}
-                  onChange={e => setModal({ ...modal, name: e.target.value })}
-                  required
-                />
+                <AdminInput placeholder="Contoh: Bronze, Silver, Gold" value={modal.name || ''} onChange={e => setModal({ ...modal, name: e.target.value })} required />
               </div>
 
               {/* Level */}
               <div>
                 <FieldLabel>Level (Urutan)</FieldLabel>
-                <input type="number" min="1" style={{ ...A.select, width: '100%' }}
-                  value={modal.level || 1}
-                  onChange={e => setModal({ ...modal, level: parseInt(e.target.value) })} required />
+                <AdminInput type="number" min="1" value={modal.level || 1} onChange={e => setModal({ ...modal, level: parseInt(e.target.value) })} required />
               </div>
 
               {/* Base Commission Rate */}
               <div>
                 <FieldLabel>Komisi Dasar (%)</FieldLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="number" step="0.1" min="0" max="100" style={{ ...A.select, flex: 1 }}
+                  <AdminInput type="number" step="0.1" min="0" max="100" style={{ flex: 1 }}
                     value={((modal.base_commission_rate || 0) * 100).toFixed(1)}
                     onChange={e => setModal({ ...modal, base_commission_rate: parseFloat(e.target.value) / 100 })} required />
                   <span style={{ fontWeight: 700, color: '#64748b' }}>%</span>
@@ -373,9 +347,7 @@ export default function MembershipTiers() {
               {/* Max Commission Depth */}
               <div>
                 <FieldLabel>Max Level Komisi</FieldLabel>
-                <input type="number" min="1" style={{ ...A.select, width: '100%' }}
-                  value={modal.max_commission_depth || 1}
-                  onChange={e => setModal({ ...modal, max_commission_depth: parseInt(e.target.value) })} />
+                <AdminInput type="number" min="1" value={modal.max_commission_depth || 1} onChange={e => setModal({ ...modal, max_commission_depth: parseInt(e.target.value) })} />
                 <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>Min = 1 otomatis</p>
               </div>
 
@@ -386,9 +358,7 @@ export default function MembershipTiers() {
                   <input type="color" style={{ width: 42, height: 42, padding: 2, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }}
                     value={modal.color || '#6366f1'}
                     onChange={e => setModal({ ...modal, color: e.target.value })} />
-                  <input style={{ ...A.select, flex: 1 }}
-                    value={modal.color || '#6366f1'}
-                    onChange={e => setModal({ ...modal, color: e.target.value })} />
+                  <AdminInput style={{ flex: 1 }} value={modal.color || '#6366f1'} onChange={e => setModal({ ...modal, color: e.target.value })} />
                 </div>
               </div>
 
@@ -396,13 +366,13 @@ export default function MembershipTiers() {
               <div>
                 <FieldLabel>Ikon</FieldLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <select style={{ ...A.select, flex: 1 }}
+                  <AdminSelect className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-400" style={{ flex: 1 }}
                     value={modal.icon || 'workspace_premium'}
                     onChange={e => setModal({ ...modal, icon: e.target.value })}>
                     {ICON_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
-                  </select>
+                  </AdminSelect>
                   <div style={{
                     width: 42, height: 42, borderRadius: 10,
                     background: (modal.color || '#6366f1') + '18',
@@ -429,9 +399,7 @@ export default function MembershipTiers() {
                   ].map(f => (
                     <div key={f.field}>
                       <FieldLabel>{f.label}</FieldLabel>
-                      <input type="number" min="0" style={{ ...A.select, width: '100%' }}
-                        value={modal[f.field] || 0}
-                        onChange={e => setModal({ ...modal, [f.field]: parseInt(e.target.value) || 0 })} />
+                      <AdminInput type="number" min="0" value={modal[f.field] || 0} onChange={e => setModal({ ...modal, [f.field]: parseInt(e.target.value) || 0 })} />
                       {f.hint && <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{f.hint}</p>}
                     </div>
                   ))}
@@ -441,10 +409,7 @@ export default function MembershipTiers() {
               {/* Deskripsi */}
               <div style={{ gridColumn: 'span 2' }}>
                 <FieldLabel>Deskripsi / Benefit</FieldLabel>
-                <textarea style={{ ...A.textarea, minHeight: 72 }}
-                  placeholder="Jelaskan keuntungan dan benefit jenjang ini..."
-                  value={modal.description || ''}
-                  onChange={e => setModal({ ...modal, description: e.target.value })} />
+                <AdminTextarea rows={3} placeholder="Jelaskan keuntungan dan benefit jenjang ini..." value={modal.description || ''} onChange={e => setModal({ ...modal, description: e.target.value })} />
               </div>
 
               {/* Aktif */}
@@ -460,12 +425,7 @@ export default function MembershipTiers() {
 
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
-              <button type="button" style={{ ...A.btnGhost, width: '100%' }} onClick={() => setModal(null)}>Batal</button>
-              <button type="submit" style={{ ...A.btnPrimary, width: '100%' }} disabled={saving}>
-                {saving ? 'Menyimpan...' : <><i className="bx bx-save" /> Simpan Jenjang</>}
-              </button>
-            </div>
+            <AdminFormActions onCancel={() => setModal(null)} saving={saving} label="Simpan Jenjang" savingLabel="Menyimpan..." />
           </form>
         </Modal>
       )}

@@ -60,17 +60,16 @@ func (ns *NotificationService) Push(receiverID, receiverType, notifType, title, 
 	return nil
 }
 
-
 // GetNotifications mengambil list notifikasi untuk receiver tertentu
 func (ns *NotificationService) GetNotifications(receiverID, receiverType string, limit int) ([]models.Notification, error) {
 	var results []models.Notification
 	query := ns.DB.Where("receiver_type = ?", receiverType)
-	
+
 	// Admin biasanya melihat semua admin notif, tapi user/merchant spesifik ID
 	if receiverType != "admin" {
 		query = query.Where("receiver_id = ?", receiverID)
 	}
-	
+
 	err := query.Order("created_at desc").Limit(limit).Find(&results).Error
 	return results, err
 }

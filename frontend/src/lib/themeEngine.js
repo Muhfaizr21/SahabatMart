@@ -17,6 +17,7 @@ const DEFAULT_THEME = {
   'theme_radius': '1rem',
   'theme_font_heading': "'Plus Jakarta Sans', sans-serif",
   'theme_font_body': "'Inter', sans-serif",
+  'platform_logo': '/akuglow.webp',
 };
 
 /**
@@ -29,7 +30,7 @@ export async function loadTheme() {
     // Filter kunci yang diawali 'theme_'
     const themeConfig = {};
     Object.keys(config).forEach(key => {
-      if (key.startsWith('theme_')) {
+      if (key.startsWith('theme_') || key === 'platform_logo' || key === 'auth_side_image') {
         themeConfig[key] = config[key];
       }
     });

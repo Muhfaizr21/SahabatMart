@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ADMIN_API_BASE, fetchJson, formatImage } from '../../lib/api';
 import { A, PageHeader, TablePanel, FieldLabel } from '../../lib/adminStyles.jsx';
+import { AdminSearch } from '../../lib/adminComponents.jsx';
 import toast from 'react-hot-toast';
 
 const API = ADMIN_API_BASE;
@@ -118,7 +119,7 @@ export default function AdminMediaLibrary() {
   };
 
   return (
-    <div style={{ ...A.page, maxWidth: 1400, margin: '0 auto', paddingBottom: 60 }} className="fade-in">
+    <div style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 60 }} className="fade-in">
       <style>{`
         .media-manager-grid {
           display: grid;
@@ -261,7 +262,7 @@ export default function AdminMediaLibrary() {
         subtitle="Kelola aset multimedia, pustaka gambar, dan dokumen statis website Anda secara terpusat"
       >
         <div style={{ display: 'flex', gap: 10 }}>
-          <label style={A.btnPrimary}>
+          <label className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
             {uploading ? (
               <>
                 <i className="bx bx-loader-alt bx-spin" /> Mengunggah...
@@ -290,21 +291,12 @@ export default function AdminMediaLibrary() {
           <TablePanel
             loading={loading}
             toolbar={(
-              <div style={{ ...A.searchWrap, width: '100%', maxWidth: 360 }}>
-                <i className="bx bx-search" style={A.searchIcon} />
-                <input 
-                  style={{ ...A.searchInput, width: '100%' }}
-                  type="text"
-                  placeholder="Cari berdasarkan nama berkas..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
-              </div>
+              <AdminSearch placeholder="Cari berdasarkan nama berkas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             )}
           >
             <div style={{ padding: 24 }}>
               {mediaList.length === 0 ? (
-                <div style={{ ...A.empty }}>
+                <div className="text-center p-12 flex flex-col items-center gap-3">
                   <i className="bx bx-image-alt" style={{ fontSize: 64, color: '#cbd5e1', marginBottom: 12 }} />
                   <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Pustaka Media Masih Kosong</h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#94a3b8' }}>
@@ -445,13 +437,13 @@ export default function AdminMediaLibrary() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
                 <button 
-                  style={{ ...A.btnGhost, width: '100%', justifyContent: 'center', padding: '10px 14px' }}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', justifyContent: 'center', padding: '10px 14px' }}
                   onClick={() => handleCopyUrl(selectedItem.url)}
                 >
                   <i className="bx bx-copy" /> Salin URL Berkas
                 </button>
                 <button 
-                  style={{ ...A.btnGhost, width: '100%', justifyContent: 'center', padding: '10px 14px', borderColor: '#ef4444', color: '#ef4444', background: '#fff' }}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" style={{ width: '100%', justifyContent: 'center', padding: '10px 14px', borderColor: '#ef4444', color: '#ef4444', background: '#fff' }}
                   onClick={() => handleDelete(selectedItem)}
                 >
                   <i className="bx bx-trash" /> Hapus Permanen

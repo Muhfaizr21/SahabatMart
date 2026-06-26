@@ -7,42 +7,12 @@ const steps = ['Detail Pengiriman', 'Konfirmasi'];
 
 const CourierLogo = ({ code, name, customLogo }) => {
   const [imgError, setImgError] = useState(false);
-  
-  const brandConfigs = {
-    jne: { bg: 'bg-blue-900', text: 'text-white font-extrabold italic', label: 'JNE' },
-    sicepat: { bg: 'bg-red-700', text: 'text-white font-black', label: 'SICEPAT' },
-    jnt: { bg: 'bg-red-600', text: 'text-white font-black italic', label: 'J&T' },
-    anteraja: { bg: 'bg-gradient-to-r from-pink-500 to-orange-500', text: 'text-white font-bold', label: 'anteraja' },
-    pos: { bg: 'bg-orange-600', text: 'text-white font-extrabold', label: 'POS' },
-    tiki: { bg: 'bg-blue-600 border-yellow-400 border', text: 'text-white font-bold italic', label: 'TIKI' },
-    lion: { bg: 'bg-red-500', text: 'text-white font-bold', label: 'LION' },
-    sap: { bg: 'bg-blue-800', text: 'text-amber-500 font-extrabold', label: 'SAP' },
-    rpx: { bg: 'bg-emerald-700', text: 'text-white font-bold', label: 'RPX' },
-    idexpress: { bg: 'bg-red-800', text: 'text-white font-black', label: 'IDE' },
-    sentral: { bg: 'bg-blue-900', text: 'text-white font-semibold tracking-widest', label: 'SENTRAL' },
-    pickup: { bg: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-700 font-bold', label: 'PICKUP', isIcon: true },
-  };
 
   const codeLower = code?.toLowerCase() || '';
-  const config = brandConfigs[codeLower] || { bg: 'bg-gray-100', text: 'text-gray-700 font-bold', label: name?.substring(0, 3).toUpperCase() };
 
-  const logoUrls = {
-    jne: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254395932-EPH35E5BOM3KKP4T5JEX/JNE.webp',
-    sicepat: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255745749-V7618DUMF5V4QZ754F8E/Sicepat.webp',
-    jnt: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589254580340-VCPW4U4JURCOQ416S4L3/J%26T.webp',
-    anteraja: 'https://seeklogo.com/images/A/anteraja-logo-E9D58E2E10-seeklogo.com.webp',
-    pos: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256334547-0639I72O4A81X941V8W8/Pos+Indonesia.webp',
-    tiki: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256247348-QO1O633519Y2K9G67LCH/Tiki.webp',
-    lion: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589255956749-C14Y4J3L9X29N9P1T8W8/Lion+Parcel.webp',
-    sap: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256087547-4W2N3639O4169P1T8W8/SAP+Express.webp',
-    idexpress: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256447547-4W2N3639O4169P1T8W8/ID+Express.webp',
-    sentral: 'https://images.squarespace-cdn.com/content/v1/5ea6873523588960840dc5e7/1589256157547-4W2N3639O4169P1T8W8/Sentral+Cargo.webp',
-    rpx: 'https://seeklogo.com/images/R/rpx-holding-logo-2CC70A5E04-seeklogo.com.webp',
-  };
+  const imageUrl = customLogo ? formatImage(customLogo) : null;
 
-  const imageUrl = customLogo ? formatImage(customLogo) : logoUrls[codeLower];
-
-  if (config.isIcon) {
+  if (codeLower === 'pickup') {
     return (
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-inner ${config.bg}`}>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -65,9 +35,11 @@ const CourierLogo = ({ code, name, customLogo }) => {
     );
   }
 
+  const label = name?.substring(0, 3).toUpperCase() || codeLower.substring(0, 3).toUpperCase() || 'CR';
+
   return (
-    <div className={`w-12 h-9 rounded-lg flex items-center justify-center px-1 text-[8px] font-black tracking-tight text-center shadow-sm select-none flex-shrink-0 ${config.bg} ${config.text}`}>
-      {config.label}
+    <div className="w-12 h-9 rounded-lg flex items-center justify-center px-1 text-[8px] font-black tracking-tight text-center shadow-sm select-none flex-shrink-0 bg-gradient-to-br from-slate-700 to-slate-900 text-white">
+      {label}
     </div>
   );
 };
@@ -111,6 +83,7 @@ export default function CheckoutPage() {
   const [altAreas, setAltAreas] = useState([]);
   const [searchingAltArea, setSearchingAltArea] = useState(false);
   const [manualTransferConfig, setManualTransferConfig] = useState(null); // { enabled, bank_name, account_number, account_holder, instructions }
+  const [qrisConfig, setQrisConfig] = useState(null); // { enabled, image_url }
   const [showProofModal, setShowProofModal] = useState(false);
   const [proofFile, setProofFile] = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
@@ -157,8 +130,17 @@ export default function CheckoutPage() {
         } else {
           setManualTransferConfig(null);
         }
+        
+        if (cfg['payment_qris_enabled'] === 'true') {
+          setQrisConfig({
+            enabled: true,
+            image_url: cfg['payment_qris_image_url'] || ''
+          });
+        } else {
+          setQrisConfig(null);
+        }
       })
-      .catch(e => console.error('[ManualTransfer] fetch error:', e));
+      .catch(e => console.error('[Config] fetch error:', e));
   }, []);
 
   useEffect(() => {
@@ -523,8 +505,8 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Jika manual transfer → tampilkan modal upload bukti dulu
-    if (paymentMethod === 'manual_transfer') {
+    // Jika manual transfer / qris → tampilkan modal upload bukti dulu
+    if (paymentMethod === 'manual_transfer' || paymentMethod === 'qris') {
       setShowProofModal(true);
       return;
     }
@@ -712,7 +694,7 @@ export default function CheckoutPage() {
               {/* Shipping Info — disembunyikan untuk produk digital */}
               {allDigital ? (
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 shadow-sm p-6 flex items-center gap-5">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl shadow-lg flex-shrink-0">💾</div>
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl shadow-lg flex-shrink-0"><i className="bx bx-save"/></div>
                   <div>
                     <div className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-1">Semua Item Digital</div>
                     <h2 className="font-black text-indigo-900 text-base">Tidak Ada Pengiriman Fisik</h2>
@@ -815,11 +797,11 @@ export default function CheckoutPage() {
                       </div>
                     ) : areaSearch.length >= 3 && !searchingArea && areas.length === 0 ? (
                       <div className="mt-2 text-[10px] text-red-500 font-bold flex items-center gap-1">
-                        <span>⚠️</span> Lokasi tidak ditemukan. Coba kata kunci lain.
+                        <i className="bx bx-error text-amber-500" /> Lokasi tidak ditemukan. Coba kata kunci lain.
                       </div>
                     ) : areaSearch.length > 0 && !form.area_id ? (
                       <div className="mt-2 text-[10px] text-orange-500 font-bold flex items-center gap-1">
-                        <span>⚠️</span> Pilih lokasi dari daftar yang muncul di atas
+                        <span><i className="bx bx-error" style={{color:'#f59e0b'}}/></span> Pilih lokasi dari daftar yang muncul di atas
                       </div>
                     ) : null}
                   </div>
@@ -956,7 +938,7 @@ export default function CheckoutPage() {
                               <span className="text-green-500">✓</span> {altForm.district}, {altForm.city}, {altForm.province}
                             </div>
                           ) : altAreaSearch.length >= 3 && !searchingAltArea && altAreas.length === 0 ? (
-                            <div className="mt-2 text-[10px] text-red-500 font-bold">⚠️ Lokasi tidak ditemukan.</div>
+                            <div className="mt-2 text-[10px] text-red-500 font-bold"> Lokasi tidak ditemukan.</div>
                           ) : null}
                         </div>
                       </div>
@@ -1000,7 +982,7 @@ export default function CheckoutPage() {
 
                 {shippingWarning && (
                   <div className="mb-4 p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <span className="text-xl">⚠️</span>
+                    <span className="text-xl"><i className="bx bx-error" style={{color:'#f59e0b'}}/></span>
                     <div className="text-sm text-orange-700 leading-relaxed font-medium">
                       {shippingWarning}
                     </div>
@@ -1067,7 +1049,7 @@ export default function CheckoutPage() {
                       })
                     ) : (
                        <div className="py-10 px-6 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                         <div className="text-3xl mb-2 opacity-30">🚚</div>
+                         <div className="text-3xl mb-2 opacity-30"></div>
                          <p className="text-gray-500 text-[11px] font-medium leading-relaxed">
                            {form.area_id 
                              ? 'Maaf, tidak ada kurir ekspedisi yang mendukung rute ini atau kurir sedang non-aktif.' 
@@ -1085,7 +1067,7 @@ export default function CheckoutPage() {
                       
                       <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
                         <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-inner border border-white/30 flex-shrink-0 animate-bounce-slow">
-                          🏪
+                          
                         </div>
                         <div className="flex-1">
                           <div className="inline-block bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-white/10">
@@ -1109,7 +1091,7 @@ export default function CheckoutPage() {
                               }, {})
                             ).map(([mId, m]) => (
                               <div key={mId} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/5">
-                                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs">📍</div>
+                                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs"></div>
                                 <div>
                                   <div className="text-xs font-black">{m.name}</div>
                                   <div className="text-[10px] text-blue-200">{m.city}</div>
@@ -1186,7 +1168,7 @@ export default function CheckoutPage() {
                 
                 {loadingChannels ? (
                    <div className="py-6 text-center">
-                      <div className="animate-spin mb-2">🌀</div>
+                      <div className="animate-spin mb-2"></div>
                       <div className="text-xs text-gray-400">Memuat metode pembayaran...</div>
                    </div>
                 ) : paymentMethods.length > 0 ? (
@@ -1207,10 +1189,10 @@ export default function CheckoutPage() {
                         >
                           <div className="flex items-center gap-3">
                             <span className="text-xl">
-                              {groupName.includes('Account') ? '🏦' : 
-                               groupName.includes('Wallet') ? '📱' : 
-                               groupName.includes('Retail') ? '🏪' : 
-                               groupName.includes('QR') ? '🤳' : '💳'}
+                              {groupName.includes('Account') ? '' : 
+                               groupName.includes('Wallet') ? '' : 
+                               groupName.includes('Retail') ? '' : 
+                               groupName.includes('QR') ? '' : ''}
                             </span>
                             <span className="font-bold text-gray-900">{groupName}</span>
                           </div>
@@ -1306,6 +1288,61 @@ export default function CheckoutPage() {
                       }`}>0 Fee</span>
                     </button>
 
+                    {/* QRIS Button */}
+                    {qrisConfig?.enabled && (
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('qris')}
+                          className={`w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-left transition-all relative ${
+                            paymentMethod === 'qris'
+                              ? 'border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-50/50'
+                              : 'border-gray-200 hover:border-emerald-300 bg-white'
+                          }`}
+                        >
+                          {paymentMethod === 'qris' && (
+                            <div className="absolute top-0 right-0 bg-emerald-500 text-white px-2 py-0.5 rounded-bl-lg rounded-tr-2xl text-[10px] font-bold">
+                              Terpilih
+                            </div>
+                          )}
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
+                            paymentMethod === 'qris' ? 'bg-emerald-600 shadow-lg shadow-emerald-200' : 'bg-gray-100'
+                          }`}>
+                            <i className={`bx bx-qr-scan text-2xl ${paymentMethod === 'qris' ? 'text-white' : 'text-gray-500'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-gray-900 text-sm">QRIS</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">
+                              Scan kode QR dengan e-Wallet atau m-Banking, lalu upload bukti
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
+                            paymentMethod === 'qris' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-500'
+                          }`}>0 Fee</span>
+                        </button>
+                        
+                        {/* Info QRIS — tampil saat dipilih */}
+                        {paymentMethod === 'qris' && (
+                          <div className="mt-3 p-4 rounded-2xl bg-gradient-to-br from-emerald-700 to-emerald-900 text-white animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-3">Scan QR Code</div>
+                            <div className="flex flex-col items-center justify-center mb-4 bg-white rounded-xl p-3">
+                              {qrisConfig.image_url ? (
+                                <img src={qrisConfig.image_url} alt="QRIS Code" className="max-w-[200px] max-h-[200px] object-contain rounded-lg" />
+                              ) : (
+                                <div className="text-gray-500 text-sm">QRIS tidak tersedia</div>
+                              )}
+                            </div>
+                            <div className="text-[11px] bg-white/10 rounded-xl p-3 leading-relaxed opacity-80 text-center">
+                              Silakan scan kode QR di atas menggunakan aplikasi e-Wallet atau Mobile Banking Anda.
+                            </div>
+                            <div className="mt-3 flex items-center gap-2 text-[10px] font-bold opacity-60">
+                              <i className="bx bxs-check-circle" /> SETELAH TRANSFER, WAJIB UPLOAD BUKTI DI BAWAH
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Info rekening — tampil saat dipilih */}
                     {paymentMethod === 'manual_transfer' && (
                       <div className="mt-3 p-4 rounded-2xl bg-gradient-to-br from-blue-700 to-blue-900 text-white animate-in fade-in slide-in-from-top-2 duration-300">
@@ -1396,7 +1433,7 @@ export default function CheckoutPage() {
                             </div>
                             {/* Stock Status Indicator */}
                             {item.product?.stock === 0 && item.product?.backorders !== 'yes' && item.product?.backorders !== 'notify' && (
-                              <div className="text-[9px] text-red-500 font-bold mt-0.5">⚠️ Stok Habis</div>
+                              <div className="text-[9px] text-red-500 font-bold mt-0.5"> Stok Habis</div>
                             )}
                           </div>
                         </div>
@@ -1515,26 +1552,26 @@ export default function CheckoutPage() {
       </div>
     </main>
 
-      {/* ── Modal Upload Bukti Transfer Manual ── */}
+      {/* ── Modal Upload Bukti Pembayaran ── */}
       {showProofModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-700 to-blue-900 p-6 text-white">
+            <div className={`bg-gradient-to-r ${paymentMethod === 'qris' ? 'from-emerald-700 to-emerald-900' : 'from-blue-700 to-blue-900'} p-6 text-white`}>
               <div className="flex items-center gap-3 mb-1">
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <i className="bx bx-transfer text-2xl" />
+                  <i className={`bx ${paymentMethod === 'qris' ? 'bx-qr-scan' : 'bx-transfer'} text-2xl`} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black">Upload Bukti Transfer</h2>
-                  <p className="text-blue-200 text-xs">Wajib untuk menyelesaikan pesanan</p>
+                  <h2 className="text-lg font-black">Upload Bukti Pembayaran</h2>
+                  <p className={`${paymentMethod === 'qris' ? 'text-emerald-200' : 'text-blue-200'} text-xs`}>Wajib untuk menyelesaikan pesanan</p>
                 </div>
               </div>
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Info rekening tujuan */}
-              {manualTransferConfig && (
+              {/* Info tujuan */}
+              {paymentMethod === 'manual_transfer' && manualTransferConfig && (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4">
                   <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
                     <i className="bx bx-credit-card text-white text-xl" />
@@ -1545,6 +1582,12 @@ export default function CheckoutPage() {
                     <div className="text-blue-700 font-bold text-lg tracking-widest">{manualTransferConfig.account_number}</div>
                     <div className="text-xs text-gray-500">a.n. {manualTransferConfig.account_holder}</div>
                   </div>
+                </div>
+              )}
+              {paymentMethod === 'qris' && qrisConfig?.image_url && (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex flex-col items-center gap-2">
+                  <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Kode QRIS</div>
+                  <img src={qrisConfig.image_url} alt="QRIS" className="w-32 h-32 object-contain rounded-lg border border-emerald-200" />
                 </div>
               )}
 

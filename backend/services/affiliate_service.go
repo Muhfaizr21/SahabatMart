@@ -5,11 +5,11 @@ import (
 	"akuglow/backend/repositories"
 	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"log"
 	"strings"
 	"sync"
 	"time"
-	"gorm.io/gorm"
 )
 
 // Mutex per-affiliate untuk mencegah race condition saat tier upgrade trigger dari multiple goroutines
@@ -68,7 +68,7 @@ func (s *AffiliateService) TrackClick(req TrackClickRequest) (*models.AffiliateM
 	// Jika klik ke produk yang sama persis dalam 3 detik (Double Click/Spam)
 	var duplicateClick int64
 	s.DB.Model(&models.AffiliateClickLog{}).
-		Where("ip_address = ? AND product_id = ? AND created_at > ?", req.IP, req.ProductID, time.Now().Add(-3 * time.Second)).
+		Where("ip_address = ? AND product_id = ? AND created_at > ?", req.IP, req.ProductID, time.Now().Add(-3*time.Second)).
 		Count(&duplicateClick)
 
 	if duplicateClick > 0 {
@@ -100,7 +100,7 @@ func (s *AffiliateService) TrackClick(req TrackClickRequest) (*models.AffiliateM
 		s.DB.Model(&models.AffiliateLink{}).
 			Where("short_code = ?", req.LinkCode).
 			Update("clicks_count", gorm.Expr("clicks_count + 1"))
-		
+
 		// If we wanted to track AffiliateClickLog, we could do it here,
 		// but updating the link clicks_count is the primary requirement for the UI.
 	}
@@ -154,17 +154,19 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 		Where("affiliate_id = ? AND status IN ?", affiliateMemberID, []string{"approved", "paid"}).
 		Select("COALESCE(SUM(amount), 0)").Scan(&totalApproved)
 
-	// 2. Hitung 'Mitra Aktif' (Total Joined - Seluruh Jaringan) — [BUG-M2 Fix] depth limit 15
+	// 2. Hitung 'Mitra Aktif' (Seluruh Jaringan) - Harus punya minimal 1 order PAID
 	var totalJoined int64
 	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
-			SELECT id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
+			SELECT id, user_id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
-			SELECT a.id, s.depth + 1, s.path || a.id::text FROM affiliate_members a
+			SELECT a.id, a.user_id, s.depth + 1, s.path || a.id::text FROM affiliate_members a
 			INNER JOIN subordinates s ON a.upline_id = s.id
 			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
-		SELECT COUNT(*) FROM subordinates
+		SELECT COUNT(DISTINCT s.id) FROM subordinates s
+		JOIN orders o ON o.buyer_id = s.user_id
+		WHERE o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
 	`, affiliateMemberID).Scan(&totalJoined)
 
 	// 3. Hitung 'Qualified Mitra' (Syarat Merchant: Directs who have downlines)
@@ -197,9 +199,9 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 
 	// Sync ke DB
 	s.DB.Model(&affiliate).Updates(map[string]interface{}{
-		"total_earned":           totalApproved,
-		"active_mitra_count":     int(totalJoined), // Display as 'Mitra Aktif' in UI
-		"team_monthly_turnover":  teamMonthlyTurnover,
+		"total_earned":          totalApproved,
+		"active_mitra_count":    int(totalJoined), // Display as 'Mitra Aktif' in UI
+		"team_monthly_turnover": teamMonthlyTurnover,
 	})
 
 	// 4. Check for Merchant Auto-Promotion
@@ -252,9 +254,9 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 			})
 
 			if err == nil && s.Notif != nil {
-				s.Notif.Push(affiliate.UserID, "merchant", "merchant_promoted", 
-					"🎉 Selamat! Anda Menjadi Merchant", 
-					"Karena performa tim yang luar biasa, Anda otomatis dipromosikan menjadi Merchant AkuGlow.", 
+				s.Notif.Push(affiliate.UserID, "merchant", "merchant_promoted",
+					"🎉 Selamat! Anda Menjadi Merchant",
+					"Karena performa tim yang luar biasa, Anda otomatis dipromosikan menjadi Merchant AkuGlow.",
 					"/merchant")
 			}
 		}
@@ -307,7 +309,6 @@ func (s *AffiliateService) TriggerTierUpgrade(affiliateMemberID string) error {
 	return nil
 }
 
-
 // GetTeamStats: Menghitung total downline dan omset tim (seluruh keturunan/infinite depth)
 func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int64, teamTurnover float64, err error) {
 	// 1. Ambil Semua ID Downlines (Semua Level) menggunakan Recursive CTE
@@ -349,15 +350,17 @@ func (s *AffiliateService) GetTeamStats(affiliateID string) (totalDownlines int6
 func (s *AffiliateService) GetFullEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64, qualifiedMitra int64, directMitra int64, totalTransactions int, performancePoints int, nextTier *models.MembershipTier) {
 	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
 
-	// 1. Total jaringan (semua level) — [BUG-M2 Fix] depth limit 15
+	// 1. Total jaringan (semua level yang aktif/paid)
 	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
-			SELECT id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
+			SELECT id, user_id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
-			SELECT a.id, s.depth + 1, s.path || a.id::text FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
+			SELECT a.id, a.user_id, s.depth + 1, s.path || a.id::text FROM affiliate_members a INNER JOIN subordinates s ON a.upline_id = s.id
 			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
-		SELECT COUNT(*) FROM subordinates
+		SELECT COUNT(DISTINCT s.id) FROM subordinates s
+		JOIN orders o ON o.buyer_id = s.user_id
+		WHERE o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
 	`, affiliateID).Scan(&activeMitra)
 
 	// 2. Qualified Mitra (directs yang punya downline)
@@ -445,15 +448,18 @@ func (s *AffiliateService) GetFullEligibility(affiliateID string) (isEligible bo
 func (s *AffiliateService) CheckMerchantEligibility(affiliateID string) (isEligible bool, activeMitra int64, monthlyTurnover float64, reqMitra int, reqTurnover float64, qualifiedMitra int64) {
 	startTime := time.Now().AddDate(0, -1, 0) // 30 hari terakhir
 
-	// 1. Hitung 'Mitra Aktif' (Total Joined - Seluruh Jaringan)
+	// 1. Hitung 'Mitra Aktif' (Total Aktif - Seluruh Jaringan)
 	s.DB.Raw(`
 		WITH RECURSIVE subordinates AS (
-			SELECT id FROM affiliate_members WHERE upline_id = ?
+			SELECT id, user_id, 1 as depth, ARRAY[id::text] as path FROM affiliate_members WHERE upline_id = ?
 			UNION ALL
-			SELECT a.id FROM affiliate_members a
+			SELECT a.id, a.user_id, s.depth + 1, s.path || a.id::text FROM affiliate_members a
 			INNER JOIN subordinates s ON a.upline_id = s.id
+			WHERE NOT (a.id::text = ANY(s.path)) AND s.depth < 15
 		)
-		SELECT COUNT(*) FROM subordinates
+		SELECT COUNT(DISTINCT s.id) FROM subordinates s
+		JOIN orders o ON o.buyer_id = s.user_id
+		WHERE o.status IN ('paid', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'completed')
 	`, affiliateID).Scan(&activeMitra)
 
 	// 2. Hitung 'Qualified Mitra' (Syarat Merchant: Directs who have downlines)
@@ -536,6 +542,7 @@ func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err err
 	`).Scan(&merchants)
 
 	startTime := time.Now().AddDate(0, -1, 0)
+	_ = startTime
 	_ = minActiveMitra
 	_ = minTurnover
 
@@ -553,22 +560,11 @@ func (s *AffiliateService) CheckAndDowngradeMerchants() (downgraded int, err err
 			WHERE am.upline_id = ?
 		`, m.AffiliateID).Scan(&qualifiedMitraCount)
 
-		// Hitung omset tim bulan ini
+		// Hitung omset tim bulan ini (Performance Fix via Snapshot)
 		var teamTurnover float64
-		var allDescIDs []string
-		s.DB.Raw(`
-			WITH RECURSIVE sub AS (
-				SELECT id FROM affiliate_members WHERE upline_id = ?
-				UNION ALL
-				SELECT a.id FROM affiliate_members a INNER JOIN sub s ON a.upline_id = s.id
-			) SELECT id FROM sub
-		`, m.AffiliateID).Scan(&allDescIDs)
-
-		if len(allDescIDs) > 0 {
-			s.DB.Model(&models.Order{}).
-				Where("affiliate_id IN ? AND status IN ? AND created_at >= ?", allDescIDs, completedOrderStatuses, startTime).
-				Select("COALESCE(SUM(subtotal), 0)").
-				Scan(&teamTurnover)
+		var snapshot models.AffiliateTurnoverSnapshot
+		if err := s.DB.Where("affiliate_id = ?", m.AffiliateID).First(&snapshot).Error; err == nil {
+			teamTurnover = snapshot.MonthlyTurnover
 		}
 
 		// Update statistik merchant (sync dengan field di models.Merchant)
@@ -627,6 +623,7 @@ func (s *AffiliateService) UpdateTurnoverSnapshot(affiliateID string) error {
 		Assign(snapshot).
 		FirstOrCreate(&models.AffiliateTurnoverSnapshot{}).Error
 }
+
 // SyncLeaderboard menghitung ulang peringkat affiliate dan menyimpan ke cache
 func (s *AffiliateService) SyncLeaderboard() error {
 	var results []struct {
@@ -791,15 +788,14 @@ func (s *AffiliateService) RequestWithdrawal(affiliateID string, amount float64)
 
 	financeSvc := NewFinanceService(s.DB)
 	var wd models.AffiliateWithdrawal
-	
+
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		// [BUG-H1 Fix] Pengecekan pending withdrawal di DALAM transaction dengan FOR UPDATE
-		var existingPending int64
-		tx.Set("gorm:query_option", "FOR UPDATE").
-			Model(&models.AffiliateWithdrawal{}).
+		var existingPending models.AffiliateWithdrawal
+		errPending := tx.Set("gorm:query_option", "FOR UPDATE").
 			Where("affiliate_id = ? AND status = 'pending'", affiliateID).
-			Count(&existingPending)
-		if existingPending > 0 {
+			First(&existingPending).Error
+		if errPending == nil {
 			return errors.New("anda masih memiliki pengajuan penarikan yang sedang diproses")
 		}
 

@@ -110,6 +110,14 @@ func (s *AuthService) Register(email, password, fullName, phone, role, referralC
 			}
 		}
 
+		// [FIX #10] Create wallets at registration to prevent race-condition creation later
+		tx.Create(&models.Wallet{
+			OwnerID:   user.ID,
+			OwnerType: models.WalletAffiliate,
+			Balance:   0,
+			IsActive:  true,
+		})
+
 		// [Akuglow Sync] Trigger Network Update for Upline
 		if aff.UplineID != nil && *aff.UplineID != "" {
 			go s.Affiliate.UpdateUplineSnapshotsRecursive(*aff.UplineID)
@@ -124,32 +132,32 @@ func (s *AuthService) Register(email, password, fullName, phone, role, referralC
 
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
 	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID, false)
-	
+
 	return user, token, err
 }
 
-func (s *AuthService) Login(email, password, clientIP string, remember bool) (*models.User, string, error) {
+func (s *AuthService) Login(email, password, clientIP string, remember bool) (*models.User, string, string, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	user, err := s.Repo.FindByEmail(email)
 	if err != nil {
-		return nil, "", errors.New("email atau kata sandi salah")
+		return nil, "", "", errors.New("email atau kata sandi salah")
 	}
 
 	if user.Status != "active" {
-		return nil, "", errors.New("akun tidak aktif")
+		return nil, "", "", errors.New("akun tidak aktif")
 	}
 
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
-		return nil, "", errors.New("akun terkunci sementara")
+		return nil, "", "", errors.New("akun terkunci sementara")
 	}
 
 	if user.PasswordHash == nil {
-		return nil, "", errors.New("silakan login menggunakan Google")
+		return nil, "", "", errors.New("silakan login menggunakan Google")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
 		s.HandleFailedLogin(user)
-		return nil, "", errors.New("email atau kata sandi salah")
+		return nil, "", "", errors.New("email atau kata sandi salah")
 	}
 
 	s.HandleSuccessfulLogin(user, clientIP)
@@ -157,9 +165,15 @@ func (s *AuthService) Login(email, password, clientIP string, remember bool) (*m
 	s.PopulatePermissions(user)
 
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
-	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID, remember)
 
-	return user, token, err
+	// [FIX #7] Use token pair (access + refresh)
+	accessToken, refreshToken, err := utils.GenerateTokenPair(user.ID, user.Role, user.Email, mID, aID)
+	if err != nil {
+		return nil, "", "", err
+	}
+	_ = utils.StoreRefreshToken(user.ID, refreshToken)
+
+	return user, accessToken, refreshToken, nil
 }
 
 func (s *AuthService) PopulatePermissions(user *models.User) {
@@ -192,7 +206,7 @@ func (s *AuthService) PopulatePermissions(user *models.User) {
 
 func (s *AuthService) GetExtraIDs(userID, role string) (string, string) {
 	mID, aID := "", ""
-	
+
 	// Everyone has an affiliate record
 	if a, err := s.Repo.GetAffiliateByID(userID); err == nil {
 		aID = a.ID
@@ -210,10 +224,10 @@ func (s *AuthService) GetExtraIDs(userID, role string) (string, string) {
 // HandleGoogleUser memproses login/register via Google dengan dukungan Referral Code
 func (s *AuthService) HandleGoogleUser(email, fullName, googleID, avatar, referralCode string) (*models.User, string, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
-	
+
 	var user models.User
 	err := s.DB.Preload("Profile").Where("email = ?", email).First(&user).Error
-	
+
 	if err == gorm.ErrRecordNotFound {
 		// Buat user baru jika belum ada
 		user = models.User{
@@ -226,7 +240,7 @@ func (s *AuthService) HandleGoogleUser(email, fullName, googleID, avatar, referr
 				AvatarUrl: &avatar,
 			},
 		}
-		
+
 		// Resolve Upline ID from Referral Code if provided
 		var uplineID *string
 		var uplineCode string
@@ -257,6 +271,14 @@ func (s *AuthService) HandleGoogleUser(email, fullName, googleID, avatar, referr
 				return err
 			}
 
+			// [FIX #10] Create wallets at registration
+			tx.Create(&models.Wallet{
+				OwnerID:   user.ID,
+				OwnerType: models.WalletAffiliate,
+				Balance:   0,
+				IsActive:  true,
+			})
+
 			// Sync Network (Infinite Depth) via Background Routine
 			if uplineID != nil {
 				go s.Affiliate.UpdateUplineSnapshotsRecursive(*uplineID)
@@ -274,10 +296,10 @@ func (s *AuthService) HandleGoogleUser(email, fullName, googleID, avatar, referr
 			s.DB.Model(&user).Update("google_id", googleID)
 		}
 	}
-	
+
 	mID, aID := s.GetExtraIDs(user.ID, user.Role)
 	token, err := utils.GenerateJWT(user.ID, user.Role, user.Email, mID, aID, false)
-	
+
 	return &user, token, err
 }
 
@@ -328,7 +350,7 @@ func (s *AuthService) RequestPasswordReset(email string) (string, error) {
 	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.Email.getBaseFrontendURL(), token)
 	subject := "🔒 Permintaan Atur Ulang Kata Sandi - AkuGlow"
 	body := fmt.Sprintf("Halo %s,\n\nKami menerima permintaan untuk mengatur ulang kata sandi akun AkuGlow Anda.\n\nKlik link di bawah ini untuk mengatur kata sandi baru:\n%s\n\nLink ini akan kadaluarsa dalam 1 jam.\n\nJika Anda tidak merasa melakukan permintaan ini, abaikan email ini.\n\nTerima kasih,\nTim AkuGlow", user.Profile.FullName, resetLink)
-	
+
 	err := s.Email.SendEmail(email, subject, body)
 	if err != nil {
 		fmt.Printf("⚠️ Gagal mengirim email reset ke %s: %v. (Pastikan SMTP sudah dikonfigurasi)\n", email, err)
@@ -352,7 +374,7 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 	}
 
 	hashedPasswordStr := string(hashedPassword)
-	
+
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		// Update password
 		if err := tx.Model(&models.User{}).Where("email = ?", reset.Email).Update("password_hash", &hashedPasswordStr).Error; err != nil {

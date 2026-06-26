@@ -166,7 +166,7 @@ export default function WishlistStats() {
         title={<><i className="bx bxs-heart" style={{ color: '#ec4899', marginRight: 8 }} />Wishlist Insight</>}
         subtitle="Produk paling diminati — kirim notifikasi ke peminat secara individu atau massal."
       >
-        <button style={A.btnGhost} onClick={load}><i className="bx bx-refresh" /> Refresh</button>
+        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm" onClick={load}><i className="bx bx-refresh" /> Refresh</button>
       </PageHeader>
 
       <TablePanel
@@ -307,8 +307,9 @@ export default function WishlistStats() {
 
       {/* ── MODAL (via portal) ── */}
       {modal && createPortal(
-        <div style={sx.overlay} onClick={closeModal}>
-          <div style={sx.modal} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={closeModal}></div>
+          <div style={{ position: 'relative', ...sx.modal }} onClick={e => e.stopPropagation()}>
             {/* HEADER */}
             <div style={sx.header}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

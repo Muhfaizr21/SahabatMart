@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { AUTH_API_BASE, postJson } from '../lib/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function ResetPasswordPage() {
+  const { theme } = useTheme();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
@@ -49,145 +51,160 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-6">
-      <div className="max-w-4xl w-full bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-gray-100">
+    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
+      <div className="w-full max-w-[1100px] bg-white rounded-2xl md:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[650px]">
         
-        {/* Kolom Kiri - Branding (Sync with Login) */}
-        <div className="hidden md:flex flex-col w-1/2 bg-[#0A0A0A] p-14 relative overflow-hidden justify-between text-white border-r border-white/5">
-          <div className="absolute -top-32 -left-32 w-80 h-80 bg-rose-900 rounded-full blur-[120px] opacity-20"></div>
-          
-          <div className="relative z-10 flex">
-            <Link to="/login" className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 p-2 pl-4 pr-4 rounded-full backdrop-blur-xl transition-all text-white text-xs font-black border border-white/10 shadow-2xl">
-              <span className="material-symbols-outlined text-sm rotate-180">arrow_forward</span>
-              Batal & Login
+        {/* Left Column - Form */}
+        <div className="lg:w-1/2 p-8 lg:p-16 flex flex-col bg-white relative">
+          {/* Top Bar: Logo & Back to Web */}
+          <div className="mb-12 flex justify-between items-center">
+            <Link to="/">
+              <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-8 w-auto object-contain" />
+            </Link>
+            <Link to="/" className="text-slate-400 hover:text-black flex items-center gap-1 text-xs font-semibold transition-colors bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-full">
+              <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+              Back to Web
             </Link>
           </div>
           
-          <div className="relative z-10 mt-auto">
-            <div className="inline-block px-4 py-1.5 bg-rose-600/10 text-rose-500 font-black text-[10px] rounded-full uppercase tracking-[0.2em] mb-6 border border-rose-600/20 backdrop-blur-sm">Reset Akun</div>
-            <h2 className="text-4xl font-black mb-6 leading-tight tracking-tight">Perbarui Rahasia Kecantikan Anda.</h2>
-            <p className="text-gray-400 mb-10 text-base font-medium leading-relaxed">Keamanan akun Anda adalah prioritas kami. Masukkan password baru yang kuat dan unik.</p>
+          <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto">
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">Reset Password</h1>
+            <p className="text-slate-500 text-sm mb-8">Please create a new secure password.</p>
             
-            <div className="flex items-center gap-4 p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-md">
-               <div className="w-12 h-12 rounded-full bg-rose-600/20 flex items-center justify-center text-rose-500">
-                  <span className="material-symbols-outlined text-2xl">verified_user</span>
-               </div>
-               <div>
-                  <p className="text-xs font-black text-white">Verifikasi Aman</p>
-                  <p className="text-[10px] text-gray-500 font-bold">Proses ini dilindungi oleh token enkripsi unik.</p>
-               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Kolom Kanan - Form */}
-        <div className="w-full md:w-1/2 p-10 md:p-14 flex flex-col justify-center bg-white">
-          <div className="mb-8 text-center md:text-left">
-            <h1 className="text-3xl font-black text-gray-900 mb-2">Reset Password ✨</h1>
-            <p className="text-gray-500 font-bold text-sm">Silakan buat kata sandi baru yang aman.</p>
-          </div>
-          
-          {message ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-green-50 border border-green-100 text-green-700 p-6 rounded-[24px] mb-8 text-sm font-bold flex items-start gap-4">
-                <span className="material-symbols-outlined text-xl mt-0.5">verified</span>
-                <div>
-                   <p className="mb-1">Password berhasil diperbarui!</p>
-                   <p className="text-xs opacity-80 font-medium">Mengarahkan Anda kembali ke halaman login dalam 3 detik...</p>
-                </div>
-              </div>
-              <Link to="/login" className="w-full bg-gray-900 hover:bg-black text-white font-black py-4.5 rounded-2xl transition-all shadow-xl shadow-gray-200 flex justify-center items-center gap-3">
-                <span className="material-symbols-outlined text-lg">login</span>
-                Masuk Sekarang
-              </Link>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              {error && (
-                <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-xs font-bold border border-red-100 flex items-center gap-3 animate-shake">
-                  <span className="material-symbols-outlined text-lg">error</span>
-                  {error}
-                </div>
-              )}
-              
-              {!token ? (
-                 <div className="text-center py-8">
-                    <p className="text-gray-400 mb-6 font-bold text-sm">Token tidak valid.</p>
-                    <Link to="/forgot-password" className="text-rose-600 font-black hover:underline uppercase tracking-widest text-[10px]">
-                      Minta Tautan Baru
-                    </Link>
-                 </div>
-              ) : (
-                <>
+            {message ? (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-green-50 border border-green-100 text-green-700 p-6 rounded-xl mb-8 text-sm flex items-start gap-3">
+                  <span className="material-symbols-outlined text-xl mt-0.5">verified</span>
                   <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Password Baru</label>
+                     <p className="font-bold mb-1">Password updated!</p>
+                     <p className="text-xs opacity-80">Redirecting to login page in 3 seconds...</p>
+                  </div>
+                </div>
+                <Link to="/login" className="w-full bg-black hover:bg-slate-800 text-white font-bold py-4 rounded transition-all active:scale-[0.98] flex justify-center items-center gap-2">
+                  <span className="material-symbols-outlined text-base">login</span>
+                  Login Now
+                </Link>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                {error && (
+                  <div className="p-3 bg-red-50 text-red-600 rounded text-xs font-semibold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {error}
+                  </div>
+                )}
+                
+                {!token ? (
+                   <div className="text-center py-8">
+                      <p className="text-slate-500 mb-6 font-semibold text-sm">Invalid token.</p>
+                      <Link to="/forgot-password" className="text-black font-bold hover:underline">
+                        Request New Link
+                      </Link>
+                   </div>
+                ) : (
+                  <>
                     <div className="relative">
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">New Password</label>
                       <input 
                         type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••" 
-                        className="w-full border border-gray-100 rounded-2xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
+                        className="w-full border-b border-slate-200 py-2 pr-8 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent tracking-widest"
                         required
                         minLength={6}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                        className="absolute right-0 bottom-2 text-slate-400 hover:text-black transition-colors"
                       >
-                        <span className="material-symbols-outlined text-xl">
+                        <span className="material-symbols-outlined text-[16px]">
                           {showPassword ? 'visibility_off' : 'visibility'}
                         </span>
                       </button>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Konfirmasi Password</label>
                     <div className="relative">
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">Confirm Password</label>
                       <input 
                         type={showConfirmPassword ? "text" : "password"}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="••••••••" 
-                        className="w-full border border-gray-100 rounded-2xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50 transition-all bg-gray-50 focus:bg-white" 
+                        className="w-full border-b border-slate-200 py-2 pr-8 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent tracking-widest"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors flex items-center"
+                        className="absolute right-0 bottom-2 text-slate-400 hover:text-black transition-colors"
                       >
-                        <span className="material-symbols-outlined text-xl">
+                        <span className="material-symbols-outlined text-[16px]">
                           {showConfirmPassword ? 'visibility_off' : 'visibility'}
                         </span>
                       </button>
                     </div>
-                  </div>
-                  
-                  <button 
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white font-black py-4.5 rounded-2xl transition-all shadow-xl shadow-gray-200 flex justify-center items-center gap-3 active:scale-[0.98]"
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                        Memproses...
-                      </>
-                    ) : (
-                      <>
-                        <span>Simpan Password Baru</span>
-                        <span className="material-symbols-outlined text-lg">save_as</span>
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-            </form>
-          )}
+                    
+                    <button 
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-black hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold py-4 rounded mt-4 transition-all active:scale-[0.98] flex justify-center items-center gap-2"
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        "Save New Password"
+                      )}
+                    </button>
+                  </>
+                )}
+              </form>
+            )}
+          </div>
         </div>
+
+        {/* Right Column - Visuals & Geometry */}
+        {theme?.auth_side_image ? (
+          <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-100">
+            <img src={theme.auth_side_image} alt="Auth Background" className="absolute inset-0 w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="hidden lg:flex lg:w-1/2 bg-[#264b96] relative overflow-hidden flex-col items-center justify-center p-8">
+          
+          {/* Background Geometry */}
+          <div className="absolute top-8 left-8 w-24 h-24 bg-[radial-gradient(#f472b6_3px,transparent_3px)] bg-[size:14px_14px] opacity-80"></div>
+          <div className="absolute -top-10 -right-10 w-72 h-72 bg-pink-400 rounded-full"></div>
+          <div className="absolute top-10 right-10 w-24 h-24 bg-rose-500 rounded-full"></div>
+          <div className="absolute top-20 right-40 w-32 h-32 bg-[#1e3a8a]" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}></div>
+          <div className="absolute top-1/3 -left-20 w-80 h-80 bg-[#fca5a5] rounded-full mix-blend-screen opacity-90"></div>
+          <div className="absolute top-1/3 right-10 w-32 h-32 bg-pink-200" style={{ clipPath: 'polygon(0 0, 0% 100%, 100% 100%)' }}></div>
+          <div className="absolute bottom-20 -left-10 w-48 h-48 bg-[#1e3a8a] opacity-80" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}></div>
+          <div className="absolute bottom-16 right-16 w-24 h-24 bg-[radial-gradient(#fca5a5_3px,transparent_3px)] bg-[size:14px_14px] opacity-80"></div>
+          <div className="absolute bottom-10 right-48 w-20 h-20 bg-rose-500 rounded-tr-full rounded-br-full"></div>
+
+          {/* Center Graphic Box */}
+          <div className="relative z-10 w-full max-w-sm">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-white shadow-2xl flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">verified</span>
+              </div>
+              <h2 className="text-xl font-semibold mb-3">Check the status</h2>
+              <p className="text-white/80 text-sm leading-relaxed mb-8">It's easy to check the status of your online orders and track your progress in the system.</p>
+              
+              <div className="flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+                <div className="w-2 h-2 rounded-full bg-white/40"></div>
+                <div className="w-2 h-2 rounded-full bg-white/40"></div>
+              </div>
+            </div>
+          </div>
+          </div>
+        )}
+
       </div>
     </main>
   );

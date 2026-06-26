@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AUTH_API_BASE, fetchJson } from '../lib/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function RegisterPage() {
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
@@ -17,18 +19,15 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
 
   // [Sync Fix] Capture ref dari URL dan simpan di localStorage
-  // Sesuai dokumen: referral dicatat otomatis dari link affiliate ?ref=...
   useEffect(() => {
     try {
       const params = new URLSearchParams(location.search);
       const ref = params.get('ref');
       if (ref) {
         setFormData(prev => ({ ...prev, referralCode: ref }));
-        // Simpan ke localStorage agar tetap ada saat checkout (jika belum daftar dulu)
         localStorage.setItem('pending_ref', ref);
-        console.log('✅ Affiliate Ref Captured & Stored:', ref);
+        console.log(' Affiliate Ref Captured & Stored:', ref);
       } else {
-        // Cek dari localStorage jika sudah pernah klik link affiliate sebelumnya
         const storedRef = localStorage.getItem('pending_ref');
         if (storedRef) setFormData(prev => ({ ...prev, referralCode: storedRef }));
       }
@@ -62,11 +61,9 @@ export default function RegisterPage() {
 
       if (data && data.token) {
         localStorage.setItem('token', data.token);
+        if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        // Hapus pending_ref setelah berhasil register
         localStorage.removeItem('pending_ref');
-        // [Sync Fix] Redirect ke Mitra Area, bukan homepage
-        // Sesuai dokumen: "Setelah registrasi selesai, mitra dapat login ke Mitra Area"
         navigate('/affiliate');
       }
     } catch (_err) {
@@ -77,202 +74,169 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-[70vh] py-12 md:py-20 premium-mesh-bg flex items-center justify-center p-4 md:p-8 relative overflow-hidden font-sans">
-
-      {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-50 pointer-events-none"></div>
-
-      {/* Main Glassmorphic Card */}
-      <div className="relative max-w-5xl w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col lg:flex-row border border-slate-100 z-10">
+    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
+      <div className="w-full max-w-[1100px] bg-white rounded-2xl md:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-[650px]">
         
-        {/* Left Column - Branding (Visuals) */}
-        <div className="lg:w-1/2 bg-gradient-to-br from-rose-50/40 via-white to-amber-50/20 p-8 lg:p-14 flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-100">
-          {/* Subtle inside glow blobs */}
-          <div className="absolute -top-32 -left-32 w-80 h-80 bg-rose-200/20 rounded-full blur-[80px] pointer-events-none"></div>
-          <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-amber-200/20 rounded-full blur-[80px] pointer-events-none"></div>
-
-          {/* Top Row - Back Button */}
-          <div className="relative z-10">
-            <Link to="/" className="group inline-flex items-center gap-2 bg-white hover:bg-slate-50 pl-3 pr-4 py-2 rounded-full transition-all duration-300 text-slate-800 text-xs font-semibold border border-slate-200/80 hover:border-slate-300 shadow-sm self-start">
-              <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">arrow_back</span>
-              Kembali ke Beranda
+        {/* Left Column - Form */}
+        <div className="lg:w-1/2 p-8 lg:p-16 flex flex-col bg-white relative">
+          {/* Top Bar: Logo & Back to Web */}
+          <div className="mb-12 flex justify-between items-center">
+            <Link to="/">
+              <img src={theme?.platform_logo || "/akuglow.webp"} alt="AkuGlow" className="h-8 w-auto object-contain" />
+            </Link>
+            <Link to="/" className="text-slate-400 hover:text-black flex items-center gap-1 text-xs font-semibold transition-colors bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-full">
+              <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+              Back to Web
             </Link>
           </div>
-
-          {/* Middle Row - Slogan & Logo */}
-          <div className="relative z-10 my-10 lg:my-auto">
-            <div className="mb-8">
-              <img src="/akuglow.webp" alt="AkuGlow" className="h-12 w-auto object-contain" />
-            </div>
-
-            <div className="space-y-4">
-              <span className="inline-block px-3 py-1 bg-rose-500/10 text-rose-600 font-extrabold text-[10px] rounded-full uppercase tracking-[0.2em] border border-rose-500/20 backdrop-blur-sm">
-                Benefit Member & Mitra
-              </span>
-              <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 leading-tight tracking-tight">
-                Eksklusivitas <br />
-                Dalam Genggaman.
-              </h2>
-              
-              <ul className="space-y-4 pt-4">
-                {[
-                  { text: "Poin Reward setiap pembelanjaan", icon: "redeem" }, 
-                  { text: "Konsultasi Skin Care Gratis", icon: "health_and_safety" },
-                  { text: "Akses Produk Limited Edition", icon: "verified" }
-                ].map((item, i) => (
-                  <li key={i} className="flex gap-3 text-xs font-bold text-slate-600 items-center">
-                    <div className="w-8 h-8 rounded-xl bg-rose-500/5 text-rose-600 flex items-center justify-center flex-shrink-0 border border-rose-500/10">
-                      <span className="material-symbols-outlined text-base">{item.icon}</span>
-                    </div>
-                    {item.text}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Bottom Row - Mission Statement */}
-          <div className="relative z-10 mt-auto">
-            <div className="p-5 bg-rose-500/[0.02] rounded-3xl border border-rose-500/5 backdrop-blur-md shadow-sm">
-              <p className="text-[9px] text-rose-600 font-black uppercase tracking-[0.2em] mb-1">Misi Kami</p>
-              <p className="text-xs text-slate-400 font-semibold leading-relaxed">Memberdayakan setiap individu untuk meraih potensi kecantikan terbaik melalui teknologi & sains.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Registration Form */}
-        <div className="lg:w-1/2 p-8 lg:p-14 flex flex-col justify-center bg-white">
-          <div className="mb-8">
-            <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Daftar Jadi Mitra Akuglow ✨</h1>
-            <p className="text-slate-500 text-sm font-medium">Bergabung gratis, dapatkan komisi dari setiap penjualan yang Anda referensikan.</p>
-          </div>
           
-          {error && (
-            <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-shake">
-              <span className="material-symbols-outlined text-lg text-rose-500">error</span>
-              <span className="flex-1 leading-relaxed">{error}</span>
-            </div>
-          )}
+          <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto">
+            <h1 className="text-2xl font-bold text-slate-800 mb-8">Create account</h1>
+            
+            {error && (
+              <div className="mb-6 p-3 bg-red-50 text-red-600 rounded text-xs font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">error</span>
+                {error}
+              </div>
+            )}
 
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            {/* Full Name Field */}
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-2">Nama Lengkap</label>
-              <div className="relative group">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-rose-500 transition-colors text-lg">person</span>
+            <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Full Name</label>
                 <input 
                   type="text" 
                   name="fullName"
                   value={formData.fullName}
                   onChange={handleChange}
                   required
-                  placeholder="Cth: John Doe" 
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-5 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 hover:border-slate-200 transition-all duration-300" 
+                  placeholder="John Doe" 
+                  className="w-full border-b border-slate-200 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent"
                 />
               </div>
-            </div>
-            
-            {/* Email & Phone Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
               <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-2">Alamat Email</label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-rose-500 transition-colors text-lg">mail</span>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Email</label>
+                <input 
+                  type="email" 
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  placeholder="josh@gmail.com" 
+                  className="w-full border-b border-slate-200 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">Phone</label>
+                  <div className="flex items-end">
+                    <span className="border-b border-slate-200 py-2 text-sm text-slate-500 pr-2">+62</span>
+                    <input 
+                      type="tel" 
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="81234567890" 
+                      className="w-full border-b border-slate-200 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1 flex justify-between">
+                    Referral
+                    {formData.referralCode && <span className="text-[10px] text-green-600 font-bold">✓</span>}
+                  </label>
                   <input 
-                    type="email" 
-                    name="email"
-                    value={formData.email}
+                    type="text" 
+                    name="referralCode"
+                    value={formData.referralCode}
                     onChange={handleChange}
-                    required
-                    placeholder="nama@email.com" 
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-5 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 hover:border-slate-200 transition-all duration-300" 
+                    placeholder="AKU-REF" 
+                    className="w-full border-b border-slate-200 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent"
                   />
                 </div>
               </div>
-              <div>
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-2">Nomor Handphone</label>
-                <div className="flex border border-slate-100 rounded-2xl overflow-hidden focus-within:border-rose-500/50 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all duration-300 bg-slate-50">
-                  <span className="flex items-center justify-center px-4 bg-slate-100 text-slate-500 text-xs border-r border-slate-100 font-extrabold">+62</span>
-                  <input 
-                    type="tel" 
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="81234567890" 
-                    className="w-full px-4 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 bg-transparent outline-none" 
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Password Field */}
-            <div>
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-2">Kata Sandi</label>
-              <div className="relative group">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-rose-500 transition-colors text-lg">lock</span>
+
+              <div className="relative">
+                <label className="text-xs font-semibold text-slate-500 block mb-1">Password</label>
                 <input 
                   type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  placeholder="Minimal 8 karakter" 
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-12 py-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 hover:border-slate-200 transition-all duration-300" 
+                  placeholder="••••••••" 
+                  className="w-full border-b border-slate-200 py-2 pr-8 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-black transition-colors bg-transparent tracking-widest"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors flex items-center"
+                  className="absolute right-0 top-1/2 translate-y-1 text-slate-400 hover:text-black transition-colors"
                 >
-                  <span className="material-symbols-outlined text-lg">
+                  <span className="material-symbols-outlined text-[16px]">
                     {showPassword ? 'visibility_off' : 'visibility'}
                   </span>
                 </button>
               </div>
-            </div>
 
-            {/* Referral Code Field */}
-            <div className="p-5 bg-rose-500/[0.02] rounded-3xl border border-rose-500/5">
-              <label className="text-[9px] font-bold text-rose-900 block mb-2 flex items-center justify-between uppercase tracking-[0.2em]">
-                Kode Referral (Opsional)
-                {formData.referralCode && <span className="text-[9px] text-white bg-rose-600 px-3 py-1 rounded-full font-black scale-95 origin-right">AKTIF ✓</span>}
-              </label>
-              <div className="relative group">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-rose-500 transition-colors text-lg">card_membership</span>
-                <input 
-                  type="text" 
-                  name="referralCode"
-                  value={formData.referralCode}
-                  onChange={handleChange}
-                  placeholder="Cth: AKU-REF" 
-                  className="w-full bg-white border border-slate-100 rounded-2xl pl-11 pr-5 py-3.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 hover:border-slate-200 transition-all duration-300" 
-                />
+              <button 
+                disabled={loading} 
+                className="w-full bg-black hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold py-4 rounded mt-4 transition-all active:scale-[0.98] flex justify-center items-center gap-2"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                ) : "Sign up"}
+              </button>
+            </form>
+
+            <p className="text-center text-xs text-slate-500 mt-8">
+              Already have an account? <Link to="/login" className="font-bold text-black hover:underline">Log in here</Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Right Column - Visuals & Geometry */}
+        {theme?.auth_side_image ? (
+          <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-100">
+            <img src={theme.auth_side_image} alt="Auth Background" className="absolute inset-0 w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="hidden lg:flex lg:w-1/2 bg-[#264b96] relative overflow-hidden flex-col items-center justify-center p-8">
+          
+          {/* Background Geometry */}
+          <div className="absolute top-8 left-8 w-24 h-24 bg-[radial-gradient(#f472b6_3px,transparent_3px)] bg-[size:14px_14px] opacity-80"></div>
+          <div className="absolute -top-10 -right-10 w-72 h-72 bg-pink-400 rounded-full"></div>
+          <div className="absolute top-10 right-10 w-24 h-24 bg-rose-500 rounded-full"></div>
+          <div className="absolute top-20 right-40 w-32 h-32 bg-[#1e3a8a]" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}></div>
+          <div className="absolute top-1/3 -left-20 w-80 h-80 bg-[#fca5a5] rounded-full mix-blend-screen opacity-90"></div>
+          <div className="absolute top-1/3 right-10 w-32 h-32 bg-pink-200" style={{ clipPath: 'polygon(0 0, 0% 100%, 100% 100%)' }}></div>
+          <div className="absolute bottom-20 -left-10 w-48 h-48 bg-[#1e3a8a] opacity-80" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}></div>
+          <div className="absolute bottom-16 right-16 w-24 h-24 bg-[radial-gradient(#fca5a5_3px,transparent_3px)] bg-[size:14px_14px] opacity-80"></div>
+          <div className="absolute bottom-10 right-48 w-20 h-20 bg-rose-500 rounded-tr-full rounded-br-full"></div>
+
+          {/* Center Graphic Box */}
+          <div className="relative z-10 w-full max-w-sm">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-white shadow-2xl flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">verified</span>
+              </div>
+              <h2 className="text-xl font-semibold mb-3">Check the status</h2>
+              <p className="text-white/80 text-sm leading-relaxed mb-8">It's easy to check the status of your online orders and track your progress in the system.</p>
+              
+              <div className="flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+                <div className="w-2 h-2 rounded-full bg-white/40"></div>
+                <div className="w-2 h-2 rounded-full bg-white/40"></div>
               </div>
             </div>
-            
-            {/* Submit Button */}
-            <button disabled={loading} className="relative w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 text-white font-extrabold py-4 rounded-2xl transition-all duration-300 mt-4 shadow-md shadow-rose-500/10 active:scale-[0.98] overflow-hidden group flex justify-center items-center gap-3 cursor-pointer">
-              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <span>Memproses...</span>
-                </>
-              ) : (
-                <>
-                  <span>Daftar Akun</span>
-                  <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-1">person_add</span>
-                </>
-              )}
-            </button>
-            
-            {/* Login Redirect */}
-            <p className="text-center text-sm text-slate-500 mt-4 font-medium">
-              Sudah punya akun? <Link to="/login" className="text-rose-600 font-extrabold hover:text-rose-500 hover:underline underline-offset-4 transition-colors">Masuk sekarang</Link>
-            </p>
-          </form>
-        </div>
+          </div>
+          </div>
+        )}
+
       </div>
     </main>
   );
 }
+

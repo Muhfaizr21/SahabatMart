@@ -115,9 +115,8 @@ const MerchantSettings = () => {
         </div>
     );
 
-    // Placeholder if no image provided
-    const bannerPreview = formatImage(store?.banner_url) || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80';
-    const logoPreview = formatImage(store?.logo_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(store?.store_name || 'Store')}&size=200&background=6366f1&color=ffffff&bold=true`;
+    const bannerPreview = formatImage(store?.banner_url);
+    const logoPreview = formatImage(store?.logo_url);
 
     return (
         <div style={{ ...A.page, padding: '24px 32px' }} className="fade-in">
@@ -164,11 +163,15 @@ const MerchantSettings = () => {
             <div style={{ position: 'relative', borderRadius: 28, overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.06)', background: '#fff', border: '1px solid #f1f5f9', marginBottom: 32 }}>
                 {/* Banner Image Preview */}
                 <div style={{ height: 180, position: 'relative', overflow: 'hidden', background: '#e2e8f0' }}>
-                    <img 
-                        src={bannerPreview} 
-                        alt="Banner Preview" 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.5s ease' }} 
-                    />
+                    {bannerPreview ? (
+                        <img 
+                            src={bannerPreview} 
+                            alt="Banner Preview" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.5s ease' }} 
+                        />
+                    ) : (
+                        <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }} />
+                    )}
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.65))' }} />
                     
                     {/* Store Title & Quick Metadata overlayed on banner */}
@@ -216,12 +219,16 @@ const MerchantSettings = () => {
                     border: '1px solid #e2e8f0',
                     zIndex: 10
                 }}>
-                    <div style={{ width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', background: '#f8fafc' }}>
-                        <img 
-                            src={logoPreview} 
-                            alt="Logo Preview" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        />
+                    <div style={{ width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 28, color: '#6366f1' }}>
+                        {logoPreview ? (
+                            <img 
+                                src={logoPreview} 
+                                alt="Logo Preview" 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            />
+                        ) : (
+                            store?.store_name?.charAt(0)?.toUpperCase() || 'S'
+                        )}
                     </div>
                 </div>
 

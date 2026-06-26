@@ -26,7 +26,7 @@ const priceRanges = [
   { label: 'Di atas Rp3.000.000', min: 3000000, max: Infinity },
 ];
 
-export default function ShopPage() {
+export default function ShopPage({ previewData }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const catParam = searchParams.get('cat');
@@ -43,10 +43,29 @@ export default function ShopPage() {
   const [allCategories, setAllCategories] = useState(['Semua']);
   const [loading, setLoading] = useState(true);
   const isLoggedIn = !!localStorage.getItem('token');
+  const [cmsContent, setCmsContent] = useState(previewData || null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 12;
+
+  useEffect(() => {
+    if (previewData) {
+      setCmsContent(previewData);
+      return;
+    }
+    const loadCMS = async () => {
+      try {
+        const res = await fetchJson(`${PUBLIC_API_BASE}/cms/page-content?platform=landing_page&page=shop`);
+        if (res && res.content) {
+          setCmsContent(res.content);
+        }
+      } catch (err) {
+        console.error('Failed to load CMS content:', err);
+      }
+    };
+    loadCMS();
+  }, [previewData]);
 
   // Search State - Synced with URL
   const searchTerm = searchParam || '';
@@ -188,13 +207,30 @@ export default function ShopPage() {
 
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
+  const str = (v, defaultVal = '') => v || defaultVal;
+  const heroTitle = str(cmsContent?.hero_title || cmsContent?.hero?.title, 'Koleksi Premium');
+  const heroSubtitle = str(cmsContent?.hero_subtitle || cmsContent?.hero?.subtitle, 'Jelajahi rangkaian produk unggulan AkuGlow yang dirancang khusus untuk kulit sehat dan bercahaya.');
+
   return (
     <main className="bg-gray-50 min-h-screen">
       <SEO
-        title={activeCategory === 'Semua' ? "Semua Produk - AkuGlow" : `${activeCategory} - AkuGlow`}
-        description={`Jelajahi koleksi ${activeCategory === 'Semua' ? 'produk kecantikan dan kesehatan' : activeCategory} terbaik di AkuGlow. Belanja sekarang dengan promo menarik.`}
+        title={activeCategory === 'Semua' ? `${heroTitle} - AkuGlow` : `${activeCategory} - AkuGlow`}
+        description={heroSubtitle}
         type="website"
       />
+      
+      {/* Hero Section */}
+      <section className="bg-white py-16 md:py-20 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+            <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight leading-tight">
+              {heroTitle}
+            </h1>
+            <p className="text-gray-500 font-medium max-w-2xl mx-auto text-lg leading-relaxed whitespace-pre-wrap">
+              {heroSubtitle}
+            </p>
+        </div>
+      </section>
+
       {/* Mobile Sticky Filter & Search Bar */}
       <div className="lg:hidden relative bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm overflow-hidden">
         <div className="flex flex-col">
@@ -484,7 +520,7 @@ export default function ShopPage() {
                         src={formatImage(product.image)} 
                         alt={product.name} 
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" 
-                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }}
+                        onError={e => { e.target.style.display = 'none'; }}
                       />
                       {product.badge && (
                         <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
@@ -504,7 +540,7 @@ export default function ShopPage() {
                       {(product.product_type === 'digital' || product.is_virtual) && (
                         <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10" style={{ top: product.badge ? '32px' : '12px' }}>
                           <span className="px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-extrabold uppercase tracking-widest text-white bg-indigo-500/90 shadow-lg backdrop-blur-md flex items-center gap-1">
-                            💾 Digital
+                             Digital
                           </span>
                         </div>
                       )}
@@ -593,7 +629,7 @@ export default function ShopPage() {
                         src={formatImage(product.image)} 
                         alt={product.name} 
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
-                        onError={e => { e.target.src = "https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=800&q=80"; }}
+                        onError={e => { e.target.style.display = 'none'; }}
                       />
                       {product.badge && (
                         <div className="absolute top-3 left-3 z-10">
@@ -605,7 +641,7 @@ export default function ShopPage() {
                       {(product.product_type === 'digital' || product.is_virtual) && (
                         <div className="absolute top-3 left-3 z-10" style={{ top: product.badge ? '32px' : '12px' }}>
                           <span className="px-3 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest text-white bg-indigo-500/90 shadow-lg backdrop-blur-md flex items-center gap-1">
-                            💾 Digital
+                             Digital
                           </span>
                         </div>
                       )}

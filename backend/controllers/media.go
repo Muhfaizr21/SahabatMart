@@ -146,7 +146,7 @@ func (mc *MediaController) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	// Try deleting physical file
 	filename := filepath.Base(media.URL)
 	filePath := filepath.Join("uploads", filename)
-	
+
 	// Check if file exists and remove it
 	if _, err := os.Stat(filePath); err == nil {
 		_ = os.Remove(filePath)

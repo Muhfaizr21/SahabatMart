@@ -54,7 +54,7 @@ const AdminSecurity = () => {
                         <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Security Score</div>
                         <div style={{ fontSize: 18, fontWeight: 900, color: scoreColor }}>{securityScore}%</div>
                     </div>
-                    <button onClick={loadClicks} style={A.btnGhost}>
+                    <button onClick={loadClicks} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm">
                         <i className={`bx bx-refresh ${loading ? 'bx-spin' : ''}`} />
                     </button>
                 </div>
@@ -114,7 +114,7 @@ const AdminSecurity = () => {
                 </TablePanel>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                    <div style={{ ...A.card, background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: 'white', padding: 24 }}>
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: 'white', padding: 24 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <i className="bx bx-info-circle text-blue-400" />
